@@ -73,8 +73,8 @@ async function run() {
   assert.equal(document.querySelector('header button[aria-label="Chia sẻ link affiliate"]'), null)
   user = { id: '42', name: 'Lucy', role: 'STUDENT' }
   await act(async () => renderShell())
-  assert.ok(document.querySelector('header details a[href="/my-space?view=learning"]'))
-  assert.equal(document.querySelector('header details a[href="/my-space?view=teaching"]'), null)
+  assert.ok(document.querySelector('header details a[href="/my-space?tab=learning"]'))
+  assert.equal(document.querySelector('header details a[href="/my-space?tab=teaching"]'), null)
   const accountButtons = [...document.querySelectorAll('header details button')]
   assert.ok(accountButtons.some(button => button.textContent === 'Ví Wi'))
   const installButton = accountButtons.find(button => button.textContent === 'Cài ứng dụng WI300')
@@ -100,7 +100,7 @@ async function run() {
   assert.equal(document.querySelector('[data-wallet]').dataset.wallet, 'Ví Wi')
   user.role = 'TEACHER'
   await act(async () => renderShell())
-  assert.ok(document.querySelector('header details a[href="/my-space?view=teaching"]'))
+  assert.ok(document.querySelector('header details a[href="/my-space?tab=teaching"]'))
   const details = document.querySelector('header details')
   details.open = true
   await act(async () => details.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
@@ -168,7 +168,7 @@ async function run() {
   global.fetch = async () => ({ ok: true, json: async () => ({ tools: [] }) })
   try {
     await act(async () => root.render(React.createElement(SpaceModule.default, { courses: courses.map(c => ({ ...c, name_lop: `Khóa ${c.id}` })), enrollments: rows, userId: 1, userPhone: null, accountError: false })))
-    assert.match(document.querySelector('h1').textContent, /Tổng quan cá nhân/)
+    assert.match(document.querySelector('h1').textContent, /Dành cho học viên/)
     assert.equal(document.querySelectorAll('article').length, 4)
     assert.deepEqual([...document.querySelectorAll('[aria-label="Trạng thái học tập"] [role="tab"]')].map(h => h.textContent), ['Đang học (4)', 'Đã hoàn thành (2)', 'Chờ xử lý (1)'])
     await act(async () => document.getElementById('learning-tab-completed').click())

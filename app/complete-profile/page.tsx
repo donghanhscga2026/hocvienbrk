@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { Loader2, ChevronDown, CheckCircle2, User, Phone, Hash, Eye, EyeOff, Lock } from "lucide-react"
 import { COUNTRY_CODES } from "@/lib/country-codes"
+import { safeReturnPath } from '@/lib/website/domain-shared'
 import { completeProfileAction } from "../actions/auth-actions"
 
 function CompleteProfileContent() {
@@ -13,6 +14,7 @@ function CompleteProfileContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const redirectSlug = searchParams.get('redirect')
+    const destination = safeReturnPath(searchParams.get('callbackUrl')) || (redirectSlug ? safeReturnPath('/' + redirectSlug) : null) || '/'
 
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -41,7 +43,7 @@ function CompleteProfileContent() {
             // Trường hợp 1: Đã có SĐT ngay trong session
             if ((session?.user as any)?.phone) {
                 console.log("✨ Đã có SĐT trong session, chuyển hướng về trang chủ...")
-                router.push(redirectSlug ? `/${redirectSlug}` : '/')
+                router.push(destination)
                 return
             }
 
@@ -54,7 +56,7 @@ function CompleteProfileContent() {
                     if (userData?.phone) {
                         console.log("✨ Phát hiện hồ sơ đã hoàn tất trong DB, đang đồng bộ session...")
                         await update({ phone: userData.phone })
-                        router.push(redirectSlug ? `/${redirectSlug}` : '/')
+                        router.push(destination)
                         router.refresh()
                     }
                 } catch (e) {
@@ -66,7 +68,7 @@ function CompleteProfileContent() {
         if (session) {
             checkExistingProfile()
         }
-    }, [session, update, router, redirectSlug])
+    }, [session, update, router, destination])
 
     // Sync name if session loads later
     useEffect(() => {
@@ -111,7 +113,7 @@ function CompleteProfileContent() {
             if (result.success) {
                 // Force session update to include the new phone number
                 await update({ phone: data.countryCode + data.phone.replace(/^0/, '') })
-                router.push(redirectSlug ? `/${redirectSlug}` : '/')
+                router.push(destination)
                 router.refresh()
             } else {
                 setError(result.message)

@@ -13,6 +13,10 @@ export default function CrmRequestButton({ courseId, courseTitle, lessonId, less
   const dialog = useRef<HTMLDialogElement>(null)
   const title = learning ? 'Hỏi giáo viên / Hỗ trợ' : 'Hỏi về khóa học này'
   useEffect(() => {
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('requestOpen') === String(courseId)) { setOpen(true); url.searchParams.delete('requestOpen'); window.history.replaceState(null, '', url.pathname + url.search + url.hash) }
+  }, [courseId])
+  useEffect(() => {
     const node = dialog.current
     if (open && !node?.open) node?.showModal()
     if (!open && node?.open) node.close()

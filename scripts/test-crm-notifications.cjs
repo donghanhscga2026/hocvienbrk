@@ -121,7 +121,16 @@ async function run() {
     }, module.exports, module)
     return module.exports
   }
+  let transactionQueue = Promise.resolve()
   fake.$transaction = async operation => {
+    if (Array.isArray(operation)) return Promise.all(operation)
+    const previousTransaction = transactionQueue
+    let release
+    transactionQueue = new Promise(resolve => { release = resolve })
+    await previousTransaction
+    try { return await runTransaction(operation) } finally { release() }
+  }
+  const runTransaction = async operation => {
     if (Array.isArray(operation)) return Promise.all(operation)
     await db.exec('BEGIN')
     try { const result = await operation(fake); await db.exec('COMMIT'); return result }
@@ -194,7 +203,8 @@ async function run() {
       return {count:result.affectedRows}
     },
   }
-  const route = load('app/api/my-requests/route.ts', { '@/lib/prisma': {default:fake}, '@/lib/crm/http':http, '@/lib/app-notifications':{notificationActor:authActor}, '@/lib/crm/service':{CrmError} })
+  const workflow = load('lib/crm/request-workflow.ts', {})
+  const route = load('app/api/my-requests/route.ts', { '@/lib/crm/request-workflow': workflow, '@/lib/prisma': {default:fake}, '@/lib/crm/http':http, '@/lib/app-notifications':{notificationActor:authActor}, '@/lib/crm/service':{CrmError} })
   const ownId='00000000-0000-4000-8000-000000000003', otherId='00000000-0000-4000-8000-000000000004'
   await q(`INSERT INTO public."CrmRequest" (id,key,"ownerId","courseId","userId",category,content,name,source,"ipHash",resolution,"publicReply",status,"updatedAt") VALUES ($1,'api-own',1,10,3,'LEARNING','Own question','Student','Lesson','hash','SECRET INTERNAL','Public answer','RESOLVED',now()),($2,'api-other',1,10,4,'LEARNING','OTHER PRIVATE QUESTION','Other','Lesson','hash','OTHER SECRET','Other answer','RESOLVED',now())`,[ownId,otherId])
   const get = url => route.GET(new Request('https://test.invalid/api/my-requests' + (url || '')))

@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Calendar, Clock, Users, Video, CheckCircle } from 'lucide-react'
+import { readCrmLeadDraft } from '@/components/crm/CrmLeadForm'
 import { useAffiliateCookie } from '@/hooks/useAffiliateCookie'
 
 export interface WebinarRegTemplateProps {
@@ -16,6 +17,7 @@ export interface WebinarRegTemplateProps {
     ctaText: string
     ctaLink?: string
     features?: string[]
+    draftSlug?: string
     onRegister?: (data: { name: string; email: string; phone: string; website?: string }) => Promise<void>
     config?: {
         backgroundColor?: string
@@ -38,6 +40,7 @@ export function WebinarRegTemplate({
     ctaLink = '/register',
     features = [],
     onRegister,
+    draftSlug,
     config = {}
 }: WebinarRegTemplateProps) {
     const { refData } = useAffiliateCookie()
@@ -47,6 +50,7 @@ export function WebinarRegTemplate({
     const [error, setError] = useState('')
     const [consent, setConsent] = useState(false)
     const [website, setWebsite] = useState('')
+    useEffect(() => { if (!draftSlug) return; const draft = readCrmLeadDraft(draftSlug); if (draft) setFormData({ name: typeof draft.name === 'string' ? draft.name : '', email: typeof draft.email === 'string' ? draft.email : '', phone: typeof draft.phone === 'string' ? draft.phone : '' }) }, [draftSlug])
     const accentColor = config.accentColor || '#2563eb'
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -194,7 +198,7 @@ export function WebinarRegTemplate({
                         {/* Registration Form */}
                         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
                             <h2 className="text-2xl font-bold mb-2">Đăng ký ngay</h2>
-                            <p className="text-gray-500 mb-6">Điền thông tin để nhận link webinar</p>
+                            <p className="text-gray-500 mb-6">Điền thông tin để nhận link webinar. Cần đăng nhập để gửi đăng ký; nội dung được giữ trong bản nháp.</p>
                             
                             <form onSubmit={handleSubmit} className="space-y-4">
                                 {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}

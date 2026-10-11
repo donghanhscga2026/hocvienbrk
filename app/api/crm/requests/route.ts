@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma'
 import { auth } from '@/auth'
 import { getCrmActor } from '@/lib/crm/auth'
 import { crmBody, crmFailure, crmResponse } from '@/lib/crm/http'
-import { createRequest, readRequests, requestSource, updateRequest } from '@/lib/crm/requests'
+import { createRequest, readRequests, requestSource, requestProfile, updateRequest } from '@/lib/crm/requests'
 import { requireDomainCourse, requireDomainModule } from '@/lib/website/domain-context'
 
 export const dynamic = 'force-dynamic'
@@ -11,19 +11,20 @@ export async function GET(request: Request) {
   try {
     const actor = await getCrmActor()
     const params = new URL(request.url).searchParams
+    if (params.has('profileId')) return crmResponse(await requestProfile(prisma, actor, z.uuid().parse(params.get('profileId'))))
     if (params.has('sourceId')) return crmResponse(await requestSource(prisma, actor, z.uuid().parse(params.get('sourceId'))))
-    const q = z.object({ page: z.coerce.number().int().min(1).max(100000).default(1), status: z.enum(['NEW', 'IN_PROGRESS', 'RESOLVED']).optional(), request: z.uuid().optional(), contactId: z.coerce.number().int().positive().optional() }).strict().parse(Object.fromEntries(new URL(request.url).searchParams))
-    return crmResponse(await readRequests(prisma, actor, q.page, q.status, q.contactId, q.request))
+    const q = z.object({ page: z.coerce.number().int().min(1).max(100000).default(1), topic: z.enum(['PARTNER','LEARNING','CONSULTATION','SUPPORT','FEEDBACK','ACCOUNT']).optional(), owner: z.union([z.literal('unassigned'), z.coerce.number().int().nonnegative()]).optional(), status: z.enum(['NEW', 'IN_PROGRESS', 'RESOLVED']).optional(), request: z.uuid().optional(), contactId: z.coerce.number().int().positive().optional() }).strict().parse(Object.fromEntries(new URL(request.url).searchParams))
+    return crmResponse(await readRequests(prisma, actor, q.page, q.status, q.contactId, q.request, q.topic, q.owner === 'unassigned' ? null : q.owner))
   } catch (e) { return crmFailure(e) }
 }
 export async function POST(request: Request) {
   try {
     const raw = await crmBody(request, 20000)
     const domain=await requireDomainModule('crm')
-    if(domain) { if(typeof raw?.courseId!=='number') return crmResponse({error:'Chọn khóa học của website.'},400); await requireDomainCourse(raw.courseId) }
+    if(domain && raw?.courseId !== undefined) { if(typeof raw.courseId!=='number') return crmResponse({error:'Chọn khóa học của website.'},400); await requireDomainCourse(raw.courseId) }
     const session = await auth()
     const userId = session?.user?.id == null ? null : Number(session.user.id)
-    const result = await createRequest(prisma, raw, userId != null && Number.isInteger(userId) && userId >= 0 ? userId : null, request.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown')
+    const result = await createRequest(prisma, raw, userId != null && Number.isInteger(userId) && userId >= 0 ? userId : null, request.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown', domain && domain.profile.userId != null ? { ownerId: domain.profile.userId, source: 'Website: ' + domain.hostname } : undefined)
     return crmResponse(result, 201)
   } catch (e) { return crmFailure(e) }
 }

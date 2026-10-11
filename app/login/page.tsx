@@ -5,6 +5,7 @@ import { signIn, signOut, useSession } from "next-auth/react"
 import { useForm } from "react-hook-form"
 import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
+import AccountSupportForm from '@/components/auth/AccountSupportForm'
 import { useWi300Brand } from '@/components/wi300/Wi300BrandContext'
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Eye, EyeOff, AlertTriangle } from "lucide-react"
@@ -33,7 +34,7 @@ function LoginForm() {
 
     const redirectSlug = searchParams.get('redirect')
     const refCode = searchParams.get('ref')
-    
+
     // NextAuth CredentialsSignin trả về error qua URL params
     // Format: ?error=CredentialsSignin&code=USER_NOT_FOUND:Email
     const errorCode = searchParams.get('code')
@@ -103,6 +104,8 @@ function LoginForm() {
                 // Reuse the existing registration form and preserve referral/redirect context.
                 const registrationParams = new URLSearchParams()
                 registrationParams.set("phone", identifier)
+                const returnPath = safeReturnPath(searchParams.get("callbackUrl"))
+                if (returnPath) registrationParams.set("callbackUrl", returnPath)
                 if (redirectSlug) registrationParams.set("redirect", redirectSlug)
                 if (refCode) registrationParams.set("ref", refCode)
                 router.push(`/register?${registrationParams.toString()}`)
@@ -138,7 +141,7 @@ function LoginForm() {
 
         try {
             const callbackUrl = safeReturnPath(searchParams.get('callbackUrl')) || (redirectSlug ? safeReturnPath(`/${redirectSlug}`) : null) || "/"
-            
+
             const result = await signIn("credentials", {
                 identifier: data.identifier,
                 password: loginMethod === "email" ? "" : data.password,
@@ -290,7 +293,7 @@ function LoginForm() {
                                 <label className="block text-sm font-medium text-brk-muted mb-1.5">Mật khẩu mới</label>
                                 <div className="relative">
                                     <input
-                                        {...register("newPassword", { 
+                                        {...register("newPassword", {
                                             required: "Vui lòng nhập mật khẩu mới",
                                             validate: (value: string) => validatePasswordStrength(value) ?? true
                                         })}
@@ -360,8 +363,8 @@ function LoginForm() {
 
                 <div className="bg-brk-background/5 backdrop-blur-sm border border-brk-outline/10 rounded-2xl p-6 space-y-5 shadow-2xl">
                     {/* DISABLED: Google Auth
-                    <SocialAuthButtons 
-                        callbackUrl={redirectSlug ? `/complete-profile?redirect=${redirectSlug}` : "/complete-profile"} 
+                    <SocialAuthButtons
+                        callbackUrl={safeReturnPath(searchParams.get('callbackUrl')) ? '/complete-profile?callbackUrl=' + encodeURIComponent(safeReturnPath(searchParams.get('callbackUrl'))!) : redirectSlug ? `/complete-profile?redirect=${encodeURIComponent(redirectSlug)}` : '/complete-profile'}
                         isLoading={isLoading}
                         onLoading={handleGoogleLoading}
                     />
@@ -443,9 +446,10 @@ function LoginForm() {
                         )}
                     </div>
 
+                    <AccountSupportForm page="login" />
                     <p className="text-center text-sm text-brk-accent">
                         Chưa có tài khoản?{' '}
-                        <Link href={redirectSlug ? `/register?redirect=${redirectSlug}${refCode ? '&ref=' + refCode : ''}` : "/register"} className="font-semibold text-brk-primary hover:text-brk-primary">Đăng ký ngay</Link>
+                        <Link href={safeReturnPath(searchParams.get('callbackUrl')) ? '/register?callbackUrl=' + encodeURIComponent(safeReturnPath(searchParams.get('callbackUrl'))!) : redirectSlug ? `/register?redirect=${encodeURIComponent(redirectSlug)}${refCode ? '&ref=' + encodeURIComponent(refCode) : ''}` : '/register'} className="font-semibold text-brk-primary hover:text-brk-primary">Đăng ký ngay</Link>
                     </p>
                 </div>
             </div>
