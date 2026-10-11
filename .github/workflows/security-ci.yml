@@ -66,6 +66,11 @@ jobs:
           node scripts/test-wi300-catalog-partners.cjs
           node scripts/test-wi300-performance.cjs
 
+      - name: Member ID change transaction and font checks
+        run: |
+          node scripts/test-user-id-change.cjs
+          node scripts/test-local-fonts.cjs
+
       - name: TypeScript check
         run: npx tsc --noEmit
 

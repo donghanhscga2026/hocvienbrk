@@ -1,6 +1,8 @@
 'use server'
 
 import { auth } from "@/auth"
+import { changeUserId, UserIdChangeError, type UserIdChangeState } from "@/lib/user-id-change"
+import { domainContext } from "@/lib/website/domain-context"
 import prisma from "@/lib/prisma"
 import { Role, Prisma, EnrollmentMemberRole } from "@prisma/client"
 import { rebuildSystem4Data } from "@/lib/brk/rebuild-service"
@@ -1347,17 +1349,34 @@ export async function exportUserEmailsAction(filters: UserEmailExportFilters) {
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
-export async function changeUserIdAction(prevState: any, formData: FormData) {
+export async function changeUserIdAction(_prevState: UserIdChangeState, formData: FormData): Promise<UserIdChangeState> {
     try {
-        await checkAdmin()
-        const currentId = parseInt(formData.get("currentId") as string)
-        const newId = parseInt(formData.get("newId") as string)
-        if (isNaN(currentId) || isNaN(newId)) return { message: "Error: ID sai định dạng." }
-        await prisma.$executeRawUnsafe(`UPDATE "User" SET id = ${newId} WHERE id = ${currentId}`)
-        await prisma.$executeRawUnsafe(`SELECT setval(pg_get_serial_sequence('"User"', 'id'), max(id), true) FROM "User"`)
-        revalidatePath("/admin/reserved-ids")
-        return { message: `Success: Đổi ID thành công.` }
-    } catch (e) { return { message: "Error: Lỗi hệ thống." } }
+        const session = await auth()
+        if (session?.user?.id == null) return { message: "Error: Bạn cần đăng nhập bằng tài khoản quản trị." }
+        if (await domainContext()) return { message: "Error: Chức năng đổi ID chỉ thực hiện trên website quản trị hệ thống." }
+        const result = await changeUserId(prisma, Number(session.user.id), {
+            currentId: formData.get("currentId"), newId: formData.get("newId"),
+            execute: formData.get("mode") === "execute", token: String(formData.get("token") || ""),
+        })
+        if (result.completed) {
+            // Lỗi làm mới trang không được báo thành lỗi giao dịch sau khi DB đã lưu.
+            try {
+                revalidatePath("/tools/reserved-ids")
+                revalidatePath("/tools/students")
+                revalidatePath("/tools/crm")
+                revalidatePath("/my-space")
+                revalidatePath("/", "layout")
+            } catch (error) { console.error("[changeUserId:revalidate]", error) }
+        }
+        return result
+    } catch (error) {
+        if (error instanceof UserIdChangeError) return { message: "Error: " + error.message }
+        console.error("[changeUserId]", error)
+        const code = error instanceof Prisma.PrismaClientKnownRequestError ? error.code : ""
+        return { message: code === "P2002" || code === "P2034"
+            ? "Error: ID hoặc dữ liệu vừa được người khác cập nhật. Hãy kiểm tra lại."
+            : "Error: Chưa thể đổi ID do dữ liệu liên quan hoặc cấu hình database. Không có thay đổi nào được lưu." }
+    }
 }
 
 /**
@@ -1787,6 +1806,9 @@ export async function addReservedIdAction(prevState: any, formData: FormData) {
 export async function deleteReservedIdAction(id: number) {
     await checkAdmin()
     try {
+        if (await prisma.systemConfig.findUnique({ where: { key: `user-id-change:retired:${id}` } })) {
+            return { message: "Error: ID cũ sau khi đổi được giữ lại để bảo vệ tài khoản; không thể xóa." }
+        }
         await prisma.reservedId.delete({ where: { id } })
         revalidatePath("/admin/reserved-ids")
         return { message: `Success: Đã xóa ID ${id}.` }
