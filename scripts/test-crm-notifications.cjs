@@ -25,6 +25,7 @@ new Function('require', 'exports', 'module', ts.transpileModule(fs.readFileSync(
   if (name === '@/auth') return { auth: async () => null }
   if (name === '@/lib/prisma') return { default: fake }
   if (name === '@/lib/crm/service') return { CrmError }
+  if (name === './notification-pagination') return { NOTIFICATION_PAGE_SIZE: 10 }
   throw new Error(name)
 }, m.exports, m)
 const feed = m.exports

@@ -13,11 +13,13 @@ async function run() {
     // Copy the real component, replacing only session, router and device dependencies.
     let source = fs.readFileSync(path.join(repo, 'components/notifications/NotificationBell.tsx'), 'utf8')
     source = source.replace("import PushDeviceSettings from './PushDeviceSettings'", "const PushDeviceSettings = () => <p>Device settings fixture</p>")
+      .replace("from '@/lib/notification-pagination'", "from './pagination'")
       .replace("import { useSession } from 'next-auth/react'", "const useSession = () => ({data:{user:{id:'0'}}})")
       .replace("import { useRouter } from 'next/navigation'", "const useRouter = () => ({push:(href:string) => { window.history.pushState({}, '', href) }})")
       .replace("import { formatCrmDate } from '@/lib/crm/shared'", "const formatCrmDate = (date:string) => date")
       .replace("import { useDomainBrand } from '@/components/website/DomainShell'", 'const useDomainBrand = () => null')
     write('app/Bell.tsx', source)
+    write('app/pagination.ts', fs.readFileSync(path.join(repo, 'lib/notification-pagination.ts'), 'utf8'))
     write('app/page.tsx', `import Bell from './Bell'; export default function Page(){return <><header style={{display:'flex',justifyContent:'flex-end',padding:12,position:'sticky',top:0}}><Bell/></header><main style={{height:1800}}><button id="outside">Outside</button></main></>}`)
     write('app/api/notifications/route.ts', `let read=false; export async function GET(){return Response.json({notifications:[{id:'one',title:'Có yêu cầu hỗ trợ mới',kind:'REQUEST_INCOMING',createdAt:'2026-10-11T06:00:00Z',readAt:read?'now':null,href:'/tools/crm?view=requests&request=one'}],total:1,unread:read?0:1})}; export async function PATCH(){read=true;return Response.json({updated:true})}`)
     server = spawn(process.execPath, [path.join(repo, 'node_modules/next/dist/bin/next'), 'dev', '--webpack', '-H', '127.0.0.1', '-p', '3108'], { cwd: fixture, env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1' }, stdio: ['ignore', 'pipe', 'pipe'] })

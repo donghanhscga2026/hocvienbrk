@@ -64,6 +64,8 @@ jobs:
           node scripts/test-wi300-navigation.cjs
           node scripts/test-wi300-space-menu.cjs
           node scripts/test-my-requests-ui.cjs
+          node scripts/test-notification-pagination.cjs
+          node scripts/test-notification-feed-ui.cjs
           node scripts/test-pwa-install.cjs
           node scripts/test-wi300-partners.cjs
           node scripts/test-wi300-catalog-partners.cjs
