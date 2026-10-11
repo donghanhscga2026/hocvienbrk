@@ -94,6 +94,7 @@ async function run() {
   assert.deepEqual(selection.where.AND[1], { id: { in: [17, 18] } }, 'Actual personal-space loader admits enrolled courses even when hidden, including account zero')
 
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://wi300.vn/' })
+  Object.defineProperty(global, 'navigator', { configurable: true, value: dom.window.navigator })
   global.window = dom.window; global.document = dom.window.document; global.IS_REACT_ACT_ENVIRONMENT = true
   const modalRenders = []
   const Card = load('components/course/CourseCard.tsx', {
