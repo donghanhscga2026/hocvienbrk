@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import { Youtube, DollarSign, Settings, Users, CreditCard, BookOpen, FileText, Gem, Map as MapIcon, Mail, Layout, Globe, Wallet, Tag, LayoutGrid, GraduationCap, UserRound, ShieldCheck, ContactRound, Link2, DatabaseBackup, LifeBuoy, Network, type LucideIcon } from 'lucide-react'
 import { recentActiveCourses } from '@/lib/wi300/catalog'
 import { canTeach, isContentTool, pendingCourseLabel, toolGroup, toolGroups, toolWorkspace, type PersonalTool } from '@/lib/wi300/personal-space'
 import type { Wi300Course, Wi300Enrollment, Wi300TeachingCourse } from './Wi300Home'
@@ -18,6 +19,39 @@ type LearningStatus = 'active' | 'completed' | 'pending'
 const spaceTabs = [{ id: 'home', label: 'Tổng quan cá nhân' }, { id: 'learning', label: 'Dành cho học viên' }, { id: 'teaching', label: 'Dành cho giảng viên' }, { id: 'affiliate', label: 'Dành cho cộng tác viên' }, { id: 'tools', label: 'Công cụ & tiện ích' }, { id: 'account', label: 'Tài khoản & cài đặt' }, { id: 'admin', label: 'Quản trị hệ thống' }]
 const box = 'rounded-2xl border border-brk-outline bg-white p-5'
 const action = 'inline-flex min-h-11 items-center justify-center rounded-xl bg-brk-primary px-4 text-sm font-semibold text-white'
+
+// Dùng lại tên icon và mã màu mà màn công cụ gốc lưu trong database.
+const toolIcons: Record<string, LucideIcon> = { Youtube, DollarSign, Settings, Users, CreditCard, BookOpen, FileText, Gem, Map: MapIcon, Mail, Layout, Globe, Wallet, Tag, LayoutGrid, GraduationCap, UserRound, ShieldCheck, ContactRound, Link2, DatabaseBackup, LifeBuoy, Network }
+const toolColors: Record<string, string> = {
+  bgRed600: 'bg-red-600', bgRed700: 'bg-red-700', bgGray500: 'bg-gray-500',
+  bgEmerald500: 'bg-emerald-500', bgIndigo500: 'bg-indigo-500', bgGreen500: 'bg-green-500',
+  bgCyan500: 'bg-cyan-500', bgOrange500: 'bg-orange-500', bgBlue500: 'bg-blue-500',
+  bgPurple500: 'bg-purple-500', bgTeal500: 'bg-teal-500', bgPink500: 'bg-pink-500',
+  bgRed400: 'bg-red-400', bgViolet500: 'bg-violet-500', bgAmber500: 'bg-amber-500',
+}
+const toolDefaults: Record<string, { icon: LucideIcon; color: string }> = {
+  courses: { icon: BookOpen, color: 'bg-emerald-500' }, students: { icon: Users, color: 'bg-blue-500' },
+  roadmap: { icon: MapIcon, color: 'bg-cyan-500' }, 'my-learning': { icon: BookOpen, color: 'bg-emerald-500' },
+  crm: { icon: ContactRound, color: 'bg-teal-500' }, 'email-mkt': { icon: Mail, color: 'bg-pink-500' },
+  pages: { icon: Globe, color: 'bg-indigo-500' }, page: { icon: Globe, color: 'bg-indigo-500' },
+  'my-site': { icon: Globe, color: 'bg-indigo-500' }, 'site-profiles': { icon: Globe, color: 'bg-indigo-500' },
+  landings: { icon: Layout, color: 'bg-violet-500' }, posts: { icon: FileText, color: 'bg-blue-500' },
+  affiliate: { icon: Link2, color: 'bg-orange-500' }, genealogy: { icon: Network, color: 'bg-purple-500' },
+  payments: { icon: CreditCard, color: 'bg-emerald-500' }, 'bank-accounts': { icon: Wallet, color: 'bg-blue-500' },
+  brk: { icon: Wallet, color: 'bg-amber-500' }, vouchers: { icon: Tag, color: 'bg-pink-500' },
+  'youtube-tools': { icon: Youtube, color: 'bg-red-600' }, settings: { icon: Settings, color: 'bg-gray-500' },
+  backup: { icon: DatabaseBackup, color: 'bg-blue-500' }, 'ho-tro': { icon: LifeBuoy, color: 'bg-teal-500' },
+  teaching: { icon: GraduationCap, color: 'bg-emerald-500' }, tools: { icon: LayoutGrid, color: 'bg-cyan-500' },
+  account: { icon: UserRound, color: 'bg-indigo-500' }, admin: { icon: ShieldCheck, color: 'bg-gray-500' },
+}
+function ToolBadge({ tool }: { tool: Pick<Tool, 'slug' | 'url' | 'icon' | 'description'> }) {
+  const route = tool.url.startsWith('/tools/') ? tool.url.split(/[?#]/)[0].split('/')[2] : ''
+  const fallback = toolDefaults[route] || toolDefaults[tool.slug || ''] || { icon: LayoutGrid, color: 'bg-teal-500' }
+  const Icon = toolIcons[tool.icon || ''] || fallback.icon
+  const color = toolColors[tool.description?.split('|')[0]?.trim() || ''] || fallback.color
+  return <span aria-hidden="true" className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm ${color}`}><Icon className="h-7 w-7" strokeWidth={1.8} /></span>
+}
+const toolTile = 'flex min-h-36 min-w-0 flex-col items-center justify-start gap-3 rounded-2xl border border-brk-outline bg-white p-4 text-center transition-shadow hover:border-brk-primary hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brk-primary'
 
 // Giữ nguyên quy tắc hiển thị công cụ của hệ thống cũ.
 export function canUseTool(role: string, roles: string[]) {
@@ -85,12 +119,12 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
   const otherTools = workspaceTools('tools')
   const availableGroups = toolGroups.filter(group => otherTools.some(tool => toolGroup(tool) === group.id))
 
-  const toolList = (items: Tool[], grouped = false) => toolsLoading ? <p role="status" className={box}>Đang tải công cụ…</p> : toolsError ? <p role="alert" className={box}>Chưa tải được công cụ. Vui lòng tải lại trang.</p> : items.length ? <div className="grid gap-3 sm:grid-cols-2">{items.map(tool => {
-    const group = isContentTool(tool) ? { label: 'Website & nội dung', description: 'Website, trang giới thiệu, landing page và bài viết.' } : toolGroups.find(item => item.id === toolGroup(tool))!
-    return <Link key={tool.id} href={safeToolUrl(tool.url)!} className={`${box} transition-shadow hover:shadow-sm`}>
-      {grouped && <p className="mb-2 text-xs font-semibold text-brk-primary">{group.label}</p>}
-      <span className="font-semibold">{tool.name}</span><span className="ml-2 text-brk-primary">→</span>
-      {grouped && <p className="mt-2 text-sm leading-6 text-brk-muted">{group.description}</p>}
+  const toolList = (items: Tool[], grouped = false) => toolsLoading ? <p role="status" className={box}>Đang tải công cụ…</p> : toolsError ? <p role="alert" className={box}>Chưa tải được công cụ. Vui lòng tải lại trang.</p> : items.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">{items.map(tool => {
+    const group = isContentTool(tool) ? { label: 'Website & nội dung' } : toolGroups.find(item => item.id === toolGroup(tool))!
+    return <Link key={tool.id} href={safeToolUrl(tool.url)!} className={toolTile}>
+      <ToolBadge tool={tool} />
+      <span className="w-full break-words text-sm font-semibold leading-5">{tool.name}</span>
+      {grouped && <span className="mt-auto text-xs leading-5 text-brk-muted">{group.label}</span>}
     </Link>
   })}</div> : <p className={box}>{grouped && otherTools.length ? 'Không tìm thấy công cụ phù hợp. Hãy đổi nhóm hoặc từ khóa.' : 'Chưa có công cụ trong nhóm này phù hợp với quyền tài khoản của bạn.'}</p>
 
@@ -120,10 +154,10 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
           </section>
           {teachingAllowed && <section className={`${box} space-y-4`} aria-labelledby="space-teaching-title"><h2 id="space-teaching-title" className="text-xl font-bold">Giảng dạy</h2><Wi300TeachingPanel courses={teachingCourses} error={teachingError} preview /></section>}
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{tabs.filter(item => !['home', 'learning'].includes(item.id)).map(item => <Link key={item.id} href={`/my-space?tab=${item.id}`} className={box}><h2 className="font-bold">{item.label} →</h2></Link>)}</div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">{tabs.filter(item => !['home', 'learning'].includes(item.id)).map(item => <Link key={item.id} href={`/my-space?tab=${item.id}`} className={toolTile}><ToolBadge tool={{ slug: item.id, url: `/my-space?tab=${item.id}` }} /><h2 className="text-sm font-semibold leading-5">{item.label}</h2></Link>)}</div>
       </>}
       {tab === 'teaching' && teachingAllowed && <><Wi300TeachingPanel courses={teachingCourses} error={teachingError} /><section className="space-y-3"><h2 className="text-xl font-bold">Quản lý giảng dạy & kinh doanh</h2><p className="text-sm text-brk-muted">Khóa học, học viên, CRM, website và marketing theo quyền tài khoản.</p>{toolList(workspaceTools('teaching'), true)}</section></>}
-      {tab === 'affiliate' && <><p className="text-brk-muted">Quản lý link giới thiệu, hoa hồng và mạng lưới của bạn. Affiliate hiện cho phép thành viên đã đăng nhập tham gia.</p><Link href="/tools/affiliate" className={box + ' block'}><h2 className="text-lg font-bold">Link giới thiệu & hoa hồng →</h2><p className="mt-2 text-sm text-brk-muted">Xem link của tôi, hoa hồng và yêu cầu thanh toán trong khu Affiliate.</p></Link>{toolList(workspaceTools('affiliate').filter(tool => tool.url.split(/[?#]/)[0].replace(/\/$/, '') !== '/tools/affiliate'))}</>}
+      {tab === 'affiliate' && <><p className="text-brk-muted">Quản lý link giới thiệu, hoa hồng và mạng lưới của bạn. Affiliate hiện cho phép thành viên đã đăng nhập tham gia.</p><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4"><Link href="/tools/affiliate" className={toolTile}><ToolBadge tool={{ slug: 'affiliate', url: '/tools/affiliate' }} /><h2 className="text-sm font-semibold leading-5">Link giới thiệu & hoa hồng</h2></Link></div>{toolList(workspaceTools('affiliate').filter(tool => tool.url.split(/[?#]/)[0].replace(/\/$/, '') !== '/tools/affiliate'))}</>}
       {tab === 'admin' && role === 'ADMIN' && <><p className="text-brk-muted">Các công cụ quản trị được cấp cho tài khoản của bạn.</p>{toolList(workspaceTools('admin'), true)}</>}
       {tab === 'learning' && <>
         <div role="tablist" aria-label="Trạng thái học tập" className="flex gap-2 overflow-x-auto pb-1">{learningGroups.map((group, index) => <button key={group.id} id={`learning-tab-${group.id}`} type="button" role="tab" aria-selected={learningStatus === group.id} aria-controls="learning-panel" tabIndex={learningStatus === group.id ? 0 : -1} onClick={() => { setLearningStatus(group.id); setLearningPage(1) }} onKeyDown={event => {
