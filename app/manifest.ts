@@ -7,7 +7,11 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     id: '/', name: `${brand.name} — ${brand.tagline}`, short_name: brand.name,
     description: brand.description, lang: 'vi', start_url: '/', scope: '/', display: 'standalone',
     background_color: '#ffffff', theme_color: brand.palette.primary,
-    icons: [{ src: brand.iconUrl, purpose: 'any' }],
+    // Icon cài app cần kích thước thực và khai báo rõ để Chrome nhận diện PWA.
+    icons: [
+      { src: '/wi300/pwa-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/wi300/pwa-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+    ],
   }
   return {
     id: '/', name: 'MFC - Dòng chảy Phước Báu', short_name: 'MFC',

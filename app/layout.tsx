@@ -65,7 +65,7 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(`https://${(await headers()).get('host') || 'wi300.vn'}`),
     title: { default: brand.seoTitle, template: `%s | ${brand.name}` },
     description: brand.description, applicationName: brand.name,
-    icons: { icon: brand.iconUrl, apple: brand.iconUrl }, manifest: '/manifest.webmanifest',
+    icons: { icon: brand.iconUrl, apple: '/wi300/pwa-icon-192.png' }, manifest: '/manifest.webmanifest',
     appleWebApp: { capable: true, title: brand.name, statusBarStyle: 'default' },
     openGraph: { title: brand.seoTitle, description: brand.description, siteName: brand.name, images: [brand.ogImageUrl] },
   }
