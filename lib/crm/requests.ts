@@ -7,6 +7,7 @@ import { CrmError } from './service'
 import { PARTNER_SOURCE, FEEDBACK_SOURCE, topicScope, requestTopic, requestEvents, partnerOutcome, type RequestTopic } from './request-workflow'
 import { learningSummaries } from './learning'
 import { requestOrigin } from './request-origin'
+import { partnerDetails } from './partner-details'
 
 export const requestInput = z.object({
   key: z.uuid(), courseId: z.number().int().positive().optional(), lessonId: z.string().max(100).optional(), commentId: z.number().int().positive().optional(),
@@ -37,7 +38,7 @@ export async function readRequests(db: PrismaClient, actor: CrmActor, page: numb
   return { requests: requests.map(row => {
     const { key, ipHash, history, ...safe } = row
     void key; void ipHash
-    return { ...safe, origin: requestOrigin(row, lessonTitles.get(row.courseId + ':' + row.lessonId) || null), topic: requestTopic(row), events: requestEvents(history), outcome: partnerOutcome(history), contactId: row.contactId != null && accessible.has(row.contactId) ? row.contactId : null }
+    return { ...safe, origin: requestOrigin(row, lessonTitles.get(row.courseId + ':' + row.lessonId) || null), partner: row.source === PARTNER_SOURCE ? partnerDetails(row.content, history) : null, topic: requestTopic(row), events: requestEvents(history), outcome: partnerOutcome(history), contactId: row.contactId != null && accessible.has(row.contactId) ? row.contactId : null }
   }), total }
 }
 export async function updateRequest(db: PrismaClient, actor: CrmActor, raw: unknown) {

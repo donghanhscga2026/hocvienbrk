@@ -20,7 +20,7 @@ let checks = 0
 const ok = (value, message) => { assert.ok(value, message); checks++ }
 const deny = async (operation, status) => { await assert.rejects(operation, error => error.status === status); checks++ }
 const id = crypto.randomUUID(), teacher = { id: 1, role: 'TEACHER', name: 'Giảng viên' }, admin = { id: 0, role: 'ADMIN', name: 'Quản trị' }
-let row = { id, key: 'private-key', ipHash: 'private-ip', userId: 3, contactId: null, courseId: null, ownerId: null, category: 'CONSULTATION', source: workflow.PARTNER_SOURCE, version: 1, status: 'NEW', resolution: '', publicReply: '', history: [], name: 'Người gửi' }, notifications = [], users = [{ id: 0, role: 'ADMIN' }, { id: 1, role: 'TEACHER' }, { id: 2, role: 'TEACHER' }, { id: 3, role: 'STUDENT', name: 'Người gửi', image: null }]
+let row = { id, key: 'private-key', ipHash: 'private-ip', userId: 3, contactId: null, courseId: null, ownerId: null, category: 'CONSULTATION', source: workflow.PARTNER_SOURCE, version: 1, status: 'NEW', resolution: '', publicReply: '', history: [], name: 'Người gửi', content: 'Đăng ký: Doanh nghiệp\nDoanh nghiệp: Wi.Tech' }, notifications = [], users = [{ id: 0, role: 'ADMIN' }, { id: 1, role: 'TEACHER' }, { id: 2, role: 'TEACHER' }, { id: 3, role: 'STUDENT', name: 'Người gửi', image: null }]
 const matches = (where, value = row) => Object.entries(where).every(([key, field]) => key === 'OR' ? field.some(item => matches(item, value)) : key === 'AND' ? field.every(item => matches(item, value)) : key === 'course' ? value.courseId === 10 && field.teacherId === 1 : value[key] === field)
 const fake = {
   crmRequest: {

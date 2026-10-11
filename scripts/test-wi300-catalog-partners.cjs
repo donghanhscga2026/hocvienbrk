@@ -59,7 +59,7 @@ async function run() {
   role = 'ADMIN'
   const workflow = load('lib/crm/request-workflow.ts')
   const requestScope = actor => actor.role === 'ADMIN' ? {} : { ownerId: actor.id, OR: [{ course: { teacherId: actor.id } }, { courseId: null }] }
-  const partners = load('lib/crm/partners.ts', { './service': { CrmError }, './requests': { requestScope }, './request-workflow': workflow })
+  const partners = load('lib/crm/partners.ts', { './service': { CrmError }, './requests': { requestScope }, './request-workflow': workflow, './partner-details': load('lib/crm/partner-details.ts') })
   const intake = (kind, organization) => [{ action: 'PARTNER_INTAKE', changedBy: 3, changedAt: new Date().toISOString(), partner: { kind, organization, expertise: 'AI', proposal: 'Hợp tác đào tạo', portfolio: '' } }]
   assert.equal(partners.partnerDetails('Đăng ký: Doanh nghiệp\nDoanh nghiệp: Wi.Tech', []).organization, 'Wi.Tech')
   assert.equal(partners.partnerDetails('Đăng ký: Doanh nghiệp\nĐăng ký: Giảng viên', []).kind, 'BUSINESS', 'Legacy classification cannot be overridden by multiline answers')
