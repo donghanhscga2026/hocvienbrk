@@ -18,15 +18,17 @@ const input = 'mt-1 min-h-11 w-full rounded-xl border border-slate-200 bg-white 
 const roleLabels: Record<string, string> = { STUDENT: 'Học viên', TEACHER: 'Giảng viên', INSTRUCTOR: 'Giảng viên', ADMIN: 'Quản trị viên', AFFILIATE: 'Cộng tác viên', DEVELOPER: 'Nhà phát triển' }
 
 export default function CrmRequests({ contactId, onChanged, onOpen, owners = [], isAdmin = false }: { owners?: CrmOwner[]; isAdmin?: boolean; contactId?: number; onChanged: () => void; onOpen?: (id: number) => void }) {
-  const queryTarget = useSearchParams().get('request') || ''
-  const [rows, setRows] = useState<Row[]>([]); const [total, setTotal] = useState(0); const [page, setPage] = useState(1); const [filter, setFilter] = useState('NEW')
+  const params = useSearchParams()
+  const queryTarget = params.get('request') || ''
+  const queryStatus = params.get('status') || ''
+  const [rows, setRows] = useState<Row[]>([]); const [total, setTotal] = useState(0); const [page, setPage] = useState(1); const [filter, setFilter] = useState(() => ['NEW', 'IN_PROGRESS', 'RESOLVED'].includes(queryStatus) && contactId == null ? queryStatus : 'NEW')
   const [topic, setTopic] = useState(''); const [ownerFilter, setOwnerFilter] = useState('')
   const [revision, setRevision] = useState(0); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('')
   const [selected, setSelected] = useState<Row | null>(null); const [status, setStatus] = useState<Row['status']>('NEW'); const [resolution, setResolution] = useState(''); const [publicReply, setPublicReply] = useState(''); const [ownerId, setOwnerId] = useState(''); const [outcome, setOutcome] = useState<Row['outcome']>('PENDING')
   const [target, setTarget] = useState(''); const [detailTab, setDetailTab] = useState('handling')
   const [source, setSource] = useState<Source | null>(null); const [profile, setProfile] = useState<Profile | null>(null); const [profileLoading, setProfileLoading] = useState(false)
   const definition = formConfigSchema.safeParse(source?.submission?.definitionSnapshot)
-  useEffect(() => { if (contactId == null) { setTarget(queryTarget); setPage(1); if (queryTarget) { setFilter(''); setTopic(''); setOwnerFilter('') } } }, [contactId, queryTarget])
+  useEffect(() => { if (contactId == null) { setTarget(queryTarget); setPage(1); if (!queryTarget && ['NEW', 'IN_PROGRESS', 'RESOLVED'].includes(queryStatus)) setFilter(queryStatus); if (queryTarget) { setFilter(''); setTopic(''); setOwnerFilter('') } } }, [contactId, queryTarget, queryStatus])
   const open = (row: Row) => { setSelected(row); setOwnerId(row.ownerId == null ? '' : String(row.ownerId)); setStatus(row.status); setResolution(row.resolution); setPublicReply(''); setOutcome(row.outcome || 'PENDING'); setDetailTab('handling'); setSource(null); setProfile(null); setError(''); setNotice('') }
   useEffect(() => {
     const abort = new AbortController(); const params = new URLSearchParams({ page: String(page) }); if (target) params.set('request', target); if (filter) params.set('status', filter); if (topic) params.set('topic', topic); if (ownerFilter) params.set('owner', ownerFilter); if (contactId != null) params.set('contactId', String(contactId))

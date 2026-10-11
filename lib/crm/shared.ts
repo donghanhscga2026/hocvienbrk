@@ -52,6 +52,7 @@ export type CrmContactView = {
   learning?: { userId?: number; courseId: number; title: string; slug: string; status: string; completed: number; total: number; lastActivityAt: string | null; lastLesson: string | null }[];
   pendingRequests?: number;
   studentProfile?: boolean;
+  linkedUserId?: number | null;
   id: number; name: string; email: string | null; phone: string | null; source: string; needs: string;
   tags: string[]; ownerId: number | null; owner: CrmOwner | null; archived: boolean; version: number;
   lastContactAt: string | null; updatedAt: string; opportunities: CrmOpportunityView[]; tasks: CrmTaskView[];
