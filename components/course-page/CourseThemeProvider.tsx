@@ -1,24 +1,29 @@
 'use client'
 
 import React from 'react'
-import { Cormorant_Garamond, Inter } from 'next/font/google'
+import localFont from 'next/font/local'
 import { CourseThemeConfig } from '@/lib/course-page/types'
 
 // [OPTIMIZE] Trước đây nạp qua @import trong <style> — cách chậm nhất để tải
 // font (trình duyệt phải đọc xong CSS này rồi mới gọi tiếp tới Google, chặn
 // hiển thị). next/font tự lưu font ngay trên server lúc build, không cần chờ
 // Google lúc người dùng truy cập trang bán khoá học.
-const cormorantGaramond = Cormorant_Garamond({
-  weight: ['400', '600', '700'],
-  style: ['normal', 'italic'],
-  subsets: ['latin'],
+// [SELF-HOSTED] Font nằm trong public/fonts — build không còn phụ thuộc
+// mạng tới Google Fonts (trước đây hay fail với lỗi next/font
+// "Cannot read properties of null" làm rớt build).
+const cormorantGaramond = localFont({
+  src: [
+    { path: '../../public/fonts/cormorant-garamond-latin-variable-normal.woff2', weight: '300 700', style: 'normal' },
+    { path: '../../public/fonts/cormorant-garamond-latin-variable-italic.woff2', weight: '300 700', style: 'italic' },
+  ],
   variable: '--font-course-serif',
   display: 'swap',
 })
 
-const coursePageInter = Inter({
-  weight: ['300', '400', '500', '600', '700'],
-  subsets: ['latin'],
+const coursePageInter = localFont({
+  src: [
+    { path: '../../public/fonts/inter-latin-variable-normal.woff2', weight: '100 900', style: 'normal' },
+  ],
   variable: '--font-course-sans',
   display: 'swap',
 })

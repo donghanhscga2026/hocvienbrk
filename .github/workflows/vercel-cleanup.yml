@@ -1,0 +1,80 @@
+name: Vercel deployment cleanup
+
+# Tự động dọn các deployment cũ trên Vercel để tránh đầy Functions Storage.
+# - Chạy định kỳ 09:00 sáng Chủ nhật (giờ VN)
+# - Có thể bấm "Run workflow" để chạy tay bất cứ lúc nào
+#
+# CẦN THIẾT LẬP TRƯỚC (làm 1 lần duy nhất):
+#   1. Vào https://vercel.com/account/tokens → Create Token (đặt tên
+#      ví dụ "github-cleanup", scope Full Account hoặc chọn team Witech)
+#   2. Vào GitHub repo → Settings → Secrets and variables → Actions
+#      → New repository secret → Name: VERCEL_TOKEN, Value: token vừa tạo
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_PROJECT_ID: prj_85CwjAhEi2LppyCkpjfTPkTyc97z
+      VERCEL_TEAM_ID: team_tqCzhwjqJ4clCmGzAH8uxOJI
+      KEEP_PRODUCTION: 5      # Giữ lại N bản production READY mới nhất (để rollback)
+      PREVIEW_KEEP_DAYS: 7    # Xóa preview cũ hơn N ngày
+      FAILED_KEEP_HOURS: 24   # Xóa bản ERROR/CANCELED cũ hơn N giờ
+    steps:
+      - name: Delete old Vercel deployments
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VERCEL_TOKEN:-}" ]; then
+            echo "::error::Thiếu secret VERCEL_TOKEN. Xem hướng dẫn ở đầu file workflow."
+            exit 1
+          fi
+
+          API="https://api.vercel.com"
+          AUTH_HEADER="Authorization: Bearer $VERCEL_TOKEN"
+          SCOPE="teamId=$VERCEL_TEAM_ID"
+          now_ms=$(date +%s%3N)
+          preview_cutoff=$(( now_ms - PREVIEW_KEEP_DAYS * 86400000 ))
+          failed_cutoff=$(( now_ms - FAILED_KEEP_HOURS * 3600000 ))
+
+          echo "Lấy danh sách deployments..."
+          resp=$(curl -s -H "$AUTH_HEADER" \
+            "$API/v6/deployments?projectId=$VERCEL_PROJECT_ID&$SCOPE&limit=100")
+
+          to_delete=$(echo "$resp" | jq -r \
+            --argjson keep "$KEEP_PRODUCTION" \
+            --argjson preview_cutoff "$preview_cutoff" \
+            --argjson failed_cutoff "$failed_cutoff" '
+            (.deployments
+              | map(select(.target == "production" and .state == "READY"))
+              | sort_by(.created) | reverse
+              | to_entries | map(select(.key >= $keep)) | map(.value)
+              | map(.uid)) as $oldprod
+            | [ .deployments[]
+                | select(
+                    ((.state == "ERROR" or .state == "CANCELED") and .created < $failed_cutoff)
+                    or ((.target != "production") and .created < $preview_cutoff)
+                    or (.uid as $u | $oldprod | index($u))
+                  )
+                | .uid
+              ] | unique | .[]')
+
+          if [ -z "$to_delete" ]; then
+            echo "Không có deployment nào cần xóa."
+            exit 0
+          fi
+
+          count=0
+          for uid in $to_delete; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+              -H "$AUTH_HEADER" \
+              "$API/v13/deployments/$uid?$SCOPE")
+            echo "DELETE $uid -> HTTP $code"
+            count=$((count + 1))
+          done
+          echo "Đã xóa $count deployments."
