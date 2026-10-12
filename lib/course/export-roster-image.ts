@@ -73,7 +73,8 @@ function renderChunk(
     format: 'png' | 'jpeg'
 ) {
     const measureCanvas = document.createElement('canvas')
-    const mctx = measureCanvas.getContext('2d')!
+    const mctx = measureCanvas.getContext('2d')
+    if (!mctx) throw new Error('Trình duyệt không hỗ trợ tạo ảnh Canvas')
 
     const PAD = 24
     const ROW_H = 34
@@ -97,7 +98,8 @@ function renderChunk(
     const dpr = Math.min(2, window.devicePixelRatio || 1)
     canvas.width = Math.ceil(width * dpr)
     canvas.height = Math.ceil(height * dpr)
-    const ctx = canvas.getContext('2d')!
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Không thể khởi tạo ảnh Canvas')
     ctx.scale(dpr, dpr)
 
     // Background
