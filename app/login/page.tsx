@@ -25,8 +25,12 @@ function LoginForm() {
     const [showPassword, setShowPassword] = useState(false)
     const [phoneStep, setPhoneStep] = useState(false)
     const [loginMethod, setLoginMethod] = useState<"password" | "email">("password")
-    const [showAdminMfa, setShowAdminMfa] = useState(false)
     const [showHelp, setShowHelp] = useState(false)
+    const [foundMemberId, setFoundMemberId] = useState<number | null>(null)
+    const [maskedEmail, setMaskedEmail] = useState<string | null>(null)
+    const [foundPhone, setFoundPhone] = useState("")
+    const [loginKind, setLoginKind] = useState<"phone" | "memberId">("phone")
+    const [mfaRequired, setMfaRequired] = useState(false)
     const [otpRequested, setOtpRequested] = useState(false)
     const [showNewPassword, setShowNewPassword] = useState(false)
     const [success, setSuccess] = useState<string | null>(null)
@@ -124,6 +128,11 @@ function LoginForm() {
                 return
             }
             setValue("identifier", identifier)
+            setLoginKind(isMemberId ? "memberId" : "phone")
+            setFoundPhone(identifier)
+            setFoundMemberId(typeof data.memberId === "number" ? data.memberId : null)
+            setMaskedEmail(typeof data.maskedEmail === "string" ? data.maskedEmail : null)
+            setMfaRequired(false)
             setPhoneStep(true)
         } catch (e: any) { setError(e.message || "Không thể kiểm tra tài khoản.") }
         finally { setIsLoading(false) }
@@ -133,16 +142,16 @@ function LoginForm() {
         setIsLoading(true)
         setError(null)
         try {
-            const rawV = (document.getElementById("smart-login-phone") as HTMLInputElement)?.value?.trim() || ""
-            const v = rawV.replace(/[\s.()-]/g, "")
-            const isMid = /^\d+$/.test(v) && v.length < 7
+            // Dùng identifier đã kiểm tra ở bước 1 (ô nhập bước 1 đã ẩn ở bước 2)
+            const isMid = loginKind === "memberId"
             const res = await fetch("/api/auth/request-login-otp", {
                 method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(isMid ? { memberId: v } : { phone: v })
+                body: JSON.stringify(isMid ? { memberId: foundPhone } : { phone: foundPhone })
             })
             const result = await res.json()
             if (!res.ok) throw new Error(result.error || "Không thể gửi mã OTP.")
             setOtpRequested(true)
+            setLoginMethod("email")
             setWarning("Nếu tài khoản có email đã xác minh, mã OTP sẽ được gửi đến hộp thư của bạn. Mã có hiệu lực 10 phút.")
         } catch (e: any) { setError(e.message || "Không thể gửi mã OTP.") }
         finally { setIsLoading(false) }
@@ -156,17 +165,28 @@ function LoginForm() {
 
         try {
             const callbackUrl = safeReturnPath(searchParams.get('callbackUrl')) || (redirectSlug ? safeReturnPath(`/${redirectSlug}`) : null) || "/"
+            // Một ô input dùng chung: ở chế độ OTP thì giá trị nhập là mã OTP
+            const otpMode = loginMethod === "email"
 
             const result = await signIn("credentials", {
                 identifier: data.identifier,
-                password: loginMethod === "email" ? "" : data.password,
+                password: otpMode ? "" : data.password,
                 otp: data.otp || "",
-                loginOtp: loginMethod === "email" ? data.loginOtp || "" : "",
+                loginOtp: otpMode ? data.password || "" : "",
                 callbackUrl: callbackUrl,
                 redirect: false,
             })
 
             if (result?.error) {
+                // Server xác nhận tài khoản cần MFA: hiện ô nhập mã Authenticator
+                const errStr = String(result.error || "")
+                if (/MFA_REQUIRED/i.test(errStr) || /mã xác thực quản trị/i.test(errStr)) {
+                    setMfaRequired(true)
+                    setError(null)
+                    setWarning("Tài khoản quản trị đã bật xác thực 2 lớp. Vui lòng nhập mã Authenticator rồi đăng nhập lại.")
+                    setIsLoading(false)
+                    return
+                }
                 let errorMsg = "Thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại."
                 let extraAction = ""
 
@@ -393,13 +413,15 @@ function LoginForm() {
                     <div className="space-y-4">
                         {warning && <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/30 p-3 text-sm text-brk-on-surface">{warning}</div>}
                         {error && <div role="alert" className="rounded-lg bg-brk-accent/10 border border-brk-accent/30 p-3 text-sm text-brk-accent">{error}</div>}
+                        {!phoneStep && (
                         <div>
-                            <label htmlFor="smart-login-phone" className="block text-sm font-medium text-brk-accent mb-1.5">Số điện thoại của bạn hoặc mã thành viên nếu đã có</label>
+                            <label htmlFor="smart-login-phone" className="block text-sm font-medium text-brk-accent mb-1.5">Số điện thoại hoặc mã thành viên</label>
                             <input id="smart-login-phone" type="tel" inputMode="tel" autoComplete="tel"
-                                disabled={phoneStep} placeholder="Nhập số điện thoại hoặc mã thành viên nếu đã có"
+                                placeholder="Nhập số điện thoại hoặc mã thành viên"
                                 className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm"
                                 onKeyDown={e => { if (!phoneStep && e.key === "Enter") { e.preventDefault(); void checkPhone() } }} />
                         </div>
+                        )}
                         {!phoneStep ? (
                             <>
                                 <button type="button" disabled={isLoading} onClick={checkPhone}
@@ -413,54 +435,47 @@ function LoginForm() {
                             </>
                         ) : (
                             <>
-                                <button type="button" className="text-xs text-brk-primary underline" onClick={() => {
-                                    setPhoneStep(false); setOtpRequested(false); setLoginMethod("password"); setError(null); setWarning(null); setValue("otp", ""); setValue("loginOtp", "")
-                                }}>Đổi số điện thoại</button>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <button type="button" onClick={() => {setLoginMethod("password");setError(null)}}
-                                        className={`rounded-lg px-2 py-3 text-sm font-medium ${loginMethod === "password" ? "bg-brk-primary text-brk-on-primary" : "border border-brk-outline text-brk-on-surface"}`}>Mật khẩu</button>
-                                    <button type="button" onClick={() => {setLoginMethod("email");setError(null)}}
-                                        className={`rounded-lg px-2 py-3 text-sm font-medium ${loginMethod === "email" ? "bg-brk-primary text-brk-on-primary" : "border border-brk-outline text-brk-on-surface"}`}>OTP qua email</button>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm font-semibold text-brk-on-surface">Thông tin của bạn</span>
+                                    <button type="button" className="text-xs text-brk-primary underline" onClick={() => {
+                                        setPhoneStep(false); setOtpRequested(false); setLoginMethod("password"); setError(null); setWarning(null); setValue("otp", ""); setValue("loginOtp", ""); setValue("password", ""); setFoundMemberId(null); setMaskedEmail(null); setMfaRequired(false)
+                                    }}>Nhập lại thông tin</button>
                                 </div>
+                                {foundMemberId != null && (
+                                    <div className="rounded-lg bg-brk-primary/10 border border-brk-primary/30 p-3 text-sm text-brk-on-surface space-y-1">
+                                        <p>{loginKind === "memberId"
+                                            ? <>Mã thành viên <span className="font-semibold">{foundMemberId}</span> của bạn đã đăng ký trên hệ thống wi300.</>
+                                            : <>Số điện thoại <span className="font-semibold">{foundPhone}</span> của bạn đã đăng ký trên hệ thống wi300 với mã thành viên là <span className="font-semibold">{foundMemberId}</span>.</>}</p>
+                                        <p>Nhập mật khẩu hoặc đăng nhập bằng mã OTP{maskedEmail ? <> được gửi qua mail <span className="font-semibold">{maskedEmail}</span></> : null}.</p>
+                                    </div>
+                                )}
                                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                                    {loginMethod === "password" ? (
-                                        <div>
-                                            <label className="block text-sm font-medium text-brk-accent mb-1.5">Mật khẩu</label>
-                                            <div className="relative">
-                                                <input {...register("password", { required: loginMethod === "password" ? "Nhập mật khẩu" : false })}
-                                                    type={showPassword ? "text" : "password"} autoComplete="current-password"
-                                                    placeholder="Nhập mật khẩu"
-                                                    className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 pr-10 text-brk-on-surface text-sm" />
-                                                <button type="button" aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-                                                    onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-brk-accent">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
-                                            </div>
-                                            {errors.password && <p className="text-xs text-brk-accent">{errors.password.message}</p>}
-                                            <div className="text-right mt-2"><Link href="/forgot-password" className="text-xs text-brk-primary">Quên mật khẩu?</Link></div>
+                                    <div>
+                                        <div className="relative">
+                                            <input {...register("password", { required: "Vui lòng nhập mật khẩu hoặc mã OTP." })}
+                                                type={showPassword ? "text" : "password"} autoComplete="current-password"
+                                                placeholder="Nhập mật khẩu hoặc mã OTP vào đây"
+                                                className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 pr-10 text-brk-on-surface text-sm" />
+                                            <button type="button" aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                                                onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-brk-accent">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
                                         </div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {!otpRequested && <button type="button" disabled={isLoading} onClick={requestEmailOtp}
-                                                className="w-full rounded-xl border border-brk-outline py-3 text-brk-on-surface">Gửi mã OTP vào email đã đăng ký</button>}
-                                            {otpRequested && <>
-                                                <label className="block text-sm font-medium text-brk-accent">Mã OTP email</label>
-                                                <input {...register("loginOtp", { required: loginMethod === "email" ? "Nhập mã OTP" : false })}
-                                                    inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="6 chữ số từ email"
-                                                    className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm" />
-                                                <button type="button" disabled={isLoading} onClick={requestEmailOtp} className="text-xs text-brk-primary underline">Gửi lại OTP</button>
-                                            </>}
+                                        {errors.password && <p className="text-xs text-brk-accent">{errors.password.message}</p>}
+                                        {otpRequested && <p className="text-xs text-brk-primary mt-1">Mã OTP đã được gửi đến email đã đăng ký. Nhập mã vào ô bên trên.</p>}
+                                        <div className="flex items-center justify-between mt-2">
+                                            <button type="button" disabled={isLoading} onClick={requestEmailOtp} className="text-xs text-brk-primary underline disabled:opacity-50">
+                                                {otpRequested ? "Gửi lại mã OTP" : "Gửi mã OTP qua mail"}
+                                            </button>
+                                            <Link href="/forgot-password" className="text-xs text-brk-primary">Quên mật khẩu?</Link>
                                         </div>
-                                    )}
-                                    <label className="flex items-center gap-2 text-xs text-brk-on-surface">
-                                        <input type="checkbox" checked={showAdminMfa} onChange={e => setShowAdminMfa(e.target.checked)} />
-                                        Tôi sử dụng Authenticator cho tài khoản quản trị
-                                    </label>
-                                    {showAdminMfa && <div>
+                                    </div>
+                                    {mfaRequired && <div>
                                         <label className="block text-sm font-medium text-brk-accent mb-1.5">Mã Authenticator</label>
                                         <input {...register("otp")} inputMode="numeric" maxLength={6} pattern="[0-9]{6}"
                                             placeholder="Mã 6 chữ số trong ứng dụng"
                                             className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm" />
+                                        <p className="text-xs text-brk-accent mt-1">Tài khoản quản trị đã bật xác thực 2 lớp. Nhập mã từ ứng dụng Authenticator rồi đăng nhập lại.</p>
                                     </div>}
-                                    <button type="submit" disabled={isLoading || (loginMethod === "email" && !otpRequested)}
+                                    <button type="submit" disabled={isLoading}
                                         className="w-full rounded-xl bg-brk-primary px-4 py-3 text-sm font-bold text-brk-on-primary disabled:opacity-50">{isLoading ? "Đang đăng nhập..." : "Đăng nhập"}</button>
                                 </form>
                                 <button type="button" onClick={() => setShowHelp(true)}
