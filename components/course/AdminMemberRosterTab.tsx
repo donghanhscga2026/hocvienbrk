@@ -11,6 +11,7 @@ import MemberDayChips from './MemberDayChips'
 import MemberDetailPanel from './MemberDetailPanel'
 import { teamLabel, groupLabel, CourseMemberLabels, RosterMember, formatStartDate, recentDayWindow } from './MemberRosterPanel'
 import { downloadRosterAsImage } from '@/lib/course/export-roster-image'
+import { downloadRosterCsv } from '@/lib/course/export-roster-csv'
 
 function localPhone(phone: string | null | undefined) {
     if (!phone) return null
@@ -393,6 +394,15 @@ export default function AdminMemberRosterTab({ courseId, courseName, members, la
                             Cập nhật{pendingCount > 0 ? ` (${pendingCount})` : ''}
                         </button>
                     )}
+                    <button
+                        type="button"
+                        onClick={() => downloadRosterCsv(courseName, members, labels, true)}
+                        disabled={members.length === 0}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg disabled:opacity-50"
+                        title="Tải danh sách học viên dạng CSV mở được bằng Excel"
+                    >
+                        Xuất Excel (CSV)
+                    </button>
                     <button
                         onClick={handleExportImage}
                         disabled={exportingImage || members.length === 0}
