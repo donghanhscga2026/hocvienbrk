@@ -2,6 +2,7 @@ import { findExternalApp } from './external-apps'
 
 /** Tên và khung chỉ dành cho trang mặc định; không áp dụng vào template nhập riêng. */
 const toolTitles: Record<string, string> = {
+  'landing-ai': 'Wi Landing AI',
   affiliate: 'Affiliate', posts: 'Bài viết cộng đồng', courses: 'Quản lý khóa học',
   students: 'Quản lý thành viên', roadmap: 'Lộ trình học tập', crm: 'Khách hàng & chăm sóc',
   'email-mkt': 'Email Marketing', genealogy: 'Nhân mạch', payments: 'Quản lý thanh toán',
