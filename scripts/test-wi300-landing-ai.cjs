@@ -28,6 +28,8 @@ async function run(){
   assert.ok(html.includes('&lt;script&gt;')&&html.includes('#236c1e'))
   assert.ok(html.includes('@media(max-width:600px)'))
   assert.ok(!html.includes('cdn.tailwindcss.com'))
+  assert.ok(model.landingHtml({...brief,color:'#ffffff'},draft).includes('.hero{background:#ffffff;color:#000000;'))
+  assert.ok(model.landingHtml({...brief,color:'#000000'},draft).includes('.hero{background:#000000;color:#ffffff;'))
   let brand=null
   const savedEnv=process.env.VERCEL_ENV
   const Ui=()=>null
