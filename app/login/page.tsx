@@ -203,7 +203,7 @@ function LoginForm() {
                 } catch {
                     // report-failed-login thất bại, dùng thông tin cơ bản
                     const identifier = data.identifier
-                    if (/^\d+$/.test(identifier)) {
+                    if (/^\d{1,6}$/.test(identifier)) {
                         errorMsg = "Mã thành viên không tồn tại hoặc mật khẩu không chính xác."
                     } else if (identifier.includes('@')) {
                         errorMsg = "Email không tồn tại hoặc mật khẩu không chính xác."
