@@ -127,20 +127,14 @@ export async function generatePreview(allNodes: TCANode[], memberInfo: Record<nu
   }
 
   // Next available IDs
-  const { getNextAvailableId } = await import('@/lib/id-helper');
-  const reserved = await prisma.reservedId.findMany({ select: { id: true } });
-  const reservedIdSet = new Set(reserved.map((r: any) => r.id));
-
-  let currentUserIdBase = await getNextAvailableId();
-  const assignedUserIds = new Set<number>();
+  const { getAvailableUserIds } = await import('@/lib/id-helper');
+  const availableUserIds = await getAvailableUserIds(Math.max(1, allNodes.length));
+  const currentUserIdBase = availableUserIds[0];
+  let availableUserIndex = 0;
 
   function getNextUserIdInBatch() {
-    while (reservedIdSet.has(currentUserIdBase) || assignedUserIds.has(currentUserIdBase)) {
-      currentUserIdBase++;
-    }
-    const id = currentUserIdBase;
-    assignedUserIds.add(id);
-    currentUserIdBase++;
+    const id = availableUserIds[availableUserIndex++];
+    if (id == null) throw new Error('Không đủ mã thành viên cho bản xem trước.');
     return id;
   }
 

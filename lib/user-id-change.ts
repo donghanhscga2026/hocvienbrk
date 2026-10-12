@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient } from '@prisma/client'
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
+import { ensureNormalUserIdCursor } from './id-helper'
 
 type Db = Prisma.TransactionClient
 type Link = { table: string; column: string; cascade: boolean }
@@ -165,6 +166,8 @@ export async function changeUserId(db: PrismaClient, actorId: number, input: { c
     const preview = await plan(tx, actorId, currentId, newId)
     if (preview.publicPlan.blockers.length) throw new UserIdChangeError(preview.publicPlan.blockers.join(' '))
     verify(input.token!, actorId, preview.snapshot)
+    // Ghi nhớ dãy thông thường trước khi đổi ID; số đẹp không làm tăng bộ đếm này.
+    await ensureNormalUserIdCursor(tx)
     await tx.$queryRaw(Prisma.sql`SELECT set_config('app.user_id_change','on',true)`)
     const affected = await tx.$executeRaw(Prisma.sql`UPDATE public."User" SET id=${newId},"updatedAt"=CURRENT_TIMESTAMP WHERE id=${currentId}`)
     if (affected !== 1) throw new UserIdChangeError('Tài khoản đã thay đổi. Hãy kiểm tra lại.')
@@ -181,7 +184,8 @@ export async function changeUserId(db: PrismaClient, actorId: number, input: { c
     // ID cũ được giữ lại để phiên đăng nhập cũ không vô tình trỏ sang tài khoản khác.
     await tx.reservedId.upsert({ where: { id: currentId }, create: { id: currentId, note: `Đã đổi sang ${newId}; không cấp lại` }, update: {} })
     await tx.systemConfig.create({ data: { key: retiredKey(currentId), value: { newId, actorId, changedAt: new Date().toISOString() } } })
-    await tx.reservedId.deleteMany({ where: { id: newId } })
+    // Số đẹp đã cấp vẫn phải nằm ngoài dãy tự động, kể cả chưa giữ chỗ trước đó.
+    await tx.reservedId.upsert({ where: { id: newId }, create: { id: newId, note: 'Mã tùy chọn đã cấp; không tính vào dãy thông thường' }, update: {} })
     const verifiedCounts = []
     const totals = await linkCounts(tx, preview.allLinks, currentId, newId)
     for (const link of preview.allLinks) {

@@ -75,6 +75,8 @@ jobs:
       - name: Member ID change transaction and font checks
         run: |
           node scripts/test-user-id-change.cjs
+          node scripts/test-normal-user-ids.cjs
+          node scripts/test-normal-id-recovery.cjs
           node scripts/test-local-fonts.cjs
 
       - name: TypeScript check
