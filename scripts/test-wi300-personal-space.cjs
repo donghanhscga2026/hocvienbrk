@@ -27,8 +27,13 @@ async function run() {
     { id: 3, slug: 'custom-page', name: 'Trang của tôi', url: '/tools/pages?tab=my-site', roles: [], isActive: true },
     { id: 4, slug: 'backup', name: 'Sao lưu', url: '/tools/backup', roles: ['ADMIN'], isActive: true },
     { id: 5, slug: 'custom', name: 'Công cụ mới', url: '/tools/new-helper', roles: [], isActive: true },
+    { id: 7, slug: 'brk', name: 'BRK (Phước Báu)', url: '/tools/brk', roles: [], isActive: true },
     { id: 6, slug: 'genealogy', name: 'Nhân Mạch', url: '/tools/genealogy', roles: [], isActive: true },
   ]
+  assert.equal(helpers.wi300ToolName(tools[5]), 'Ví Wi')
+  assert.equal(tools[5].name, 'BRK (Phước Báu)', 'Nhãn Wi không sửa tên chung trong dữ liệu')
+  assert.equal(helpers.spaceNavigation('STUDENT',tools).find(g=>g.id==='account').items.find(i=>i.href==='/tools/brk').label,'Ví Wi')
+  assert.equal(helpers.wi300ToolName(tools[0]), tools[0].name)
   assert.equal(helpers.isContentTool(tools[2]), true)
   assert.equal(helpers.toolGroup(tools[0]), 'marketing')
   assert.equal(helpers.toolGroup(tools[4]), 'other')
@@ -171,6 +176,8 @@ async function run() {
     assert.ok(document.getElementById('overview-tab-teaching'))
     params = new URLSearchParams('tab=account')
     await act(async () => render())
+    assert.equal(document.querySelector('a[href="/tools/brk"]').textContent,'Ví Wi','Thẻ ví dùng nhãn Wi')
+    assert.ok(!document.body.textContent.includes('BRK (Phước Báu)'))
     assert.ok(document.querySelector('a[href="/account-settings"] svg'), 'Cài đặt có icon')
     assert.ok(document.querySelector('a[href="/support"] svg'), 'Hỗ trợ có icon và mở trang dành cho thành viên')
     params = new URLSearchParams('tab=tools')

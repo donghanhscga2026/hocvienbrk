@@ -21,6 +21,10 @@ const contentSlugs = ['pages', 'page', 'landings', 'posts', 'my-site', 'site-pro
 function routeSlug(tool: PersonalTool) {
   return tool.url.startsWith('/tools/') ? tool.url.split(/[?#]/)[0].split('/')[2] : ''
 }
+// Nhãn riêng cho Wi300; mã ví và cấu hình công cụ chung vẫn giữ nguyên.
+export function wi300ToolName(tool: PersonalTool) {
+  return routeSlug(tool) === 'brk' || tool.slug === 'brk' ? 'Ví Wi' : tool.name
+}
 export function isContentTool(tool: PersonalTool) {
   return contentSlugs.includes(tool.slug || '') || contentSlugs.includes(routeSlug(tool))
 }
@@ -42,7 +46,7 @@ export function toolWorkspace(tool: PersonalTool) {
 }
 export function filterPersonalTools(tools: PersonalTool[], query: string, group: string) {
   const needle = searchText(query)
-  return tools.filter(tool => (!group || toolGroup(tool) === group) && (!needle || searchText(`${tool.name} ${toolGroups.find(item => item.id === toolGroup(tool))?.description || ''}`).includes(needle)))
+  return tools.filter(tool => (!group || toolGroup(tool) === group) && (!needle || searchText(`${wi300ToolName(tool)} ${toolGroups.find(item => item.id === toolGroup(tool))?.description || ''}`).includes(needle)))
 }
 
 // Chỉ dùng trạng thái/minh chứng đã lưu, không coi tải minh chứng là đã duyệt tiền.
@@ -94,7 +98,7 @@ export function spaceNavigation(role: string, tools: PersonalTool[]): SpaceNavGr
   for (const tool of tools) {
     if (!tool || !tool.isActive || !Array.isArray(tool.roles) || !tool.roles.every(r => typeof r === 'string') || !canUseTool(role, tool.roles) || typeof tool.url !== 'string' || !safeToolUrl(tool.url) || typeof tool.name !== 'string') continue
     const group = groups.find(g => g.id === toolWorkspace(tool))
-    if (group && !group.items.some(i => i.href === tool.url)) group.items.push({ label: tool.name, href: tool.url, icon: tool.icon })
+    if (group && !group.items.some(i => i.href === tool.url)) group.items.push({ label: wi300ToolName(tool), href: tool.url, icon: tool.icon })
   }
   return groups
 }

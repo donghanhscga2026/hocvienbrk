@@ -37,8 +37,8 @@ async function run() {
   global.window = dom.window; global.document = dom.window.document; global.Node = dom.window.Node
   Object.defineProperty(global, 'navigator', { configurable: true, value: dom.window.navigator })
   global.IS_REACT_ACT_ENVIRONMENT = true
-  let hover = true
-  window.matchMedia = query => ({ matches: query.includes('min-width') ? true : hover })
+  let hover = true, desktop = true
+  window.matchMedia = query => ({ matches: query.includes('min-width') ? desktop : hover })
   const link = { __esModule: true, default: ({ children, onNavigate, scroll, onClick, ...props }) => React.createElement('a', { ...props, onClick: e => { e.preventDefault(); onClick?.(e); onNavigate?.() } }, children) }
   const menu = load('components/wi300/Wi300SpaceMenu.tsx', { 'next/link': link, '@/lib/wi300/personal-space': model })
   const { createRoot } = require('react-dom/client')
@@ -124,6 +124,20 @@ async function run() {
     window.HTMLElement.prototype.getBoundingClientRect=oldRect
     if(oldHeight)Object.defineProperty(window.HTMLElement.prototype,'scrollHeight',oldHeight)
     else delete window.HTMLElement.prototype.scrollHeight
+    desktop=false;hover=false
+    await act(async()=>click(findButton('Dành cho học viên')))
+    assert.equal(findButton('Dành cho học viên').getAttribute('aria-expanded'),'true','Chạm chữ trên điện thoại mở mục con')
+    assert.ok(document.querySelector('a[href*="status=pending"]'))
+    assert.equal(navigations,0,'Chạm tên nhóm không chuyển trang hoặc cuộn xuống nội dung')
+    await act(async()=>click(findButton('Dành cho học viên')))
+    assert.equal(findButton('Lối tắt Dành cho học viên').getAttribute('aria-expanded'),'false')
+    await act(async()=>click(findButton('Lối tắt Dành cho học viên')))
+    assert.equal(findButton('Dành cho học viên').getAttribute('aria-expanded'),'true','Nút > và chữ dùng cùng trạng thái')
+    await act(async()=>click(document.querySelector('a[href*="status=completed"]')))
+    assert.equal(findButton('Dành cho học viên').getAttribute('aria-expanded'),'false','Chọn mục con mới điều hướng và đóng')
+    desktop=true;hover=true
+    await act(async()=>click(document.querySelector('a[href="/my-space?tab=teaching"]')))
+    assert.equal(navigations,1,'Link nhóm trên máy tính vẫn mở trực tiếp nội dung')
     await act(async () => root.unmount())
   } finally { global.fetch = savedFetch; dom.window.close() }
   console.log('WI300 space menu: role/URL isolation, lazy cached tools, hover/touch, keyboard/Escape, outside close, account/route reset, API fallback and sidebar direct shortcuts passed.')
