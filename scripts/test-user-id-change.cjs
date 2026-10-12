@@ -44,7 +44,9 @@ const adapter = {
   },
 }
 const mod = {exports:{}}
-new Function('require','exports','module',ts.transpileModule(fs.readFileSync(path.join(root,'lib/user-id-change.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText)(require,mod.exports,mod)
+const ids = {exports:{}}
+new Function('require','exports','module',ts.transpileModule(fs.readFileSync(path.join(root,'lib/id-helper.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText)(name=>name==='./prisma'?{__esModule:true,default:adapter}:require(name),ids.exports,ids)
+new Function('require','exports','module',ts.transpileModule(fs.readFileSync(path.join(root,'lib/user-id-change.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText)(name=>name==='./id-helper'?ids.exports:require(name),mod.exports,mod)
 const {changeUserId,parseUserId} = mod.exports
 const input = {currentId:'3698',newId:'3687'}
 const rejects = async (fn, pattern, label) => { await assert.rejects(fn, pattern); checks++ }
@@ -124,13 +126,15 @@ async function main() {
   ok(request.content.includes('3698') && request.history[0].content==='3698','Free text preserved')
   ok(Number((await query('SELECT count(*) n FROM "AppNotification" WHERE "recipientId"=3687'))[0].n)===19,'Notifications preserved and moved without new messages')
   ok(!!await adapter.systemConfig.findUnique({where:{key:'wi300:learning-hidden:3687:10'}}),'WI300 preferences moved')
-  ok(!!await adapter.reservedId.findUnique({where:{id:3698}}) && !await adapter.reservedId.findUnique({where:{id:3687}}),'Old ID reserved; target consumed')
+  ok(!!await adapter.reservedId.findUnique({where:{id:3698}}) && !!await adapter.reservedId.findUnique({where:{id:3687}}),'Old ID retired; assigned special ID stays excluded')
   ok(!!await adapter.user.findUnique({where:{id:2689}}),'2689 untouched')
   await rejects(()=>changeUserId(adapter,0,{currentId:'3687',newId:'3698'}),/cấp lại/,'Retired ID cannot be reused')
   const seq = Number((await query(`SELECT nextval(pg_get_serial_sequence('"User"','id')) n`))[0].n)
   ok(seq>10000,'Automatic sequence never rewound')
   preview=await changeUserId(adapter,0,{currentId:'3687',newId:'20000'})
   await changeUserId(adapter,0,{currentId:'3687',newId:'20000',execute:true,token:preview.plan.token})
+  ok((await adapter.systemConfig.findUnique({where:{key:ids.exports.NORMAL_USER_ID_CURSOR_KEY}})).value===3698,'Special rename never advances normal cursor')
+  ok(await ids.exports.getNextAvailableId(adapter)===3699,'Next normal registration ignores the high special ID')
   ok(Number((await query(`SELECT nextval(pg_get_serial_sequence('"User"','id')) n`))[0].n)>20000,'High ID advances automatic sequence')
   await db.exec(`UPDATE "CrmRequest" SET status='IN_PROGRESS',version=2`)
   ok(Number((await query('SELECT count(*) n FROM "AppNotification"'))[0].n)===20,'Normal CRM updates still notify after maintenance transaction')

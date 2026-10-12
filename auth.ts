@@ -40,20 +40,15 @@ const customAdapter = {
     ...baseAdapter,
     createUser: async (data: any) => {
         try {
-            const { getNextAvailableId } = await import("@/lib/id-helper")
-            const newId = await getNextAvailableId()
-            console.log(`✨ [Auth] Tạo user mới qua OAuth với ID tùy chỉnh: #${newId} (${data.email})`)
-            return prisma.user.create({
-                data: {
-                    ...data,
-                    id: newId,
-                    referrerId: 0, // Default to root admin
-                },
+            const { createUserWithAvailableId } = await import("@/lib/id-helper")
+            return await createUserWithAvailableId({
+                ...data,
+                referrerId: 0, // Default to root admin
             })
         } catch (error) {
             console.error("❌ [Auth] Lỗi khi tạo user với ID tùy chỉnh:", error)
-            // Fallback: để database tự quyết định nếu có lỗi (tránh block sign-in)
-            return baseAdapter.createUser!(data)
+            // Không cấp lại bằng sequence mặc định: sequence có thể đang ở số đẹp.
+            throw error
         }
     }
 }
