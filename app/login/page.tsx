@@ -152,7 +152,6 @@ function LoginForm() {
             if (!res.ok) throw new Error(result.error || "Không thể gửi mã OTP.")
             setOtpRequested(true)
             setLoginMethod("email")
-            setWarning("Nếu tài khoản có email đã xác minh, mã OTP sẽ được gửi đến hộp thư của bạn. Mã có hiệu lực 10 phút.")
         } catch (e: any) { setError(e.message || "Không thể gửi mã OTP.") }
         finally { setIsLoading(false) }
     }
