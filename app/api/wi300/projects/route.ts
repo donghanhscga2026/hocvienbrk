@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import { crmBody, crmResponse } from '@/lib/crm/http'
 import { CrmError } from '@/lib/crm/service'
-import { managedProjects, saveProject } from '@/lib/wi300/project-service'
+import { createProject, deleteProject, managedProjects, saveProject } from '@/lib/wi300/project-service'
 import { ZodError } from 'zod'
 import { revalidatePath } from 'next/cache'
 
@@ -31,5 +31,20 @@ export async function PUT(request: Request) {
     const project = await saveProject(prisma, id, slug, await crmBody(request, 64000))
     revalidatePath('/'); revalidatePath('/kham-pha'); revalidatePath('/du-an'); revalidatePath(`/du-an/${slug}`)
     return crmResponse({ project })
+  } catch (error) { return failure(error) }
+}
+export async function POST(request: Request) {
+  try {
+    const project = await createProject(prisma, await actor(), await crmBody(request, 64000))
+    revalidatePath('/du-an/quan-ly')
+    return crmResponse({ project }, 201)
+  } catch (error) { return failure(error) }
+}
+export async function DELETE(request: Request) {
+  try {
+    const slug = new URL(request.url).searchParams.get('slug') || ''
+    const result = await deleteProject(prisma, await actor(), slug, await crmBody(request, 64000))
+    revalidatePath('/'); revalidatePath('/kham-pha'); revalidatePath('/du-an'); revalidatePath(`/du-an/${slug}`); revalidatePath('/du-an/quan-ly')
+    return crmResponse(result)
   } catch (error) { return failure(error) }
 }

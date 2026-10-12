@@ -21,7 +21,7 @@ export { canUseTool } from '@/lib/wi300/personal-space'
 const PaymentModal = dynamic(() => import('@/components/course/PaymentModal'), { ssr: false })
 type Tool = PersonalTool
 type LearningStatus = 'active' | 'completed' | 'pending'
-const spaceTabs = [{ id: 'home', label: 'Tổng quan cá nhân' }, { id: 'learning', label: 'Dành cho học viên' }, { id: 'teaching', label: 'Dành cho giảng viên' }, { id: 'affiliate', label: 'Dành cho cộng tác viên' }, { id: 'tools', label: 'Công cụ & tiện ích' }, { id: 'account', label: 'Tài khoản & cài đặt' }, { id: 'admin', label: 'Quản trị hệ thống' }]
+const spaceTabs = [{ id: 'home', label: 'Tổng quan cá nhân' }, { id: 'learning', label: 'Dành cho học viên' }, { id: 'teaching', label: 'Dành cho giảng viên' }, { id: 'affiliate', label: 'Dành cho cộng tác viên' }, { id: 'business', label: 'Quản lý & kinh doanh' }, { id: 'tools', label: 'Công cụ & tiện ích' }, { id: 'account', label: 'Tài khoản & cài đặt' }, { id: 'admin', label: 'Quản trị hệ thống' }]
 const box = 'rounded-2xl border border-brk-outline bg-white p-4 sm:p-5'
 const action = 'inline-flex min-h-11 items-center justify-center rounded-xl bg-brk-primary px-4 text-sm font-semibold text-white'
 
@@ -63,8 +63,9 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
   const params = useSearchParams()
   const router = useRouter()
   const role = session?.user?.role || 'guest'
+  const [tools, setTools] = useState<Tool[]>([])
   const teachingAllowed = canTeach(role)
-  const tabs = spaceTabs.filter(item => (item.id !== 'teaching' || teachingAllowed) && (item.id !== 'admin' || role === 'ADMIN') && (item.id !== 'affiliate' || !!session?.user))
+  const tabs = spaceTabs.filter(item => (item.id !== 'teaching' || teachingAllowed) && (item.id !== 'admin' || role === 'ADMIN') && (item.id !== 'affiliate' || !!session?.user) && (item.id !== 'business' || (!!session?.user && tools.some(tool => tool.slug === 'wi-projects'))))
   // Giữ đường dẫn Website & nội dung cũ cho bookmark đã lưu.
   const requestedTab = params.get('tab')
   const tab = requestedTab === 'pages' ? 'pages' : tabs.some(item => item.id === requestedTab) ? requestedTab! : 'home'
@@ -73,7 +74,6 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
   const overviewTabs = [{ id: 'learning', label: 'Học tập' }, ...(teachingAllowed ? [{ id: 'teaching', label: 'Giảng dạy' }] : [])]
   const pageSize = useCoursePageSize()
   const titleRef = useRef<HTMLHeadingElement>(null)
-  const [tools, setTools] = useState<Tool[]>([])
   const [toolsError, setToolsError] = useState(false)
   const [toolsLoading, setToolsLoading] = useState(true)
   const requestedStatus = params.get('status')
@@ -100,7 +100,7 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
     }
     void load()
     return () => controller.abort()
-  }, [role])
+  }, [role, session?.user?.id])
 
   const map = new Map(enrollments.map(row => [row.courseId, row]))
   const learning = courses.filter(course => { const row = map.get(course.id); return row && !row.hiddenFromGifts })
@@ -154,7 +154,7 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
   return <div className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-4 sm:py-8 lg:px-6"><div className="grid min-w-0 gap-5 lg:grid-cols-[290px_minmax(0,1fr)]">
     <aside className="relative z-30 min-w-0 lg:sticky lg:top-24 lg:self-start"><SpaceSidebar groups={spaceNavigation(role, permittedTools)} active={tab} route={params.toString()} onNavigate={() => titleRef.current?.scrollIntoView({ block: 'start' })} loading={toolsLoading} failed={toolsError} /></aside>
     <div className="relative z-0 min-w-0 space-y-5"><h1 ref={titleRef} className="scroll-mt-44 break-words text-2xl font-bold sm:text-3xl lg:scroll-mt-24">{tab === 'home' ? 'Tổng quan cá nhân' : tab === 'pages' ? 'Website & nội dung' : tabs.find(item => item.id === tab)?.label}</h1>
-      {['home', 'pages', 'admin'].includes(tab) && <Link href="/du-an/quan-ly" className="flex min-h-16 items-center justify-between gap-3 rounded-2xl border border-brk-outline bg-white p-4 font-semibold text-brk-primary"><span>{role === 'ADMIN' ? 'Quản lý các dự án Wi' : 'Dự án Wi của tôi'}</span><span aria-hidden="true">→</span></Link>}
+      {tab === 'business' && toolList(workspaceTools('business'))}
       {accountError && <p role="alert" className="rounded-xl bg-amber-50 p-4 text-amber-900">Chưa tải được dữ liệu học tập. Vui lòng thử tải lại trang.</p>}
       {tab === 'home' && <>
         <p className="text-sm leading-6 text-brk-muted">Chào {session?.user?.name || 'bạn'}! Theo dõi khóa học và công việc của bạn tại đây.</p>

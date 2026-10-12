@@ -14,11 +14,12 @@ export const featuredBusinesses = businesses.map(business => business.name)
 export default function Wi300Businesses({ projects = businesses, error = false }: { projects?: PublicWiProject[]; error?: boolean }) {
   const [paused, setPaused] = useState(false)
   return <section id="doanh-nghiep-tieu-bieu" aria-labelledby="wi300-businesses-title" className="mx-auto max-w-7xl scroll-mt-40 px-4 py-12 sm:px-6 lg:scroll-mt-24 lg:px-8">
-    <div className="flex items-end justify-between gap-4">
-      <div><h2 id="wi300-businesses-title" className="text-2xl font-bold text-brk-on-surface sm:text-3xl">Doanh nghiệp tiêu biểu</h2>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-brk-muted">Cùng kết nối và phát triển trong hệ sinh thái Wi.</p></div>
+    <div className="flex items-start justify-between gap-2 sm:items-center sm:gap-4">
+      <h2 id="wi300-businesses-title" className="min-w-0 flex-1 text-2xl font-bold text-brk-on-surface sm:text-3xl">Dự án tiêu biểu</h2>
+      <Link href="/du-an" className="inline-flex min-h-11 shrink-0 items-center text-sm font-semibold text-brk-primary">Xem tất cả →</Link>
       <button type="button" aria-pressed={paused} aria-label={paused ? 'Tiếp tục chạy doanh nghiệp' : 'Tạm dừng chạy doanh nghiệp'} onClick={() => setPaused(value => !value)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-brk-outline bg-white text-brk-primary">{paused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}</button>
     </div>
+    <p className="mt-3 max-w-2xl text-sm leading-6 text-brk-muted">Cùng kết nối và phát triển trong hệ sinh thái Wi.</p>
     <div tabIndex={0} role="region" aria-label="Dãy doanh nghiệp chạy từ phải sang trái" className={`mt-8 pb-5 focus-visible:outline-brk-primary ${styles.viewport} ${paused ? styles.paused : ''}`}>
       <div className={styles.track}>
         {/* Bản lặp chỉ phục vụ chuyển động, không đọc trùng bằng trình đọc màn hình. */}
@@ -37,6 +38,5 @@ export default function Wi300Businesses({ projects = businesses, error = false }
       </div>
     </div>
     {error ? <p role="alert" className="mt-4 text-sm text-brk-muted">Chưa tải được thông tin dự án. Vui lòng tải lại trang.</p> : !projects.length && <p className="mt-4 text-sm text-brk-muted">Chưa có dự án tiêu biểu được công khai.</p>}
-    <Link href="/du-an" className="mt-3 inline-flex min-h-11 items-center font-semibold text-brk-primary">Xem tất cả dự án Wi →</Link>
   </section>
 }

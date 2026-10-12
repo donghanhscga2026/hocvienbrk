@@ -2,6 +2,7 @@
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict'), ts = require('typescript')
 const React = require('react'), { JSDOM } = require('jsdom')
 function load(file, mocks = {}) {
+  mocks = { '@/auth': { auth: async () => null }, ...mocks }
   const module = { exports: {} }
   const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
   new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : require(name), module, module.exports)
@@ -50,6 +51,24 @@ async function run() {
   await assert.rejects(() => service.saveProject(db, 0, 'wi-art', { revision: 0, content }), error => error.status === 403)
   users.get(0).role = 'ADMIN'
   assert.ok(locks >= writes)
+  const newInput = { slug: 'wi-test', name: 'Wi.Test', description: 'Dự án kiểm thử' }
+  await assert.rejects(() => service.createProject(db, 8, newInput), error => error.status === 403)
+  await assert.rejects(() => service.createProject(db, 0, { ...newInput, slug: 'quan-ly' }))
+  const creations = await Promise.allSettled([service.createProject(db, 0, newInput), service.createProject(db, 0, newInput)])
+  assert.equal(creations.filter(result => result.status === 'fulfilled').length, 1)
+  assert.equal(creations.find(result => result.status === 'rejected').reason.status, 409)
+  assert.equal((await service.readPublicProjects(db)).some(project => project.slug === 'wi-test'), false, 'New draft is not public')
+  await service.saveProject(db, 0, 'wi-test', { revision: 1, content, controls: { ownerId: 8, published: true, featured: false, order: 100 } })
+  assert.ok((await service.managedProjects(db, 8)).projects.some(project => project.slug === 'wi-test'))
+  assert.equal((await service.readPublicProjects(db)).some(project => project.slug === 'wi-test'), false, 'Public non-featured project stays off home')
+  await assert.rejects(() => service.deleteProject(db, 8, 'wi-test', { revision: 2 }), error => error.status === 403)
+  await assert.rejects(() => service.deleteProject(db, 0, 'wi-test', { revision: 1 }), error => error.status === 409)
+  await service.deleteProject(db, 0, 'wi-test', { revision: 2 })
+  assert.equal((await service.readProjects(db)).some(project => project.slug === 'wi-test'), false)
+  await assert.rejects(() => service.saveProject(db, 0, 'wi-test', { revision: 2, content }), error => error.status === 404)
+  await assert.rejects(() => service.createProject(db, 0, newInput), error => error.status === 409)
+  await service.deleteProject(db, 0, 'wi-can', { revision: 0 })
+  assert.equal((await service.readProjects(db)).some(project => project.slug === 'wi-can'), false, 'Deleted default does not return')
   assert.equal(shared.projectContent.safeParse({ ...content, ownerId: 9 }).success, false)
   assert.equal(shared.projectContent.safeParse({ ...content, offerings: [{ name: 'Bad', description: '', kind: 'PRODUCT', url: 'javascript:alert(1)' }] }).success, false)
 
@@ -69,6 +88,28 @@ async function run() {
   assert.equal((await api.GET()).headers.get('cache-control'), 'private, no-store')
   assert.equal((await api.PUT(request({ revision: 1, content }))).status, 403, 'JWT admin role is not authorization')
   users.get(0).role = 'ADMIN'
+
+  const lifecycleRequest = (method, body, origin = 'https://wi300.vn') => new Request('https://wi300.vn/api/wi300/projects?slug=wi-api-test', { method, headers: { 'Content-Type': 'application/json', Origin: origin }, body: JSON.stringify(body) })
+  const apiInput = { slug: 'wi-api-test', name: 'Wi API Test', description: 'Kiểm tra API' }
+  assert.equal((await api.POST(lifecycleRequest('POST', apiInput, 'https://evil.example'))).status, 403)
+  assert.equal((await api.POST(lifecycleRequest('POST', apiInput))).status, 201)
+  assert.equal((await api.DELETE(lifecycleRequest('DELETE', { revision: 1 }, 'https://evil.example'))).status, 403)
+  users.get(0).role = 'STUDENT'
+  assert.equal((await api.DELETE(lifecycleRequest('DELETE', { revision: 1 }))).status, 403)
+  users.get(0).role = 'ADMIN'
+  assert.equal((await api.DELETE(lifecycleRequest('DELETE', { revision: 1 }))).status, 200)
+
+  const toolsApi = load('app/api/tools/route.ts', {
+    '@/auth': { auth: async () => session }, '@/lib/prisma': { __esModule: true, default: { ...db, tool: { findMany: async () => [] } } },
+    '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => brand }, '@/lib/wi300/project-service': service,
+  })
+  const containsProject = async () => (await (await toolsApi.GET()).json()).tools.some(tool => tool.slug === 'wi-projects')
+  session = null; assert.equal(await containsProject(), false)
+  session = { user: { id: '0' } }; assert.equal(await containsProject(), true)
+  session = { user: { id: '8' } }; assert.equal(await containsProject(), false)
+  session = { user: { id: '9' } }; assert.equal(await containsProject(), true, 'Owner sees management even for unpublished project')
+  brand = null; assert.equal(await containsProject(), false, 'No project menu on other deployments')
+  brand = {}; session = { user: { id: '0' } }
 
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://wi300.vn/du-an/quan-ly' })
   global.window = dom.window; global.document = dom.window.document; global.FormData = dom.window.FormData; global.IS_REACT_ACT_ENVIRONMENT = true
@@ -91,6 +132,31 @@ async function run() {
     fail = false; await React.act(async () => submit())
     assert.match(document.querySelector('[role="status"]').textContent, /Đã lưu/)
     assert.equal(document.querySelector('[name="name"]').value, 'Dự án mới')
+    const methods = []
+    global.fetch = async (url, options) => {
+      methods.push(options.method)
+      const input = JSON.parse(options.body)
+      return { ok: true, json: async () => options.method === 'POST' ? { project: { ...initial, ...input, revision: 1, published: false, featured: false } } : { slug: 'wi-ui-test' } }
+    }
+    await React.act(async () => root.render(React.createElement(Manager, { courses: [], initial: { admin: true, projects: [initial] } })))
+    // Chuyển từ chủ dự án sang admin bằng remount, như đổi phiên đăng nhập.
+    await React.act(async () => root.render(React.createElement(Manager, { key: 'admin', courses: [], initial: { admin: true, projects: [initial] } })))
+    await React.act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === '+ Thêm dự án').click())
+    const createForm = document.querySelector('form')
+    createForm.querySelector('[name="name"]').value = 'Wi UI Test'
+    createForm.querySelector('[name="slug"]').value = 'wi-ui-test'
+    createForm.querySelector('[name="description"]').value = 'Dự án UI'
+    await React.act(async () => createForm.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true })))
+    assert.equal(document.querySelector('select').value, 'wi-ui-test')
+    assert.ok(document.querySelector('[name="featured"]'))
+    await React.act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === 'Xóa dự án').click())
+    assert.deepEqual(methods, ['POST'], 'Delete requires confirmation')
+    await React.act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === 'Hủy').click())
+    assert.deepEqual(methods, ['POST'], 'Cancel never deletes')
+    await React.act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === 'Xóa dự án').click())
+    await React.act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === 'Xác nhận xóa').click())
+    assert.deepEqual(methods, ['POST', 'DELETE'])
+    assert.equal(document.querySelector('select').value, 'wi-grow')
   } finally { await React.act(async () => root.unmount()); dom.window.close(); global.fetch = savedFetch }
 
   const visibility = load('lib/wi300/course-visibility.ts')
@@ -99,6 +165,32 @@ async function run() {
   const html = require('react-dom/server').renderToStaticMarkup(await page({ params: Promise.resolve({ slug: 'wi-grow' }) }))
   assert.ok(html.includes('A%2FB')); assert.ok(html.includes('&lt;script&gt;')); assert.ok(!html.includes('<script>'))
   brand = null; await assert.rejects(() => page({ params: Promise.resolve({ slug: 'wi-grow' }) }), /404/)
+  brand = {}
+  const render = require('react-dom/server').renderToStaticMarkup
+  const projectPage = (actorId, role) => load('app/du-an/[slug]/page.tsx', {
+    'next/link': link, 'next/image': { __esModule: true, default: props => React.createElement('img', props) },
+    'next/navigation': { notFound: () => { throw new Error('404') } }, '@/auth': { auth: async () => actorId == null ? null : { user: { id: String(actorId) } } },
+    '@/lib/prisma': { __esModule: true, default: { user: { findUnique: async () => ({ name: 'Lucy', role }) } } },
+    '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => brand },
+    '@/lib/site-profile/runtime': { getCurrentSiteProfile: async () => ({}), getCourseWhereForProfile: () => scope },
+    '@/lib/wi300/course-visibility': { ...visibility, wi300CoursePreferences: async () => new Map() },
+    '@/lib/wi300/project-service': { readProjects: async () => [{ ...initial, ownerId: 8 }] },
+  }).default
+  for (const [actorId, role, permitted] of [[null, null, false], [9, 'STUDENT', false], [8, 'STUDENT', true], [0, 'ADMIN', true], [0, 'STUDENT', false]]) {
+    const markup = render(await projectPage(actorId, role)({ params: Promise.resolve({ slug: 'wi-grow' }) }))
+    assert.equal(markup.includes('Quản lý dự án này'), permitted)
+    assert.ok(markup.includes('/du-an/chu-du-an/8'))
+    if (permitted) assert.ok(markup.includes('/du-an/quan-ly?project=wi-grow'))
+  }
+  const navigation = load('lib/wi300/personal-space.ts', { './catalog': { searchText: value => value.toLowerCase() } })
+  const projectTool = { id: -3, slug: 'wi-projects', name: 'Dự án Wi', url: '/du-an/quan-ly', roles: [], isActive: true }
+  assert.equal(navigation.spaceNavigation('STUDENT', []).some(group => group.id === 'business'), false)
+  assert.equal(navigation.spaceNavigation('guest', [projectTool]).some(group => group.id === 'business'), false)
+  for (const role of ['ADMIN', 'STUDENT']) {
+    const groups = navigation.spaceNavigation(role, [projectTool])
+    assert.equal(groups.flatMap(group => group.items).filter(item => item.href === '/du-an/quan-ly').length, 1)
+    assert.equal(groups.find(group => group.id === 'business').items[0].label, 'Dự án Wi')
+  }
   console.log('WI projects: defaults/read-only, ownership, fresh roles, strict input, safe URLs, optimistic concurrency, admin controls, origin, invalidation, form save/retry, course scope, XSS and deployment isolation passed (mock DB only).')
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })
