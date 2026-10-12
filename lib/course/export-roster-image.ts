@@ -214,16 +214,15 @@ function renderChunk(
     ctx.font = '500 10px Arial, sans-serif'
     ctx.fillText('Ô trống = chưa bắt đầu học hoặc chưa tới ngày này', lx + 10, ly)
 
+    // Dùng download trực tiếp để không revoke Blob URL trước khi trình duyệt nhận file.
     const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png'
-    canvas.toBlob(blob => {
-        if (!blob) return
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `nop-bai-${slugify(courseName)}${fileSuffix}-${exportedAt.toISOString().slice(0, 10)}.${format === 'jpeg' ? 'jpg' : 'png'}`
-        a.click()
-        URL.revokeObjectURL(url)
-    }, mime, format === 'jpeg' ? 0.95 : undefined)
+    const filename = `nop-bai-${slugify(courseName)}${fileSuffix}-${exportedAt.toISOString().slice(0, 10)}.${format === 'jpeg' ? 'jpg' : 'png'}`
+    const a = document.createElement('a')
+    a.download = filename
+    a.href = canvas.toDataURL(mime, format === 'jpeg' ? 0.95 : undefined)
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
 }
 
 /**
@@ -241,6 +240,7 @@ export function downloadRosterAsImage(
     if (rows.length === 0) return
 
     const exportedAt = new Date()
+    if (typeof document === 'undefined') throw new Error('Chỉ hỗ trợ xuất ảnh trên trình duyệt')
     const startMids = rows.map(r => toVnMidnightUTC(r.startDate))
     const earliestStartMid = Math.min(...startMids)
     const todayMid = toVnMidnightUTC(exportedAt)
