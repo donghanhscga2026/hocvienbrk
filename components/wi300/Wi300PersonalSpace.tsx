@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import Wi300CourseCover from './Wi300CourseCover'
+import { ExternalAppsCatalog } from './Wi300ExternalApps'
 import { Youtube, DollarSign, Settings, Users, CreditCard, BookOpen, FileText, Gem, Map as MapIcon, Mail, Layout, Globe, Wallet, Tag, LayoutGrid, GraduationCap, UserRound, ShieldCheck, ContactRound, Link2, DatabaseBackup, LifeBuoy, Network, type LucideIcon } from 'lucide-react'
 import { recentActiveCourses } from '@/lib/wi300/catalog'
 import { canTeach, isContentTool, wi300ToolName, pendingCourseLabel, toolGroup, toolGroups, toolWorkspace, type PersonalTool } from '@/lib/wi300/personal-space'
@@ -179,7 +180,7 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
         </section>
       </>}
       {tab === 'learning' && <section className="space-y-3"><h2 className="text-xl font-bold">Lộ trình & công cụ học tập</h2>{toolList(workspaceTools('learning'))}</section>}
-      {tab === 'tools' && <><p className="text-brk-muted">Các công cụ được chia theo mục đích sử dụng và quyền tài khoản của bạn.</p>
+      {tab === 'tools' && <><ExternalAppsCatalog /><p className="text-brk-muted">Các công cụ được chia theo mục đích sử dụng và quyền tài khoản của bạn.</p>
         {/* Chỉ hiển thị nhóm có công cụ được phép dùng, giữ nguyên phân quyền. */}
         {toolsLoading || toolsError || !otherTools.length ? toolList(otherTools) : availableGroups.map(group => {
           const items = otherTools.filter(tool => toolGroup(tool) === group.id)

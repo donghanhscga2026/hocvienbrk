@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV !== "production";
 const isVercelPreview = process.env.VERCEL_ENV === "preview";
+// Chỉ cho hai app đã được duyệt nhúng trong project WI300.
+const wi300AppFrames = process.env.SITE_VARIANT?.trim().toLowerCase() === "wi300"
+  ? " https://cleanimage.vercel.app https://digital-biz-scan.lovable.app" : "";
 
 const nextConfig: NextConfig = {
   // Tăng tốc phản hồi HTTP
@@ -159,7 +162,7 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: https: blob:",
               "font-src 'self' data: https:",
               "connect-src 'self' https: ws: wss:",
-              `frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://www.dailymotion.com https://www.tiktok.com https://www.facebook.com https://drive.google.com https://docs.google.com https://*.supabase.co${isVercelPreview ? " https://vercel.live" : ""}`,
+              `frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://www.dailymotion.com https://www.tiktok.com https://www.facebook.com https://drive.google.com https://docs.google.com https://*.supabase.co${wi300AppFrames}${isVercelPreview ? " https://vercel.live" : ""}`,
               "media-src 'self' https: blob:",
               "object-src 'none'",
               "base-uri 'self'",
