@@ -18,7 +18,13 @@ export async function projectActor(db: PrismaClient, id: number) {
 export async function managedProjects(db: PrismaClient, id: number) {
   const actor = await projectActor(db, id)
   const admin = actor.role === 'ADMIN'
-  return { admin, projects: (await readProjects(db)).filter(project => admin || project.ownerId === id) }
+  const projects = (await readProjects(db)).filter(project => admin || project.ownerId === id)
+  const ownerIds = [...new Set(projects.flatMap(project => project.ownerId == null ? [] : [project.ownerId]))]
+  const ownerNames = Object.fromEntries(await Promise.all(ownerIds.map(async ownerId => {
+    const owner = await db.user.findUnique({ where: { id: ownerId }, select: { name: true } })
+    return [String(ownerId), owner?.name || `Thành viên #${ownerId}`]
+  })))
+  return { admin, projects, ownerNames }
 }
 export async function saveProject(db: PrismaClient, id: number, slug: string, raw: unknown) {
   projectSlug.parse(slug)

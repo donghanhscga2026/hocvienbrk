@@ -30,7 +30,7 @@ export async function GET() {
       if (Number.isSafeInteger(id) && id >= 0) {
         const managed = await managedProjects(prisma, id)
         if (managed.admin || managed.projects.length) tools.push({
-          id: -3, slug: 'wi-projects', name: 'Dự án Wi', description: 'Quản lý các dự án được giao', icon: 'Handshake',
+          id: -3, slug: 'wi-projects', name: 'Quản lý dự án', description: 'Quản lý các dự án được giao', icon: 'Handshake',
           url: '/du-an/quan-ly', roles: [], order: 102, isActive: true, createdAt: new Date(), updatedAt: new Date(),
         })
       }

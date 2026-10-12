@@ -114,13 +114,14 @@ async function run() {
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://wi300.vn/du-an/quan-ly' })
   global.window = dom.window; global.document = dom.window.document; global.FormData = dom.window.FormData; global.IS_REACT_ACT_ENVIRONMENT = true
   const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
-  const Manager = load('components/wi300/WiProjectManager.tsx', { 'next/link': link }).default
+  const navigationCalls = []
+  const Manager = load('components/wi300/WiProjectManager.tsx', { 'next/link': link, 'next/image': { __esModule: true, default: props => React.createElement('img', props) }, 'next/navigation': { useRouter: () => ({ push: url => navigationCalls.push(['push', url]), replace: url => navigationCalls.push(['replace', url]) }) } }).default
   const { createRoot } = require('react-dom/client'), root = createRoot(document.getElementById('root'))
   let payload, fail = true
   const savedFetch = global.fetch
   global.fetch = async (url, options) => { payload = JSON.parse(options.body); return { ok: !fail, json: async () => fail ? { error: 'Dữ liệu đã thay đổi. Tải lại.' } : { project: { ...initial, ...payload.content, revision: 1 } } } }
   try {
-    await React.act(async () => root.render(React.createElement(Manager, { courses: [{ id: 1, name_lop: 'Khóa AI', id_khoa: 'AI' }], initial: { admin: false, projects: [{ ...initial, ownerId: 8, courseIds: [2] }] } })))
+    await React.act(async () => root.render(React.createElement(Manager, { initialSlug: 'wi-grow', courses: [{ id: 1, name_lop: 'Khóa AI', id_khoa: 'AI' }], initial: { admin: false, projects: [{ ...initial, ownerId: 8, courseIds: [2] }] } })))
     assert.equal(document.querySelector('[name="ownerId"]'), null)
     document.querySelector('[name="name"]').value = 'Dự án mới'
     document.querySelector('[name="courseIds"]').checked = true
@@ -133,21 +134,29 @@ async function run() {
     assert.match(document.querySelector('[role="status"]').textContent, /Đã lưu/)
     assert.equal(document.querySelector('[name="name"]').value, 'Dự án mới')
     const methods = []
+    let createdProject
     global.fetch = async (url, options) => {
       methods.push(options.method)
       const input = JSON.parse(options.body)
-      return { ok: true, json: async () => options.method === 'POST' ? { project: { ...initial, ...input, revision: 1, published: false, featured: false } } : { slug: 'wi-ui-test' } }
+      createdProject = { ...initial, ...input, revision: 1, published: false, featured: false }
+      return { ok: true, json: async () => options.method === 'POST' ? { project: createdProject } : { slug: 'wi-ui-test' } }
     }
     await React.act(async () => root.render(React.createElement(Manager, { courses: [], initial: { admin: true, projects: [initial] } })))
     // Chuyển từ chủ dự án sang admin bằng remount, như đổi phiên đăng nhập.
     await React.act(async () => root.render(React.createElement(Manager, { key: 'admin', courses: [], initial: { admin: true, projects: [initial] } })))
+    assert.equal(document.querySelector('select'), null, 'List is cards rather than a project dropdown')
+    assert.equal(document.querySelector('form'), null, 'List does not automatically open the first project')
+    assert.equal(document.querySelector('[aria-label="Quản lý Wi.Grow"]').getAttribute('href'), '/du-an/quan-ly?project=wi-grow')
     await React.act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === '+ Thêm dự án').click())
     const createForm = document.querySelector('form')
     createForm.querySelector('[name="name"]').value = 'Wi UI Test'
     createForm.querySelector('[name="slug"]').value = 'wi-ui-test'
     createForm.querySelector('[name="description"]').value = 'Dự án UI'
     await React.act(async () => createForm.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true })))
-    assert.equal(document.querySelector('select').value, 'wi-ui-test')
+    assert.deepEqual(navigationCalls.at(-1), ['push', '/du-an/quan-ly?project=wi-ui-test'])
+    await React.act(async () => root.render(React.createElement(Manager, { key: 'new-edit', initialSlug: 'wi-ui-test', courses: [], initial: { admin: true, projects: [initial, createdProject] } })))
+    assert.equal(document.querySelector('[name="name"]').value, 'Wi UI Test')
+    assert.ok([...document.querySelectorAll('a')].some(anchor => anchor.textContent.includes('Danh sách dự án') && anchor.getAttribute('href') === '/du-an/quan-ly'))
     assert.ok(document.querySelector('[name="featured"]'))
     await React.act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === 'Xóa dự án').click())
     assert.deepEqual(methods, ['POST'], 'Delete requires confirmation')
@@ -156,7 +165,13 @@ async function run() {
     await React.act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === 'Xóa dự án').click())
     await React.act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === 'Xác nhận xóa').click())
     assert.deepEqual(methods, ['POST', 'DELETE'])
-    assert.equal(document.querySelector('select').value, 'wi-grow')
+    assert.deepEqual(navigationCalls.at(-1), ['replace', '/du-an/quan-ly'])
+    assert.equal(document.querySelector('form'), null)
+    assert.ok(document.querySelector('[aria-label="Quản lý Wi.Grow"]'))
+    await React.act(async () => root.render(React.createElement(Manager, { key: 'owner-list', courses: [], initial: { admin: false, projects: [{ ...initial, ownerId: 8 }], ownerNames: { '8': 'Lucy' } } })))
+    assert.equal(document.querySelectorAll('article').length, 1)
+    assert.ok(document.querySelector('article').textContent.includes('Lucy'))
+    assert.equal([...document.querySelectorAll('button')].some(button => button.textContent === '+ Thêm dự án'), false)
   } finally { await React.act(async () => root.unmount()); dom.window.close(); global.fetch = savedFetch }
 
   const visibility = load('lib/wi300/course-visibility.ts')
@@ -167,6 +182,21 @@ async function run() {
   brand = null; await assert.rejects(() => page({ params: Promise.resolve({ slug: 'wi-grow' }) }), /404/)
   brand = {}
   const render = require('react-dom/server').renderToStaticMarkup
+  let courseLoads = 0
+  const managerPage = load('app/du-an/quan-ly/page.tsx', {
+    'next/link': link, 'next/navigation': { notFound: () => { throw new Error('404') }, redirect: () => { throw new Error('login') } },
+    '@/auth': { auth: async () => ({ user: { id: '8' } }) }, '@/lib/prisma': { __esModule: true, default: { course: { findMany: async () => { courseLoads++; return [] } } } },
+    '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => ({}) }, '@/lib/site-profile/runtime': { getCurrentSiteProfile: async () => ({}), getCourseWhereForProfile: () => scope },
+    '@/lib/wi300/course-visibility': { ...visibility, wi300CoursePreferences: async () => new Map() },
+    '@/lib/wi300/project-service': { managedProjects: async () => ({ admin: false, projects: [initial] }) },
+    '@/components/wi300/WiProjectManager': { __esModule: true, default: ({ initialSlug }) => React.createElement('div', { 'data-project': initialSlug || 'list' }) },
+  }).default
+  assert.ok(render(await managerPage({ searchParams: Promise.resolve({}) })).includes('data-project="list"'))
+  assert.equal(courseLoads, 0, 'Card list does not load the course catalog')
+  assert.ok(render(await managerPage({ searchParams: Promise.resolve({ project: 'wi-grow' }) })).includes('data-project="wi-grow"'))
+  assert.equal(courseLoads, 1)
+  await assert.rejects(() => managerPage({ searchParams: Promise.resolve({ project: 'not-my-project' }) }), /404/)
+  assert.equal(courseLoads, 1, 'Unauthorized project never loads course catalog')
   const projectPage = (actorId, role) => load('app/du-an/[slug]/page.tsx', {
     'next/link': link, 'next/image': { __esModule: true, default: props => React.createElement('img', props) },
     'next/navigation': { notFound: () => { throw new Error('404') } }, '@/auth': { auth: async () => actorId == null ? null : { user: { id: String(actorId) } } },
