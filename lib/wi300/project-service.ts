@@ -1,7 +1,7 @@
 import type { PrismaClient } from '@prisma/client'
 import { z } from 'zod'
 import { CrmError } from '@/lib/crm/service'
-import { PROJECT_PREFIX, mergeProjects, projectContent, projectControls, projectDefaults, projectSlug, publicProject } from './projects'
+import { PROJECT_PREFIX, mergeProjects, projectContent, projectControls, projectDefaults, projectSlug, publicProject, projectMembers, canManageProject } from './projects'
 
 export async function readProjects(db: PrismaClient) {
   return mergeProjects(await db.systemConfig.findMany({ where: { key: { startsWith: PROJECT_PREFIX } }, select: { key: true, value: true } }))
@@ -18,33 +18,37 @@ export async function projectActor(db: PrismaClient, id: number) {
 export async function managedProjects(db: PrismaClient, id: number) {
   const actor = await projectActor(db, id)
   const admin = actor.role === 'ADMIN'
-  const projects = (await readProjects(db)).filter(project => admin || project.ownerId === id)
-  const ownerIds = [...new Set(projects.flatMap(project => project.ownerId == null ? [] : [project.ownerId]))]
+  const projects = (await readProjects(db)).filter(project => canManageProject(project, id, admin))
+  const ownerIds = [...new Set(projects.flatMap(project => [...(project.ownerId == null ? [] : [project.ownerId]), ...(project.members || []).map(member => member.userId)]))]
   const ownerNames = Object.fromEntries(await Promise.all(ownerIds.map(async ownerId => {
     const owner = await db.user.findUnique({ where: { id: ownerId }, select: { name: true } })
     return [String(ownerId), owner?.name || `Thành viên #${ownerId}`]
   })))
-  return { admin, projects, ownerNames }
+  return { admin, actorId: id, projects, ownerNames }
 }
 export async function saveProject(db: PrismaClient, id: number, slug: string, raw: unknown) {
   projectSlug.parse(slug)
-  const envelope = z.object({ revision: z.number().int().min(0), content: projectContent, controls: projectControls.optional() }).strict().parse(raw)
+  const envelope = z.object({ revision: z.number().int().min(0), content: projectContent, controls: projectControls.optional(), members: projectMembers.optional() }).strict().parse(raw)
   return db.$transaction(async tx => {
     // Khóa cùng dự án để việc đổi chủ và lưu nội dung không ghi đè nhau.
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${PROJECT_PREFIX + slug}))`
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${PROJECT_PREFIX}))`
     const actor = await tx.user.findUnique({ where: { id }, select: { id: true, role: true } })
     if (!actor) throw new CrmError('Vui lòng đăng nhập lại.', 401)
     const row = await tx.systemConfig.findUnique({ where: { key: PROJECT_PREFIX + slug } })
     const current = mergeProjects(row ? [row] : []).find(project => project.slug === slug)
     if (!current) throw new CrmError('Không tìm thấy dự án hoặc dự án đã bị xóa.', 404)
     const admin = actor.role === 'ADMIN'
-    if (!admin && current.ownerId !== id) throw new CrmError('Bạn không được sửa dự án này.', 403)
+    if (!canManageProject(current, id, admin)) throw new CrmError('Bạn không được sửa dự án này.', 403)
+    if (envelope.members && !admin && current.ownerId !== id) throw new CrmError('Chỉ chủ dự án hoặc quản trị viên được đổi đội ngũ.', 403)
+    if (envelope.members) for (const member of envelope.members) {
+      if (!await tx.user.findUnique({ where: { id: member.userId }, select: { id: true } })) throw new CrmError('Mã thành viên trong đội ngũ không tồn tại.')
+    }
     if (!admin && envelope.controls) throw new CrmError('Chỉ quản trị viên được đổi chủ hoặc chế độ hiển thị.', 403)
     if (envelope.revision !== current.revision) throw new CrmError('Dự án đã được người khác cập nhật. Tải lại trước khi sửa tiếp.', 409)
     const controls = envelope.controls || { ownerId: current.ownerId, published: current.published, featured: current.featured, order: current.order }
     if (controls.ownerId != null && !await tx.user.findUnique({ where: { id: controls.ownerId }, select: { id: true } })) throw new CrmError('Mã thành viên của chủ dự án không tồn tại.')
     if (envelope.content.courseIds.length && await tx.course.count({ where: { id: { in: envelope.content.courseIds } } }) !== envelope.content.courseIds.length) throw new CrmError('Một số khóa học không tồn tại. Vui lòng chọn lại.')
-    const value = { ...envelope.content, ...controls, revision: current.revision + 1 }
+    const value = { ...envelope.content, ...controls, members: envelope.members || current.members || [], revision: current.revision + 1 }
     await tx.systemConfig.upsert({ where: { key: PROJECT_PREFIX + slug }, create: { key: PROJECT_PREFIX + slug, value }, update: { value } })
     return { slug, ...value }
   }, { timeout: 15000 })
@@ -53,7 +57,7 @@ export async function saveProject(db: PrismaClient, id: number, slug: string, ra
 export async function createProject(db: PrismaClient, id: number, raw: unknown) {
   const input = z.object({ slug: projectSlug, name: projectContent.shape.name, description: projectContent.shape.description }).strict().parse(raw)
   return db.$transaction(async tx => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${PROJECT_PREFIX + input.slug}))`
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${PROJECT_PREFIX}))`
     const actor = await tx.user.findUnique({ where: { id }, select: { id: true, role: true } })
     if (!actor) throw new CrmError('Vui lòng đăng nhập lại.', 401)
     if (actor.role !== 'ADMIN') throw new CrmError('Chỉ quản trị viên được thêm dự án.', 403)
@@ -70,7 +74,7 @@ export async function deleteProject(db: PrismaClient, id: number, slug: string, 
   projectSlug.parse(slug)
   const input = z.object({ revision: z.number().int().min(0) }).strict().parse(raw)
   return db.$transaction(async tx => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${PROJECT_PREFIX + slug}))`
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${PROJECT_PREFIX}))`
     const actor = await tx.user.findUnique({ where: { id }, select: { id: true, role: true } })
     if (!actor) throw new CrmError('Vui lòng đăng nhập lại.', 401)
     if (actor.role !== 'ADMIN') throw new CrmError('Chỉ quản trị viên được xóa dự án.', 403)

@@ -7,6 +7,7 @@ import { updateCourseAction, updateLessonAction, deleteLessonAction } from '@/ap
 import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle2, AlertCircle, List, Play, Edit2, X, FileSpreadsheet, Download, Save, Trash2, Plus, Mail, ArrowUp, ArrowDown, Bell } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
+import WiCourseProjects from '@/components/wi300/WiCourseProjects'
 
 import { ImportLessonsModal } from '@/components/admin/courses/ImportLessonsModal'
 import { LessonEditModal } from '@/components/admin/courses/LessonEditModal'
@@ -375,6 +376,7 @@ function CreateCourseContent() {
                     <ArrowLeft className="w-4 h-4" /> Quay lại danh sách
                 </Link>
                 
+                {isEditMode && activeTab === 'info' && <WiCourseProjects key={courseId} courseId={courseId!} />}
                 {( !isEditMode || activeTab === 'info' ) && (
                 <form onSubmit={handleSubmit} className="space-y-8">
                 {/* SECTION 1: THÔNG TIN CƠ BẢN */}

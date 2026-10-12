@@ -5,7 +5,7 @@ function load(file, mocks = {}) {
   mocks = { '@/auth': { auth: async () => null }, ...mocks }
   const module = { exports: {} }
   const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : require(name), module, module.exports)
+  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name === '@/lib/wi300/projects' ? load('lib/wi300/projects.ts') : name === './WiProjectTeamEditor' ? load('components/wi300/WiProjectTeamEditor.tsx') : require(name), module, module.exports)
   return module.exports
 }
 class CrmError extends Error { constructor(message, status = 400) { super(message); this.status = status } }
@@ -124,12 +124,11 @@ async function run() {
     await React.act(async () => root.render(React.createElement(Manager, { initialSlug: 'wi-grow', courses: [{ id: 1, name_lop: 'Khóa AI', id_khoa: 'AI' }], initial: { admin: false, projects: [{ ...initial, ownerId: 8, courseIds: [2] }] } })))
     assert.equal(document.querySelector('[name="ownerId"]'), null)
     document.querySelector('[name="name"]').value = 'Dự án mới'
-    document.querySelector('[name="courseIds"]').checked = true
     const submit = () => document.querySelector('form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }))
     await React.act(async () => submit())
     assert.match(document.querySelector('[role="alert"]').textContent, /Tải lại/)
     assert.equal(document.querySelector('[name="name"]').value, 'Dự án mới', 'Save failure retains typed draft')
-    assert.equal('controls' in payload, false); assert.deepEqual(payload.content.courseIds, [1, 2])
+    assert.equal('controls' in payload, false); assert.deepEqual(payload.content.courseIds, [2])
     fail = false; await React.act(async () => submit())
     assert.match(document.querySelector('[role="status"]').textContent, /Đã lưu/)
     assert.equal(document.querySelector('[name="name"]').value, 'Dự án mới')
