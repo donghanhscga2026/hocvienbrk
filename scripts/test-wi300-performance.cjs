@@ -77,6 +77,7 @@ async function run() {
 
   let selection
   const home = load('components/wi300/Wi300Home.tsx', {
+    '@/lib/wi300/project-service': { readPublicProjects: async () => [] },
     '@/lib/wi300/course-visibility': load('lib/wi300/course-visibility.ts'),
     '@/lib/wi300/personal-space': { canTeach: role => ['ADMIN', 'TEACHER'].includes(role) },
     'next/cache': { unstable_cache: fn => fn },

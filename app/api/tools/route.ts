@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { auth } from '@/auth'
+import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
+import { managedProjects } from '@/lib/wi300/project-service'
 
 export async function GET() {
   try {
@@ -21,7 +24,18 @@ export async function GET() {
       url: '/tools/dev-flow', roles: ['ADMIN', 'DEVELOPER'], order: 101,
       isActive: true, createdAt: new Date(), updatedAt: new Date(),
     })
-    return NextResponse.json({ tools })
+    if (await getCurrentDeploymentBrand()) {
+      const session = await auth()
+      const id = session?.user?.id == null ? NaN : Number(session.user.id)
+      if (Number.isSafeInteger(id) && id >= 0) {
+        const managed = await managedProjects(prisma, id)
+        if (managed.admin || managed.projects.length) tools.push({
+          id: -3, slug: 'wi-projects', name: 'Quản lý dự án', description: 'Quản lý các dự án được giao', icon: 'Handshake',
+          url: '/du-an/quan-ly', roles: [], order: 102, isActive: true, createdAt: new Date(), updatedAt: new Date(),
+        })
+      }
+    }
+    return NextResponse.json({ tools }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error: unknown) {
     console.error('Tools API Error:', error)
     return NextResponse.json({ error: 'Không thể tải danh sách công cụ.' }, { status: 500 })

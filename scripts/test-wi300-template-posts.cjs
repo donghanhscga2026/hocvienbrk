@@ -9,7 +9,7 @@ function load(file, mocks = {}) {
   const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true }
   }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : require(name), module, module.exports)
+  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name === '@/lib/wi300/projects' ? load('lib/wi300/projects.ts') : require(name), module, module.exports)
   return module.exports
 }
 async function run() {
@@ -113,7 +113,8 @@ async function run() {
   assert.equal(businessDoc.querySelectorAll('ul[aria-hidden="true"] li').length, 7)
   for (const logo of ['wi-art.webp', 'wi-mentor.webp', 'wi-finance.webp', 'wi-marketing.webp', 'wi-grow.png', 'wi-tech.png']) assert.ok(businessDoc.querySelector(`ul[aria-label] img[src$="${logo}"]`))
   for (const img of businessDoc.querySelectorAll('ul[aria-label] img')) assert.ok(img.classList.contains('rounded-full'), 'Ảnh được bo tròn ngay trên phần tử ảnh')
-  assert.equal(businessDoc.querySelectorAll('a').length, 0, 'No invented company URLs')
+  assert.equal(businessDoc.querySelectorAll('ul[aria-label] a[href^="/du-an/"]').length, 7, 'Project logos open internal profiles')
+  assert.equal(businessDoc.querySelectorAll('a[href^="http"]').length, 0, 'No invented external company URLs')
   console.log('WI300 template viewport, repeated menu navigation, registration isolation, post edit authorization/UI and business identities passed.')
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })

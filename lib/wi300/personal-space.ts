@@ -35,6 +35,7 @@ export function toolGroup(tool: PersonalTool) {
 // Phân khu chỉ sắp xếp điều hướng; quyền công cụ vẫn được kiểm tra riêng.
 export function toolWorkspace(tool: PersonalTool) {
   const slug = routeSlug(tool) || tool.slug || ''
+  if (slug === 'wi-projects') return 'business'
   if (slug === 'dev-flow') return 'tools'
   if (tool.roles.length && tool.roles.every(role => ['ADMIN', 'DEVELOPER'].includes(role))) return 'admin'
   if (['roadmap', 'my-learning'].includes(slug)) return 'learning'
@@ -87,6 +88,7 @@ export function spaceNavigation(role: string, tools: PersonalTool[]): SpaceNavGr
     ] },
     ...(canTeach(role) ? [{ id: 'teaching', label: 'Dành cho giảng viên', href: '/my-space?tab=teaching', icon: 'GraduationCap', items: [] }] : []),
     ...(loggedIn ? [{ id: 'affiliate', label: 'Dành cho cộng tác viên', href: '/my-space?tab=affiliate', icon: 'Link2', items: [{ label: 'Link giới thiệu & hoa hồng', href: '/tools/affiliate', icon: 'Link2' }] }] : []),
+    ...(loggedIn && tools.some(tool => tool.slug === 'wi-projects' && tool.isActive && canUseTool(role, tool.roles)) ? [{ id: 'business', label: 'Quản lý & kinh doanh', href: '/my-space?tab=business', icon: 'Handshake', items: [] }] : []),
     { id: 'tools', label: 'Công cụ & tiện ích', href: '/my-space?tab=tools', icon: 'LayoutGrid', items: [] },
     { id: 'account', label: 'Tài khoản & cài đặt', href: '/my-space?tab=account', icon: 'UserRound', items: [
       { label: loggedIn ? 'Cài đặt tài khoản' : 'Đăng nhập', href: loggedIn ? '/account-settings' : '/login', icon: 'Settings' },

@@ -14,9 +14,11 @@ import type { Wi300Course, Wi300Enrollment, Wi300TeachingCourse } from './Wi300H
 import Wi300PersonalSpace from './Wi300PersonalSpace'
 import Wi300Businesses from './Wi300Businesses'
 import Wi300Teachers from './Wi300Teachers'
+import type { PublicWiProject } from '@/lib/wi300/projects'
 
 const PaymentModal = dynamic(() => import('@/components/course/PaymentModal'), { ssr: false })
 type Props = {
+  projects?: PublicWiProject[]; projectsError?: boolean;
   brand: DeploymentBrand; courses: Wi300Course[]; enrollments: Wi300Enrollment[];
   teachingCourses?: Wi300TeachingCourse[]; teachingError?: boolean;
   userId: number | null; userPhone: string | null; loggedIn: boolean;
@@ -28,7 +30,7 @@ export default function Wi300HomeClient(props: Props) {
   return <Suspense fallback={<div className="p-8 text-center">Đang tải khóa học…</div>}><HomeContent key={props.view || 'home'} {...props} /></Suspense>
 }
 
-function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn, catalogError, accountError, teachingCourses = [], teachingError = false, view = 'home' }: Props) {
+function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn, catalogError, accountError, teachingCourses = [], teachingError = false, view = 'home', projects, projectsError = false }: Props) {
   const searchParams = useSearchParams()
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [category, setCategory] = useState('')
@@ -94,7 +96,7 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
         <Link href="/san-pham" className="flex min-h-28 items-center gap-4 rounded-2xl border border-brk-outline bg-white p-5 hover:border-brk-primary"><Package className="h-7 w-7 shrink-0 text-brk-accent" /><div><h2 className="font-bold">Sản phẩm</h2><p className="mt-1 text-sm text-brk-muted">Kết nối sản phẩm từ doanh nghiệp Wi →</p></div></Link>
         <div className="flex min-h-28 items-center gap-4 rounded-2xl border border-brk-outline bg-white p-5"><BriefcaseBusiness className="h-7 w-7 shrink-0 text-brk-accent" /><div><h2 className="font-bold">Dịch vụ</h2><p className="mt-1 text-sm text-brk-muted">Sẽ được bổ sung</p></div></div>
       </section>
-      <Wi300Businesses />
+      <Wi300Businesses projects={projects} error={projectsError} />
       <Wi300Teachers teachers={teachers} catalogError={catalogError} />
       <section id="khoa-hoc" className="mx-auto max-w-7xl scroll-mt-40 px-4 py-12 lg:scroll-mt-24 lg:px-6"><div className="mb-5 flex flex-wrap items-end justify-between gap-3"><h2 className="text-2xl font-bold">Khóa học tiêu biểu</h2><Link href="/khoa-hoc" className="py-3 text-sm font-semibold text-brk-primary">Xem tất cả khóa học →</Link></div>{catalogError ? <p role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900">Chưa tải được khóa học. Vui lòng thử lại sau.</p> : featured.length ? <div className="grid items-start gap-5 md:grid-cols-2 xl:grid-cols-3">{featured.map(card)}</div> : <p className="text-brk-muted">Các khóa học sẽ được cập nhật tại đây.</p>}</section>
     </>}
@@ -107,7 +109,7 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
       </nav>
       <div className="mt-6 grid gap-4 sm:grid-cols-2">{[{ id: 'san-pham', title: 'Sản phẩm', icon: Package }, { id: 'dich-vu', title: 'Dịch vụ', icon: BriefcaseBusiness }].map(({ id, title, icon: Icon }) => <section id={id} key={id} className="scroll-mt-44 rounded-2xl border border-brk-outline p-5 lg:scroll-mt-24"><Icon className="mb-3 text-brk-accent" /><h2 className="font-bold">{title}</h2><p className="mt-2 text-sm text-brk-muted">Sẽ được bổ sung trong giai đoạn tiếp theo.</p></section>)}</div>
     </section>}
-    {view === 'discover' && <><Wi300Businesses />
+    {view === 'discover' && <><Wi300Businesses projects={projects} error={projectsError} />
       <Wi300Teachers teachers={teachers} catalogError={catalogError} />
     </>}
     {view === 'space' && <Wi300PersonalSpace teachingCourses={teachingCourses} teachingError={teachingError} courses={courses} enrollments={enrollments} userId={userId} userPhone={userPhone} accountError={accountError || catalogError} />}
