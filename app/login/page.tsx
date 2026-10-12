@@ -459,7 +459,7 @@ function LoginForm() {
                                                 onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-brk-accent">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
                                         </div>
                                         {errors.password && <p className="text-xs text-brk-accent">{errors.password.message}</p>}
-                                        {otpRequested && <p className="text-xs text-brk-primary mt-1">Mã OTP đã được gửi đến email đã đăng ký. Nhập mã vào ô bên trên.</p>}
+                                        {otpRequested && <p className="text-xs text-brk-primary mt-1">Lấy mã OTP đã được gửi qua mail của bạn điền vào ô trên, quá 10 phút phải lấy lại mã OTP khác.</p>}
                                         <div className="flex items-center justify-between mt-2">
                                             <button type="button" disabled={isLoading} onClick={requestEmailOtp} className="text-xs text-brk-primary underline disabled:opacity-50">
                                                 {otpRequested ? "Gửi lại mã OTP" : "Gửi mã OTP qua mail"}
