@@ -25,7 +25,7 @@ new Function('require', 'exports', 'module', ts.transpileModule(fs.readFileSync(
   if (name === '@/auth') return { auth: async () => null }
   if (name === '@/lib/prisma') return { default: fake }
   if (name === '@/lib/crm/service') return { CrmError }
-  if (name === './notification-pagination') return { NOTIFICATION_PAGE_SIZE: 10 }
+  if (name === './notification-pagination') return { NOTIFICATION_PAGE_SIZE: 10, NOTIFICATION_APPEND_SIZE: 3 }
   throw new Error(name)
 }, m.exports, m)
 const feed = m.exports
@@ -230,7 +230,14 @@ async function run() {
   const notificationRoute=load('app/api/notifications/route.ts',{'@/lib/crm/http':http,'@/lib/app-notifications':{...feed,notificationActor:authActor}})
   ok((await notificationRoute.PATCH(new Request('https://test.invalid/api/notifications',{method:'PATCH',headers:{origin:'https://evil.invalid','content-type':'application/json'},body:JSON.stringify({all:true})}))).status===403,'Notification writes require same origin')
   ok((await notificationRoute.GET(new Request('https://test.invalid/api/notifications?page=0'))).status===400,'Notification paging validated')
+  const streamResponse=await notificationRoute.GET(new Request('https://test.invalid/api/notifications?stream=1'))
+  const streamPayload=await streamResponse.json()
+  ok(streamResponse.status===200 && streamPayload.notifications.length<=10 && 'nextCursor' in streamPayload,'Stream API exposes first ten and cursor')
+  ok((await notificationRoute.GET(new Request('https://test.invalid/api/notifications?stream=1&cursor=bad!'))).status===400,'Stream cursor validated')
+  ok((await notificationRoute.GET(new Request('https://test.invalid/api/notifications?stream=1&page=2'))).status===400,'Stream rejects mixed pagination')
+  ok((await notificationRoute.GET(new Request('https://test.invalid/api/notifications?stream=1&userId=4'))).status===400,'Stream rejects actor override')
   sessionUser=null; ok((await notificationRoute.GET(new Request('https://test.invalid/api/notifications'))).status===401,'Anonymous notification API rejected')
+  ok((await notificationRoute.GET(new Request('https://test.invalid/api/notifications?stream=1'))).status===401,'Anonymous stream rejected')
   const announcementRoute=load('app/api/courses/[id]/lessons/[lessonId]/announce/route.ts',{'@/lib/crm/http':http,'@/lib/app-notifications':{notificationActor:authActor},'@/lib/lesson-announcements':announcements,'@/lib/web-push-config':config,'@/lib/web-push-worker':{processWebPush:async()=>{}},'next/server':{after:()=>{}}})
   const context={params:Promise.resolve({id:'10',lessonId:'lesson-a'})}
   const postAnnouncement=(body,origin='https://test.invalid')=>announcementRoute.POST(new Request('https://test.invalid/api/courses/10/lessons/lesson-a/announce',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(body)}),context)

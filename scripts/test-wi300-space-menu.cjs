@@ -38,7 +38,7 @@ async function run() {
   Object.defineProperty(global, 'navigator', { configurable: true, value: dom.window.navigator })
   global.IS_REACT_ACT_ENVIRONMENT = true
   let hover = true
-  window.matchMedia = () => ({ matches: hover })
+  window.matchMedia = query => ({ matches: query.includes('min-width') ? true : hover })
   const link = { __esModule: true, default: ({ children, onNavigate, scroll, onClick, ...props }) => React.createElement('a', { ...props, onClick: e => { e.preventDefault(); onClick?.(e); onNavigate?.() } }, children) }
   const menu = load('components/wi300/Wi300SpaceMenu.tsx', { 'next/link': link, '@/lib/wi300/personal-space': model })
   const { createRoot } = require('react-dom/client')
@@ -102,6 +102,28 @@ async function run() {
     assert.equal(findButton('Lối tắt Dành cho học viên').getAttribute('aria-expanded'), 'true')
     assert.ok(document.querySelector('a[href*="status=completed"]'))
     assert.equal(navigations, 0)
+    const oldRect = window.HTMLElement.prototype.getBoundingClientRect
+    const oldHeight = Object.getOwnPropertyDescriptor(window.HTMLElement.prototype, 'scrollHeight')
+    let rowTop=300, panelHeight=90
+    Object.defineProperty(window,'innerHeight',{configurable:true,value:800})
+    window.HTMLElement.prototype.getBoundingClientRect=function(){
+      const top=this.getAttribute('aria-label')==='Menu không gian cá nhân'?100:this.parentElement?.hasAttribute('data-space-group')?rowTop:0
+      return {top,bottom:top+44,left:0,right:290,width:290,height:44,x:0,y:top,toJSON:()=>({})}
+    }
+    Object.defineProperty(window.HTMLElement.prototype,'scrollHeight',{configurable:true,get(){return this.style.getPropertyValue('--space-submenu-top')?panelHeight:0}})
+    const submenu=()=>document.getElementById(findButton('Lối tắt Dành cho giảng viên').getAttribute('aria-controls'))
+    await act(async()=>enter(findButton('Lối tắt Dành cho giảng viên').parentElement))
+    assert.equal(submenu().style.getPropertyValue('--space-submenu-top'),'200px','Menu bắt đầu ngang dòng đang rê chuột')
+    rowTop=750;panelHeight=450
+    await act(async()=>window.dispatchEvent(new window.Event('resize')))
+    assert.equal(submenu().style.getPropertyValue('--space-submenu-top'),'242px','Chỉ đẩy lên khi vượt đáy màn hình')
+    assert.equal(submenu().style.getPropertyValue('--space-submenu-max-height'),'520px')
+    rowTop=260
+    await act(async()=>window.dispatchEvent(new window.Event('scroll')))
+    assert.equal(submenu().style.getPropertyValue('--space-submenu-top'),'160px')
+    window.HTMLElement.prototype.getBoundingClientRect=oldRect
+    if(oldHeight)Object.defineProperty(window.HTMLElement.prototype,'scrollHeight',oldHeight)
+    else delete window.HTMLElement.prototype.scrollHeight
     await act(async () => root.unmount())
   } finally { global.fetch = savedFetch; dom.window.close() }
   console.log('WI300 space menu: role/URL isolation, lazy cached tools, hover/touch, keyboard/Escape, outside close, account/route reset, API fallback and sidebar direct shortcuts passed.')

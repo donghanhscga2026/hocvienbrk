@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client'
 import { auth } from '@/auth'
 import prisma from '@/lib/prisma'
 import { CrmError } from '@/lib/crm/service'
-import { NOTIFICATION_PAGE_SIZE } from './notification-pagination'
+import { NOTIFICATION_PAGE_SIZE, NOTIFICATION_APPEND_SIZE } from './notification-pagination'
 
 export async function notificationActor() {
   const session = await auth()
@@ -76,4 +76,33 @@ export async function markNotifications(actor: Actor, ids: string[] | null) {
   const condition = ids == null ? Prisma.sql`TRUE` : Prisma.sql`n.id IN (${Prisma.join(ids)})`
   const count = await prisma.$executeRaw(Prisma.sql`WITH visible AS (${visible}) UPDATE public."AppNotification" n SET "readAt" = ${new Date()} WHERE n.id IN (SELECT id FROM visible) AND n."readAt" IS NULL AND ${condition}`)
   return { updated: count }
+}
+
+/** Mốc thời gian + ID giữ thứ tự ổn định khi có thông báo mới được chèn ở đầu. */
+export async function readNotificationStream(actor: Actor, cursor?: string) {
+  let after: { date: Date; id: string } | null = null
+  if (cursor) {
+    try {
+      if (!/^[A-Za-z0-9_-]{1,500}$/.test(cursor)) throw new Error('cursor')
+      const value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'))
+      if (!Array.isArray(value) || value.length !== 2 || typeof value[0] !== 'string' || typeof value[1] !== 'string' || !value[1] || value[1].length > 128) throw new Error('cursor')
+      const date = new Date(value[0])
+      if (!Number.isFinite(date.getTime()) || date.toISOString() !== value[0]) throw new Error('cursor')
+      after = { date, id: value[1] }
+    } catch { throw new CrmError('Mốc tải thông báo không hợp lệ.', 400) }
+  }
+  const visible = visibleNotifications(actor)
+  const size = after ? NOTIFICATION_APPEND_SIZE : NOTIFICATION_PAGE_SIZE
+  const condition = after ? Prisma.sql`("notBefore", id) < (${after.date}, ${after.id})` : Prisma.sql`TRUE`
+  const [rows, stats] = await prisma.$transaction([
+    prisma.$queryRaw<NotificationRow[]>(Prisma.sql`WITH visible AS (${visible}) SELECT * FROM visible WHERE ${condition} ORDER BY "notBefore" DESC, id DESC LIMIT ${size + 1}`),
+    prisma.$queryRaw<{ total: bigint; unread: bigint }[]>(Prisma.sql`WITH visible AS (${visible}) SELECT count(*) AS total, count(*) FILTER (WHERE "readAt" IS NULL) AS unread FROM visible`),
+  ])
+  const items = rows.slice(0, size)
+  const last = items[items.length - 1]
+  return {
+    notifications: items.map(row => ({ id: row.id, title: row.title, kind: row.kind, readAt: row.readAt, createdAt: row.notBefore, href: notificationHref(row) })),
+    total: Number(stats[0].total), unread: Number(stats[0].unread),
+    nextCursor: rows.length > size && last ? Buffer.from(JSON.stringify([last.notBefore.toISOString(), last.id])).toString('base64url') : null,
+  }
 }
