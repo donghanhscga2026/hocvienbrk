@@ -8,7 +8,7 @@ import dynamic from 'next/dynamic'
 import Wi300CourseCover from './Wi300CourseCover'
 import { Youtube, DollarSign, Settings, Users, CreditCard, BookOpen, FileText, Gem, Map as MapIcon, Mail, Layout, Globe, Wallet, Tag, LayoutGrid, GraduationCap, UserRound, ShieldCheck, ContactRound, Link2, DatabaseBackup, LifeBuoy, Network, type LucideIcon } from 'lucide-react'
 import { recentActiveCourses } from '@/lib/wi300/catalog'
-import { canTeach, isContentTool, pendingCourseLabel, toolGroup, toolGroups, toolWorkspace, type PersonalTool } from '@/lib/wi300/personal-space'
+import { canTeach, isContentTool, wi300ToolName, pendingCourseLabel, toolGroup, toolGroups, toolWorkspace, type PersonalTool } from '@/lib/wi300/personal-space'
 import type { Wi300Course, Wi300Enrollment, Wi300TeachingCourse } from './Wi300Home'
 
 import Wi300TeachingPanel from './Wi300TeachingPanel'
@@ -127,7 +127,7 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
     const group = isContentTool(tool) ? { label: 'Website & nội dung' } : toolGroups.find(item => item.id === toolGroup(tool))!
     return <Link key={tool.id} href={safeToolUrl(tool.url)!} className={toolTile}>
       <ToolBadge tool={tool} />
-      <span className="w-full break-words text-sm font-semibold leading-5">{tool.name}</span>
+      <span className="w-full break-words text-sm font-semibold leading-5">{wi300ToolName(tool)}</span>
       {grouped && <span className="mt-auto text-xs leading-5 text-brk-muted">{group.label}</span>}
     </Link>
   })}</div> : <p className={box}>{grouped && otherTools.length ? 'Không tìm thấy công cụ phù hợp. Hãy đổi nhóm hoặc từ khóa.' : 'Chưa có công cụ trong nhóm này phù hợp với quyền tài khoản của bạn.'}</p>
