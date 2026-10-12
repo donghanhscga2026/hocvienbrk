@@ -7,6 +7,7 @@ import type { DeploymentBrand } from '@/lib/site-profile/deployment-brand'
 import Wi300HomeClient from './Wi300HomeClient'
 import { canTeach } from '@/lib/wi300/personal-space'
 import { wi300CoursePreferences, wi300CourseWhere, wi300HiddenLearning } from '@/lib/wi300/course-visibility'
+import { readPublicProjects } from '@/lib/wi300/project-service'
 
 // Chỉ gửi dữ liệu dùng bởi card, bộ lọc và đăng ký; bỏ nội dung dài/email quản trị.
 const courseSelect = {
@@ -39,6 +40,9 @@ const getCatalog = unstable_cache(async (where: Prisma.CourseWhereInput) => pris
 }), ['wi300-course-catalog-v4'], { tags: ['site-profile'], revalidate: 600 })
 
 export default async function Wi300Home({ brand, session, view = 'home' }: { brand: DeploymentBrand; session: Session | null; view?: 'home' | 'catalog' | 'discover' | 'space' }) {
+  const projectsReady = view === 'home' || view === 'discover'
+    ? readPublicProjects(prisma).then(projects => ({ projects, projectsError: false })).catch(error => { console.error('[WI300 projects]', error instanceof Error ? error.name : 'Unknown'); return { projects: [], projectsError: true } })
+    : Promise.resolve({ projects: [], projectsError: false })
   const userId = session?.user?.id != null ? Number(session.user.id) : null
   let preferences = new Map<number, boolean>()
   let courses: Wi300Course[] = []
@@ -102,5 +106,6 @@ export default async function Wi300Home({ brand, session, view = 'home' }: { bra
     }
   }
   const { teachingCourses, teachingError } = await teachingReady
-  return <Wi300HomeClient brand={brand} courses={courses} enrollments={enrollments} teachingCourses={teachingCourses.map(course => ({ ...course, status: preferences.get(course.id) ?? false }))} teachingError={teachingError} userId={userId} userPhone={userPhone} loggedIn={!!session?.user} catalogError={catalogError} accountError={accountError} view={view} />
+  const { projects, projectsError } = await projectsReady
+  return <Wi300HomeClient projects={projects} projectsError={projectsError} brand={brand} courses={courses} enrollments={enrollments} teachingCourses={teachingCourses.map(course => ({ ...course, status: preferences.get(course.id) ?? false }))} teachingError={teachingError} userId={userId} userPhone={userPhone} loggedIn={!!session?.user} catalogError={catalogError} accountError={accountError} view={view} />
 }

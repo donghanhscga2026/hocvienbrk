@@ -2,22 +2,16 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
+import { projectDefaults, publicProject, type PublicWiProject } from '@/lib/wi300/projects'
 import { Pause, Play } from 'lucide-react'
 import styles from './Wi300Businesses.module.css'
 
 /** Dùng logo chính thức khi đã có; tên trong hình tròn là đại diện tạm. */
-const businesses = [
-  { name: 'WiArt', description: 'Nghệ thuật và sáng tạo', logo: '/wi300/businesses/wi-art.webp' },
-  { name: 'Wi.Mentor', description: 'Cố vấn và đồng hành', logo: '/wi300/businesses/wi-mentor.webp' },
-  { name: 'Wi.Tech', description: 'Công nghệ và giải pháp số', logo: '/wi300/businesses/wi-tech.png' },
-  { name: 'Wi.Grow', description: 'Phát triển cùng doanh nghiệp', logo: '/wi300/businesses/wi-grow.png' },
-  { name: 'Wi.Finance', description: 'Tài chính và dòng tiền', logo: '/wi300/businesses/wi-finance.webp' },
-  { name: 'Wi.Marketing', description: 'Marketing và kết nối khách hàng', logo: '/wi300/businesses/wi-marketing.webp' },
-  { name: 'WiCan', description: 'Kết nối trong hệ sinh thái Wi', logo: null },
-]
+const businesses = projectDefaults.map(publicProject)
 export const featuredBusinesses = businesses.map(business => business.name)
 
-export default function Wi300Businesses() {
+export default function Wi300Businesses({ projects = businesses, error = false }: { projects?: PublicWiProject[]; error?: boolean }) {
   const [paused, setPaused] = useState(false)
   return <section id="doanh-nghiep-tieu-bieu" aria-labelledby="wi300-businesses-title" className="mx-auto max-w-7xl scroll-mt-40 px-4 py-12 sm:px-6 lg:scroll-mt-24 lg:px-8">
     <div className="flex items-end justify-between gap-4">
@@ -29,16 +23,20 @@ export default function Wi300Businesses() {
       <div className={styles.track}>
         {/* Bản lặp chỉ phục vụ chuyển động, không đọc trùng bằng trình đọc màn hình. */}
         {[false, true].map(copy => <ul key={String(copy)} aria-label={copy ? undefined : 'Doanh nghiệp tiêu biểu'} aria-hidden={copy || undefined} className={`${styles.group} ${copy ? styles.copy : ''}`}>
-          {businesses.map(business => <li key={business.name} className="w-40 shrink-0 text-center sm:w-48">
+          {projects.map(business => <li key={business.slug} className="w-40 shrink-0 text-center sm:w-48">
+            <Link href={`/du-an/${business.slug}`} tabIndex={copy ? -1 : undefined} className="block rounded-2xl focus-visible:outline-2 focus-visible:outline-brk-primary">
             <div className="mx-auto flex h-36 w-36 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-white shadow-md ring-1 ring-brk-outline sm:h-40 sm:w-40">
               {/* Ảnh vuông phủ kín vòng tròn; logo ngang giữ đủ chữ và được bo tròn ngay trên ảnh. */}
               {business.logo ? <Image src={business.logo} alt={copy ? '' : business.name} width={160} height={160} className={`h-full w-full rounded-full ${business.name === 'Wi.Mentor' ? 'object-cover' : business.name === 'WiArt' ? 'bg-[#f1f2ed] object-contain' : 'bg-white object-contain p-2'}`} /> : <span role="img" aria-label={`Ảnh đại diện tạm của ${business.name}`} className="flex h-full w-full items-center justify-center rounded-full bg-brk-background px-2 text-lg font-extrabold tracking-tight text-brk-primary">{business.name}</span>}
             </div>
             <h3 className="mt-5 text-lg font-bold text-brk-on-surface">{business.name}</h3>
             <p className="mt-2 text-sm leading-6 text-brk-muted">{business.description}</p>
+            </Link>
           </li>)}
         </ul>)}
       </div>
     </div>
+    {error ? <p role="alert" className="mt-4 text-sm text-brk-muted">Chưa tải được thông tin dự án. Vui lòng tải lại trang.</p> : !projects.length && <p className="mt-4 text-sm text-brk-muted">Chưa có dự án tiêu biểu được công khai.</p>}
+    <Link href="/du-an" className="mt-3 inline-flex min-h-11 items-center font-semibold text-brk-primary">Xem tất cả dự án Wi →</Link>
   </section>
 }
