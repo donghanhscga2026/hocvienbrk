@@ -57,7 +57,16 @@ async function run() {
   const creations = await Promise.allSettled([service.createProject(db, 0, newInput), service.createProject(db, 0, newInput)])
   assert.equal(creations.filter(result => result.status === 'fulfilled').length, 1)
   assert.equal(creations.find(result => result.status === 'rejected').reason.status, 409)
-  assert.equal((await service.readPublicProjects(db)).some(project => project.slug === 'wi-test'), false, 'New draft is not public')
+  const newlyCreated = (await service.readProjects(db)).find(project => project.slug === 'wi-test')
+  assert.equal(newlyCreated.published, true, 'New project is public immediately')
+  assert.equal(newlyCreated.featured, false, 'Featuring remains an explicit admin choice')
+  assert.equal((await service.readPublicProjects(db)).some(project => project.slug === 'wi-test'), false, 'Non-featured project stays off featured home')
+  await assert.rejects(() => service.createProject(db, 0, { ...newInput, slug: 'wi-invalid-owner', ownerId: 999 }), /không tồn tại/)
+  assert.equal(rows.has(shared.PROJECT_PREFIX + 'wi-invalid-owner'), false)
+  const fullProject = await service.createProject(db, 0, { ...newInput, slug: 'wi-full', introduction: 'Giới thiệu', logo: 'https://example.com/logo.png', website: 'https://example.com', ownerId: 8, published: true, featured: true, order: 12, members: [{ userId: 9, title: 'Helper', visible: true, canManage: true }] })
+  assert.equal(fullProject.ownerId, 8); assert.equal(fullProject.introduction, 'Giới thiệu'); assert.equal(fullProject.members[0].userId, 9)
+  assert.ok((await service.readPublicProjects(db)).some(project => project.slug === 'wi-full'))
+  await service.deleteProject(db, 0, 'wi-full', { revision: 1 })
   await service.saveProject(db, 0, 'wi-test', { revision: 1, content, controls: { ownerId: 8, published: true, featured: false, order: 100 } })
   assert.ok((await service.managedProjects(db, 8)).projects.some(project => project.slug === 'wi-test'))
   assert.equal((await service.readPublicProjects(db)).some(project => project.slug === 'wi-test'), false, 'Public non-featured project stays off home')
@@ -115,7 +124,7 @@ async function run() {
   global.window = dom.window; global.document = dom.window.document; global.FormData = dom.window.FormData; global.IS_REACT_ACT_ENVIRONMENT = true
   const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
   const navigationCalls = []
-  const Manager = load('components/wi300/WiProjectManager.tsx', { 'next/link': link, 'next/image': { __esModule: true, default: props => React.createElement('img', props) }, 'next/navigation': { useRouter: () => ({ push: url => navigationCalls.push(['push', url]), replace: url => navigationCalls.push(['replace', url]) }) } }).default
+  const Manager = load('components/wi300/WiProjectManager.tsx', { 'next/link': link, 'next/image': { __esModule: true, default: props => React.createElement('img', props) }, 'next/navigation': { useRouter: () => ({ refresh: () => navigationCalls.push(['refresh']), push: url => navigationCalls.push(['push', url]), replace: url => navigationCalls.push(['replace', url]) }) } }).default
   const { createRoot } = require('react-dom/client'), root = createRoot(document.getElementById('root'))
   let payload, fail = true
   const savedFetch = global.fetch
@@ -137,7 +146,7 @@ async function run() {
     global.fetch = async (url, options) => {
       methods.push(options.method)
       const input = JSON.parse(options.body)
-      createdProject = { ...initial, ...input, revision: 1, published: false, featured: false }
+      createdProject = { ...initial, ...input, revision: 1 }
       return { ok: true, json: async () => options.method === 'POST' ? { project: createdProject } : { slug: 'wi-ui-test' } }
     }
     await React.act(async () => root.render(React.createElement(Manager, { courses: [], initial: { admin: true, projects: [initial] } })))
@@ -151,8 +160,15 @@ async function run() {
     createForm.querySelector('[name="name"]').value = 'Wi UI Test'
     createForm.querySelector('[name="slug"]').value = 'wi-ui-test'
     createForm.querySelector('[name="description"]').value = 'Dự án UI'
+    createForm.querySelector('[name="introduction"]').value = 'Giới thiệu từ form tạo mới'
+    createForm.querySelector('[name="ownerId"]').value = '8'
+    assert.equal(createForm.querySelector('[name="published"]').checked, true)
+    assert.equal(createForm.querySelector('[name="featured"]').checked, false)
     await React.act(async () => createForm.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true })))
-    assert.deepEqual(navigationCalls.at(-1), ['push', '/du-an/quan-ly?project=wi-ui-test'])
+    assert.deepEqual(navigationCalls.at(-1), ['refresh'])
+    assert.equal(createdProject.ownerId, 8)
+    assert.equal(createdProject.introduction, 'Giới thiệu từ form tạo mới')
+    assert.equal(document.querySelector('form'), null, 'Creating returns to project cards in one step')
     await React.act(async () => root.render(React.createElement(Manager, { key: 'new-edit', initialSlug: 'wi-ui-test', courses: [], initial: { admin: true, projects: [initial, createdProject] } })))
     assert.equal(document.querySelector('[name="name"]').value, 'Wi UI Test')
     assert.ok([...document.querySelectorAll('a')].some(anchor => anchor.textContent.includes('Danh sách dự án') && anchor.getAttribute('href') === '/du-an/quan-ly'))

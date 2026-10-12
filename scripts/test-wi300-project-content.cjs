@@ -31,6 +31,7 @@ async function run() {
   await assert.rejects(() => service.saveProject(db, 8, 'wi-grow', { revision: 1, content: body(grow), members: [{ userId: 999, title: '', visible: true, canManage: false }] }), /không tồn tại/)
   await assert.rejects(() => service.saveProject(db, 8, 'wi-grow', { revision: 1, content: body(grow), members: [{ userId: 9, title: '', visible: true, canManage: false }, { userId: 9, title: '', visible: true, canManage: false }] }))
   assert.equal((await contentService.courseProjectOptions(db, 9, 1))[0].selected, false)
+  assert.equal((await contentService.courseProjectOptions(db, 0, 1)).length, 7, 'Admin sees all projects')
   await assert.rejects(() => contentService.courseProjectOptions(db, 8, 1), error => error.status === 403)
   const link = { projects: [{ slug: 'wi-grow', revision: 1, selected: true }] }
   await contentService.saveCourseProjects(db, 9, 1, link)
@@ -103,6 +104,47 @@ async function run() {
     await React.act(async () => root.render(React.createElement(Team, { key: 'readonly', members: [{ userId: 9, title: 'Helper', visible: true, canManage: true }], names: {}, editable: false })))
     assert.equal(document.querySelector('[name="members"]'), null, 'Helpers cannot submit team changes')
     assert.ok([...document.querySelectorAll('input')].every(input => input.disabled))
+    const CourseProjects = load('components/wi300/WiCourseProjects.tsx').default
+    for (const [key, status, projects] of [['no-projects', 200, []], ['forbidden', 403, undefined], ['guest', 401, undefined]]) {
+      global.fetch = async () => ({ status, ok: status === 200, json: async () => ({ projects }) })
+      await React.act(async () => root.render(React.createElement(CourseProjects, { key, courseId: '1' })))
+      assert.equal(document.querySelector('section'), null, 'No permission or projects hides entire selector')
+    }
+    const options = [{ slug: 'wi-grow', name: 'Wi.Grow', selected: false, revision: 1 }, { slug: 'wi-art', name: 'Wi.Art', selected: true, revision: 2 }]
+    let failSave = true, savedLinks
+    global.fetch = async (url, init) => {
+      if (init.method === 'PUT') {
+        savedLinks = JSON.parse(init.body)
+        return { status: failSave ? 409 : 200, ok: !failSave, json: async () => failSave ? { error: 'Dự án đã thay đổi. Tải lại.' } : { success: true } }
+      }
+      return { status: 200, ok: true, json: async () => ({ projects: options }) }
+    }
+    await React.act(async () => root.render(React.createElement(CourseProjects, { key: 'allowed', courseId: '1' })))
+    assert.equal(document.querySelectorAll('input[type="checkbox"]').length, 2)
+    assert.ok(document.querySelector('section').textContent.includes('Đã chọn: 1'))
+    await React.act(async () => document.querySelector('input[type="checkbox"]').click())
+    assert.ok(document.querySelector('section').textContent.includes('Đã chọn: 2'))
+    const button = label => [...document.querySelectorAll('button')].find(item => item.textContent === label)
+    await React.act(async () => button('Lưu liên kết').click())
+    assert.equal(savedLinks.projects[0].selected, true)
+    assert.equal(button('Lưu liên kết').disabled, true, 'Failed save requires a fresh version')
+    assert.ok([...document.querySelectorAll('input')].every(input => input.disabled))
+    await React.act(async () => button('Tải lại').click())
+    assert.equal(button('Lưu liên kết').disabled, false)
+    failSave = false
+    await React.act(async () => button('Lưu liên kết').click())
+    assert.match(document.querySelector('[role="status"]').textContent, /Đã lưu/)
+    const realSetTimeout = global.setTimeout
+    global.setTimeout = (callback, delay, ...args) => realSetTimeout(callback, delay === 20000 ? 1 : delay, ...args)
+    try {
+      global.fetch = (url, init) => new Promise((resolve, reject) => init.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }))
+      await React.act(async () => {
+        root.render(React.createElement(CourseProjects, { key: 'timeout', courseId: '1' }))
+      })
+      await React.act(async () => { await new Promise(resolve => realSetTimeout(resolve, 10)) })
+      assert.match(document.querySelector('[role="alert"]').textContent, /Phản hồi quá lâu/)
+      assert.equal(button('Tải lại').disabled, false, 'Timeout leaves retry available')
+    } finally { global.setTimeout = realSetTimeout }
   } finally { await React.act(async () => root.unmount()); dom.window.close(); global.fetch = savedFetch }
   console.log('Project teams/content: permissions, revocation, course links, atomic moves, concurrency, legacy/default preservation and origin passed (mock DB).')
 }

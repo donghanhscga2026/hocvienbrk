@@ -28,14 +28,19 @@ export default function WiProjectManager({ courses, initial, initialSlug }: { co
     event.preventDefault()
     if (!admin || busy) return
     const data = new FormData(event.currentTarget)
+    const text = (key: string) => String(data.get(key) || '').trim()
     setBusy(true); setError(''); setMessage('')
     try {
-      const response = await fetch('/api/wi300/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: String(data.get('slug') || '').trim(), name: String(data.get('name') || '').trim(), description: String(data.get('description') || '').trim() }) })
+      const response = await fetch('/api/wi300/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        slug: text('slug'), name: text('name'), description: text('description'), introduction: text('introduction'), logo: text('logo'), website: text('website'),
+        ownerId: text('ownerId') === '' ? null : Number(text('ownerId')), order: Number(text('order')),
+        published: data.has('published'), featured: data.has('featured'), members: JSON.parse(String(data.get('members') || '[]')),
+      }) })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Không tạo được dự án.')
       setProjects(current => [...current, result.project]); setCreating(false); setConfirmDelete(false)
-      setMessage('Đã tạo bản nháp. Nhập thông tin, gán chủ và chọn công khai khi sẵn sàng.')
-      router.push(`/du-an/quan-ly?project=${encodeURIComponent(result.project.slug)}`)
+      setMessage('Đã tạo dự án mới. Bạn có thể tiếp tục chỉnh sửa khi cần.')
+      router.refresh()
     } catch (error) { setError(error instanceof Error ? error.message : 'Không tạo được dự án.') }
     finally { setBusy(false) }
   }
@@ -93,8 +98,31 @@ export default function WiProjectManager({ courses, initial, initialSlug }: { co
     <div className="flex flex-wrap items-center justify-between gap-3"><p className="max-w-2xl text-sm leading-6 text-brk-muted">{admin ? 'Chọn dự án, gán chủ bằng mã thành viên và kiểm soát hiển thị trên trang chủ.' : 'Bạn chỉ được sửa những dự án đã được quản trị viên giao cho mình.'}</p><button type="button" disabled={busy || loading} onClick={() => void load()} className="min-h-11 rounded-xl border border-brk-outline bg-white px-4 disabled:opacity-50">Tải lại dữ liệu</button></div>
     {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">{error}</p>}
     {message && <p role="status" className="rounded-xl bg-green-50 p-4 text-green-800">{message}</p>}
-    {!selected && admin && <div className="space-y-3"><button type="button" disabled={busy || loading} onClick={() => setCreating(value => !value)} className="min-h-11 rounded-xl bg-brk-primary px-4 font-semibold text-white disabled:opacity-50">{creating ? 'Đóng form thêm dự án' : '+ Thêm dự án'}</button>{creating && <form onSubmit={create} className="space-y-4 rounded-2xl border border-brk-outline bg-white p-4 sm:p-6"><fieldset disabled={busy} className="space-y-4"><h2 className="text-xl font-bold">Thêm dự án mới</h2><label className="block text-sm font-semibold">Tên dự án<input name="name" required minLength={2} maxLength={100} className={field} /></label><label className="block text-sm font-semibold">Đường dẫn dự án<input name="slug" required minLength={2} maxLength={80} pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="wi-du-an-moi" className={field} /><span className="text-xs font-normal text-brk-muted">Chữ thường không dấu, số và dấu gạch ngang. Đường dẫn được giữ cố định sau khi tạo.</span></label><label className="block text-sm font-semibold">Mô tả ngắn<input name="description" required minLength={3} maxLength={300} className={field} /></label><button type="submit" className="min-h-11 rounded-xl bg-brk-primary px-5 font-semibold text-white">{busy ? 'Đang tạo…' : 'Tạo bản nháp'}</button></fieldset></form>}</div>}
-    {loading ? <p role="status">Đang tải dự án…</p> : !projects.length ? <p className="rounded-2xl border border-brk-outline bg-white p-6">{admin ? 'Chưa có dự án. Bấm Thêm dự án để tạo bản nháp mới.' : 'Bạn chưa được giao quản lý dự án. Vui lòng liên hệ ban điều phối để gắn tài khoản với dự án của bạn.'}</p> : <>
+    {!selected && admin && <div className="space-y-3">
+      <button type="button" disabled={busy || loading} onClick={() => setCreating(value => !value)} className="min-h-11 rounded-xl bg-brk-primary px-4 font-semibold text-white disabled:opacity-50">{creating ? 'Đóng form thêm dự án' : '+ Thêm dự án'}</button>
+      {creating && <form onSubmit={create} className="rounded-2xl border border-brk-outline bg-white p-4 sm:p-6"><fieldset disabled={busy} className="space-y-4">
+        <h2 className="text-xl font-bold">Thêm dự án mới</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="text-sm font-semibold">Tên dự án<input name="name" required minLength={2} maxLength={100} className={field} /></label>
+          <label className="text-sm font-semibold">Đường dẫn dự án<input name="slug" required minLength={2} maxLength={80} pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="wi-du-an-moi" className={field} /><span className="text-xs font-normal text-brk-muted">Chữ thường không dấu, số và dấu gạch ngang. Giữ cố định sau khi tạo.</span></label>
+        </div>
+        <label className="block text-sm font-semibold">Mô tả ngắn<input name="description" required minLength={3} maxLength={300} className={field} /></label>
+        <label className="block text-sm font-semibold">Giới thiệu chi tiết<textarea name="introduction" rows={4} maxLength={10000} className={field} /></label>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="text-sm font-semibold">Đường dẫn ảnh logo<input name="logo" maxLength={1000} placeholder="https://…" className={field} /></label>
+          <label className="text-sm font-semibold">Website / liên hệ<input name="website" maxLength={1000} placeholder="https://…" className={field} /></label>
+          <label className="text-sm font-semibold">Mã thành viên chủ dự án<input name="ownerId" type="number" min={0} step={1} placeholder="Để trống nếu chưa giao chủ" className={field} /></label>
+          <label className="text-sm font-semibold">Thứ tự (số nhỏ đứng trước)<input name="order" type="number" required min={0} max={999} step={1} defaultValue={100} className={field} /></label>
+        </div>
+        <WiProjectTeamEditor members={[]} names={ownerNames} editable />
+        <div className="flex flex-wrap gap-4">
+          <label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="published" defaultChecked />Công khai hồ sơ</label>
+          <label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="featured" />Hiện ở mục tiêu biểu</label>
+        </div>
+        <button type="submit" className="min-h-11 rounded-xl bg-brk-primary px-5 font-semibold text-white">{busy ? 'Đang tạo…' : 'Tạo dự án'}</button>
+      </fieldset></form>}
+    </div>}
+    {loading ? <p role="status">Đang tải dự án…</p> : !projects.length ? <p className="rounded-2xl border border-brk-outline bg-white p-6">{admin ? 'Chưa có dự án. Bấm Thêm dự án để tạo mới.' : 'Bạn chưa được giao quản lý dự án. Vui lòng liên hệ ban điều phối để gắn tài khoản với dự án của bạn.'}</p> : <>
       {!selected && <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{projects.map(item => <article key={item.slug} className="flex min-w-0 flex-col gap-4 rounded-2xl border border-brk-outline bg-white p-5 shadow-sm">
         <div className="flex items-center gap-4">{item.logo ? <Image src={item.logo} alt={`Logo ${item.name}`} width={72} height={72} className="h-18 w-18 shrink-0 rounded-full border border-brk-outline bg-white object-contain p-1" /> : <span className="flex h-18 w-18 shrink-0 items-center justify-center rounded-full bg-brk-background text-2xl font-bold text-brk-primary" aria-hidden="true">{item.name.slice(0, 2)}</span>}<h2 className="min-w-0 break-words text-xl font-bold">{item.name}</h2></div>
         <p className="line-clamp-3 text-sm leading-6 text-brk-muted">{item.description}</p>

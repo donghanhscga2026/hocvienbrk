@@ -55,7 +55,13 @@ export async function saveProject(db: PrismaClient, id: number, slug: string, ra
 }
 
 export async function createProject(db: PrismaClient, id: number, raw: unknown) {
-  const input = z.object({ slug: projectSlug, name: projectContent.shape.name, description: projectContent.shape.description }).strict().parse(raw)
+  const input = z.object({
+    slug: projectSlug, name: projectContent.shape.name, description: projectContent.shape.description,
+    introduction: projectContent.shape.introduction.default(''), logo: projectContent.shape.logo.default(''), website: projectContent.shape.website.default(''),
+    ownerId: projectControls.shape.ownerId.default(null), published: projectControls.shape.published.default(true),
+    featured: projectControls.shape.featured.default(false), order: projectControls.shape.order.default(100),
+    members: projectMembers.default([]),
+  }).strict().parse(raw)
   return db.$transaction(async tx => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${PROJECT_PREFIX}))`
     const actor = await tx.user.findUnique({ where: { id }, select: { id: true, role: true } })
@@ -63,8 +69,12 @@ export async function createProject(db: PrismaClient, id: number, raw: unknown) 
     if (actor.role !== 'ADMIN') throw new CrmError('Chỉ quản trị viên được thêm dự án.', 403)
     if (projectDefaults.some(project => project.slug === input.slug) || await tx.systemConfig.findUnique({ where: { key: PROJECT_PREFIX + input.slug } })) throw new CrmError('Đường dẫn đã được sử dụng. Vui lòng chọn đường dẫn khác.', 409)
     const { slug, ...text } = input
-    // Dự án mới là bản nháp; quản trị viên nhập đủ thông tin rồi mới công khai.
-    const value = { ...text, introduction: '', logo: '', website: '', courseIds: [], offerings: [], ownerId: null, published: false, featured: false, order: 100, revision: 1 }
+    if (input.ownerId != null && !await tx.user.findUnique({ where: { id: input.ownerId }, select: { id: true } })) throw new CrmError('Mã thành viên của chủ dự án không tồn tại.')
+    for (const member of input.members) {
+      if (!await tx.user.findUnique({ where: { id: member.userId }, select: { id: true } })) throw new CrmError('Mã thành viên trong đội ngũ không tồn tại.')
+    }
+    // Lưu đầy đủ trong một lần; không cần tạo bản nháp rồi nhập lại thông tin.
+    const value = { ...text, courseIds: [], offerings: [], revision: 1 }
     await tx.systemConfig.upsert({ where: { key: PROJECT_PREFIX + slug }, create: { key: PROJECT_PREFIX + slug, value }, update: { value } })
     return { slug, ...value }
   }, { timeout: 15000 })

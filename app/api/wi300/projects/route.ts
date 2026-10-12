@@ -36,6 +36,7 @@ export async function PUT(request: Request) {
 export async function POST(request: Request) {
   try {
     const project = await createProject(prisma, await actor(), await crmBody(request, 64000))
+    revalidatePath('/'); revalidatePath('/kham-pha'); revalidatePath('/du-an'); revalidatePath(`/du-an/${project.slug}`)
     revalidatePath('/du-an/quan-ly')
     return crmResponse({ project }, 201)
   } catch (error) { return failure(error) }
