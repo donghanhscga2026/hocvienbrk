@@ -134,13 +134,9 @@ export default function MemberRosterPanel({ members, labels, canViewPhone, cours
         if (members.length === 0) return
         setExportingImage(true)
         try {
-            const teamsWithPS = new Set(members.filter(m => m.memberRole === 'PS').map(m => m.team))
-            const countedMembers = members.filter(m => {
-                if (!teamsWithPS.has(m.team)) return false
-                if (m.memberRole === 'PS') return true
-                return groupLabel(m.team, m.group, labels) !== 'Tạm dừng/có lý do'
-            })
-            const sorted = [...countedMembers].sort((a, b) => {
+            // Xuất toàn bộ học viên của khóa học, không chỉ những team có PS.
+            // Giữ thứ tự theo team, vai trò, group để bảng dễ đối chiếu.
+            const sorted = [...members].sort((a, b) => {
                 if (a.team !== b.team) return a.team - b.team
                 if (a.memberRole !== b.memberRole) return a.memberRole === 'PS' ? -1 : 1
                 if (a.group !== b.group) return a.group - b.group
