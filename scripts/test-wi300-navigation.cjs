@@ -56,7 +56,7 @@ async function run() {
     'next/dynamic': { __esModule: true, default: () => props => props.shareType ? React.createElement('div', { 'data-header-share': props.affiliateCode, 'data-site-name': props.siteName }, 'Share') : React.createElement('div', { 'data-wallet': props.title }) },
   }).default
   const Shell = load('components/wi300/Wi300Shell.tsx', { 'next/navigation': { usePathname: () => pathname }, './Wi300Header': { __esModule: true, default: Header },
-    './Wi300Footer': load('components/wi300/Wi300Footer.tsx', { 'next/link': link, 'next/image': { __esModule: true, default: ({ unoptimized, ...props }) => React.createElement('img', props) }, './Wi300BrandContext': { useWi300Brand: () => brand } }), 'next/link': link, '@/lib/wi300/default-pages': load('lib/wi300/default-pages.ts') }).default
+    './Wi300Footer': load('components/wi300/Wi300Footer.tsx', { 'next/link': link, 'next/image': { __esModule: true, default: ({ unoptimized, ...props }) => React.createElement('img', props) }, './Wi300BrandContext': { useWi300Brand: () => brand } }), 'next/link': link, '@/lib/wi300/default-pages': load('lib/wi300/default-pages.ts', { './external-apps': load('lib/wi300/external-apps.ts') }) }).default
   const root = createRoot(document.getElementById('root'))
   const renderShell = () => root.render(React.createElement(Shell, null, React.createElement('div', null, 'Page')))
   await act(async () => renderShell())
@@ -157,6 +157,7 @@ async function run() {
   assert.equal(document.querySelectorAll('nav:not([aria-label])').length, 0, 'HTML import không nhận thêm menu')
   const SpaceModule = load('components/wi300/Wi300PersonalSpace.tsx', {
     './Wi300SpaceMenu': spaceMenu,
+    './Wi300ExternalApps': load('components/wi300/Wi300ExternalApps.tsx', { 'next/link': link, '@/lib/wi300/external-apps': load('lib/wi300/external-apps.ts') }),
     './Wi300CourseCover': { __esModule: true, default: () => null },
     './Wi300TeachingPanel': { __esModule: true, default: () => null },
     './useCoursePageSize': { __esModule: true, default: () => 6 },

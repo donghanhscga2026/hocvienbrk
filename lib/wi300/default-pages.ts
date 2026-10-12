@@ -1,3 +1,5 @@
+import { findExternalApp } from './external-apps'
+
 /** Tên và khung chỉ dành cho trang mặc định; không áp dụng vào template nhập riêng. */
 const toolTitles: Record<string, string> = {
   affiliate: 'Affiliate', posts: 'Bài viết cộng đồng', courses: 'Quản lý khóa học',
@@ -16,6 +18,7 @@ export function defaultPageTitle(pathname: string) {
   if (pathname === '/tools') return 'Công cụ'
   if (!pathname.startsWith('/tools/')) return null
   const [, , slug, subpage] = pathname.split('/')
+  if (slug === 'apps') return subpage ? findExternalApp(subpage)?.name || 'Ứng dụng WI300' : 'Ứng dụng WI300'
   if (slug === 'affiliate' && subpage) return affiliateTitles[subpage] || 'Affiliate'
   return toolTitles[slug] || 'Công cụ'
 }

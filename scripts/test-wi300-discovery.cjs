@@ -12,7 +12,7 @@ function load(file, overrides = {}) {
   return module.exports
 }
 async function run() {
-  const pages = load('lib/wi300/default-pages.ts')
+  const pages = load('lib/wi300/default-pages.ts', { './external-apps': load('lib/wi300/external-apps.ts') })
   for (const pathname of ['/khoa-hoc/course', '/courses/course/learn', '/page/custom', '/landing/custom', '/login', '/']) assert.equal(pages.defaultPageTitle(pathname), null)
   assert.equal(pages.defaultPageTitle('/tools/posts'), 'Bài viết cộng đồng')
   assert.equal(pages.defaultPageTitle('/tools/affiliate/payouts'), 'Duyệt rút tiền')

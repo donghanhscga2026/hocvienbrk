@@ -69,6 +69,7 @@ async function run() {
     'next/navigation': { useSearchParams: () => params, useRouter: () => ({ refresh: () => { refreshCalls++ }, push: href => { params = new URLSearchParams(href.split('?')[1]); render() } }) },
     'next/dynamic': { __esModule: true, default: () => props => { paymentProps = props; return React.createElement('div', { 'data-payment': true }, 'Payment') } },
     '@/lib/wi300/catalog': catalog, '@/lib/wi300/personal-space': helpers, './Wi300SpaceMenu': spaceMenu,
+    './Wi300ExternalApps': load('components/wi300/Wi300ExternalApps.tsx', { 'next/link': link, '@/lib/wi300/external-apps': load('lib/wi300/external-apps.ts') }),
     './Wi300CourseCover': Cover, './useCoursePageSize': responsive, './Wi300TeachingPanel': Teaching,
   })
   // Các quy tắc role giống trang tools cũ, kể cả ADMIN không tự có quyền DEVELOPER.
@@ -113,6 +114,9 @@ async function run() {
     assert.equal(document.querySelector('a[href="/tools/backup"]'), null)
     assert.equal(document.querySelector('a[href="/tools/crm"]'), null)
     assert.equal(document.querySelector('a[href^="/tools/pages"]'), null, 'Nội dung ở mục riêng')
+    assert.ok(document.querySelector('a[href="/tools/apps/cleanimage"]'))
+    assert.ok(document.querySelector('a[href="/tools/apps/digital-biz-scan"]'))
+    assert.equal(document.querySelector('iframe'),null,'Danh mục không tải app ngoài')
     assert.equal(document.querySelector('select'), null)
     assert.equal(document.querySelector('input[type="search"]'), null)
     assert.deepEqual([...document.querySelectorAll('section[aria-labelledby^="tool-group-"]')].map(s => s.getAttribute('aria-labelledby')), ['tool-group-utilities', 'tool-group-other'])
