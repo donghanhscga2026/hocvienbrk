@@ -94,7 +94,6 @@ export default function WiProjectManager({ courses, initial, initialSlug }: { co
     finally { setBusy(false) }
   }
   return <section className="space-y-5">
-    <Link href="/du-an/noi-dung" className="inline-flex min-h-11 items-center rounded-xl border border-brk-outline px-4 font-semibold text-brk-primary">Quản lý sản phẩm & dịch vụ →</Link>
     <div className="flex flex-wrap items-center justify-between gap-3"><p className="max-w-2xl text-sm leading-6 text-brk-muted">{admin ? 'Chọn dự án, gán chủ bằng mã thành viên và kiểm soát hiển thị trên trang chủ.' : 'Bạn chỉ được sửa những dự án đã được quản trị viên giao cho mình.'}</p><button type="button" disabled={busy || loading} onClick={() => void load()} className="min-h-11 rounded-xl border border-brk-outline bg-white px-4 disabled:opacity-50">Tải lại dữ liệu</button></div>
     {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">{error}</p>}
     {message && <p role="status" className="rounded-xl bg-green-50 p-4 text-green-800">{message}</p>}
