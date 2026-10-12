@@ -117,6 +117,13 @@ export const authOptions: NextAuthConfig = {
                 }
 
                 let user = loginOtp ? await lookupLoginPhone(identifier) : null;
+                // OTP đăng nhập bằng mã thành viên: tra thêm theo ID (lookupLoginPhone chỉ xử lý SĐT)
+                if (loginOtp && !user && /^\d+$/.test(identifier)) {
+                    const memberId = parseInt(identifier, 10)
+                    if (memberId >= 0 && memberId < 2147483647) {
+                        user = await prisma.user.findUnique({ where: { id: memberId } })
+                    }
+                }
                 let potentialId = NaN;
 
                 // 1. Thử nhận diện ID thành viên (nếu chỉ chứa các ký số)
@@ -195,7 +202,8 @@ export const authOptions: NextAuthConfig = {
                         isLoginFailed = true;
                     } else if (user.role === "ADMIN" && user.mfaEnabled &&
                         (!user.mfaSecret || !otp || !verifyTotp(decryptMfaSecret(user.mfaSecret), otp.trim()))) {
-                        isLoginFailed = true;
+                        // Ném MFA_REQUIRED (thay vì fail chung) để client hiện ô nhập mã Authenticator
+                        throw new CustomLoginError("Cần mã xác thực quản trị viên hợp lệ.", "MFA_REQUIRED");
                     } else if (!(await consumeLoginOtp(user.id, loginOtp))) {
                         isLoginFailed = true;
                     }

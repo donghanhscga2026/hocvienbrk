@@ -5,7 +5,8 @@ import { signIn, signOut, useSession } from "next-auth/react"
 import { useForm } from "react-hook-form"
 import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
-import AccountSupportForm from '@/components/auth/AccountSupportForm'
+// TẠM ẨN 2026-10-11: mở lại import này khi cần hiện form hỗ trợ đăng nhập
+// import AccountSupportForm from '@/components/auth/AccountSupportForm'
 import { useWi300Brand } from '@/components/wi300/Wi300BrandContext'
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Eye, EyeOff, AlertTriangle } from "lucide-react"
@@ -24,7 +25,12 @@ function LoginForm() {
     const [showPassword, setShowPassword] = useState(false)
     const [phoneStep, setPhoneStep] = useState(false)
     const [loginMethod, setLoginMethod] = useState<"password" | "email">("password")
-    const [showAdminMfa, setShowAdminMfa] = useState(false)
+    const [showHelp, setShowHelp] = useState(false)
+    const [foundMemberId, setFoundMemberId] = useState<number | null>(null)
+    const [maskedEmail, setMaskedEmail] = useState<string | null>(null)
+    const [foundPhone, setFoundPhone] = useState("")
+    const [loginKind, setLoginKind] = useState<"phone" | "memberId">("phone")
+    const [mfaRequired, setMfaRequired] = useState(false)
     const [otpRequested, setOtpRequested] = useState(false)
     const [showNewPassword, setShowNewPassword] = useState(false)
     const [success, setSuccess] = useState<string | null>(null)
@@ -89,15 +95,25 @@ function LoginForm() {
     }, [errorCode])
 
     async function checkPhone() {
-        const identifier = (document.getElementById("smart-login-phone") as HTMLInputElement)?.value?.trim() || ""
-        if (!/^0[0-9]{9}$/.test(identifier)) {
-            setError("Vui lòng nhập số điện thoại Việt Nam hợp lệ (10 chữ số).")
+        const rawInput = (document.getElementById("smart-login-phone") as HTMLInputElement)?.value?.trim() || ""
+        // Chuẩn hóa: bỏ khoảng trắng và ký tự phân tách thường gặp
+        const identifier = rawInput.replace(/[\s.()-]/g, "")
+        if (!identifier) {
+            setError("Vui lòng nhập số điện thoại hoặc mã thành viên.")
+            return
+        }
+        // Mã thành viên: toàn ký số và dưới 7 ký số
+        const isMemberId = /^\d+$/.test(identifier) && identifier.length < 7
+        // SĐT: chấp nhận +84xxxx, 84xxxx, 0xxxxxxxxx, xxxxxxxx
+        const isPhoneLike = /^\+?[0-9]{7,15}$/.test(identifier)
+        if (!isMemberId && !isPhoneLike) {
+            setError("Vui lòng nhập số điện thoại hợp lệ hoặc mã thành viên.")
             return
         }
         setIsLoading(true)
         setError(null)
         try {
-            const res = await fetch("/api/auth/phone-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: identifier }) })
+            const res = await fetch("/api/auth/phone-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(isMemberId ? { memberId: identifier } : { phone: identifier }) })
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || "Không thể kiểm tra tài khoản.")
             if (!data.found) {
@@ -112,6 +128,11 @@ function LoginForm() {
                 return
             }
             setValue("identifier", identifier)
+            setLoginKind(isMemberId ? "memberId" : "phone")
+            setFoundPhone(identifier)
+            setFoundMemberId(typeof data.memberId === "number" ? data.memberId : null)
+            setMaskedEmail(typeof data.maskedEmail === "string" ? data.maskedEmail : null)
+            setMfaRequired(false)
             setPhoneStep(true)
         } catch (e: any) { setError(e.message || "Không thể kiểm tra tài khoản.") }
         finally { setIsLoading(false) }
@@ -121,14 +142,16 @@ function LoginForm() {
         setIsLoading(true)
         setError(null)
         try {
+            // Dùng identifier đã kiểm tra ở bước 1 (ô nhập bước 1 đã ẩn ở bước 2)
+            const isMid = loginKind === "memberId"
             const res = await fetch("/api/auth/request-login-otp", {
                 method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ phone: (document.getElementById("smart-login-phone") as HTMLInputElement)?.value?.trim() || "" })
+                body: JSON.stringify(isMid ? { memberId: foundPhone } : { phone: foundPhone })
             })
             const result = await res.json()
             if (!res.ok) throw new Error(result.error || "Không thể gửi mã OTP.")
             setOtpRequested(true)
-            setWarning("Nếu tài khoản có email đã xác minh, mã OTP sẽ được gửi đến hộp thư của bạn. Mã có hiệu lực 10 phút.")
+            setLoginMethod("email")
         } catch (e: any) { setError(e.message || "Không thể gửi mã OTP.") }
         finally { setIsLoading(false) }
     }
@@ -141,17 +164,28 @@ function LoginForm() {
 
         try {
             const callbackUrl = safeReturnPath(searchParams.get('callbackUrl')) || (redirectSlug ? safeReturnPath(`/${redirectSlug}`) : null) || "/"
+            // Một ô input dùng chung: ở chế độ OTP thì giá trị nhập là mã OTP
+            const otpMode = loginMethod === "email"
 
             const result = await signIn("credentials", {
                 identifier: data.identifier,
-                password: loginMethod === "email" ? "" : data.password,
+                password: otpMode ? "" : data.password,
                 otp: data.otp || "",
-                loginOtp: loginMethod === "email" ? data.loginOtp || "" : "",
+                loginOtp: otpMode ? data.password || "" : "",
                 callbackUrl: callbackUrl,
                 redirect: false,
             })
 
             if (result?.error) {
+                // Server xác nhận tài khoản cần MFA: hiện ô nhập mã Authenticator
+                const errStr = String(result.error || "")
+                if (/MFA_REQUIRED/i.test(errStr) || /mã xác thực quản trị/i.test(errStr)) {
+                    setMfaRequired(true)
+                    setError(null)
+                    setWarning("Tài khoản quản trị đã bật xác thực 2 lớp. Vui lòng nhập mã Authenticator rồi đăng nhập lại.")
+                    setIsLoading(false)
+                    return
+                }
                 let errorMsg = "Thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại."
                 let extraAction = ""
 
@@ -358,7 +392,7 @@ function LoginForm() {
                 {/* Logo */}
                 <div className="text-center mb-8">
                     <h1 className="text-2xl font-black text-brk-on-surface tracking-tight">{wi300 ? `Đăng nhập ${wi300.name}` : 'HỌC VIỆN BRK'}</h1>
-                    <p className="text-brk-accent text-sm mt-1">{wi300 ? 'Học tập, kết nối và khám phá cùng cộng đồng doanh nghiệp số.' : 'Đăng nhập để tiếp tục hành trình'}</p>
+                    <p className="text-brk-accent text-sm mt-1">{wi300 ? `(${wi300.name} là nền tảng vận hành của hệ sinh thái WI.CAN)` : '(WI300 là nền tảng vận hành của hệ sinh thái WI.CAN)'}</p>
                 </div>
 
                 <div className="bg-brk-background/5 backdrop-blur-sm border border-brk-outline/10 rounded-2xl p-6 space-y-5 shadow-2xl">
@@ -378,79 +412,101 @@ function LoginForm() {
                     <div className="space-y-4">
                         {warning && <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/30 p-3 text-sm text-brk-on-surface">{warning}</div>}
                         {error && <div role="alert" className="rounded-lg bg-brk-accent/10 border border-brk-accent/30 p-3 text-sm text-brk-accent">{error}</div>}
+                        {!phoneStep && (
                         <div>
-                            <label htmlFor="smart-login-phone" className="block text-sm font-medium text-brk-accent mb-1.5">Số điện thoại của bạn</label>
+                            <label htmlFor="smart-login-phone" className="block text-sm font-medium text-brk-accent mb-1.5">Số điện thoại hoặc mã thành viên</label>
                             <input id="smart-login-phone" type="tel" inputMode="tel" autoComplete="tel"
-                                disabled={phoneStep} placeholder="Nhập số điện thoại"
+                                placeholder="Nhập số điện thoại hoặc mã thành viên"
                                 className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm"
                                 onKeyDown={e => { if (!phoneStep && e.key === "Enter") { e.preventDefault(); void checkPhone() } }} />
                         </div>
+                        )}
                         {!phoneStep ? (
-                            <button type="button" disabled={isLoading} onClick={checkPhone}
-                                className="w-full rounded-xl bg-brk-primary px-4 py-3 font-bold text-brk-on-primary disabled:opacity-50">
-                                {isLoading ? "Đang kiểm tra..." : "Kiểm tra và tiếp tục"}
-                            </button>
+                            <>
+                                <button type="button" disabled={isLoading} onClick={checkPhone}
+                                    className="w-full rounded-xl bg-brk-primary px-4 py-3 font-bold text-brk-on-primary disabled:opacity-50">
+                                    {isLoading ? "Đang kiểm tra..." : "Kiểm tra và tiếp tục"}
+                                </button>
+                                <button type="button" onClick={() => setShowHelp(true)}
+                                    className="mx-auto block text-xs text-brk-muted underline hover:text-brk-primary">
+                                    Trợ giúp
+                                </button>
+                            </>
                         ) : (
                             <>
-                                <button type="button" className="text-xs text-brk-primary underline" onClick={() => {
-                                    setPhoneStep(false); setOtpRequested(false); setLoginMethod("password"); setError(null); setWarning(null); setValue("otp", ""); setValue("loginOtp", "")
-                                }}>Đổi số điện thoại</button>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <button type="button" onClick={() => {setLoginMethod("password");setError(null)}}
-                                        className={`rounded-lg px-2 py-3 text-sm font-medium ${loginMethod === "password" ? "bg-brk-primary text-brk-on-primary" : "border border-brk-outline text-brk-on-surface"}`}>Mật khẩu</button>
-                                    <button type="button" onClick={() => {setLoginMethod("email");setError(null)}}
-                                        className={`rounded-lg px-2 py-3 text-sm font-medium ${loginMethod === "email" ? "bg-brk-primary text-brk-on-primary" : "border border-brk-outline text-brk-on-surface"}`}>OTP qua email</button>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm font-semibold text-brk-on-surface">Thông tin của bạn</span>
+                                    <button type="button" className="text-xs text-brk-primary underline" onClick={() => {
+                                        setPhoneStep(false); setOtpRequested(false); setLoginMethod("password"); setError(null); setWarning(null); setValue("otp", ""); setValue("loginOtp", ""); setValue("password", ""); setFoundMemberId(null); setMaskedEmail(null); setMfaRequired(false)
+                                    }}>Nhập lại thông tin</button>
                                 </div>
+                                {foundMemberId != null && (
+                                    <div className="rounded-lg bg-brk-primary/10 border border-brk-primary/30 p-3 text-sm text-brk-on-surface space-y-1">
+                                        <p>{loginKind === "memberId"
+                                            ? <>Mã thành viên <span className="font-semibold">{foundMemberId}</span> của bạn đã đăng ký trên hệ thống wi300.</>
+                                            : <>Số điện thoại <span className="font-semibold">{foundPhone}</span> của bạn đã đăng ký trên hệ thống wi300 với mã thành viên là <span className="font-semibold">{foundMemberId}</span>.</>}</p>
+                                        <p>Nhập mật khẩu hoặc đăng nhập bằng mã OTP{maskedEmail ? <> được gửi qua mail <span className="font-semibold">{maskedEmail}</span></> : null}.</p>
+                                    </div>
+                                )}
                                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                                    {loginMethod === "password" ? (
-                                        <div>
-                                            <label className="block text-sm font-medium text-brk-accent mb-1.5">Mật khẩu</label>
-                                            <div className="relative">
-                                                <input {...register("password", { required: loginMethod === "password" ? "Nhập mật khẩu" : false })}
-                                                    type={showPassword ? "text" : "password"} autoComplete="current-password"
-                                                    placeholder="Nhập mật khẩu"
-                                                    className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 pr-10 text-brk-on-surface text-sm" />
-                                                <button type="button" aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-                                                    onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-brk-accent">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
-                                            </div>
-                                            {errors.password && <p className="text-xs text-brk-accent">{errors.password.message}</p>}
-                                            <div className="text-right mt-2"><Link href="/forgot-password" className="text-xs text-brk-primary">Quên mật khẩu?</Link></div>
+                                    <div>
+                                        <div className="relative">
+                                            <input {...register("password", { required: "Vui lòng nhập mật khẩu hoặc mã OTP." })}
+                                                type={showPassword ? "text" : "password"} autoComplete="current-password"
+                                                placeholder="Nhập mật khẩu hoặc mã OTP vào đây"
+                                                className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 pr-10 text-brk-on-surface text-sm" />
+                                            <button type="button" aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                                                onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-brk-accent">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
                                         </div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {!otpRequested && <button type="button" disabled={isLoading} onClick={requestEmailOtp}
-                                                className="w-full rounded-xl border border-brk-outline py-3 text-brk-on-surface">Gửi mã OTP vào email đã đăng ký</button>}
-                                            {otpRequested && <>
-                                                <label className="block text-sm font-medium text-brk-accent">Mã OTP email</label>
-                                                <input {...register("loginOtp", { required: loginMethod === "email" ? "Nhập mã OTP" : false })}
-                                                    inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="6 chữ số từ email"
-                                                    className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm" />
-                                                <button type="button" disabled={isLoading} onClick={requestEmailOtp} className="text-xs text-brk-primary underline">Gửi lại OTP</button>
-                                            </>}
+                                        {errors.password && <p className="text-xs text-brk-accent">{errors.password.message}</p>}
+                                        {otpRequested && <p className="text-xs text-brk-primary mt-1">Lấy mã OTP đã được gửi qua mail của bạn điền vào ô trên, quá 10 phút phải lấy lại mã OTP khác.</p>}
+                                        <div className="flex items-center justify-between mt-2">
+                                            <button type="button" disabled={isLoading} onClick={requestEmailOtp} className="text-xs text-brk-primary underline disabled:opacity-50">
+                                                {otpRequested ? "Gửi lại mã OTP" : "Gửi mã OTP qua mail"}
+                                            </button>
+                                            <Link href="/forgot-password" className="text-xs text-brk-primary">Quên mật khẩu?</Link>
                                         </div>
-                                    )}
-                                    <label className="flex items-center gap-2 text-xs text-brk-on-surface">
-                                        <input type="checkbox" checked={showAdminMfa} onChange={e => setShowAdminMfa(e.target.checked)} />
-                                        Tôi sử dụng Authenticator cho tài khoản quản trị
-                                    </label>
-                                    {showAdminMfa && <div>
+                                    </div>
+                                    {mfaRequired && <div>
                                         <label className="block text-sm font-medium text-brk-accent mb-1.5">Mã Authenticator</label>
                                         <input {...register("otp")} inputMode="numeric" maxLength={6} pattern="[0-9]{6}"
                                             placeholder="Mã 6 chữ số trong ứng dụng"
                                             className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm" />
+                                        <p className="text-xs text-brk-accent mt-1">Tài khoản quản trị đã bật xác thực 2 lớp. Nhập mã từ ứng dụng Authenticator rồi đăng nhập lại.</p>
                                     </div>}
-                                    <button type="submit" disabled={isLoading || (loginMethod === "email" && !otpRequested)}
+                                    <button type="submit" disabled={isLoading}
                                         className="w-full rounded-xl bg-brk-primary px-4 py-3 text-sm font-bold text-brk-on-primary disabled:opacity-50">{isLoading ? "Đang đăng nhập..." : "Đăng nhập"}</button>
                                 </form>
+                                <button type="button" onClick={() => setShowHelp(true)}
+                                    className="mx-auto block text-xs text-brk-muted underline hover:text-brk-primary">
+                                    Trợ giúp
+                                </button>
                             </>
                         )}
                     </div>
 
+                    {/* TẠM ẨN 2026-10-11: form hỗ trợ khi không đăng nhập/đăng ký được — bỏ comment để mở lại
                     <AccountSupportForm page="login" />
+                    */}
+                    {/* TẠM ẨN 2026-10-11: link đăng ký — bỏ comment để mở lại
                     <p className="text-center text-sm text-brk-accent">
                         Chưa có tài khoản?{' '}
                         <Link href={safeReturnPath(searchParams.get('callbackUrl')) ? '/register?callbackUrl=' + encodeURIComponent(safeReturnPath(searchParams.get('callbackUrl'))!) : redirectSlug ? `/register?redirect=${encodeURIComponent(redirectSlug)}${refCode ? '&ref=' + encodeURIComponent(refCode) : ''}` : '/register'} className="font-semibold text-brk-primary hover:text-brk-primary">Đăng ký ngay</Link>
                     </p>
+                    */}
+                    {/* MODAL TRỢ GIÚP (placeholder — thay nội dung thật sau) */}
+                    {showHelp && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowHelp(false)}>
+                            <div className="w-full max-w-sm rounded-2xl bg-brk-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                                <h3 className="text-base font-bold text-brk-on-surface">Trợ giúp</h3>
+                                <p className="mt-2 text-sm text-brk-muted">Nội dung hướng dẫn & hỗ trợ đang được hoàn thiện.</p>
+                                <button type="button" onClick={() => setShowHelp(false)}
+                                    className="mt-4 w-full rounded-xl bg-brk-primary px-4 py-2.5 text-sm font-bold text-brk-on-primary">
+                                    Đóng
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
