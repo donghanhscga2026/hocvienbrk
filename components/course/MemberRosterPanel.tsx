@@ -5,6 +5,7 @@ import { Loader2, ImageDown } from 'lucide-react'
 import MemberDayChips, { DayStatus } from './MemberDayChips'
 import MemberDetailPanel from './MemberDetailPanel'
 import { downloadRosterAsImage } from '@/lib/course/export-roster-image'
+import { downloadRosterCsv } from '@/lib/course/export-roster-csv'
 
 const RECENT_DAYS = 7
 
@@ -233,6 +234,15 @@ export default function MemberRosterPanel({ members, labels, canViewPhone, cours
                         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-purple-500/60" /> Nộp muộn</span>
                         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-500/60" /> Chưa nộp</span>
                     </div>
+                    <button
+                        type="button"
+                        onClick={() => downloadRosterCsv(courseName, members, labels, canViewPhone)}
+                        disabled={members.length === 0}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg disabled:opacity-50"
+                        title="Tải danh sách học viên dạng CSV mở được bằng Excel"
+                    >
+                        Xuất Excel (CSV)
+                    </button>
                     <button
                         onClick={handleExportImage}
                         disabled={exportingImage || members.length === 0}
