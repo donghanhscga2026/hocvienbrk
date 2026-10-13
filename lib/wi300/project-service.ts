@@ -49,6 +49,8 @@ export async function saveProject(db: PrismaClient, id: number, slug: string, ra
     const controls = envelope.controls || { ownerId: current.ownerId, published: current.published, featured: current.featured, showOnHomepage: current.showOnHomepage, order: current.order }
     if (controls.ownerId != null && !await tx.user.findUnique({ where: { id: controls.ownerId }, select: { id: true } })) throw new CrmError('Mã thành viên của chủ dự án không tồn tại.')
     if (envelope.content.courseIds.length && await tx.course.count({ where: { id: { in: envelope.content.courseIds } } }) !== envelope.content.courseIds.length) throw new CrmError('Một số khóa học không tồn tại. Vui lòng chọn lại.')
+    const addedCourseIds = envelope.content.courseIds.filter(courseId => !current.courseIds.includes(courseId))
+    if (!admin && addedCourseIds.length && await tx.course.count({ where: { id: { in: addedCourseIds }, teacherId: id } }) !== addedCourseIds.length) throw new CrmError('Chỉ được thêm khóa học bạn có quyền quản lý.', 403)
     const value = { ...envelope.content, category: envelope.content.category ?? current.category ?? 'OTHER', ...controls, members: envelope.members || current.members || [], revision: current.revision + 1 }
     await tx.systemConfig.upsert({ where: { key: PROJECT_PREFIX + slug }, create: { key: PROJECT_PREFIX + slug, value }, update: { value } })
     return { slug, ...value }

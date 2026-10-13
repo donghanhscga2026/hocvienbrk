@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Loader2, Plus, Minus, AlertTriangle, Save, FileSpreadsheet, ImageDown } from 'lucide-react'
 import {
     updateCourseMemberAssignmentsAction,
@@ -161,18 +161,22 @@ function ToggleCheckbox({ checked, onChange, label }: { checked: boolean; onChan
     )
 }
 
-export default function AdminMemberRosterTab({ courseId, courseName, members, labels, reload }: {
+export default function AdminMemberRosterTab({ courseId, courseName, members, labels, reload, initialStudentId }: {
     courseId: number
     courseName: string
     members: RosterMember[]
     labels: CourseMemberLabels
     reload: () => void
+    initialStudentId?: number
 }) {
     const [editedMembers, setEditedMembers] = useState<Record<number, EditPatch>>({})
     const [savingAssignments, setSavingAssignments] = useState(false)
     const [ssMode, setSsMode] = useState(false)
     const [cardDisplay, setCardDisplay] = useState<CardDisplayToggles>({ role: true, code: true, phone: true })
     const [selectedMember, setSelectedMember] = useState<RosterMember | null>(null)
+    useEffect(() => {
+        if (initialStudentId != null) setSelectedMember(members.find(member => member.user.id === initialStudentId) || null)
+    }, [initialStudentId, members])
     const [exportingStudents, setExportingStudents] = useState(false)
     const [exportingImage, setExportingImage] = useState(false)
 

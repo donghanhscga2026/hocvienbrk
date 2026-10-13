@@ -84,6 +84,13 @@ jobs:
       - name: TypeScript check
         run: npx tsc --noEmit
 
+      - name: Course and project management regression checks
+        run: |
+          node scripts/test-wi300-projects.cjs
+          node scripts/test-wi300-project-content.cjs
+          node scripts/test-course-management-activity.cjs
+          node scripts/test-management-workspace-ui.cjs
+
       - name: ZIP template source regression checks
         run: node scripts/test-zip-template-source.cjs
 

@@ -6,25 +6,19 @@ import { getTeachersAction } from '@/app/actions/course-actions'
 import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Eye, EyeOff, CheckSquare, X, Search, Tag, Trash2, Save, Edit2, Palette } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
-import { getCoursePages, updateCoursePage, createCoursePage, applyCoursePageTemplate } from '@/app/actions/course-page-actions'
-import { applyStoredCoursePageTemplate, getStoredCoursePageTemplateOptions } from '@/app/actions/course-page-template-actions'
-import { COURSE_TEMPLATE_LIBRARY, CourseTemplateKey } from '@/lib/course-page/templates'
 import CourseDashboardModal from '@/components/course/CourseDashboardModal'
 import AdminMemberRosterTab from '@/components/course/AdminMemberRosterTab'
+import type { ActivitySummary } from '@/components/course/CourseManagementActivity'
 
 export default function ToolsCoursesPage() {
     const [activeTab, setActiveTab] = useState<'courses' | 'categories'>('courses')
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <MainHeader title="KHÓA HỌC" toolSlug="courses" />
+            <MainHeader title="Quản lý khóa học" toolSlug="courses" />
 
-            <div className="p-4 max-w-4xl mx-auto space-y-4 pb-20">
-                <div className="flex justify-end mt-4">
-                    <Link href="/tools/courses/templates" className="inline-flex items-center gap-2 rounded-xl bg-purple-700 px-4 py-2 text-xs font-black text-white shadow-sm hover:bg-purple-800">
-                        <Palette className="w-4 h-4" /> Thư viện mẫu Salespage
-                    </Link>
-                </div>
+            <div className="p-4 max-w-7xl mx-auto space-y-4 pb-20">
+                <div className="rounded-2xl border border-brk-outline bg-brk-background p-5"><h1 className="text-2xl font-bold text-brk-primary">Quản lý khóa học</h1><p className="mt-2 text-sm text-gray-600">Quản lý nội dung, học viên và hoạt động của từng khóa. Chọn mẫu Sales Page trong mục Trang bán khóa học.</p></div>
 
                 <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl mt-4">
                     <button
@@ -49,8 +43,6 @@ export default function ToolsCoursesPage() {
 
 function CoursesTab() {
     const [courses, setCourses] = useState<any[]>([])
-    const [coursePages, setCoursePages] = useState<any[]>([])
-    const [storedTemplates, setStoredTemplates] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [isAdmin, setIsAdmin] = useState(false)
     const [visibilityScope, setVisibilityScope] = useState("shared")
@@ -63,6 +55,13 @@ function CoursesTab() {
     const [search, setSearch] = useState('')
     const [filterStatus, setFilterStatus] = useState('ACTIVE')
     const [filterCategory, setFilterCategory] = useState('ALL')
+    const [filterProject, setFilterProject] = useState('ALL')
+    const [projects, setProjects] = useState<{ slug: string; name: string; courseIds: number[] }[]>([])
+    const [page, setPage] = useState(1)
+    const [activity, setActivity] = useState<ActivitySummary[]>([])
+    const [activityError, setActivityError] = useState('')
+    const [activityLoading, setActivityLoading] = useState(false)
+    const [activityRevision, setActivityRevision] = useState(0)
     // ✅ Mặc định luôn xem khoá học CỦA CHÍNH MÌNH — kể cả ADMIN. Muốn xem toàn bộ
     // hoặc của GV khác thì chủ động đổi ở dropdown (chỉ ADMIN mới đổi được).
     const [filterTeacher, setFilterTeacher] = useState('SELF')
@@ -105,9 +104,8 @@ function CoursesTab() {
     }, [filterTeacher])
 
     useEffect(() => {
-        getCoursePages().then(setCoursePages)
-        getStoredCoursePageTemplateOptions().then(res => {
-            if (res.success) setStoredTemplates(res.templates || [])
+        fetch('/api/wi300/projects', { cache: 'no-store' }).then(async response => {
+            if (response.ok) { const data = await response.json(); setProjects(data.projects || []) }
         }).catch(() => {})
         fetch('/api/vouchers').then(r => r.json()).then(data => setAllVouchers(data.vouchers || [])).catch(() => {})
         // ✅ Danh sách GV cho dropdown lọc — tải riêng, độc lập với phạm vi khoá học
@@ -126,51 +124,6 @@ function CoursesTab() {
     }, [])
 
     const categoryOptions = allCategories
-
-    const handleToggleTemplate = async (slug: string, page: any, currentVal: boolean) => {
-        if (page) {
-            const res = await updateCoursePage(page.id, { useTemplate: !currentVal })
-            if (res.success) {
-                setCoursePages(prev => prev.map(p => p.id === page.id ? { ...p, useTemplate: !currentVal } : p))
-            } else {
-                alert(res.error || 'Có lỗi xảy ra khi cập nhật cấu hình')
-            }
-        } else {
-            const res = await createCoursePage({
-                slug,
-                name: slug,
-                useTemplate: true
-            })
-            if (res.success && res.page) {
-                setCoursePages(prev => [...prev, res.page])
-            } else {
-                alert(res.error || 'Có lỗi xảy ra khi khởi tạo cấu hình')
-            }
-        }
-    }
-
-    const handleApplyTemplate = async (course: any, page: any, templateKey: string) => {
-        const customId = templateKey.startsWith('custom:') ? templateKey.slice('custom:'.length) : null
-        const template = customId
-            ? storedTemplates.find(t => t.id === customId)
-            : COURSE_TEMPLATE_LIBRARY.find(t => t.key === templateKey)
-        if (!template) return
-        if (page && !confirm(`Áp dụng mẫu "${template.name}" sẽ thay thế bố cục trang hiện tại của khóa học này. Nội dung của các khóa học khác không bị ảnh hưởng. Tiếp tục?`)) return
-        setBatchLoading(true)
-        try {
-            const res = customId
-                ? await applyStoredCoursePageTemplate(customId, course.id_khoa, course.name_lop || course.id_khoa)
-                : await applyCoursePageTemplate(course.id_khoa, course.name_lop || course.id_khoa, templateKey as CourseTemplateKey)
-            if (res.success) {
-                const pages = await getCoursePages()
-                setCoursePages(pages)
-            } else {
-                alert(res.error || 'Có lỗi xảy ra khi áp dụng mẫu')
-            }
-        } finally {
-            setBatchLoading(false)
-        }
-    }
 
     const handleToggleCourseStatus = async (courseId: number, currentStatus: boolean) => {
         const res = await bulkToggleCourseStatusAction([courseId], !currentStatus)
@@ -201,9 +154,28 @@ function CoursesTab() {
             if (filterStatus === 'HIDDEN' && course.status) return false
             const catName = course.courseCategory?.name || course.category || 'Khác'
             if (filterCategory !== 'ALL' && catName !== filterCategory) return false
+            if (filterProject !== 'ALL' && !projects.find(project => project.slug === filterProject)?.courseIds.includes(course.id)) return false
             return true
         })
-    }, [courses, search, filterStatus, filterCategory])
+    }, [courses, search, filterStatus, filterCategory, filterProject, projects])
+
+    const totalPages = Math.max(1, Math.ceil(filteredCourses.length / 10))
+    const currentPage = Math.min(page, totalPages)
+    const visibleCourses = filteredCourses.slice((currentPage - 1) * 10, currentPage * 10)
+    const activityIds = visibleCourses.map(course => course.id).join(',')
+    useEffect(() => { setPage(1); setSelectedIds(new Set()) }, [search, filterStatus, filterCategory, filterProject, filterTeacher])
+    useEffect(() => {
+        const controller = new AbortController()
+        setActivity([]); setActivityError('')
+        if (!activityIds) { setActivityLoading(false); return }
+        setActivityLoading(true)
+        fetch(`/api/courses/management-activity?ids=${activityIds}`, { signal: controller.signal, cache: 'no-store' }).then(async response => {
+            const data = await response.json()
+            if (!response.ok) throw new Error(data.error || 'Không tải được hoạt động.')
+            if (!controller.signal.aborted) setActivity(data.summary || [])
+        }).catch(error => { if (!controller.signal.aborted) setActivityError(error.message) }).finally(() => { if (!controller.signal.aborted) setActivityLoading(false) })
+        return () => controller.abort()
+    }, [activityIds, activityRevision])
 
     const toggleSelect = (id: number) => {
         setSelectedIds(prev => {
@@ -265,8 +237,6 @@ function CoursesTab() {
             const res = await bulkUpdateCoursesOptionsAction(Array.from(selectedIds), opts)
             if (res.success) {
                 await fetchCourses(filterTeacher)
-                const pages = await getCoursePages()
-                setCoursePages(pages)
                 setShowBulkOptions(false)
                 setBulkOpts({...defaultBulkOpts})
                 setSelectedIds(new Set())
@@ -287,7 +257,7 @@ function CoursesTab() {
                     <p className="text-gray-600 text-sm">Quản lý nội dung & học phí</p>
                 </div>
                 <Link href="/tools/courses/new" className="bg-yellow-400 text-black p-2 rounded-xl inline-flex">
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-4 h-4" /> <span className="ml-2 text-sm font-semibold">Thêm khóa học</span>
                 </Link>
             </div>
 
@@ -315,6 +285,7 @@ function CoursesTab() {
                         <option value="ALL">Tất cả danh mục</option>
                         {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                     </select>
+                    {projects.length > 0 && <select aria-label="Lọc theo dự án" value={filterProject} onChange={event => setFilterProject(event.target.value)} className="min-h-11 rounded-lg border border-gray-100 bg-gray-50 px-2 text-xs"><option value="ALL">Tất cả dự án</option>{projects.map(project => <option key={project.slug} value={project.slug}>{project.name}</option>)}</select>}
                     {isAdmin ? (
                         <select value={filterTeacher} onChange={e => setFilterTeacher(e.target.value)}
                             className="text-xs bg-gray-50 border border-gray-100 rounded-lg px-2 py-1.5 font-medium outline-none focus:ring-2 focus:ring-yellow-200">
@@ -330,8 +301,8 @@ function CoursesTab() {
                             <option value="SELF">{teacherOptions.find(t => t.id === currentUserId)?.name || 'Khóa học của tôi'}</option>
                         </select>
                     )}
-                    {search || filterStatus !== 'ACTIVE' || filterCategory !== 'ALL' || (isAdmin && filterTeacher !== 'SELF') ? (
-                        <button onClick={() => { setSearch(''); setFilterStatus('ACTIVE'); setFilterCategory('ALL'); if (isAdmin) setFilterTeacher('SELF') }}
+                    {search || filterStatus !== 'ACTIVE' || filterCategory !== 'ALL' || filterProject !== 'ALL' || (isAdmin && filterTeacher !== 'SELF') ? (
+                        <button onClick={() => { setSearch(''); setFilterStatus('ACTIVE'); setFilterCategory('ALL'); setFilterProject('ALL'); if (isAdmin) setFilterTeacher('SELF') }}
                             className="text-xs text-gray-400 hover:text-gray-600 font-bold px-2 py-1">
                             Xóa lọc
                         </button>
@@ -404,167 +375,21 @@ function CoursesTab() {
                 </div>
             ) : (
                 <div className="space-y-3">
-                    {filteredCourses.map((course) => {
-                        const catName = course.courseCategory?.name || course.category || null
-                        return (
-                            <div
-                                key={course.id}
-                                className={`bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden transition-all ${
-                                    !course.status ? 'opacity-60' : ''
-                                } ${selectedIds.has(course.id) ? 'ring-2 ring-yellow-400' : 'hover:shadow-md'}`}
-                            >
-                                <div className="p-4">
-                                    <div className="flex items-start gap-3">
-                                        <div className="pt-0.5">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.has(course.id)}
-                                                onChange={() => toggleSelect(course.id)}
-                                                className="rounded border-gray-300 accent-yellow-500 cursor-pointer mt-1"
-                                            />
-                                        </div>
-
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                                <span className="text-[10px] font-black font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 shrink-0">
-                                                    #{course.id}
-                                                </span>
-                                                <span className="text-[10px] font-bold font-mono text-gray-400">
-                                                    {course.id_khoa}
-                                                </span>
-                                                {catName && catName !== 'Khác' && (
-                                                    <span className="inline-block px-1.5 py-0.5 rounded-full text-[9px] font-black bg-purple-100 text-purple-700 border border-purple-200 shrink-0">
-                                                        {catName}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="mb-2.5">
-                                                <Link
-                                                    href={`/khoa-hoc/${course.id_khoa || course.id}`}
-                                                    className="font-black text-orange-600 text-sm leading-tight break-words hover:text-orange-700 hover:underline underline-offset-2"
-                                                    title={course.name_lop}
-                                                >
-                                                    {course.name_lop}
-                                                </Link>
-                                            </div>
-
-                                            <div className="flex items-center gap-3 text-[10px] text-gray-500 font-bold flex-wrap pb-2.5 border-b border-gray-100">
-                                                <div className="flex items-center gap-1">
-                                                    <DollarSign className="w-3 h-3 text-green-500" />
-                                                    {course.phi_coc.toLocaleString()}đ
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    <BookOpen className="w-3 h-3 text-blue-400" />
-                                                    {course._count?.lessons} bài
-                                                </div>
-                                                <button
-                                                    onClick={() => handleViewStudents(course.id, course.name_lop)}
-                                                    className="flex items-center gap-1 hover:text-purple-600 transition-colors"
-                                                    title="Xem thành viên đã đăng ký"
-                                                >
-                                                    <Users className="w-3 h-3 text-purple-500" />
-                                                    {course._count?.enrollments} TV
-                                                </button>
-                                                {course.teacher && (
-                                                    <span className="text-[10px] text-gray-400 font-medium ml-auto">
-                                                        GV: {course.teacher.name || course.teacher.email}
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            <div className="flex items-center justify-between gap-2 pt-2.5 flex-wrap">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    {/* Nút bật/tắt Publish (Hiển thị) */}
-                                                    <div className="flex items-center gap-1 bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-lg">
-                                                        <span className="text-[9px] font-black text-gray-500">Đăng:</span>
-                                                        <button
-                                                            onClick={() => handleToggleCourseStatus(course.id, course.status)}
-                                                            className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                                                course.status ? 'bg-green-600' : 'bg-gray-300'
-                                                            }`}
-                                                            title={course.status ? "Đang hiển thị" : "Đang ẩn"}
-                                                        >
-                                                            <span
-                                                                className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                                                    course.status ? 'translate-x-3' : 'translate-x-0'
-                                                                }`}
-                                                            />
-                                                        </button>
-                                                    </div>
-
-                                                    {/* Nút bật/tắt Template Động */}
-                                                    {(() => {
-                                                        const page = coursePages.find((p) => p.slug === course.id_khoa)
-                                                        const isTemplateApplied = page ? page.useTemplate !== false : false
-                                                        return (
-                                                            <div className="flex items-center gap-1 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-lg">
-                                                                <span className="text-[9px] font-black text-purple-700">Mẫu:</span>
-                                                                <button
-                                                                    onClick={() => handleToggleTemplate(course.id_khoa, page, isTemplateApplied)}
-                                                                    className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                                                        isTemplateApplied ? 'bg-purple-700' : 'bg-gray-300'
-                                                                    }`}
-                                                                    title={isTemplateApplied ? "Đang áp dụng template động" : "Đang dùng giao diện gốc"}
-                                                                >
-                                                                    <span
-                                                                        className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                                                            isTemplateApplied ? 'translate-x-3' : 'translate-x-0'
-                                                                        }`}
-                                                                    />
-                                                                </button>
-                                                                {isTemplateApplied && (
-                                                                    <select
-                                                                        value={(page?.seo as any)?.templateKey || ''}
-                                                                        onChange={(e) => e.target.value && handleApplyTemplate(course, page, e.target.value)}
-                                                                        className="h-6 max-w-[125px] rounded-md border border-purple-200 bg-white px-1 text-[9px] font-bold text-purple-800"
-                                                                        title="Chọn mẫu giao diện"
-                                                                    >
-                                                                        <option value="">Tùy chỉnh</option>
-                                                                        <optgroup label="Mẫu hệ thống">
-                                                                            {COURSE_TEMPLATE_LIBRARY.map(template => (
-                                                                                <option key={template.key} value={template.key}>{template.name}</option>
-                                                                            ))}
-                                                                        </optgroup>
-                                                                        {storedTemplates.length > 0 && (
-                                                                            <optgroup label="Mẫu của tôi">
-                                                                                {storedTemplates.map(template => (
-                                                                                    <option key={template.id} value={`custom:${template.id}`}>{template.name}</option>
-                                                                                ))}
-                                                                            </optgroup>
-                                                                        )}
-                                                                    </select>
-                                                                )}
-                                                                {isTemplateApplied && page && (
-                                                                    <Link
-                                                                        href={`/tools/courses/pages/${page.id}`}
-                                                                        className="inline-flex items-center justify-center w-5 h-5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-full transition-all ml-1"
-                                                                        title="Chỉnh nội dung riêng của khóa học"
-                                                                    >
-                                                                        <Palette className="w-3 h-3" />
-                                                                    </Link>
-                                                                )}
-                                                            </div>
-                                                        )
-                                                    })()}
-                                                </div>
-
-                                                <div className="flex items-center gap-2 ml-auto">
-                                                    <Link
-                                                        href={`/tools/courses/new?id=${course.id}`}
-                                                        className="inline-flex items-center justify-center gap-1 px-3 py-1 bg-black text-yellow-400 rounded-lg hover:bg-zinc-800 active:scale-95 transition-all text-xs font-black shadow-sm"
-                                                        title="Sửa cấu hình khóa học"
-                                                    >
-                                                        <Settings className="w-3.5 h-3.5" />
-                                                        <span>Sửa</span>
-                                                    </Link>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-brk-background p-3 text-sm"><p><strong>Hoạt động học viên:</strong> yêu cầu cần trả lời và bài nộp / bình luận chưa xem là hai nhóm riêng.</p><button type="button" disabled={activityLoading} onClick={() => setActivityRevision(value => value + 1)} className="min-h-11 rounded-xl border border-brk-outline bg-white px-3 text-brk-primary disabled:opacity-50">Tải lại hoạt động</button></div>
+                    {activityError && <p role="alert" className="text-sm text-red-700">{activityError} · Bấm Tải lại hoạt động để thử lại.</p>}
+                    <div className="hidden items-center gap-3 rounded-xl bg-gray-100 px-4 py-3 text-xs font-semibold text-gray-500 lg:grid lg:grid-cols-[24px_minmax(180px,2fr)_minmax(100px,1fr)_minmax(150px,1.3fr)_minmax(170px,1.5fr)_auto]"><span /><span>Khóa học / Giảng viên</span><span>Danh mục</span><span>Học phí / Nội dung</span><span>Hoạt động học viên</span><span>Thao tác</span></div>
+                    {visibleCourses.map(course => {
+                        const summary = activity.find(item => item.courseId === course.id)
+                        return <article key={course.id} className={`grid gap-3 rounded-xl border border-brk-outline bg-white p-4 lg:grid-cols-[24px_minmax(180px,2fr)_minmax(100px,1fr)_minmax(150px,1.3fr)_minmax(170px,1.5fr)_auto] lg:items-center ${selectedIds.has(course.id) ? 'ring-2 ring-brk-primary' : ''}`}>
+                            <input type="checkbox" aria-label={`Chọn ${course.name_lop}`} checked={selectedIds.has(course.id)} onChange={() => toggleSelect(course.id)} className="h-4 w-4 accent-green-700" />
+                            <div className="min-w-0"><Link href={`/tools/courses/new?id=${course.id}`} className="break-words text-sm font-bold text-brk-primary">{course.name_lop}</Link><p className="mt-1 break-words text-xs text-gray-500">{course.id_khoa} · #{course.id}</p><p className="mt-1 text-xs text-gray-500">GV: {course.teacher?.name || course.teacher?.email || 'Chưa phân công'}</p></div>
+                            <div className="text-xs"><span className="rounded-full bg-brk-background px-2 py-1 text-brk-primary">{course.courseCategory?.name || course.category || 'Khác'}</span><p className="mt-3">{course.status ? 'Đang hiển thị' : 'Đang ẩn'}</p>{isAdmin && <button type="button" disabled={batchLoading} onClick={() => void handleToggleCourseStatus(course.id, course.status)} className="mt-1 min-h-11 text-brk-primary">{course.status ? 'Ẩn khóa học' : 'Hiện khóa học'}</button>}</div>
+                            <div className="space-y-2 text-xs text-gray-600"><p>{Number(course.phi_coc || 0).toLocaleString('vi-VN')}đ</p><p>{course._count?.lessons || 0} bài giảng</p><button type="button" onClick={() => handleViewStudents(course.id, course.name_lop)} className="min-h-11 text-brk-primary">{course._count?.enrollments || 0} học viên →</button></div>
+                            <div className="text-xs">{activityLoading ? <p role="status">Đang tải hoạt động…</p> : summary ? <Link href={`/tools/courses/new?id=${course.id}&tab=activity`} className="block min-h-11 space-y-2 rounded-xl bg-brk-background p-3 text-brk-primary"><p><strong>{summary.requests}</strong> yêu cầu cần trả lời</p><p><strong>{summary.submissions + summary.comments}</strong> hoạt động chưa xem</p></Link> : <p className="text-gray-500">Chưa tải được hoạt động</p>}</div>
+                            <div className="flex flex-wrap gap-2 lg:flex-col"><Link href={`/tools/courses/new?id=${course.id}`} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brk-primary px-3 text-xs font-semibold text-white">Quản lý</Link><Link href={`/tools/courses/new?id=${course.id}&tab=sales`} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-brk-outline px-3 text-xs font-semibold text-brk-primary">Trang bán</Link><Link href={`/khoa-hoc/${course.id_khoa || course.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center justify-center px-3 text-xs text-gray-500">Xem công khai ↗</Link></div>
+                        </article>
                     })}
+                    <div className="flex flex-wrap items-center justify-between gap-3 text-sm"><p>{filteredCourses.length} khóa học · Trang {currentPage}/{totalPages}</p><div className="flex gap-2"><button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} className="min-h-11 rounded-xl border bg-white px-4 disabled:opacity-40">Trước</button><button type="button" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)} className="min-h-11 rounded-xl border bg-white px-4 disabled:opacity-40">Sau</button></div></div>
                 </div>
             )}
 

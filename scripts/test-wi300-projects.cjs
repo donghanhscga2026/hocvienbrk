@@ -16,7 +16,7 @@ async function run() {
   for (const url of ['', '/wi300/businesses/wi-grow.png', 'https://example.com/logo.png']) assert.equal(shared.safeProjectUrl(url), true)
   const rows = new Map(), users = new Map([[0, { id: 0, role: 'ADMIN', name: 'Admin' }], [8, { id: 8, role: 'STUDENT', name: 'Lucy' }], [9, { id: 9, role: 'STUDENT', name: 'Other' }]])
   let locks = 0, writes = 0, queue = Promise.resolve()
-  const db = { user: { findUnique: async ({ where }) => users.get(where.id) || null }, course: { count: async ({ where }) => where.id.in.filter(id => [1, 2].includes(id)).length }, systemConfig: {
+  const db = { user: { findUnique: async ({ where }) => users.get(where.id) || null }, course: { count: async ({ where }) => where.id.in.filter(id => [1, 2].includes(id) && (where.teacherId === undefined || ({ 1: 8, 2: 9 })[id] === where.teacherId)).length }, systemConfig: {
     findMany: async ({ where }) => [...rows].filter(([key]) => key.startsWith(where.key.startsWith)).map(([key, value]) => ({ key, value })),
     findUnique: async ({ where }) => rows.has(where.key) ? { key: where.key, value: rows.get(where.key) } : null,
     upsert: async ({ where, create, update }) => { writes++; rows.set(where.key, rows.has(where.key) ? update.value : create.value) },
@@ -114,6 +114,12 @@ async function run() {
   users.get(0).role = 'ADMIN'
   assert.equal((await api.DELETE(lifecycleRequest('DELETE', { revision: 1 }))).status, 200)
 
+  const linkProject = await service.createProject(db, 0, { slug: 'wi-link-permissions', name: 'Link Permissions', description: 'Check course owner permissions', ownerId: 8 })
+  const linkContent = Object.fromEntries(Object.keys(shared.projectContent.shape).map(key => [key, linkProject[key]]))
+  await assert.rejects(() => service.saveProject(db, 8, linkProject.slug, { revision: 1, content: { ...linkContent, courseIds: [2] } }), error => error.status === 403)
+  await service.saveProject(db, 8, linkProject.slug, { revision: 1, content: { ...linkContent, courseIds: [1] } })
+  await service.deleteProject(db, 0, linkProject.slug, { revision: 2 })
+
   const toolsApi = load('app/api/tools/route.ts', {
     '@/auth': { auth: async () => session }, '@/lib/prisma': { __esModule: true, default: { ...db, tool: { findMany: async () => [] } } },
     '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => brand }, '@/lib/wi300/project-service': service,
@@ -158,7 +164,7 @@ async function run() {
     await React.act(async () => root.render(React.createElement(Manager, { courses: [], initial: { admin: true, projects: [initial] } })))
     // Chuyển từ chủ dự án sang admin bằng remount, như đổi phiên đăng nhập.
     await React.act(async () => root.render(React.createElement(Manager, { key: 'admin', courses: [], initial: { admin: true, projects: [initial] } })))
-    assert.equal(document.querySelector('select'), null, 'List is cards rather than a project dropdown')
+    assert.equal(document.querySelector('[aria-label="Trạng thái dự án"]').value, 'all', 'List supports a status filter without selecting a project')
     assert.equal(document.querySelector('form'), null, 'List does not automatically open the first project')
     assert.equal(document.querySelector('[aria-label="Quản lý Wi.Grow"]').getAttribute('href'), '/du-an/quan-ly?project=wi-grow')
     const createFetch = global.fetch

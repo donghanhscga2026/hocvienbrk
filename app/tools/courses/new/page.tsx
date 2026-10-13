@@ -8,6 +8,10 @@ import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 import WiCourseProjects from '@/components/wi300/WiCourseProjects'
+import CourseManagementActivity from '@/components/course/CourseManagementActivity'
+import CourseSalesPagePanel from '@/components/course/CourseSalesPagePanel'
+import CourseRosterWorkspace from '@/components/course/CourseRosterWorkspace'
+import CourseActivityFeedTab from '@/components/course/CourseActivityFeedTab'
 
 import { ImportLessonsModal } from '@/components/admin/courses/ImportLessonsModal'
 import { LessonEditModal } from '@/components/admin/courses/LessonEditModal'
@@ -31,7 +35,16 @@ function CreateCourseContent() {
     const courseId = searchParams.get('id')
     const isEditMode = !!courseId
     
-    const [activeTab, setActiveTab] = useState<'info' | 'lessons'>('info')
+    type ManagementTab = 'info' | 'lessons' | 'members' | 'stats' | 'feed' | 'activity' | 'sales'
+    const initialTab = searchParams.get('tab')
+    const [activeTab, setActiveTab] = useState<ManagementTab>((['info', 'lessons', 'members', 'stats', 'feed', 'activity', 'sales'] as string[]).includes(initialTab || '') ? initialTab as ManagementTab : 'info')
+    const [infoGroup, setInfoGroup] = useState<'basic' | 'payment' | 'email'>('basic')
+    const [visitedRoster, setVisitedRoster] = useState(initialTab === 'members' || initialTab === 'stats')
+    const [initialStudentId, setInitialStudentId] = useState<number | undefined>()
+    function selectTab(tab: ManagementTab) {
+        if (tab === 'members' || tab === 'stats') setVisitedRoster(true)
+        setActiveTab(tab)
+    }
     const [lessons, setLessons] = useState<any[]>([])
     // ✅ Sắp xếp danh sách bài giảng theo thứ tự — mặc định giảm dần (bài mới/thứ tự lớn nhất lên đầu)
     const [lessonSortDir, setLessonSortDir] = useState<'asc' | 'desc'>('desc')
@@ -354,33 +367,28 @@ function CreateCourseContent() {
         <div className="min-h-screen bg-gray-50">
             <MainHeader title={isEditMode ? "SỬA KHÓA HỌC" : "TẠO KHÓA HỌC MỚI"} toolSlug="courses" />
             
-            {isEditMode && (
-                <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl mx-4 mb-6">
-                    <button 
-                        onClick={() => setActiveTab('info')} 
-                        className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'info' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                    >
-                        <Settings className="w-4 h-4 inline mr-2" /> Thông tin
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('lessons')} 
-                        className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'lessons' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                    >
-                        <List className="w-4 h-4 inline mr-2" /> Bài giảng ({lessons.length})
-                    </button>
-                </div>
-            )}
+            {isEditMode && <div className="mx-auto max-w-6xl space-y-4 px-4 pt-4">
+                <div className="rounded-2xl border border-brk-outline bg-brk-background p-5"><h1 className="text-2xl font-bold text-brk-primary">{nameLop || 'Quản lý khóa học'}</h1><p className="mt-1 text-sm text-gray-600">{idKhoa} · {lessons.length} bài giảng</p></div>
+                <nav aria-label="Quản lý khóa học" className="flex gap-2 overflow-x-auto pb-2">{([{ id: 'info', label: 'Thông tin' }, { id: 'lessons', label: 'Bài giảng' }, { id: 'members', label: 'Thành viên' }, { id: 'stats', label: 'Thống kê' }, { id: 'activity', label: 'Hoạt động học viên' }, { id: 'feed', label: 'Nhật ký' }, { id: 'sales', label: 'Trang bán khóa học' }] as const).map(tab => <button key={tab.id} type="button" aria-current={activeTab === tab.id ? 'page' : undefined} onClick={() => selectTab(tab.id)} className={`min-h-11 shrink-0 rounded-xl px-4 text-sm font-semibold ${activeTab === tab.id ? 'bg-brk-primary text-white' : 'border border-brk-outline bg-white text-gray-600'}`}>{tab.label}</button>)}</nav>
+            </div>}
             
-            <div className="max-w-2xl mx-auto space-y-8 p-4 pb-32">
+            <div className="max-w-6xl mx-auto space-y-6 p-4 pb-32">
                 <Link href="/tools/courses" className="inline-flex items-center gap-2 text-xs font-black text-gray-400 uppercase hover:text-purple-600 transition-colors">
                     <ArrowLeft className="w-4 h-4" /> Quay lại danh sách
                 </Link>
                 
-                {isEditMode && activeTab === 'info' && <WiCourseProjects key={courseId} courseId={courseId!} />}
-                {( !isEditMode || activeTab === 'info' ) && (
-                <form onSubmit={handleSubmit} className="space-y-8">
+                {isEditMode && activeTab === 'activity' && <CourseManagementActivity courseId={Number(courseId)} onOpenStudent={id => { setInitialStudentId(id); selectTab('members') }} />}
+                {isEditMode && visitedRoster && <div hidden={activeTab !== 'members' && activeTab !== 'stats'}><CourseRosterWorkspace courseId={Number(courseId)} courseName={nameLop} tab={activeTab === 'stats' ? 'stats' : 'members'} initialStudentId={initialStudentId} /></div>}
+                {isEditMode && activeTab === 'feed' && <div className="rounded-2xl border bg-white"><CourseActivityFeedTab courseId={Number(courseId)} showAllActivity /></div>}
+                {isEditMode && activeTab === 'sales' && idKhoa && <CourseSalesPagePanel slug={idKhoa} courseName={nameLop} canEdit={isAdmin} />}
+                <div hidden={isEditMode && activeTab !== 'info'} className="space-y-5">
+                {isEditMode && <nav aria-label="Nhóm thông tin khóa học" className="flex flex-wrap gap-2">{([{ id: 'basic', label: 'Thông tin & hình ảnh' }, { id: 'payment', label: 'Thanh toán & kích hoạt' }, { id: 'email', label: 'Email & Zalo' }] as const).map(group => <button key={group.id} type="button" aria-pressed={infoGroup === group.id} onClick={() => setInfoGroup(group.id)} className={`min-h-11 rounded-xl border border-brk-outline px-4 text-sm ${infoGroup === group.id ? 'bg-brk-background font-bold text-brk-primary' : 'bg-white'}`}>{group.label}</button>)}</nav>}
+                {isEditMode && <div hidden={infoGroup !== 'basic'}><WiCourseProjects key={courseId} courseId={courseId!} /></div>}
+                <form onSubmit={handleSubmit} onInvalid={event => { const group = (event.target as HTMLElement).closest<HTMLElement>('[data-info-group]')?.dataset.infoGroup; if (group === 'basic' || group === 'payment' || group === 'email') { setInfoGroup(group); setActiveTab('info') } }} className="space-y-8">
+                {/* Giữ form được mount để không mất dữ liệu khi chuyển nhóm / tab. */}
+                <div data-info-group="basic" hidden={isEditMode && infoGroup !== 'basic'} className="space-y-5">
                 {/* SECTION 1: THÔNG TIN CƠ BẢN */}
-                <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
+                <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-brk-outline">
                     <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
                         <BookOpen className="w-5 h-5 text-blue-500" /> Thông tin cơ bản *
                     </h2>
@@ -592,7 +600,7 @@ function CreateCourseContent() {
                 </div>
                 
                 {/* SECTION 2: MÔ TẢ & HÌNH ẢNH */}
-                <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
+                <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-brk-outline">
                     <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
                         <Settings className="w-5 h-5 text-green-500" /> Mô tả & Hình ảnh
                     </h2>
@@ -651,8 +659,9 @@ function CreateCourseContent() {
                     </div>
                 </div>
                 
+                </div><div data-info-group="payment" hidden={isEditMode && infoGroup !== 'payment'}>
                 {/* SECTION 3: HỌC PHÍ & THANH TOÁN */}
-                <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
+                <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-brk-outline">
                     <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
                         <DollarSign className="w-5 h-5 text-yellow-500" /> Học phí & Thanh toán
                     </h2>
@@ -746,8 +755,9 @@ function CreateCourseContent() {
                     </div>
                 </div>
                 
+                </div><div data-info-group="email" hidden={isEditMode && infoGroup !== 'email'}>
                 {/* SECTION 4: EMAIL & ZALO */}
-                <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
+                <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-brk-outline">
                     <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
                         <Upload className="w-5 h-5 text-purple-500" /> Email & Zalo
                     </h2>
@@ -786,6 +796,7 @@ function CreateCourseContent() {
                     </div>
                 </div>
                 
+                </div>
                 {message && (
                     <div className={`p-4 rounded-2xl flex items-center gap-3 text-xs font-bold ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                         {message.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
@@ -802,7 +813,7 @@ function CreateCourseContent() {
                     {isEditMode ? 'Lưu Khóa học' : 'Tạo Khóa học'}
                 </button>
                 </form>
-                )}
+                </div>
 
                 {isEditMode && activeTab === 'lessons' && (
                     <div className="space-y-4">
