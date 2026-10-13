@@ -279,6 +279,36 @@ export async function processPaymentEmails() {
           const parsed = parseBankEmail(body, fromAddress, subject);
           if (!parsed || !parsed.amount || (!parsed.userId && !parsed.phone)) continue;
 
+          // Dedup: mỗi email chỉ xử lý 1 lần (tránh quét lặp / kích hoạt trùng)
+          const gmailExternalId = `gmail:${msg.id || ''}`;
+          let txRecord: { id: number } | null = null;
+          try {
+            const existingTx = await prisma.processedTransaction.findUnique({ where: { externalId: gmailExternalId } });
+            if (existingTx && existingTx.status !== 'FAILED') {
+              continue; // Đã xử lý (PROCESSED/UNMATCHED/PROCESSING) — bỏ qua
+            }
+            if (existingTx && existingTx.status === 'FAILED') {
+              txRecord = existingTx;
+            } else {
+              txRecord = await prisma.processedTransaction.create({
+                data: {
+                  source: 'EMAIL',
+                  externalId: gmailExternalId,
+                  amount: parsed.amount,
+                  bankName: 'Sacombank',
+                  content: parsed.content,
+                  transferTime: parsed.transferTime,
+                  status: 'PROCESSING',
+                }
+              });
+            }
+          } catch (dupErr: any) {
+            if (dupErr?.code === 'P2002') continue; // Race: tiến trình khác đã ghi nhận
+            console.error(`  ⚠️ Lỗi ghi nhận dedup cho message ${msg.id}:`, dupErr);
+          }
+
+        let emailMatchedEnrollmentId: number | null = null;
+        let emailError: string | null = null;
         for (const enrollment of pendingEnrollments) {
           // Bỏ qua enrollment của tài khoản test hệ thống
           if (isTestAccount(enrollment.userId)) continue;
@@ -383,9 +413,33 @@ export async function processPaymentEmails() {
             }
 
             matchedCount++;
+            emailMatchedEnrollmentId = enrollment.id;
+            if (txRecord) {
+              await prisma.processedTransaction.update({
+                where: { id: txRecord.id },
+                data: { status: 'PROCESSED', enrollmentId: enrollment.id }
+              });
+            }
             break; // Mỗi email chỉ match 1 enrollment
           } catch (innerErr) {
+            emailError = innerErr instanceof Error ? innerErr.message : String(innerErr);
             console.error(`  ⚠️ Lỗi xử lý enrollment #${enrollment.id}:`, innerErr);
+          }
+        }
+
+        // Ghi nhận kết quả để admin đối soát / retry
+        if (txRecord && !emailMatchedEnrollmentId) {
+          if (emailError) {
+            await prisma.processedTransaction.update({
+              where: { id: txRecord.id },
+              data: { status: 'FAILED', reason: emailError.slice(0, 500) }
+            });
+          } else {
+            const reason = `Không khớp enrollment PENDING nào (định danh: ${parsed.userId ? 'HV ' + parsed.userId : 'SĐT ' + parsed.phone}, mã khóa: ${parsed.courseCode || 'không có'}, số tiền: ${parsed.amount.toLocaleString()}đ)`;
+            await prisma.processedTransaction.update({
+              where: { id: txRecord.id },
+              data: { status: 'UNMATCHED', reason }
+            });
           }
         }
       } catch (msgErr) {
