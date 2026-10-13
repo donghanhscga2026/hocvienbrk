@@ -2284,3 +2284,21 @@ model WebPushDelivery {
   @@index([subscriptionId])
   @@index([status, nextAttemptAt])
 }
+
+model ProcessedTransaction {
+  id            Int      @id @default(autoincrement())
+  source        String   // SEPAY | EMAIL
+  externalId    String   @unique // SePay transaction id | Gmail message id
+  enrollmentId  Int?
+  amount        Int?
+  accountNumber String?
+  bankName      String?
+  content       String?
+  transferTime  DateTime?
+  status        String   @default("PROCESSED") // PROCESSED | UNMATCHED | DISMISSED
+  reason        String?
+  createdAt     DateTime @default(now())
+
+  @@index([status])
+  @@map("processed_transaction")
+}
