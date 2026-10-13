@@ -7,7 +7,7 @@ export async function readProjects(db: PrismaClient) {
   return mergeProjects(await db.systemConfig.findMany({ where: { key: { startsWith: PROJECT_PREFIX } }, select: { key: true, value: true } }))
 }
 export async function readPublicProjects(db: PrismaClient) {
-  // Trang chủ giới thiệu các dự án công khai, không yêu cầu nhãn tiêu biểu.
+  // Công khai, tiêu biểu và hiển thị trang chủ là ba lựa chọn độc lập.
   return (await readProjects(db)).filter(project => project.published).map(publicProject)
 }
 export async function projectActor(db: PrismaClient, id: number) {
@@ -46,7 +46,7 @@ export async function saveProject(db: PrismaClient, id: number, slug: string, ra
     }
     if (!admin && envelope.controls) throw new CrmError('Chỉ quản trị viên được đổi chủ hoặc chế độ hiển thị.', 403)
     if (envelope.revision !== current.revision) throw new CrmError('Dự án đã được người khác cập nhật. Tải lại trước khi sửa tiếp.', 409)
-    const controls = envelope.controls || { ownerId: current.ownerId, published: current.published, featured: current.featured, order: current.order }
+    const controls = envelope.controls || { ownerId: current.ownerId, published: current.published, featured: current.featured, showOnHomepage: current.showOnHomepage, order: current.order }
     if (controls.ownerId != null && !await tx.user.findUnique({ where: { id: controls.ownerId }, select: { id: true } })) throw new CrmError('Mã thành viên của chủ dự án không tồn tại.')
     if (envelope.content.courseIds.length && await tx.course.count({ where: { id: { in: envelope.content.courseIds } } }) !== envelope.content.courseIds.length) throw new CrmError('Một số khóa học không tồn tại. Vui lòng chọn lại.')
     const value = { ...envelope.content, ...controls, members: envelope.members || current.members || [], revision: current.revision + 1 }
@@ -60,7 +60,7 @@ export async function createProject(db: PrismaClient, id: number, raw: unknown) 
     slug: projectSlug, name: projectContent.shape.name, description: projectContent.shape.description,
     introduction: projectContent.shape.introduction.default(''), logo: projectContent.shape.logo.default(''), website: projectContent.shape.website.default(''),
     ownerId: projectControls.shape.ownerId.default(null), published: projectControls.shape.published.default(true),
-    featured: projectControls.shape.featured.default(false), order: projectControls.shape.order.default(100),
+    featured: projectControls.shape.featured.default(false), showOnHomepage: projectControls.shape.showOnHomepage.default(false), order: projectControls.shape.order.default(100),
     members: projectMembers.default([]),
   }).strict().parse(raw)
   return db.$transaction(async tx => {

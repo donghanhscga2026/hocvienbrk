@@ -51,6 +51,11 @@ async function run() {
   assert.equal(doc.querySelector('[data-teachers]'), null)
   assert.doesNotMatch(doc.body.textContent, /tiêu biểu/)
   dom.window.close()
+  // Homepage selection is independent of featuring and public directory visibility.
+  dom = render({ projects: projects.map((project, i) => ({ ...project, featured: i % 2 === 0, showOnHomepage: i !== 0 && i !== 1, published: i !== 2 })) }); doc = dom.window.document
+  assert.equal(doc.querySelector('#du-an-wi li a').getAttribute('href'), '/du-an/project-3')
+  assert.equal(doc.querySelectorAll('#du-an-wi li').length, 8)
+  dom.window.close()
   for (const props of [{ projects: [] }, { projects, projectsError: true }]) {
     dom = render(props); doc = dom.window.document
     assert.equal(doc.querySelectorAll('#du-an-wi li').length, 0, 'Empty/error does not show default or stale projects')
@@ -65,7 +70,8 @@ async function run() {
     assert.match(cta.textContent, /Bạn muốn chia sẻ chuyên môn/)
     assert.equal(cta.querySelector('a').getAttribute('href'), '/doi-tac')
     assert.ok(doc.querySelector('#khoa-hoc').compareDocumentPosition(cta) & 4)
-    assert.equal(doc.querySelector('#giang-vien'), null, 'Empty catalog does not invent teacher profiles')
+    assert.equal(doc.querySelectorAll('#giang-vien li').length, 0, 'Empty catalog does not invent teacher profiles')
+    if (props.catalogError) assert.ok(doc.querySelector('#giang-vien [role="alert"]'))
     dom.window.close()
   }
   const courses = [
@@ -128,6 +134,31 @@ async function run() {
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: ui.window.navigator })
   const renderer = require('react-dom/client').createRoot(document.getElementById('root'))
   try {
+    const Directory = load('components/wi300/WiProjectDirectory.tsx', { 'next/link': link, 'next/image': image }).default
+    await React.act(async () => renderer.render(React.createElement(Directory, { projects: [{ ...projects[0], name: 'Wi Kết nối', showOnHomepage: false }, { ...projects[1], published: false }] })))
+    assert.equal(document.querySelectorAll('li h3').length, 1, 'Public directory includes a project omitted from homepage')
+    const searchInput = document.querySelector('input[type="search"]')
+    await React.act(async () => {
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(searchInput, 'ket noi')
+      searchInput.dispatchEvent(new window.Event('input', { bubbles: true }))
+    })
+    assert.equal(document.querySelectorAll('li h3').length, 1)
+    await React.act(async () => renderer.render(React.createElement(Teachers.default, { teachers: profiles, catalogError: false })))
+    const track = document.querySelector('#wi300-teacher-track')
+    Object.defineProperties(track, { clientWidth: { value: 1000 }, scrollWidth: { value: 2020 }, scrollLeft: { value: 0, writable: true } })
+    Object.defineProperty(track.children[0], 'offsetWidth', { value: 235 })
+    global.getComputedStyle = () => ({ columnGap: '20px' })
+    window.matchMedia = () => ({ matches: false })
+    let scrolled
+    track.scrollTo = options => { scrolled = options; track.scrollLeft = options.left }
+    await React.act(async () => document.querySelector('[aria-label="Giảng viên tiếp theo"]').click())
+    assert.equal(scrolled.left, 255)
+    assert.ok(document.querySelector('[aria-label="Chạy slide giảng viên"]'), 'Manual navigation pauses autoplay')
+    track.scrollLeft = 1020
+    await React.act(async () => document.querySelector('[aria-label="Giảng viên tiếp theo"]').click())
+    assert.equal(scrolled.left, 0, 'Last slide wraps without copying profiles')
+    await React.act(async () => document.querySelector('[aria-label="Giảng viên trước"]').click())
+    assert.equal(scrolled.left, 1020)
     await React.act(async () => renderer.render(React.createElement(Home, { ...base, view: 'catalog', courses })))
     assert.equal(document.querySelectorAll('[data-course]').length, 3)
     search = 'q=' + encodeURIComponent('Hương Lucy')

@@ -24,6 +24,21 @@ export default function WiProjectManager({ courses, initial, initialSlug }: { co
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [ownerNames, setOwnerNames] = useState(initial.ownerNames || {})
   const project = projects.find(item => item.slug === selected)
+  // Lưu qua API hiện có: quyền admin và revision vẫn được kiểm tra ở server.
+  async function toggleHomepage(item: WiProject, checked: boolean) {
+    if (!admin || busy) return
+    setBusy(true); setError(''); setMessage('')
+    const { name, description, introduction, logo, website, courseIds, offerings } = item
+    try {
+      const response = await fetch(`/api/wi300/projects?slug=${encodeURIComponent(item.slug)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision: item.revision, content: { name, description, introduction, logo, website, courseIds, offerings }, controls: { ownerId: item.ownerId, published: item.published, featured: item.featured, order: item.order, showOnHomepage: checked } }) })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Không cập nhật được hiển thị.')
+      setProjects(current => current.map(project => project.slug === item.slug ? result.project : project))
+      setMessage(checked ? 'Đã chọn hiển thị trên trang chủ. Dự án cần được công khai; trang chủ hiện tối đa 8 dự án.' : 'Đã bỏ hiển thị trên trang chủ.')
+      router.refresh()
+    } catch (error) { setError(error instanceof Error ? error.message : 'Không cập nhật được hiển thị.') }
+    finally { setBusy(false) }
+  }
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!admin || busy) return
@@ -34,7 +49,7 @@ export default function WiProjectManager({ courses, initial, initialSlug }: { co
       const response = await fetch('/api/wi300/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
         slug: text('slug'), name: text('name'), description: text('description'), introduction: text('introduction'), logo: text('logo'), website: text('website'),
         ownerId: text('ownerId') === '' ? null : Number(text('ownerId')), order: Number(text('order')),
-        published: data.has('published'), featured: data.has('featured'), members: JSON.parse(String(data.get('members') || '[]')),
+        published: data.has('published'), featured: data.has('featured'), showOnHomepage: data.has('showOnHomepage'), members: JSON.parse(String(data.get('members') || '[]')),
       }) })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Không tạo được dự án.')
@@ -82,7 +97,7 @@ export default function WiProjectManager({ courses, initial, initialSlug }: { co
       // Giữ liên kết; chỉ màn quản lý nội dung mới thay đổi liên kết khóa học.
       courseIds: project.courseIds,
     }
-    const controls = admin ? { ownerId: text('ownerId') === '' ? null : Number(text('ownerId')), published: data.has('published'), featured: data.has('featured'), order: Number(text('order')) } : undefined
+    const controls = admin ? { ownerId: text('ownerId') === '' ? null : Number(text('ownerId')), published: data.has('published'), featured: data.has('featured'), showOnHomepage: data.has('showOnHomepage'), order: Number(text('order')) } : undefined
     setBusy(true); setError(''); setMessage('')
     try {
       const response = await fetch(`/api/wi300/projects?slug=${encodeURIComponent(project.slug)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision: project.revision, content, ...(controls ? { controls } : {}), ...(data.has('members') ? { members: JSON.parse(String(data.get('members'))) } : {}) }) })
@@ -116,7 +131,7 @@ export default function WiProjectManager({ courses, initial, initialSlug }: { co
         <WiProjectTeamEditor members={[]} names={ownerNames} editable />
         <div className="flex flex-wrap gap-4">
           <label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="published" defaultChecked />Công khai hồ sơ</label>
-          <label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="featured" />Hiện ở mục tiêu biểu</label>
+          <label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="featured" />Tiêu biểu</label><label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="showOnHomepage" />Hiển thị trên trang chủ</label>
         </div>
         <button type="submit" className="min-h-11 rounded-xl bg-brk-primary px-5 font-semibold text-white">{busy ? 'Đang tạo…' : 'Tạo dự án'}</button>
       </fieldset></form>}
@@ -126,7 +141,8 @@ export default function WiProjectManager({ courses, initial, initialSlug }: { co
         <div className="flex items-center gap-4">{item.logo ? <Image src={item.logo} alt={`Logo ${item.name}`} width={72} height={72} className="h-18 w-18 shrink-0 rounded-full border border-brk-outline bg-white object-contain p-1" /> : <span className="flex h-18 w-18 shrink-0 items-center justify-center rounded-full bg-brk-background text-2xl font-bold text-brk-primary" aria-hidden="true">{item.name.slice(0, 2)}</span>}<h2 className="min-w-0 break-words text-xl font-bold">{item.name}</h2></div>
         <p className="line-clamp-3 text-sm leading-6 text-brk-muted">{item.description}</p>
         <p className="text-sm">Chủ dự án: <span className="font-semibold">{item.ownerId == null ? 'Chưa được giao' : ownerNames[String(item.ownerId)] || `Thành viên #${item.ownerId}`}</span></p>
-        <div className="flex flex-wrap gap-2 text-xs font-semibold"><span className={`rounded-full px-3 py-1 ${item.published ? 'bg-green-50 text-green-800' : 'bg-slate-100 text-slate-700'}`}>{item.published ? 'Công khai' : 'Bản nháp / đang ẩn'}</span><span className="rounded-full bg-brk-background px-3 py-1 text-brk-primary">{item.published && item.featured ? 'Tiêu biểu' : 'Không lên tiêu biểu'}</span></div>
+        <div className="flex flex-wrap gap-2 text-xs font-semibold"><span className={`rounded-full px-3 py-1 ${item.published ? 'bg-green-50 text-green-800' : 'bg-slate-100 text-slate-700'}`}>{item.published ? 'Công khai' : 'Bản nháp / đang ẩn'}</span><span className="rounded-full bg-brk-background px-3 py-1 text-brk-primary">{item.featured ? 'Tiêu biểu' : 'Không tiêu biểu'}</span></div>
+        {admin && <label className="flex min-h-11 items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={item.showOnHomepage} disabled={busy || loading} onChange={event => void toggleHomepage(item, event.target.checked)} />Hiển thị trên trang chủ</label>}
         <Link href={`/du-an/quan-ly?project=${encodeURIComponent(item.slug)}`} aria-label={`Quản lý ${item.name}`} className="mt-auto inline-flex min-h-11 items-center justify-center rounded-xl bg-brk-primary px-4 font-semibold text-white">Quản lý →</Link>
       </article>)}</div>}
       {selected && <Link href="/du-an/quan-ly" className="inline-flex min-h-11 items-center font-semibold text-brk-primary">← Danh sách dự án</Link>}
@@ -137,7 +153,7 @@ export default function WiProjectManager({ courses, initial, initialSlug }: { co
           <label className="block text-sm font-semibold">Giới thiệu chi tiết<textarea name="introduction" rows={7} maxLength={10000} defaultValue={project.introduction} className={field} /><span className="text-xs font-normal text-brk-muted">Nhập văn bản, xuống dòng để chia đoạn.</span></label>
           <div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold">Đường dẫn ảnh logo<input name="logo" maxLength={1000} defaultValue={project.logo} placeholder="https://…" className={field} /></label><label className="text-sm font-semibold">Website / liên hệ<input name="website" maxLength={1000} defaultValue={project.website} placeholder="https://…" className={field} /></label></div>
           <WiProjectTeamEditor members={project.members || []} names={ownerNames} editable={admin || project.ownerId === initial.actorId} />
-          {admin && <div className="space-y-4 rounded-xl bg-brk-background p-4"><h3 className="font-bold">Quyền quản lý & hiển thị</h3><div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold">Mã thành viên chủ dự án<input name="ownerId" type="number" min={0} step={1} defaultValue={project.ownerId ?? ''} placeholder="Để trống nếu chưa giao chủ" className={field} /></label><label className="text-sm font-semibold">Thứ tự (số nhỏ đứng trước)<input name="order" type="number" required min={0} max={999} step={1} defaultValue={project.order} className={field} /></label></div><div className="flex flex-wrap gap-5"><label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="published" defaultChecked={project.published} />Công khai hồ sơ</label><label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="featured" defaultChecked={project.featured} />Hiện ở mục tiêu biểu</label></div><p className="text-xs leading-5 text-brk-muted">Chủ dự án không được đổi quyền hoặc chế độ hiển thị. Mục tiêu biểu chỉ hiện khi hồ sơ được công khai.</p></div>}
+          {admin && <div className="space-y-4 rounded-xl bg-brk-background p-4"><h3 className="font-bold">Quyền quản lý & hiển thị</h3><div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold">Mã thành viên chủ dự án<input name="ownerId" type="number" min={0} step={1} defaultValue={project.ownerId ?? ''} placeholder="Để trống nếu chưa giao chủ" className={field} /></label><label className="text-sm font-semibold">Thứ tự (số nhỏ đứng trước)<input name="order" type="number" required min={0} max={999} step={1} defaultValue={project.order} className={field} /></label></div><div className="flex flex-wrap gap-5"><label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="published" defaultChecked={project.published} />Công khai hồ sơ</label><label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="featured" defaultChecked={project.featured} />Tiêu biểu</label><label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="showOnHomepage" defaultChecked={project.showOnHomepage} />Hiển thị trên trang chủ</label></div><p className="text-xs leading-5 text-brk-muted">Chủ dự án không được đổi quyền hoặc chế độ hiển thị. Công khai đưa dự án vào danh sách. Trang chủ chỉ hiện dự án công khai được tick Hiển thị trên trang chủ, tối đa 8 theo thứ tự. Tiêu biểu là nhãn riêng.</p></div>}
           <section className="space-y-3"><h3 className="font-bold">Khóa học liên quan</h3><p className="text-sm text-brk-muted">Mở màn sửa khóa học → Thuộc dự án để gắn hoặc gỡ liên kết. Khóa bị ẩn trong danh mục vẫn giữ liên kết cũ.</p><div className="flex flex-wrap gap-3">{courses.filter(course => project.courseIds.includes(course.id)).map(course => <Link key={course.id} href={`/tools/courses/new?id=${course.id}`} className="inline-flex min-h-11 items-center rounded-xl border border-brk-outline px-3 text-sm text-brk-primary">{course.name_lop} →</Link>)}</div><Link href="/tools/courses" className="inline-flex min-h-11 items-center font-semibold text-brk-primary">Đến quản lý khóa học →</Link></section>
           <section className="space-y-3"><h3 className="font-bold">Sản phẩm & dịch vụ</h3><p className="text-sm text-brk-muted">Dự án đang có {project.offerings.length} nội dung. Quản lý từng nội dung và chọn dự án tại màn Sản phẩm & dịch vụ.</p><Link href="/du-an/noi-dung" className="inline-flex min-h-11 items-center font-semibold text-brk-primary">Quản lý sản phẩm & dịch vụ →</Link></section>
           <button type="submit" className="min-h-12 rounded-xl bg-brk-primary px-6 font-semibold text-white">{busy ? 'Đang lưu…' : 'Lưu dự án'}</button>
