@@ -152,7 +152,7 @@ export default function AutoVerifyAdminPage() {
             Mỗi khóa học có phí cần 1 cấu hình: email người gửi + từ khóa để Gmail quét email biến động số dư của đúng TK ngân hàng giảng viên.
           </p>
         </div>
-        <button onClick={openAdd} className="inline-flex items-center gap-1 text-sm bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 shrink-0">
+        <button data-help-id="btn-add-autoverify" onClick={openAdd} className="inline-flex items-center gap-1 text-sm bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 shrink-0">
           <Plus className="w-4 h-4" /> Thêm cấu hình
         </button>
       </div>
@@ -216,7 +216,7 @@ export default function AutoVerifyAdminPage() {
             {!editing && (
               <div>
                 <label className="text-xs font-semibold text-gray-600">Khóa học có phí (chưa có cấu hình)</label>
-                <select value={form.courseId} onChange={e => onSelectCourse(parseInt(e.target.value))} className="w-full text-sm border rounded px-2 py-2 mt-1">
+                <select data-help-id="select-course" value={form.courseId} onChange={e => onSelectCourse(parseInt(e.target.value))} className="w-full text-sm border rounded px-2 py-2 mt-1">
                   <option value={0}>— Chọn khóa học —</option>
                   {courses.map(c => (
                     <option key={c.id} value={c.id}>
@@ -253,7 +253,7 @@ export default function AutoVerifyAdminPage() {
               Bật quét tự động
             </label>
 
-            <button onClick={handleSave} disabled={saving} className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50">
+            <button data-help-id="btn-save-autoverify" onClick={handleSave} disabled={saving} className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50">
               {saving ? 'Đang lưu...' : 'Lưu cấu hình'}
             </button>
           </div>

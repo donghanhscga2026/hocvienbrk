@@ -286,7 +286,7 @@ function CoursesTab() {
                 <div>
                     <p className="text-gray-600 text-sm">Quản lý nội dung & học phí</p>
                 </div>
-                <Link href="/tools/courses/new" className="bg-yellow-400 text-black p-2 rounded-xl inline-flex">
+                <Link data-help-id="link-new-course" href="/tools/courses/new" className="bg-yellow-400 text-black p-2 rounded-xl inline-flex">
                     <Plus className="w-4 h-4" />
                 </Link>
             </div>

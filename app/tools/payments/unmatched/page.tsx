@@ -130,6 +130,7 @@ export default function UnmatchedTransactionsPage() {
                 </div>
                 <div className="flex gap-2 items-center">
                   <input
+                    data-help-id="input-enrollment-id"
                     type="number"
                     placeholder="ID enrollment"
                     value={enrollmentInputs[tx.id] || ''}
@@ -137,6 +138,7 @@ export default function UnmatchedTransactionsPage() {
                     className="w-32 text-sm border rounded px-2 py-1.5"
                   />
                   <button
+                    data-help-id="btn-assign-tx"
                     onClick={() => handleAssign(tx.id)}
                     disabled={actionLoading === tx.id}
                     className="text-sm bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 disabled:opacity-50"

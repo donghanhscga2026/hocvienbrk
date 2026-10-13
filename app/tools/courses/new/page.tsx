@@ -388,13 +388,14 @@ function CreateCourseContent() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên lớp học *</label>
-                            <input 
-                                type="text" 
-                                value={nameLop} 
-                                onChange={(e) => setNameLop(e.target.value)} 
-                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                                placeholder="Tên lớp..." 
-                                required 
+                            <input
+                                data-help-id="input-class-name"
+                                type="text"
+                                value={nameLop}
+                                onChange={(e) => setNameLop(e.target.value)}
+                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
+                                placeholder="Tên lớp..."
+                                required
                             />
                         </div>
                         <div className="space-y-1.5">
@@ -686,11 +687,12 @@ function CreateCourseContent() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Học phí (VND)</label>
-                            <input 
-                                type="number" 
-                                value={phiCoc} 
-                                onChange={(e) => setPhiCoc(parseInt(e.target.value) || 0)} 
-                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
+                            <input
+                                data-help-id="input-course-fee"
+                                type="number"
+                                value={phiCoc}
+                                onChange={(e) => setPhiCoc(parseInt(e.target.value) || 0)}
+                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
                             />
                         </div>
                         <div className="space-y-1.5">
@@ -793,8 +795,9 @@ function CreateCourseContent() {
                     </div>
                 )}
                 
-                <button 
-                    type="submit" 
+                <button
+                    data-help-id="btn-create-course"
+                    type="submit"
                     disabled={loading || !idKhoa || !nameLop}
                     className="w-full bg-black text-yellow-400 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >

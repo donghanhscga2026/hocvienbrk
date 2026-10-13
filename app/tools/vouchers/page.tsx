@@ -158,7 +158,7 @@ export default function VouchersPage() {
                         <p className="text-sm text-gray-500 mt-1">{isAdmin ? 'Tất cả voucher trong hệ thống' : 'Voucher của các khóa bạn quản lý'}</p>
                     </div>
                     {isAdmin && (
-                        <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-brk-accent text-white rounded-xl hover:bg-brk-accent/90 transition-all font-bold text-sm shadow-lg">
+                        <button data-help-id="btn-create-voucher" onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-brk-accent text-white rounded-xl hover:bg-brk-accent/90 transition-all font-bold text-sm shadow-lg">
                             <Plus className="h-4 w-4" /> Tạo Voucher mới
                         </button>
                     )}

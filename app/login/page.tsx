@@ -423,7 +423,7 @@ function LoginForm() {
                         )}
                         {!phoneStep ? (
                             <>
-                                <button type="button" disabled={isLoading} onClick={checkPhone}
+                                <button type="button" data-help-id="btn-check-phone" disabled={isLoading} onClick={checkPhone}
                                     className="w-full rounded-xl bg-brk-primary px-4 py-3 font-bold text-brk-on-primary disabled:opacity-50">
                                     {isLoading ? "Đang kiểm tra..." : "Kiểm tra và tiếp tục"}
                                 </button>
@@ -452,6 +452,7 @@ function LoginForm() {
                                     <div>
                                         <div className="relative">
                                             <input {...register("password", { required: "Vui lòng nhập mật khẩu hoặc mã OTP." })}
+                                                data-help-id="input-password-otp"
                                                 type={showPassword ? "text" : "password"} autoComplete="current-password"
                                                 placeholder="Nhập mật khẩu hoặc mã OTP vào đây"
                                                 className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 pr-10 text-brk-on-surface text-sm" />
@@ -461,7 +462,7 @@ function LoginForm() {
                                         {errors.password && <p className="text-xs text-brk-accent">{errors.password.message}</p>}
                                         {otpRequested && <p className="text-xs text-brk-primary mt-1">Lấy mã OTP đã được gửi qua mail của bạn điền vào ô trên, quá 10 phút phải lấy lại mã OTP khác.</p>}
                                         <div className="flex items-center justify-between mt-2">
-                                            <button type="button" disabled={isLoading} onClick={requestEmailOtp} className="text-xs text-brk-primary underline disabled:opacity-50">
+                                            <button type="button" data-help-id="btn-send-otp" disabled={isLoading} onClick={requestEmailOtp} className="text-xs text-brk-primary underline disabled:opacity-50">
                                                 {otpRequested ? "Gửi lại mã OTP" : "Gửi mã OTP qua mail"}
                                             </button>
                                             <Link href="/forgot-password" className="text-xs text-brk-primary">Quên mật khẩu?</Link>
@@ -474,7 +475,7 @@ function LoginForm() {
                                             className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm" />
                                         <p className="text-xs text-brk-accent mt-1">Tài khoản quản trị đã bật xác thực 2 lớp. Nhập mã từ ứng dụng Authenticator rồi đăng nhập lại.</p>
                                     </div>}
-                                    <button type="submit" disabled={isLoading}
+                                    <button type="submit" data-help-id="btn-do-login" disabled={isLoading}
                                         className="w-full rounded-xl bg-brk-primary px-4 py-3 text-sm font-bold text-brk-on-primary disabled:opacity-50">{isLoading ? "Đang đăng nhập..." : "Đăng nhập"}</button>
                                 </form>
                                 <button type="button" onClick={() => setShowHelp(true)}
