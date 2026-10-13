@@ -15,7 +15,7 @@ export default function Wi300Teachers({ teachers, catalogError, directory = fals
   const [query, setQuery] = useState('')
   const [countFilter, setCountFilter] = useState('all')
   const profiles = [...unique.values()]
-  const visibleTeachers = directory ? profiles.filter(teacher => normalize(teacher.name).includes(normalize(query.trim())) && (countFilter === 'all' || (countFilter === 'one' ? teacher.count === 1 : (teacher.count ?? 0) >= 2))) : profiles.slice(0, 8)
+  const visibleTeachers = directory ? profiles.filter(teacher => normalize(teacher.name).includes(normalize(query.trim())) && (countFilter === 'all' || (countFilter === 'one' ? teacher.count === 1 : (teacher.count ?? 0) >= 2))) : profiles.slice(0, 20)
   const track = useRef<HTMLUListElement>(null)
   const [paused, setPaused] = useState(false)
   const [hovered, setHovered] = useState(false)
