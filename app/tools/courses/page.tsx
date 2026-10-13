@@ -5,6 +5,8 @@ import { getAdminCoursesAction, bulkToggleCourseStatusAction, bulkUpdateCoursesO
 import { getTeachersAction } from '@/app/actions/course-actions'
 import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Eye, EyeOff, CheckSquare, X, Search, Tag, Trash2, Save, Edit2, Palette } from 'lucide-react'
 import Link from 'next/link'
+import CourseExportButton from '@/components/course/CourseExportButton'
+import ManagementWorkspace from '@/components/layout/ManagementWorkspace'
 import MainHeader from '@/components/layout/MainHeader'
 import CourseDashboardModal from '@/components/course/CourseDashboardModal'
 import AdminMemberRosterTab from '@/components/course/AdminMemberRosterTab'
@@ -17,8 +19,8 @@ export default function ToolsCoursesPage() {
         <div className="min-h-screen bg-gray-50">
             <MainHeader title="Quản lý khóa học" toolSlug="courses" />
 
-            <div className="p-4 max-w-7xl mx-auto space-y-4 pb-20">
-                <div className="rounded-2xl border border-brk-outline bg-brk-background p-5"><h1 className="text-2xl font-bold text-brk-primary">Quản lý khóa học</h1><p className="mt-2 text-sm text-gray-600">Quản lý nội dung, học viên và hoạt động của từng khóa. Chọn mẫu Sales Page trong mục Trang bán khóa học.</p></div>
+            <ManagementWorkspace active="courses">
+                <div><h1 className="text-2xl font-bold text-brk-primary">Quản lý khóa học</h1><p className="mt-2 text-sm text-gray-600">Quản lý nội dung, học viên và hoạt động của từng khóa. Chọn mẫu Sales Page trong mục Trang bán khóa học.</p></div>
 
                 <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl mt-4">
                     <button
@@ -36,7 +38,7 @@ export default function ToolsCoursesPage() {
                 </div>
 
                 {activeTab === 'courses' ? <CoursesTab /> : <CategoriesTab />}
-            </div>
+            </ManagementWorkspace>
         </div>
     )
 }
@@ -58,6 +60,7 @@ function CoursesTab() {
     const [filterProject, setFilterProject] = useState('ALL')
     const [projects, setProjects] = useState<{ slug: string; name: string; courseIds: number[] }[]>([])
     const [page, setPage] = useState(1)
+    const [display, setDisplay] = useState<'list' | 'cards'>('list')
     const [activity, setActivity] = useState<ActivitySummary[]>([])
     const [activityError, setActivityError] = useState('')
     const [activityLoading, setActivityLoading] = useState(false)
@@ -252,15 +255,13 @@ function CoursesTab() {
 
     return (
         <>
-            <div className="flex items-center justify-between mt-4">
-                <div>
-                    <p className="text-gray-600 text-sm">Quản lý nội dung & học phí</p>
-                </div>
-                <Link href="/tools/courses/new" className="bg-yellow-400 text-black p-2 rounded-xl inline-flex">
-                    <Plus className="w-4 h-4" /> <span className="ml-2 text-sm font-semibold">Thêm khóa học</span>
-                </Link>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-gray-500">Nội dung và dữ liệu học viên trong một nơi.</p>
+                <div className="flex flex-wrap gap-2"><CourseExportButton courseIds={selectedIds.size ? [...selectedIds] : filteredCourses.map(course => course.id)} label={selectedIds.size ? 'Xuất học viên khóa đã chọn' : 'Xuất học viên các khóa đang lọc'} /><Link href="/tools/courses/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brk-primary px-4 text-sm font-semibold text-white"><Plus size={17} />Tạo khóa học</Link></div>
             </div>
-
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                {[{ label: 'Tổng khóa học', value: courses.length }, { label: 'Đang hiển thị', value: courses.filter(course => course.status).length }, { label: 'Đang ẩn', value: courses.filter(course => !course.status).length }, { label: 'Lượt học viên đang học', value: courses.reduce((sum, course) => sum + (course._count?.enrollments || 0), 0) }].map(stat => <div key={stat.label} className="rounded-2xl border border-brk-outline bg-white p-5"><p className="text-sm text-gray-500">{stat.label}</p><strong className="mt-2 block text-3xl text-brk-primary">{loading ? '…' : stat.value}</strong></div>)}
+            </div>
             <div className="bg-white border border-gray-200 rounded-xl p-3 space-y-2">
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -375,20 +376,29 @@ function CoursesTab() {
                 </div>
             ) : (
                 <div className="space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-brk-background p-3 text-sm"><p><strong>Hoạt động học viên:</strong> yêu cầu cần trả lời và bài nộp / bình luận chưa xem là hai nhóm riêng.</p><button type="button" disabled={activityLoading} onClick={() => setActivityRevision(value => value + 1)} className="min-h-11 rounded-xl border border-brk-outline bg-white px-3 text-brk-primary disabled:opacity-50">Tải lại hoạt động</button></div>
+                    <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500"><p>Yêu cầu cần trả lời và hoạt động chưa xem được đếm riêng.</p><button type="button" disabled={activityLoading} onClick={() => setActivityRevision(value => value + 1)} className="min-h-11 rounded-xl border border-brk-outline bg-white px-3 text-brk-primary disabled:opacity-50">Tải lại hoạt động</button></div>
                     {activityError && <p role="alert" className="text-sm text-red-700">{activityError} · Bấm Tải lại hoạt động để thử lại.</p>}
-                    <div className="hidden items-center gap-3 rounded-xl bg-gray-100 px-4 py-3 text-xs font-semibold text-gray-500 lg:grid lg:grid-cols-[24px_minmax(180px,2fr)_minmax(100px,1fr)_minmax(150px,1.3fr)_minmax(170px,1.5fr)_auto]"><span /><span>Khóa học / Giảng viên</span><span>Danh mục</span><span>Học phí / Nội dung</span><span>Hoạt động học viên</span><span>Thao tác</span></div>
-                    {visibleCourses.map(course => {
-                        const summary = activity.find(item => item.courseId === course.id)
-                        return <article key={course.id} className={`grid gap-3 rounded-xl border border-brk-outline bg-white p-4 lg:grid-cols-[24px_minmax(180px,2fr)_minmax(100px,1fr)_minmax(150px,1.3fr)_minmax(170px,1.5fr)_auto] lg:items-center ${selectedIds.has(course.id) ? 'ring-2 ring-brk-primary' : ''}`}>
-                            <input type="checkbox" aria-label={`Chọn ${course.name_lop}`} checked={selectedIds.has(course.id)} onChange={() => toggleSelect(course.id)} className="h-4 w-4 accent-green-700" />
-                            <div className="min-w-0"><Link href={`/tools/courses/new?id=${course.id}`} className="break-words text-sm font-bold text-brk-primary">{course.name_lop}</Link><p className="mt-1 break-words text-xs text-gray-500">{course.id_khoa} · #{course.id}</p><p className="mt-1 text-xs text-gray-500">GV: {course.teacher?.name || course.teacher?.email || 'Chưa phân công'}</p></div>
-                            <div className="text-xs"><span className="rounded-full bg-brk-background px-2 py-1 text-brk-primary">{course.courseCategory?.name || course.category || 'Khác'}</span><p className="mt-3">{course.status ? 'Đang hiển thị' : 'Đang ẩn'}</p>{isAdmin && <button type="button" disabled={batchLoading} onClick={() => void handleToggleCourseStatus(course.id, course.status)} className="mt-1 min-h-11 text-brk-primary">{course.status ? 'Ẩn khóa học' : 'Hiện khóa học'}</button>}</div>
-                            <div className="space-y-2 text-xs text-gray-600"><p>{Number(course.phi_coc || 0).toLocaleString('vi-VN')}đ</p><p>{course._count?.lessons || 0} bài giảng</p><button type="button" onClick={() => handleViewStudents(course.id, course.name_lop)} className="min-h-11 text-brk-primary">{course._count?.enrollments || 0} học viên →</button></div>
-                            <div className="text-xs">{activityLoading ? <p role="status">Đang tải hoạt động…</p> : summary ? <Link href={`/tools/courses/new?id=${course.id}&tab=activity`} className="block min-h-11 space-y-2 rounded-xl bg-brk-background p-3 text-brk-primary"><p><strong>{summary.requests}</strong> yêu cầu cần trả lời</p><p><strong>{summary.submissions + summary.comments}</strong> hoạt động chưa xem</p></Link> : <p className="text-gray-500">Chưa tải được hoạt động</p>}</div>
-                            <div className="flex flex-wrap gap-2 lg:flex-col"><Link href={`/tools/courses/new?id=${course.id}`} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brk-primary px-3 text-xs font-semibold text-white">Quản lý</Link><Link href={`/tools/courses/new?id=${course.id}&tab=sales`} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-brk-outline px-3 text-xs font-semibold text-brk-primary">Trang bán</Link><Link href={`/khoa-hoc/${course.id_khoa || course.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center justify-center px-3 text-xs text-gray-500">Xem công khai ↗</Link></div>
-                        </article>
-                    })}
+                    <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-gray-600">Danh sách khóa học</p><div className="flex rounded-xl border border-brk-outline bg-white p-1">{(['list', 'cards'] as const).map(mode => <button key={mode} type="button" aria-pressed={display === mode} onClick={() => setDisplay(mode)} className={`min-h-10 rounded-lg px-3 text-sm ${display === mode ? 'bg-brk-background font-semibold text-brk-primary' : 'text-gray-500'}`}>{mode === 'list' ? 'Danh sách' : 'Thẻ'}</button>)}</div></div>
+                    <div className={display === 'list' ? 'overflow-x-auto rounded-2xl border border-brk-outline bg-white' : 'rounded-2xl'}>
+                        <div className={display === 'list' ? 'min-w-[960px]' : ''}>
+                        {display === 'list' && <div className="grid grid-cols-[24px_minmax(240px,2fr)_minmax(100px,1fr)_100px_80px_minmax(140px,1.2fr)_100px] items-center gap-3 bg-gray-50 px-4 py-3 text-xs font-semibold text-gray-500"><span /><span>Khóa học / Giảng viên</span><span>Dự án</span><span>Hiển thị</span><span>Học viên</span><span>Hoạt động học viên</span><span>Thao tác</span></div>}
+                        <div className={display === 'cards' ? 'grid gap-4 sm:grid-cols-2 xl:grid-cols-3' : 'divide-y divide-brk-outline'}>
+                        {visibleCourses.map(course => {
+                            const summary = activity.find(item => item.courseId === course.id)
+                            const names = projects.filter(project => project.courseIds.includes(course.id)).map(project => project.name)
+                            return <article key={course.id} className={`gap-3 p-4 ${display === 'list' ? 'grid grid-cols-[24px_minmax(240px,2fr)_minmax(100px,1fr)_100px_80px_minmax(140px,1.2fr)_100px] items-center' : 'grid rounded-2xl border border-brk-outline bg-white'} ${selectedIds.has(course.id) ? 'bg-brk-background ring-2 ring-inset ring-brk-primary' : ''}`}>
+                                <input type="checkbox" aria-label={`Chọn ${course.name_lop}`} checked={selectedIds.has(course.id)} onChange={() => toggleSelect(course.id)} className="h-4 w-4 accent-green-700" />
+                                <div className="flex min-w-0 items-center gap-3">{course.link_anh_bia ? <img src={course.link_anh_bia} alt="" className="h-16 w-20 shrink-0 rounded-lg object-cover" /> : <div className="flex h-16 w-20 shrink-0 items-center justify-center rounded-lg bg-brk-background text-brk-primary"><BookOpen size={24} /></div>}<div className="min-w-0"><Link href={`/tools/courses/new?id=${course.id}`} className="break-words text-sm font-bold text-brk-primary">{course.name_lop}</Link><p className="mt-1 text-xs text-gray-500">{course.id_khoa} · {course.courseCategory?.name || course.category || 'Khác'}</p><p className="mt-1 text-xs text-gray-500">{course.teacher?.name || course.teacher?.email || 'Chưa phân công'} · {course._count?.lessons || 0} bài</p></div></div>
+                                <p className="break-words text-xs text-gray-600">{names.join(', ') || 'Chưa liên kết'}</p>
+                                <span className={`w-fit rounded-full px-2 py-1 text-xs ${course.status ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{course.status ? 'Hiển thị' : 'Đang ẩn'}</span>
+                                <button type="button" onClick={() => handleViewStudents(course.id, course.name_lop)} className="min-h-11 text-left text-sm font-semibold text-brk-primary">{course._count?.enrollments || 0} →</button>
+                                <div className="text-xs">{activityLoading ? <p role="status">Đang tải…</p> : summary ? <Link href={`/tools/courses/new?id=${course.id}&tab=activity`} className="block min-h-11 space-y-1 text-brk-primary"><p><strong>{summary.requests}</strong> yêu cầu cần trả lời</p><p><strong>{summary.submissions + summary.comments}</strong> hoạt động chưa xem</p></Link> : <p className="text-gray-500">Chưa tải được</p>}</div>
+                                <div className="flex items-center gap-2"><Link href={`/tools/courses/new?id=${course.id}`} className="inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-xl bg-brk-primary px-3 text-xs font-semibold text-white">Quản lý</Link><details className="relative"><summary aria-label={`Thao tác với ${course.name_lop}`} className="cursor-pointer list-none px-1 py-3 text-lg">⋮</summary><div className="absolute right-0 z-10 w-40 rounded-xl border bg-white p-2 shadow-lg"><Link href={`/tools/courses/new?id=${course.id}&tab=sales`} className="block rounded-lg p-2 text-xs">Trang bán khóa học</Link><Link href={`/khoa-hoc/${course.id_khoa || course.id}`} target="_blank" rel="noopener noreferrer" className="block rounded-lg p-2 text-xs">Xem công khai ↗</Link>{isAdmin && <button type="button" disabled={batchLoading} onClick={() => void handleToggleCourseStatus(course.id, course.status)} className="min-h-11 p-2 text-xs">{course.status ? 'Ẩn khóa học' : 'Hiện khóa học'}</button>}</div></details></div>
+                            </article>
+                        })}
+                        </div></div>
+                    </div>
+                    <div className="rounded-xl bg-brk-background p-4 text-sm text-gray-600">Trang bán khóa học có thư viện mẫu riêng. Mở <strong>Quản lý → Trang bán khóa học</strong> để chọn mẫu cho đúng khóa.</div>
                     <div className="flex flex-wrap items-center justify-between gap-3 text-sm"><p>{filteredCourses.length} khóa học · Trang {currentPage}/{totalPages}</p><div className="flex gap-2"><button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} className="min-h-11 rounded-xl border bg-white px-4 disabled:opacity-40">Trước</button><button type="button" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)} className="min-h-11 rounded-xl border bg-white px-4 disabled:opacity-40">Sau</button></div></div>
                 </div>
             )}

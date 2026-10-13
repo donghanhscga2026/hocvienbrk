@@ -90,6 +90,7 @@ jobs:
           node scripts/test-wi300-project-content.cjs
           node scripts/test-course-management-activity.cjs
           node scripts/test-management-workspace-ui.cjs
+          node scripts/test-course-member-export.cjs
 
       - name: ZIP template source regression checks
         run: node scripts/test-zip-template-source.cjs

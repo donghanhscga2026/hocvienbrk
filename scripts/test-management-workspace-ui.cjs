@@ -7,7 +7,7 @@ global.window = dom.window; global.document = dom.window.document; global.FormDa
 Object.defineProperty(global, 'navigator', { configurable: true, value: dom.window.navigator })
 dom.window.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
 dom.window.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open') }
-const course = { id: 1, id_khoa: 'AI', name_lop: 'Khóa thực hành AI', name_khoa: 'AI', type: 'NORMAL', status: true, pin: 0, teacherId: 8, categoryId: 1, category: 'Công nghệ', courseCategory: { name: 'Công nghệ' }, phi_coc: 1000000, mo_ta_ngan: 'Mô tả ngắn', mo_ta_dai: 'Mô tả dài', link_anh_bia: '', lessons: [{ id: 'l1', title: 'Bài thực hành', order: 1 }], _count: { lessons: 1, enrollments: 12 }, teacher: { name: 'Hương Lucy' } }
+const course = { id: 1, id_khoa: 'AI', name_lop: 'Khóa thực hành AI', name_khoa: 'AI', type: 'NORMAL', status: true, pin: 0, teacherId: 8, categoryId: 1, category: 'Công nghệ', courseCategory: { name: 'Công nghệ' }, phi_coc: 1000000, mo_ta_ngan: 'Mô tả ngắn', mo_ta_dai: 'Mô tả dài', link_anh_bia: '/wi300/businesses/wi-tech.png', lessons: [{ id: 'l1', title: 'Bài thực hành', order: 1 }], _count: { lessons: 1, enrollments: 12 }, teacher: { name: 'Hương Lucy' } }
 const templates = [{ id: 'external-html', name: 'Mẫu HTML bên ngoài', description: 'Giữ nguồn HTML' }]
 const applied = []
 const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
@@ -17,7 +17,6 @@ const mocks = {
   'next/link': link,
   'next/navigation': { useRouter: () => ({ push: () => {}, refresh: () => {}, replace: () => {} }), useSearchParams: () => params },
   '@/components/layout/MainHeader': { __esModule: true, default: props => React.createElement('header', { className: 'bg-white p-4 text-xl font-bold' }, props.title) },
-  '@/components/wi300/WiCourseProjects': stub('Dự án'),
   '@/components/course/CourseManagementActivity': stub('Hoạt động'),
   '@/components/course/CourseRosterWorkspace': stub('Học viên'),
   '@/components/course/CourseActivityFeedTab': stub('Nhật ký'),
@@ -41,9 +40,9 @@ function load(file) {
   cache.set(file, module.exports); return module.exports
 }
 const savedFetch = global.fetch
-global.fetch = async url => ({ ok: true, json: async () => url === '/api/auth/session' ? { user: { id: 8, role: 'ADMIN' } } : url.startsWith('/api/courses/management-activity') ? { summary: Array.from({ length: 12 }, (_, i) => ({ courseId: i + 1, requests: 2, submissions: 3, comments: 1 })) } : url.startsWith('/api/courses/categories') ? { categories: [{ id: 1, name: 'Công nghệ', color: '#167a42', icon: 'BookOpen', _count: { courses: 12 } }] } : url.startsWith('/api/courses/1') ? course : url.includes('/bank-accounts') ? { accounts: [] } : url.includes('projects') ? { projects: [] } : { vouchers: [] } })
+global.fetch = async url => ({ ok: true, json: async () => url === '/api/auth/session' ? { user: { id: 8, role: 'ADMIN' } } : url.startsWith('/api/courses/management-activity') ? { summary: Array.from({ length: 12 }, (_, i) => ({ courseId: i + 1, requests: 2, submissions: 3, comments: 1 })) } : url.startsWith('/api/courses/categories') ? { categories: [{ id: 1, name: 'Công nghệ', color: '#167a42', icon: 'BookOpen', _count: { courses: 12 } }] } : url.startsWith('/api/courses/1') ? course : url.includes('/bank-accounts') ? { accounts: [] } : url.includes('project-content') ? { projects: [{ slug: 'wi-tech', name: 'Wi.Tech', revision: 0, selected: true }, { slug: 'wi-grow', name: 'Wi.Grow', revision: 0, selected: false }] } : url.includes('projects') ? { projects: [{ slug: 'wi-tech', name: 'Wi.Tech', courseIds: [1, 2, 3, 4] }] } : { vouchers: [] } })
 const { createRoot } = require('react-dom/client'), root = createRoot(document.getElementById('root'))
-const click = async text => React.act(async () => { const button = [...document.querySelectorAll('button')].find(item => item.textContent.trim() === text); assert.ok(button, 'Missing button: ' + text); button.click() })
+const click = async text => React.act(async () => { const button = [...document.querySelectorAll('button')].find(item => item.textContent.trim() === text || item.getAttribute('aria-label') === text); assert.ok(button, 'Missing button: ' + text); button.click() })
 function snapshot(name) { if (process.env.MANAGEMENT_UI_SNAPSHOT_DIR) { fs.mkdirSync(process.env.MANAGEMENT_UI_SNAPSHOT_DIR, { recursive: true }); fs.writeFileSync(path.join(process.env.MANAGEMENT_UI_SNAPSHOT_DIR, name + '.html'), document.getElementById('root').innerHTML) } }
 async function run() {
   try {
@@ -52,6 +51,8 @@ async function run() {
     assert.equal(document.querySelectorAll('article').length, 10, 'Course list paginates')
     assert.equal(document.querySelectorAll('a[href="/tools/courses/templates"]').length, 0, 'Template library is removed from the course list header')
     assert.ok(document.querySelector('a[href$="tab=activity"]')); snapshot('course-list')
+    await click('Thẻ'); assert.equal(document.querySelectorAll('article').length, 10); snapshot('course-cards'); await click('Danh sách')
+    await click('Xuất học viên các khóa đang lọc'); assert.ok(document.querySelector('dialog[open]')); assert.equal(document.querySelector('dialog select').value, 'ALL'); snapshot('course-export'); await click('Đóng lựa chọn xuất')
     await click('Sau'); assert.equal(document.querySelectorAll('article').length, 2)
     await click('Danh mục'); assert.ok(document.body.textContent.includes('Công nghệ'), 'Category management stays available')
     const Editor = load('app/tools/courses/new/page.tsx').default
@@ -60,7 +61,8 @@ async function run() {
     const shortDescription = [...document.querySelectorAll('textarea')].find(item => item.value === 'Mô tả ngắn')
     const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
     await React.act(async () => { setter.call(shortDescription, 'Nội dung đang sửa chưa lưu'); shortDescription.dispatchEvent(new window.Event('input', { bubbles: true })) })
-    await click('Bài giảng'); assert.ok(document.body.textContent.includes('Thông báo học viên'))
+    snapshot('course-info')
+    await click('Bài giảng'); snapshot('course-lessons'); assert.ok(document.body.textContent.includes('Thông báo học viên'))
     await click('Thông tin'); assert.equal([...document.querySelectorAll('textarea')].find(item => item === shortDescription).value, 'Nội dung đang sửa chưa lưu', 'Switching tabs preserves form edits')
     await click('Thanh toán & kích hoạt'); assert.ok([...document.querySelectorAll('input')].some(item => item.value === '1000000')); snapshot('course-settings')
     await click('Email & Zalo'); assert.ok(document.body.textContent.includes('Nội dung email kích hoạt'))

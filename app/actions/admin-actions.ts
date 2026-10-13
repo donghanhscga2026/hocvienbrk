@@ -1188,47 +1188,24 @@ export async function updateCourseMemberAssignmentsAction(
  * Xuất danh sách thành viên ACTIVE của 1 khóa học ra Google Sheet (ID, họ tên,
  * vai trò, Team, Group) — dùng cho modal "Xem thành viên" ở trang quản lý khóa học.
  */
-export async function exportCourseMembersAction(courseId: number, courseName: string) {
+export async function exportCourseMembersAction(courseId: number, _courseName: string) {
     try {
-        const access = await checkCourseMemberAccess(courseId)
-        if (access.error) return { success: false, error: access.error }
-
-        const [enrollments, course] = await Promise.all([
-            prisma.enrollment.findMany({
-                where: { courseId, status: 'ACTIVE' },
-                select: { memberRole: true, team: true, group: true, user: { select: { id: true, name: true } } },
-                orderBy: [{ team: 'asc' }, { memberRole: 'asc' }, { group: 'asc' }, { activatedAt: 'asc' }]
-            }),
-            prisma.course.findUnique({ where: { id: courseId }, select: { memberLabels: true } })
-        ])
-
-        if (enrollments.length === 0) return { success: false, error: "Chưa có thành viên nào" }
-
-        const labels = (course?.memberLabels as CourseMemberLabels) || {}
-        const headers = ["STT", "ID", "Họ tên", "Vai trò", "Team", "Group"]
-        const rows = enrollments.map((e, index) => [
-            (index + 1).toString(),
-            e.user.id.toString(),
-            e.user.name || "Chưa có tên",
-            e.memberRole === 'PS' ? "Phụng sự (PS)" : "Thành viên (TV)",
-            teamLabel(e.team, labels),
-            e.memberRole === 'PS' ? "" : groupLabel(e.team, e.group, labels),
-        ])
-
-        const safeTitle = courseName.replace(/[<>:"/\\|?*]/g, "").substring(0, 90)
-        const dateStr = new Date().toLocaleDateString("vi-VN").replace(/\//g, "-")
-        const fileName = `ThanhVien_${safeTitle}_${dateStr}`
-
-        const csvHeader = headers.join(",")
-        const csvRows = rows.map(r => r.map(v => (v.includes(",") || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v)).join(","))
-        const csvContent = [csvHeader, ...csvRows].join("\n")
-
-        const { tryCreateSheet } = await import("@/lib/email-campaign-export")
-        const fullSheetTitle = `[Thành viên] ${safeTitle} - ${new Date().toLocaleDateString("vi-VN")}`
-        const { sheetUrl, error } = await tryCreateSheet(rows, headers, fullSheetTitle)
-
-        return { success: true, sheetUrl, csvContent, fileName, totalRows: rows.length, sheetError: error }
-    } catch (error: any) { return { success: false, error: error.message } }
+        if (await domainContext()) return { success: false, error: 'Xuất dữ liệu tại hệ thống chính.' }
+        const session = await auth()
+        const id = session?.user?.id == null ? NaN : Number(session.user.id)
+        if (!Number.isSafeInteger(id) || id < 0) return { success: false, error: 'Vui lòng đăng nhập.' }
+        const actor = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true, email: true, emailVerified: true } })
+        if (!actor) return { success: false, error: 'Vui lòng đăng nhập lại.' }
+        if (!actor.emailVerified) return { success: false, error: 'Xác minh email tài khoản để nhận Google Sheet. Bạn vẫn có thể dùng Xuất Excel.' }
+        const { memberExportSheets } = await import('@/lib/course/member-export')
+        const { createCourseGoogleSheet } = await import('@/lib/course/google-export')
+        const report = await memberExportSheets(prisma, actor, { courseIds: [courseId] })
+        const sheetUrl = await createCourseGoogleSheet(report.sheets, `Học viên - ${report.title} - ${new Date().toLocaleDateString('vi-VN')}`, actor.email)
+        return { success: true, sheetUrl, totalRows: report.total }
+    } catch (error) {
+        const { CrmError } = await import('@/lib/crm/service')
+        return { success: false, error: error instanceof CrmError ? error.message : 'Không tạo được Google Sheet. Hãy thử lại hoặc tải Excel.' }
+    }
 }
 
 // ==========================================

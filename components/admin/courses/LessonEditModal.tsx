@@ -5,8 +5,9 @@ import { Loader2, X, Save, Trash2, Upload } from 'lucide-react'
 import { LessonPartsEditor } from './LessonPartsEditor'
 import { parseLessonToParts, serializeLessonParts, type LessonPartDraft } from '@/lib/course/lesson-parts'
 
-export function LessonEditModal({ lesson, onClose, onSave, onDelete }: {
+export function LessonEditModal({ lesson, onClose, onSave, onDelete, presentation = 'modal' }: {
     lesson: any,
+    presentation?: 'modal' | 'drawer',
     onClose: () => void,
     onSave: (data: any) => Promise<void>,
     onDelete?: (id: string) => Promise<void>
@@ -53,9 +54,11 @@ export function LessonEditModal({ lesson, onClose, onSave, onDelete }: {
         setError('')
 
         setSaving(true)
+        try {
         await onSave({ id: lesson.id, title, videoUrl: result.videoUrl, order, type: result.type, content: result.content, imageUrl: imageUrl || null, isDailyChallenge })
-        setSaving(false)
         onClose()
+        } catch (error) { setError(error instanceof Error ? error.message : 'Không lưu được bài học. Hãy thử lại.') }
+        finally { setSaving(false) }
     }
 
     const handleDelete = async () => {
@@ -68,11 +71,11 @@ export function LessonEditModal({ lesson, onClose, onSave, onDelete }: {
     }
 
     return (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-            <div className="bg-white w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                <div className="bg-gray-900 p-6 text-white flex justify-between items-center shrink-0">
+        <div className={`fixed inset-0 z-[150] flex bg-black/35 ${presentation === 'drawer' ? 'justify-end' : 'items-center justify-center p-4'}`} onClick={onClose}>
+            <div role="dialog" aria-modal="true" aria-label="Sửa bài giảng" className={`flex w-full flex-col overflow-hidden bg-white shadow-2xl ${presentation === 'drawer' ? 'h-full max-w-[520px]' : 'max-h-[90vh] max-w-md rounded-2xl'}`} onClick={e => e.stopPropagation()}>
+                <div className="flex shrink-0 items-center justify-between border-b border-brk-outline bg-brk-background p-5 text-brk-primary">
                     <h3 className="font-black text-sm uppercase tracking-widest">Sửa bài học #{lesson.order}</h3>
-                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full"><X className="w-5 h-5 text-yellow-400" /></button>
+                    <button aria-label="Đóng bài giảng" onClick={onClose} className="p-2 hover:bg-white/10 rounded-full"><X className="w-5 h-5 text-brk-primary" /></button>
                 </div>
                 <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto">
                     <div className="space-y-1.5">

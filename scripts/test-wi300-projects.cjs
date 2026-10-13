@@ -5,7 +5,7 @@ function load(file, mocks = {}) {
   mocks = { '@/auth': { auth: async () => null }, ...mocks }
   const module = { exports: {} }
   const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name === '@/lib/wi300/projects' ? load('lib/wi300/projects.ts') : name === './WiProjectTeamEditor' ? load('components/wi300/WiProjectTeamEditor.tsx') : require(name), module, module.exports)
+  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name === '@/lib/wi300/projects' ? load('lib/wi300/projects.ts') : name.startsWith('@/components/') || name.startsWith('./') ? load(name.startsWith('@/') ? name.slice(2) + '.tsx' : path.posix.join(path.posix.dirname(file), name + '.tsx'), mocks) : require(name), module, module.exports)
   return module.exports
 }
 class CrmError extends Error { constructor(message, status = 400) { super(message); this.status = status } }
@@ -144,6 +144,7 @@ async function run() {
   global.fetch = async (url, options) => { payload = JSON.parse(options.body); return { ok: !fail, json: async () => fail ? { error: 'Dữ liệu đã thay đổi. Tải lại.' } : { project: { ...initial, ...payload.content, revision: 1 } } } }
   try {
     await React.act(async () => root.render(React.createElement(Manager, { initialSlug: 'wi-grow', courses: [{ id: 1, name_lop: 'Khóa AI', id_khoa: 'AI' }], initial: { admin: false, projects: [{ ...initial, ownerId: 8, courseIds: [2] }] } })))
+    if (process.env.MANAGEMENT_UI_SNAPSHOT_DIR) { fs.mkdirSync(process.env.MANAGEMENT_UI_SNAPSHOT_DIR, { recursive: true }); fs.writeFileSync(path.join(process.env.MANAGEMENT_UI_SNAPSHOT_DIR, 'project-overview.html'), require('react-dom/server').renderToStaticMarkup(React.createElement(load('components/layout/ManagementWorkspace.tsx', { 'next/link': link }).default, { active: 'projects' }, React.createElement(Manager, { initialSlug: 'wi-grow', courses: [{ id: 1, name_lop: 'Khóa thực hành AI', id_khoa: 'AI', teacherName: 'Hương Lucy', status: true }], initial: { admin: true, projects: [{ ...initial, ownerId: 8, courseIds: [1] }], ownerNames: { '8': 'Hương Lucy' } } })))) }
     assert.equal(document.querySelector('[name="ownerId"]'), null)
     document.querySelector('[name="name"]').value = 'Dự án mới'
     const submit = () => document.querySelector('form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }))

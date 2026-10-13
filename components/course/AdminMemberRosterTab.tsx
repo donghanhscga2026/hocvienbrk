@@ -7,6 +7,7 @@ import {
     updateCourseMemberLabelAction,
     exportCourseMembersAction,
 } from '@/app/actions/admin-actions'
+import CourseExportButton from './CourseExportButton'
 import MemberDayChips from './MemberDayChips'
 import MemberDetailPanel from './MemberDetailPanel'
 import { teamLabel, groupLabel, CourseMemberLabels, RosterMember, formatStartDate, recentDayWindow } from './MemberRosterPanel'
@@ -245,24 +246,20 @@ export default function AdminMemberRosterTab({ courseId, courseName, members, la
 
     const handleExportStudents = async () => {
         setExportingStudents(true)
+        const popup = window.open('about:blank', '_blank')
+        if (popup) popup.opener = null
         try {
             const res = await exportCourseMembersAction(courseId, courseName)
             if (res.success && res.sheetUrl) {
-                window.open(res.sheetUrl, '_blank')
-            } else if (res.success && res.csvContent) {
-                const blob = new Blob([res.csvContent], { type: 'text/csv;charset=utf-8;' })
-                const url = URL.createObjectURL(blob)
-                const a = document.createElement('a')
-                a.href = url
-                a.download = `${res.fileName || 'thanh-vien'}.csv`
-                a.click()
-                URL.revokeObjectURL(url)
-                alert('Không tạo được Google Sheet, đã tải file CSV thay thế.')
+                if (popup) popup.location.href = res.sheetUrl
+                else alert(`Google Sheet đã tạo. Mở đường dẫn: ${res.sheetUrl}`)
             } else {
-                alert(res.error || 'Lỗi xuất danh sách')
+                popup?.close()
+                alert(res.error || 'Không tạo được Google Sheet. Bạn có thể dùng Xuất Excel.')
             }
         } catch {
-            alert('Lỗi xuất danh sách')
+            popup?.close()
+            alert('Không tạo được Google Sheet. Hãy thử lại hoặc tải Excel.')
         }
         setExportingStudents(false)
     }
@@ -406,9 +403,10 @@ export default function AdminMemberRosterTab({ courseId, courseName, members, la
                         {exportingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageDown className="w-3.5 h-3.5" />}
                         Xuất ảnh
                     </button>
+                    <CourseExportButton courseIds={[courseId]} courseName={courseName} />
                     <button
                         onClick={handleExportStudents}
-                        disabled={exportingStudents || members.length === 0}
+                        disabled={exportingStudents}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {exportingStudents ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}

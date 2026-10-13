@@ -27,7 +27,7 @@ async function requestProjects(url: string, init: RequestInit = {}) {
   }
 }
 
-export default function WiCourseProjects({ courseId }: { courseId: string }) {
+export default function WiCourseProjects({ courseId, compact = false }: { courseId: string; compact?: boolean }) {
   const [projects, setProjects] = useState<Option[] | null>(null)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -84,7 +84,7 @@ export default function WiCourseProjects({ courseId }: { courseId: string }) {
       {projects && <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-600">Đã chọn: {selectedCount}</span>}
     </div>
     <p className="text-sm text-gray-600">Chọn dự án để liên kết khóa học này.</p>
-    {projects && <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 sm:grid-cols-3">
+    {projects && <div className={compact ? "grid grid-cols-1 gap-2" : "grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 sm:grid-cols-3"}>
       {projects.map(project => <label key={project.slug} className={`flex min-h-11 min-w-0 cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${project.selected ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'} ${busy || needsReload ? 'cursor-default opacity-60' : ''}`}>
         <input type="checkbox" checked={project.selected} disabled={busy || needsReload} className="h-4 w-4 shrink-0 accent-green-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700" onChange={event => setProjects(current => current?.map(item => item.slug === project.slug ? { ...item, selected: event.target.checked } : item) || null)} />
         <span className="min-w-0 break-words">{project.name}</span>
