@@ -88,7 +88,7 @@ export default function RoadmapBuilder() {
       <div className="space-y-6 animate-in fade-in duration-500 text-black mx-auto px-4 py-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <h2 className="text-xl font-black uppercase tracking-tight">Quản lý khảo sát</h2>
-          <button onClick={handleCreateNew} className="w-full md:w-auto bg-black text-yellow-400 px-4 py-2.5 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 shadow-lg">
+          <button data-help-id="btn-new-survey" onClick={handleCreateNew} className="w-full md:w-auto bg-black text-yellow-400 px-4 py-2.5 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 shadow-lg">
             <Plus className="w-3 h-3" /> Tạo mới
           </button>
         </div>

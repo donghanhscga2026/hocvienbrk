@@ -755,6 +755,7 @@ function RegisterForm() {
                         </div>
 
                         <button
+                            data-help-id="btn-register"
                             type="submit"
                             disabled={isLoading}
                             className="flex w-full justify-center rounded-lg bg-brk-primary px-4 py-2.5 text-sm font-medium text-brk-on-primary hover:bg-brk-primary-hover focus:outline-none focus:ring-2 focus:ring-brk-primary focus:ring-offset-2 disabled:opacity-50"

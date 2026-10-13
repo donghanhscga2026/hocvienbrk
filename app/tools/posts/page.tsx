@@ -86,7 +86,7 @@ export default function ToolsPostsPage() {
         <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 pb-16 sm:px-6">
             <div className="flex items-center justify-between gap-3">
                 <p className="text-sm text-gray-600">Quản lý bài viết cộng đồng</p>
-                {isAdmin && <button type="button" disabled={saving} onClick={() => {
+                {isAdmin && <button data-help-id="btn-new-post" type="button" disabled={saving} onClick={() => {
                     if (showCreate) resetForm()
                     else { resetForm(); setShowCreate(true); setNotice('') }
                 }} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brk-primary px-4 text-sm font-semibold text-white">

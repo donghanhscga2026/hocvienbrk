@@ -44,7 +44,7 @@ export default function AdminMfaPage() {
   return <main className="mx-auto max-w-xl p-6 space-y-5">
     <h1 className="text-2xl font-bold">Bảo mật quản trị viên</h1>
     <p>Trạng thái MFA: <strong>{enabled ? "Đã bật" : "Chưa bật"}</strong></p>
-    {!enabled && !secret && <button className="rounded-lg bg-brk-primary px-4 py-2 font-semibold text-brk-on-primary" onClick={begin}>Thiết lập Authenticator</button>}
+    {!enabled && !secret && <button data-help-id="btn-setup-mfa" className="rounded-lg bg-brk-primary px-4 py-2 font-semibold text-brk-on-primary" onClick={begin}>Thiết lập Authenticator</button>}
     {secret && <div className="space-y-3 rounded-xl border p-4">
       <p className="text-sm">Trong Google/Microsoft Authenticator, chọn nhập khóa thiết lập và dùng khóa sau:</p>
       <code className="block break-all rounded bg-black/10 p-3 select-all">{secret}</code>
