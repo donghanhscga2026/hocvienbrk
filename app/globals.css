@@ -219,3 +219,122 @@ body {
 .today-ring-pulse-done {
   animation: today-ring-pulse-done 1.2s ease-in-out infinite;
 }
+
+/* Thẻ Wi lấy màu từ nhận diện triển khai; họa tiết CSS không tải thêm ảnh. */
+.wi300-discovery-card,
+.wi300-solution-card,
+.wi300-partner-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.wi300-discovery-card {
+  --wi-card-color: var(--color-primary);
+  background: linear-gradient(135deg, var(--color-surface) 0%, color-mix(in srgb, var(--wi-card-color) 10%, var(--color-surface)) 100%);
+  border-color: color-mix(in srgb, var(--wi-card-color) 20%, var(--color-surface));
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--color-primary) 5%, transparent);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+.wi300-discovery-card[data-tone="1"] { --wi-card-color: var(--color-accent); }
+.wi300-discovery-card[data-tone="2"] { --wi-card-color: var(--color-primary); background: linear-gradient(135deg, var(--color-background), var(--color-surface)); }
+.wi300-discovery-card::before,
+.wi300-solution-card::before,
+.wi300-partner-card::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 14rem;
+  height: 14rem;
+  right: -6rem;
+  top: -6rem;
+  border: 1.5rem solid color-mix(in srgb, var(--wi-card-color, var(--color-primary)) 8%, transparent);
+  border-radius: 50%;
+}
+.wi300-discovery-card > div > span {
+  background: var(--color-surface);
+  color: var(--wi-card-color);
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--wi-card-color) 10%, transparent);
+}
+.wi300-solution-card {
+  background: linear-gradient(135deg, var(--color-surface), var(--color-background));
+  border-color: color-mix(in srgb, var(--color-primary) 20%, var(--color-surface));
+}
+.wi300-partner-card {
+  background: linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 80%, black));
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+.wi300-partner-card::before {
+  width: 20rem;
+  height: 20rem;
+  right: -8rem;
+  top: -8rem;
+  border-color: #ffffff12;
+}
+@media (hover: hover) {
+  .wi300-discovery-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--wi-card-color);
+    box-shadow: 0 12px 28px color-mix(in srgb, var(--wi-card-color) 14%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wi300-discovery-card { transition: none; }
+  .wi300-discovery-card:hover { transform: none; }
+}
+
+/* Hero và dự án chỉ dùng biến nhận diện của deployment Wi300 hiện tại. */
+.wi300-hero {
+  background: radial-gradient(ellipse at 82% 45%, color-mix(in srgb, var(--color-primary) 9%, transparent), transparent 58%),
+    linear-gradient(155deg, var(--color-surface), var(--color-background));
+}
+.wi300-hero-title,
+.wi300-hero-secondary,
+.wi300-project-action { color: var(--color-primary); }
+.wi300-hero-primary { background: var(--color-accent); color: var(--color-on-primary); }
+.wi300-hero-secondary { border-color: var(--color-primary); background: var(--color-surface); }
+.wi300-ecosystem-art {
+  position: relative;
+  aspect-ratio: 600 / 540;
+  overflow: hidden;
+  background: radial-gradient(ellipse, #fff5aa90, transparent 72%);
+}
+/* Di chuyển cả vòng cùng nhau để chữ luôn ngay ngắn, không quay hoặc biến dạng. */
+@media (prefers-reduced-motion: no-preference) {
+  .wi300-ecosystem-art { animation: wi300-ecosystem-float 7s ease-in-out infinite; }
+}
+.wi300-ecosystem-art:hover,
+.wi300-ecosystem-art:focus-visible { animation-play-state: paused; }
+@keyframes wi300-ecosystem-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+/* Ảnh 1280×720: vùng vòng tròn tại (575, 25), kích thước 600×540. */
+.wi300-ecosystem-source {
+  position: absolute;
+  width: 213.333333%;
+  max-width: none;
+  height: auto;
+  left: -95.833333%;
+  top: -4.62963%;
+  -webkit-mask-image: url('/wi300/ecosystem-mask.svg');
+  mask-image: url('/wi300/ecosystem-mask.svg');
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+.wi300-project-card {
+  box-shadow: 0 3px 16px color-mix(in srgb, var(--color-primary) 4%, transparent);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+@media (hover: hover) {
+  .wi300-project-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--color-primary);
+    box-shadow: 0 12px 28px color-mix(in srgb, var(--color-primary) 10%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wi300-project-card { transition: none; }
+  .wi300-project-card:hover { transform: none; }
+}
