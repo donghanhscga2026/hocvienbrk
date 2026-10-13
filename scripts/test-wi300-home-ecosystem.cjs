@@ -62,7 +62,7 @@ async function run() {
     dom = render(props); doc = dom.window.document
     const cta = doc.querySelector('[aria-labelledby="wi300-course-partner-title"]')
     assert.ok(cta)
-    assert.match(cta.textContent, /Bạn muốn chia sẻ chuyên môn/)
+    assert.match(cta.textContent, /Chia sẻ chuyên môn/)
     assert.equal(cta.querySelector('a').getAttribute('href'), '/doi-tac')
     assert.ok(doc.querySelector('#khoa-hoc').compareDocumentPosition(cta) & 4)
     assert.equal(doc.querySelector('#giang-vien'), null, 'Empty catalog does not invent teacher profiles')
@@ -80,8 +80,34 @@ async function run() {
   assert.equal(teachers.querySelectorAll('ul[aria-label] li').length, 2, 'Only selected teachers with photos appear')
   assert.match(teachers.querySelector('h2').textContent, /Đội ngũ giảng viên/)
   assert.ok(teachers.querySelector('a[href="/khoa-hoc?q=H%C6%B0%C6%A1ng%20Lucy"]'))
-  assert.ok([...teachers.querySelectorAll('ul[aria-hidden="true"] a')].every(a => a.tabIndex === -1))
+  assert.equal(teachers.querySelectorAll('ul[aria-hidden="true"]').length, 0, 'No repeated marquee copies')
+  assert.ok(teachers.querySelector('a[href="/giang-vien"]'))
   dom.window.close()
+  // Danh sách giới thiệu không cố định ba người, khử trùng và giới hạn tám.
+  const profiles = Array.from({ length: 12 }, (_, i) => ({ id: i, name: 'Giảng viên ' + i, image: '/teacher.png', count: 1 }))
+  for (const directory of [false, true]) {
+    dom = new JSDOM(renderToStaticMarkup(React.createElement(Teachers.default, { teachers: [...profiles, profiles[0], { id: 99, name: 'Không ảnh', count: 1, image: '' }], catalogError: false, directory })))
+    doc = dom.window.document
+    assert.equal(doc.querySelectorAll('ul li').length, directory ? 12 : 8)
+    assert.equal(doc.querySelectorAll('ul[aria-hidden]').length, 0)
+    if (directory) assert.equal(doc.querySelector('h1').textContent, 'Đội ngũ giảng viên')
+    dom.window.close()
+  }
+  dom = render({ view: 'teachers', courses }); doc = dom.window.document
+  assert.ok(doc.querySelector('#giang-vien h1'))
+  assert.equal(doc.querySelector('#khoa-hoc'), null)
+  assert.equal(doc.querySelector('[aria-labelledby="wi300-course-partner-title"] a').getAttribute('href'), '/doi-tac')
+  dom.window.close()
+  let directoryBrand = null
+  const DirectoryPage = load('app/giang-vien/page.tsx', {
+    'next/navigation': { notFound: () => { throw Error('404') } },
+    '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => directoryBrand },
+    '@/lib/get-session': { getSession: async () => null },
+    '@/components/wi300/Wi300Home': { __esModule: true, default: () => null },
+  }).default
+  await assert.rejects(() => DirectoryPage(), /404/)
+  directoryBrand = base.brand
+  assert.equal((await DirectoryPage()).props.view, 'teachers')
   // Chuyển URL trên cùng component phải đổi kết quả, không giữ từ khóa cũ.
   const ui = new JSDOM('<div id="root"></div>', { url: 'https://example.com/khoa-hoc' })
   global.window = ui.window; global.document = ui.window.document; global.IS_REACT_ACT_ENVIRONMENT = true

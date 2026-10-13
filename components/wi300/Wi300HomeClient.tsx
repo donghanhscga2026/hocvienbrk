@@ -22,9 +22,8 @@ type Props = {
   brand: DeploymentBrand; courses: Wi300Course[]; enrollments: Wi300Enrollment[];
   teachingCourses?: Wi300TeachingCourse[]; teachingError?: boolean;
   userId: number | null; userPhone: string | null; loggedIn: boolean;
-  catalogError: boolean; accountError: boolean; view?: 'home' | 'catalog' | 'discover' | 'space';
+  catalogError: boolean; accountError: boolean; view?: 'home' | 'catalog' | 'discover' | 'space' | 'teachers';
 }
-const action = 'inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brk-primary px-5 font-semibold text-white transition-opacity hover:opacity-90'
 
 export default function Wi300HomeClient(props: Props) {
   return <Suspense fallback={<div className="p-8 text-center">Đang tải khóa học…</div>}><HomeRoute {...props} /></Suspense>
@@ -142,12 +141,16 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
       {catalogError ? <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900"><p>Chưa thể tải khóa học. Vui lòng thử lại sau.</p><button type="button" onClick={() => window.location.reload()} className="mt-3 min-h-11 font-semibold underline">Tải lại trang</button></div> : filtered.length ? <><div className="grid items-start gap-5 md:grid-cols-2 xl:grid-cols-3">{filtered.slice(0, limit).map(card)}</div>{limit < filtered.length && <div className="mt-8 text-center"><button type="button" onClick={() => setLimit(value => value + 9)} className="min-h-12 rounded-xl border border-brk-outline bg-white px-6 font-semibold text-brk-primary">Xem thêm khóa học</button></div>}</> : <div className="rounded-2xl border border-brk-outline bg-white p-8 text-center"><BookOpen className="mx-auto mb-3 h-8 w-8 text-brk-muted" /><p className="text-brk-muted">{courses.length ? 'Chưa tìm thấy khóa học phù hợp với bộ lọc.' : 'Các khóa học sẽ được cập nhật tại đây.'}</p>{courses.length > 0 && <button type="button" onClick={clearFilters} className="mt-3 min-h-11 font-semibold text-brk-primary">Xóa bộ lọc</button>}</div>}
     </section>}
 
+    {view === 'teachers' && <div className="pt-10"><Wi300Teachers teachers={teachers} catalogError={catalogError} directory /></div>}
     {view === 'catalog' && <Wi300Teachers teachers={teachers} catalogError={catalogError} />}
     {/* CTA cuối danh mục: dẫn tới form đối tác hiện có, không thay đổi luồng học. */}
-    {view === 'catalog' && <section aria-labelledby="wi300-course-partner-title" className="mx-auto max-w-7xl px-4 pb-12 lg:px-6">
-      <div className="wi300-solution-card flex flex-col gap-6 rounded-3xl border border-brk-primary/15 bg-brk-primary/5 p-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex min-w-0 items-start gap-4"><span aria-hidden="true" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brk-primary/10 text-brk-primary"><BookOpen className="h-7 w-7" /></span><div><h2 id="wi300-course-partner-title" className="text-xl font-bold sm:text-2xl">Bạn muốn chia sẻ chuyên môn?</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-brk-muted">Đồng hành cùng Wi để lan tỏa kiến thức và tạo giá trị cho cộng đồng.</p></div></div>
-        <Link href="/doi-tac" className={action + ' shrink-0'}>Đăng ký làm đối tác<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
+    {(view === 'catalog' || view === 'teachers') && <section aria-labelledby="wi300-course-partner-title" className="mx-auto max-w-7xl px-4 pb-12 lg:px-6">
+      <div className="wi300-teacher-cta wi300-partner-card flex flex-col gap-6 rounded-3xl p-6 text-white sm:p-8 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-start gap-4 sm:gap-5">
+          <span aria-hidden="true" className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-2xl border border-white/25 bg-white/10"><Sparkles className="h-4 w-4" /><BookOpen className="mt-1 h-8 w-8" /></span>
+          <div><h2 id="wi300-course-partner-title" className="text-xl font-bold leading-snug sm:text-2xl">Chia sẻ chuyên môn.<br />Lan tỏa giá trị.</h2><p className="mt-3 max-w-xl text-sm leading-6 text-white/90">Đồng hành cùng Wi để đưa kiến thức và kinh nghiệm của bạn đến cộng đồng.</p></div>
+        </div>
+        <Link href="/doi-tac" className="wi300-teacher-register inline-flex min-h-14 shrink-0 items-center justify-center gap-3 rounded-xl bg-brk-surface px-5 py-3 font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Đăng ký làm giảng viên<ArrowRight className="h-5 w-5" aria-hidden="true" /></Link>
       </div>
     </section>}
     {view === 'home' && <section className="mx-auto max-w-7xl px-4 pb-12 lg:px-6" aria-labelledby="wi300-start-title">

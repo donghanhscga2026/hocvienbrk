@@ -382,3 +382,32 @@ body {
   .wi300-project-card { transition: none; }
   .wi300-project-card:hover { transform: none; }
 }
+
+/* Thẻ giảng viên cố định, dùng ảnh gốc và màu deployment Wi300. */
+.wi300-teacher-card {
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--color-primary) 6%, transparent);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+.wi300-teacher-portrait::before,
+.wi300-teacher-portrait::after {
+  content: "";
+  position: absolute;
+  width: 8rem;
+  height: 6rem;
+  background: var(--color-background);
+  border-radius: 70% 30% 65% 35%;
+}
+.wi300-teacher-portrait::before { left: -1rem; top: 0.5rem; transform: rotate(-20deg); }
+.wi300-teacher-portrait::after { right: -1rem; bottom: 0; transform: rotate(25deg); }
+.wi300-teacher-link { color: var(--color-primary); border-color: var(--color-primary); }
+.wi300-teacher-register { color: var(--color-accent); }
+@media (hover: hover) {
+  .wi300-teacher-card:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 12px 30px color-mix(in srgb, var(--color-primary) 12%, transparent);
+  }
+  .wi300-teacher-register:hover { background: var(--color-background); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wi300-teacher-card { transition: none; }
+}
