@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual, createHash } from 'crypto';
+import { buildTxFingerprint, TX_FINAL_STATES } from '@/lib/payment-dedup';
 import prisma from '@/lib/prisma';
 import { isTestAccount } from '@/lib/test-account';
 import { processEnrollmentActivation } from '@/lib/enrollment-activation';
@@ -79,37 +80,55 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: true, message: 'Ignored or invalid payload' }, { status: 200 });
         }
 
-        // Dedup key: ưu tiên id của SePay (docs khuyến nghị), fallback hash nội dung+số tiền+thời gian
+        // Dedup 2 lớp:
+        //  - externalId (id của SePay): chống retry của chính SePay
+        //  - fingerprint (nội dung + số tiền + ngày): chống trùng LIÊN KÊNH
+        //    (cùng giao dịch đã được kênh email xử lý trước đó)
         const externalId = sepayId
             ? `sepay:${sepayId}`
             : `sepay:${createHash('sha256').update(`${accountNumber}|${transferAmount}|${content}|${transactionDate || ''}`).digest('hex')}`;
+        const transferTime = transactionDate ? new Date(transactionDate) : null;
+        const fingerprint = buildTxFingerprint({
+            content: String(content),
+            amount: Number(transferAmount),
+            transferTime,
+        });
 
         // Ghi nhận giao dịch trước khi xử lý để chống retry/trùng lặp (SePay retry tối đa 7 lần)
         let txRecord;
-        try {
-            txRecord = await prisma.processedTransaction.create({
-                data: {
-                    source: 'SEPAY',
-                    externalId,
-                    amount: Number(transferAmount),
-                    accountNumber: String(accountNumber),
-                    bankName: gateway || null,
-                    content: String(content),
-                    transferTime: transactionDate ? new Date(transactionDate) : null,
-                    status: 'PROCESSING',
-                }
+        const existingTx = await prisma.processedTransaction.findFirst({
+            where: { OR: [{ externalId }, { fingerprint }] }
+        });
+        if (existingTx && TX_FINAL_STATES.includes(existingTx.status)) {
+            // Đã xử lý (kênh này hoặc kênh email) — bỏ qua
+            return NextResponse.json({ success: true, message: 'Duplicate transaction, already processed' }, { status: 200 });
+        }
+        if (existingTx) {
+            // UNMATCHED | FAILED | DISMISSED → cho xử lý lại, tái sử dụng bản ghi
+            txRecord = await prisma.processedTransaction.update({
+                where: { id: existingTx.id },
+                data: { status: 'PROCESSING', reason: null, source: 'SEPAY', externalId }
             });
-        } catch (dupErr: any) {
-            if (dupErr?.code === 'P2002') {
-                const existing = await prisma.processedTransaction.findUnique({ where: { externalId } });
-                // Giao dịch từng thất bại thì cho phép retry xử lý lại
-                if (existing && existing.status === 'FAILED') {
-                    txRecord = existing;
-                    txRecordId = existing.id;
-                } else {
+        } else {
+            try {
+                txRecord = await prisma.processedTransaction.create({
+                    data: {
+                        source: 'SEPAY',
+                        externalId,
+                        fingerprint,
+                        amount: Number(transferAmount),
+                        accountNumber: String(accountNumber),
+                        bankName: gateway || null,
+                        content: String(content),
+                        transferTime,
+                        status: 'PROCESSING',
+                    }
+                });
+            } catch (dupErr: any) {
+                if (dupErr?.code === 'P2002') {
+                    // Race: tiến trình/kênh khác vừa ghi nhận
                     return NextResponse.json({ success: true, message: 'Duplicate transaction, already processed' }, { status: 200 });
                 }
-            } else {
                 throw dupErr;
             }
         }

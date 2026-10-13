@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { buildTxFingerprint, TX_FINAL_STATES } from '@/lib/payment-dedup';
 import prisma from '@/lib/prisma';
 import { sendTelegramAdmin, sendSuccessEmail, sendTelegram } from './notifications';
 import { isTestAccount } from '@/lib/test-account';
@@ -287,31 +288,48 @@ export async function processPaymentEmails() {
           });
           const txBankName = matchedConfig?.bankName || 'Sacombank';
 
-          // Dedup: mỗi email chỉ xử lý 1 lần (tránh quét lặp / kích hoạt trùng)
+          // Dedup 2 lớp:
+          //  - externalId (gmail message id): chống quét lặp email
+          //  - fingerprint (nội dung + số tiền + ngày): chống trùng LIÊN KÊNH
+          //    (cùng giao dịch đã được webhook SePay xử lý trước đó)
           const gmailExternalId = `gmail:${msg.id || ''}`;
+          const emailTime = parsed.transferTime
+            || (message.data.internalDate ? new Date(Number(message.data.internalDate)) : null);
+          const fingerprint = buildTxFingerprint({
+            content: parsed.content,
+            amount: parsed.amount,
+            transferTime: emailTime,
+          });
           let txRecord: { id: number } | null = null;
           try {
-            const existingTx = await prisma.processedTransaction.findUnique({ where: { externalId: gmailExternalId } });
-            if (existingTx && existingTx.status !== 'FAILED') {
-              continue; // Đã xử lý (PROCESSED/UNMATCHED/PROCESSING) — bỏ qua
+            const existingTx = await prisma.processedTransaction.findFirst({
+              where: { OR: [{ externalId: gmailExternalId }, { fingerprint }] }
+            });
+            if (existingTx && TX_FINAL_STATES.includes(existingTx.status)) {
+              continue; // Đã xử lý (kênh này hoặc kênh SePay) — bỏ qua
             }
-            if (existingTx && existingTx.status === 'FAILED') {
-              txRecord = existingTx;
+            if (existingTx) {
+              // UNMATCHED | FAILED | DISMISSED → cho xử lý lại, tái sử dụng bản ghi
+              txRecord = await prisma.processedTransaction.update({
+                where: { id: existingTx.id },
+                data: { status: 'PROCESSING', reason: null, source: 'EMAIL', externalId: gmailExternalId }
+              });
             } else {
               txRecord = await prisma.processedTransaction.create({
                 data: {
                   source: 'EMAIL',
                   externalId: gmailExternalId,
+                  fingerprint,
                   amount: parsed.amount,
                   bankName: txBankName,
                   content: parsed.content,
-                  transferTime: parsed.transferTime,
+                  transferTime: emailTime,
                   status: 'PROCESSING',
                 }
               });
             }
           } catch (dupErr: any) {
-            if (dupErr?.code === 'P2002') continue; // Race: tiến trình khác đã ghi nhận
+            if (dupErr?.code === 'P2002') continue; // Race: tiến trình/kênh khác vừa ghi nhận
             console.error(`  ⚠️ Lỗi ghi nhận dedup cho message ${msg.id}:`, dupErr);
           }
 

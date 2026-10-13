@@ -2289,6 +2289,7 @@ model ProcessedTransaction {
   id            Int      @id @default(autoincrement())
   source        String   // SEPAY | EMAIL
   externalId    String   @unique // SePay transaction id | Gmail message id
+  fingerprint   String?  @unique // sha256(nội dung chuẩn hóa | số tiền | ngày) — chống trùng LIÊN KÊNH
   enrollmentId  Int?
   amount        Int?
   accountNumber String?
