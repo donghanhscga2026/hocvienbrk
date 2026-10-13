@@ -2,7 +2,9 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import AssistantPopup from './AssistantPopup'
+import AssistantFab from './AssistantFab'
 
 export type DisplayMode = 'icon' | 'avatar'
 
@@ -19,6 +21,16 @@ export interface AssistantGuideSection {
   content?: string
 }
 
+export interface AssistantGuideStep {
+  id: number
+  stepOrder: number
+  title: string
+  body: string | null
+  imageUrl: string | null
+  videoUrl: string | null
+  targetSelector: string | null
+}
+
 export interface AssistantGuideData {
   id: number
   pagePath: string | null
@@ -29,6 +41,8 @@ export interface AssistantGuideData {
   agentVideoUrl: string | null
   toolSlug: string | null
   sections: AssistantGuideSection[] | null
+  roles: string[]
+  steps: AssistantGuideStep[]
 }
 
 interface AssistantContextType {
@@ -55,6 +69,8 @@ export function useFloatingAssistant() {
 
 export function AssistantProvider({ children, toastEnabled = true }: { children: ReactNode; toastEnabled?: boolean }) {
   const pathname = usePathname()
+  const { data: session } = useSession()
+  const role = (session?.user as { role?: string } | undefined)?.role || ''
   const [isOpen, setIsOpen] = useState(false)
   const [displayMode, setDisplayMode] = useState<DisplayMode>('icon')
   const [guideData, setGuideData] = useState<AssistantGuideData | null>(null)
@@ -62,9 +78,11 @@ export function AssistantProvider({ children, toastEnabled = true }: { children:
   const [activeTab, setActiveTab] = useState<'guide' | 'features'>('guide')
   const [showToast, setShowToast] = useState(false)
 
-  const fetchGuide = useCallback(async (pagePath: string) => {
+  const fetchGuide = useCallback(async (pagePath: string, userRole: string) => {
     try {
-      const res = await fetch(`/api/assistant-guide?pagePath=${encodeURIComponent(pagePath)}`)
+      const params = new URLSearchParams({ pagePath })
+      if (userRole) params.set('role', userRole)
+      const res = await fetch(`/api/assistant-guide?${params.toString()}`)
       const json = await res.json()
       if (json.success && json.data) {
         if (json.data.pageGuide) {
@@ -87,8 +105,9 @@ export function AssistantProvider({ children, toastEnabled = true }: { children:
   }, [])
 
   useEffect(() => {
-    void Promise.resolve().then(() => fetchGuide(pathname))
-  }, [pathname, fetchGuide])
+    setIsOpen(false)
+    void Promise.resolve().then(() => fetchGuide(pathname, role))
+  }, [pathname, role, fetchGuide])
 
   useEffect(() => {
     if (!toastEnabled || (!guideData && !toolGuideData)) return
@@ -114,13 +133,16 @@ export function AssistantProvider({ children, toastEnabled = true }: { children:
     } catch {}
   }, [pathname])
 
+  const hasGuide = !!(guideData || toolGuideData)
+
   return (
     <AssistantContext.Provider value={{
       isOpen, setIsOpen, displayMode, guideData, toolGuideData,
       activeTab, setActiveTab, showToast, dismissToast,
     }}>
       {children}
-      {toastEnabled && showToast && (guideData || toolGuideData) && (
+      {hasGuide && !isOpen && <AssistantFab onOpen={() => setIsOpen(true)} />}
+      {toastEnabled && showToast && hasGuide && (
         <AssistantToast
           guideData={guideData}
           toolGuideData={toolGuideData}

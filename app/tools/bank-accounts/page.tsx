@@ -267,6 +267,7 @@ export default function AdminBankAccountsPage() {
             />
           </div>
           <button
+            data-help-id="btn-add-bank-account"
             onClick={openAddModal}
             className="flex items-center gap-2 px-5 py-3 bg-black text-yellow-400 rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-gray-800 transition-all"
           >
@@ -325,6 +326,7 @@ export default function AdminBankAccountsPage() {
                         </div>
                       ) : (
                         <button
+                          data-help-id="btn-gen-key"
                           onClick={() => handleGenerateKey(acc)}
                           disabled={keyLoading === acc.id}
                           className="text-[11px] font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded px-2 py-1 hover:bg-blue-100 disabled:opacity-50"
@@ -428,7 +430,7 @@ export default function AdminBankAccountsPage() {
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Số tài khoản *</label>
-                <input type="text" value={formAccountNumber} onChange={(e) => setFormAccountNumber(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
+                <input data-help-id="input-account-number" type="text" value={formAccountNumber} onChange={(e) => setFormAccountNumber(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
               </div>
 
               <div className="space-y-1.5">
@@ -460,6 +462,7 @@ export default function AdminBankAccountsPage() {
               </label>
 
               <button
+                data-help-id="btn-save-bank-account"
                 type="submit"
                 disabled={saving}
                 className="w-full bg-black text-yellow-400 py-3.5 rounded-2xl font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-50"
