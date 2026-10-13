@@ -18,15 +18,15 @@ export default function Wi300Businesses({ projects = businesses, error = false }
     <p className="mt-2 max-w-2xl text-sm leading-6 text-brk-muted">Tìm hiểu từng dự án và khám phá các khóa học, sản phẩm, dịch vụ liên quan.</p>
     {error ? <p role="alert" className="mt-6 rounded-2xl border border-brk-outline bg-white p-6 text-brk-muted">Chưa tải được thông tin dự án. Vui lòng tải lại trang.</p> : projects.length ? <ul aria-label="Các dự án Wi" className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {projects.slice(0, 9).map(project => <li key={project.slug} className="min-w-0">
-        <Link href={`/du-an/${project.slug}`} className="group flex h-full flex-col rounded-2xl border border-brk-outline bg-white p-5 transition-shadow hover:border-brk-primary hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brk-primary sm:p-6">
-          <div className="flex items-center gap-4">
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-brk-outline bg-brk-background">
-              {project.logo ? <Image src={project.logo} alt="" width={80} height={80} sizes="80px" className={`h-full w-full rounded-full ${project.name === 'Wi.Mentor' ? 'object-cover' : project.name === 'WiArt' ? 'bg-[#f1f2ed] object-contain' : 'bg-white object-contain p-2'}`} /> : <span aria-hidden="true" className="px-2 text-center text-sm font-extrabold text-brk-primary">{project.name}</span>}
+        <Link href={`/du-an/${project.slug}`} className="group flex h-full flex-col rounded-2xl border border-brk-outline bg-white p-5 text-center transition-shadow hover:border-brk-primary hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brk-primary sm:p-6">
+          <div className="flex flex-col items-center gap-4">
+            <div className="flex h-32 w-32 shrink-0 sm:h-36 sm:w-36 items-center justify-center overflow-hidden rounded-full border border-brk-outline bg-brk-background">
+              {project.logo ? <Image src={project.logo} alt="" width={144} height={144} sizes="(max-width: 639px) 128px, 144px" className={`h-full w-full rounded-full ${project.name === 'Wi.Mentor' ? 'bg-white object-contain' : project.name === 'WiArt' ? 'bg-[#f1f2ed] object-contain' : 'bg-white object-contain p-1'}`} /> : <span aria-hidden="true" className="px-2 text-center text-sm font-extrabold text-brk-primary">{project.name}</span>}
             </div>
-            <h3 className="min-w-0 break-words text-lg font-bold text-brk-on-surface">{project.name}</h3>
+            <h3 className="min-w-0 break-words text-xl font-bold text-brk-on-surface">{project.name}</h3>
           </div>
           <p className="mt-4 line-clamp-3 break-words text-sm leading-6 text-brk-muted">{project.description}</p>
-          <span className="mt-auto inline-flex min-h-11 items-center gap-2 pt-4 text-sm font-semibold text-brk-primary">Xem dự án<ArrowRight className="h-4 w-4" aria-hidden="true" /></span>
+          <span className="mt-auto inline-flex min-h-11 items-center justify-center gap-2 pt-4 text-sm font-semibold text-brk-primary">Xem dự án<ArrowRight className="h-4 w-4" aria-hidden="true" /></span>
         </Link>
       </li>)}
     </ul> : <p className="mt-6 rounded-2xl border border-brk-outline bg-white p-6 text-brk-muted">Các dự án sẽ được cập nhật tại đây.</p>}
