@@ -381,6 +381,9 @@ export default function PaymentsPage() {
         <Link href="/tools/payments/unmatched" className="inline-flex items-center gap-1.5 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5 hover:bg-amber-100">
           <AlertCircle className="w-4 h-4" /> Giao dịch chưa khớp (đối soát tay)
         </Link>
+        <Link href="/tools/payments/auto-verify" className="inline-flex items-center gap-1.5 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded px-2.5 py-1.5 hover:bg-blue-100 ml-2">
+          <CheckCircle className="w-4 h-4" /> Cấu hình tự động xác minh
+        </Link>
       </div>
 
       {gmailStatus.penalized && (

@@ -921,6 +921,32 @@ export async function createCourseAction(formData: FormData) {
             data: courseData as Prisma.CourseCreateInput
         })
 
+        // Tự tạo AutoVerifyConfig cho khóa học có phí (thanh toán tự động theo GV).
+        // Chỉ bật ngay khi đã biết email người gửi của ngân hàng; ngân hàng khác
+        // tạo ở trạng thái TẮT để admin điền email thật sau.
+        try {
+            const feeCoc = (courseData as any).phi_coc || 0
+            const bankAccountId = (courseData as any).teacherBankAccountId
+            if (feeCoc > 0 && bankAccountId) {
+                const bankAcc = await prisma.userBankAccount.findUnique({ where: { id: bankAccountId } })
+                const { getBankSenderDefaults } = await import('@/lib/bank-sender-defaults')
+                const defaults = getBankSenderDefaults(bankAcc?.bankName)
+                await prisma.autoVerifyConfig.upsert({
+                    where: { courseId: newCourse.id },
+                    create: {
+                        courseId: newCourse.id,
+                        emailFrom: defaults.emailFrom,
+                        emailQuery: defaults.emailQuery,
+                        bankName: defaults.bankName,
+                        enabled: defaults.enabled,
+                    },
+                    update: {}
+                })
+            }
+        } catch (cfgErr) {
+            console.error('⚠️ Auto-create AutoVerifyConfig failed:', cfgErr)
+        }
+
         // Create accepted voucher records
         const acceptedVoucherIdsRaw = formData.get('acceptedVoucherIds') as string
         if (acceptedVoucherIdsRaw) {

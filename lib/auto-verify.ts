@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { buildTxFingerprint, TX_FINAL_STATES } from '@/lib/payment-dedup';
 import prisma from '@/lib/prisma';
 import { sendTelegramAdmin, sendSuccessEmail, sendTelegram } from './notifications';
 import { isTestAccount } from '@/lib/test-account';
@@ -279,31 +280,56 @@ export async function processPaymentEmails() {
           const parsed = parseBankEmail(body, fromAddress, subject);
           if (!parsed || !parsed.amount || (!parsed.userId && !parsed.phone)) continue;
 
-          // Dedup: mỗi email chỉ xử lý 1 lần (tránh quét lặp / kích hoạt trùng)
+          // Xác định config khớp email này để lấy đúng tên ngân hàng (đa GV, đa ngân hàng)
+          const fromLower = fromAddress.toLowerCase();
+          const matchedConfig = configs.find(c => {
+            const cfgFrom = (c.emailFrom || '').toLowerCase();
+            return cfgFrom && (fromLower.includes(cfgFrom) || cfgFrom.includes(fromLower));
+          });
+          const txBankName = matchedConfig?.bankName || 'Sacombank';
+
+          // Dedup 2 lớp:
+          //  - externalId (gmail message id): chống quét lặp email
+          //  - fingerprint (nội dung + số tiền + ngày): chống trùng LIÊN KÊNH
+          //    (cùng giao dịch đã được webhook SePay xử lý trước đó)
           const gmailExternalId = `gmail:${msg.id || ''}`;
+          const emailTime = parsed.transferTime
+            || (message.data.internalDate ? new Date(Number(message.data.internalDate)) : null);
+          const fingerprint = buildTxFingerprint({
+            content: parsed.content,
+            amount: parsed.amount,
+            transferTime: emailTime,
+          });
           let txRecord: { id: number } | null = null;
           try {
-            const existingTx = await prisma.processedTransaction.findUnique({ where: { externalId: gmailExternalId } });
-            if (existingTx && existingTx.status !== 'FAILED') {
-              continue; // Đã xử lý (PROCESSED/UNMATCHED/PROCESSING) — bỏ qua
+            const existingTx = await prisma.processedTransaction.findFirst({
+              where: { OR: [{ externalId: gmailExternalId }, { fingerprint }] }
+            });
+            if (existingTx && TX_FINAL_STATES.includes(existingTx.status)) {
+              continue; // Đã xử lý (kênh này hoặc kênh SePay) — bỏ qua
             }
-            if (existingTx && existingTx.status === 'FAILED') {
-              txRecord = existingTx;
+            if (existingTx) {
+              // UNMATCHED | FAILED | DISMISSED → cho xử lý lại, tái sử dụng bản ghi
+              txRecord = await prisma.processedTransaction.update({
+                where: { id: existingTx.id },
+                data: { status: 'PROCESSING', reason: null, source: 'EMAIL', externalId: gmailExternalId }
+              });
             } else {
               txRecord = await prisma.processedTransaction.create({
                 data: {
                   source: 'EMAIL',
                   externalId: gmailExternalId,
+                  fingerprint,
                   amount: parsed.amount,
-                  bankName: 'Sacombank',
+                  bankName: txBankName,
                   content: parsed.content,
-                  transferTime: parsed.transferTime,
+                  transferTime: emailTime,
                   status: 'PROCESSING',
                 }
               });
             }
           } catch (dupErr: any) {
-            if (dupErr?.code === 'P2002') continue; // Race: tiến trình khác đã ghi nhận
+            if (dupErr?.code === 'P2002') continue; // Race: tiến trình/kênh khác vừa ghi nhận
             console.error(`  ⚠️ Lỗi ghi nhận dedup cho message ${msg.id}:`, dupErr);
           }
 
@@ -344,7 +370,7 @@ export async function processPaymentEmails() {
                 amount: parsed.amount,
                 phone: parsed.phone,
                 courseCode: parsed.courseCode,
-                bankName: 'Sacombank',
+                bankName: txBankName,
                 accountNumber: null,
                 transferTime: parsed.transferTime,
                 content: parsed.content,
@@ -369,7 +395,7 @@ export async function processPaymentEmails() {
                 userId: enrollment.userId,
                 action: 'PAYMENT_VERIFIED',
                 detail: `Xác minh thanh toán tự động: ${enrollment.course.name_lop} - ${parsed.amount.toLocaleString()}đ`,
-                metadata: { courseId: enrollment.courseId, enrollmentId: enrollment.id, amount: parsed.amount, bankName: 'Sacombank' },
+                metadata: { courseId: enrollment.courseId, enrollmentId: enrollment.id, amount: parsed.amount, bankName: txBankName },
                 createdAt: parsed.transferTime || new Date(),
               });
             } catch (logErr) {
@@ -395,7 +421,7 @@ export async function processPaymentEmails() {
               `📞 SĐT: ${enrollment.user.phone}\n` +
               `🎓 Khóa học: <b>${enrollment.course.name_lop} (${enrollment.course.id_khoa})</b>\n` +
               `${refLink}💰 Số tiền: ${parsed.amount.toLocaleString()}đ\n` +
-              `🏦 Ngân hàng: Sacombank\n` +
+              `🏦 Ngân hàng: ${txBankName}\n` +
               `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}\n` +
               brkPlacementMsg;
             await sendTelegram(msgAdmin, 'ACTIVATE');

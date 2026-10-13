@@ -76,8 +76,8 @@ async function main() {
   const tx5 = await prisma.processedTransaction.findUnique({ where: { externalId: 'sepay:1002' } });
   ok('T5: thiếu định danh → UNMATCHED', res.status === 200 && tx5?.status === 'UNMATCHED', tx5?.status);
 
-  // T6: sai số tài khoản → UNMATCHED
-  res = await post(basePayload({ id: 1003, accountNumber: '0000000000' }), GOOD_AUTH);
+  // T6: sai số tài khoản → UNMATCHED (nội dung khác các case trước để tránh fingerprint trùng)
+  res = await post(basePayload({ id: 1003, accountNumber: '0000000000', content: `SDT 112223 HV ${student.id} COC TEST01 REF6` }), GOOD_AUTH);
   const tx6 = await prisma.processedTransaction.findUnique({ where: { externalId: 'sepay:1003' } });
   ok('T6: sai accountNumber → UNMATCHED', tx6?.status === 'UNMATCHED', tx6?.status);
 

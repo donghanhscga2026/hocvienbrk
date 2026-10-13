@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual, createHash } from 'crypto';
+import { buildTxFingerprint, TX_FINAL_STATES } from '@/lib/payment-dedup';
 import prisma from '@/lib/prisma';
 import { isTestAccount } from '@/lib/test-account';
 import { processEnrollmentActivation } from '@/lib/enrollment-activation';
@@ -37,28 +38,54 @@ function extractInfoFromDescription(description: string) {
     return { phone, userId, courseCode };
 }
 
-// Xác thực webhook theo chuẩn SePay: header "Authorization: Apikey <key>"
-// Key do user tự đặt khi tạo webhook trên SePay dashboard, lưu trong env SEPAY_WEBHOOK_API_KEY.
-function isAuthorizedWebhook(req: NextRequest): boolean {
-    const expected = process.env.SEPAY_WEBHOOK_API_KEY?.trim();
-    if (!expected) return false;
+// So sánh timing-safe 2 chuỗi
+function safeEqual(a: string, b: string): boolean {
+    const ba = Buffer.from(a);
+    const bb = Buffer.from(b);
+    return ba.length === bb.length && timingSafeEqual(ba, bb);
+}
+
+// Lấy key từ header "Authorization: Apikey <key>" theo chuẩn SePay
+function extractApiKey(req: NextRequest): string | null {
     const header = req.headers.get('authorization');
-    if (!header) return false;
-    const a = Buffer.from(header);
-    const b = Buffer.from(`Apikey ${expected}`);
-    return a.length === b.length && timingSafeEqual(a, b);
+    if (!header || !header.startsWith('Apikey ')) return null;
+    return header.slice('Apikey '.length).trim() || null;
+}
+
+// Xác thực webhook:
+//  - Ưu tiên key RIÊNG của tài khoản ngân hàng (admin cấp cho từng GV,
+//    lưu dạng SHA-256 trong UserBankAccount.webhookApiKeyHash).
+//  - Fallback key CHUNG trong env SEPAY_WEBHOOK_API_KEY (cho TK của admin
+//    hoặc khi TK chưa được cấp key riêng).
+function isAuthorizedWebhook(providedKey: string | null, bankAccount: { webhookApiKeyHash: string | null } | null): boolean {
+    if (!providedKey) return false;
+    if (bankAccount?.webhookApiKeyHash) {
+        const providedHash = createHash('sha256').update(providedKey).digest('hex');
+        return safeEqual(providedHash, bankAccount.webhookApiKeyHash);
+    }
+    const globalKey = process.env.SEPAY_WEBHOOK_API_KEY?.trim();
+    if (!globalKey) return false;
+    return safeEqual(providedKey, globalKey);
 }
 
 export async function POST(req: NextRequest) {
-    // 0. Xác thực — chặn request giả mạo kích hoạt miễn phí
-    if (!isAuthorizedWebhook(req)) {
-        console.warn('⚠️ [SEPAY WEBHOOK] Unauthorized access attempt');
-        return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
-
     let txRecordId: number | null = null;
     try {
         const body = await req.json();
+
+        // 0. Xác thực — chặn request giả mạo kích hoạt miễn phí.
+        // Cần accountNumber trước để biết dùng key riêng của TK nào.
+        const providedKey = extractApiKey(req);
+        const authAccount = body?.accountNumber
+            ? await prisma.userBankAccount.findFirst({
+                where: { accountNumber: String(body.accountNumber) },
+                select: { id: true, userId: true, bankName: true, webhookApiKeyHash: true }
+            })
+            : null;
+        if (!isAuthorizedWebhook(providedKey, authAccount)) {
+            console.warn('⚠️ [SEPAY WEBHOOK] Unauthorized access attempt');
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
 
         // SePay webhook format
         // https://docs.sepay.vn/tich-hop-he-thong/webhook
@@ -79,37 +106,55 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: true, message: 'Ignored or invalid payload' }, { status: 200 });
         }
 
-        // Dedup key: ưu tiên id của SePay (docs khuyến nghị), fallback hash nội dung+số tiền+thời gian
+        // Dedup 2 lớp:
+        //  - externalId (id của SePay): chống retry của chính SePay
+        //  - fingerprint (nội dung + số tiền + ngày): chống trùng LIÊN KÊNH
+        //    (cùng giao dịch đã được kênh email xử lý trước đó)
         const externalId = sepayId
             ? `sepay:${sepayId}`
             : `sepay:${createHash('sha256').update(`${accountNumber}|${transferAmount}|${content}|${transactionDate || ''}`).digest('hex')}`;
+        const transferTime = transactionDate ? new Date(transactionDate) : null;
+        const fingerprint = buildTxFingerprint({
+            content: String(content),
+            amount: Number(transferAmount),
+            transferTime,
+        });
 
         // Ghi nhận giao dịch trước khi xử lý để chống retry/trùng lặp (SePay retry tối đa 7 lần)
         let txRecord;
-        try {
-            txRecord = await prisma.processedTransaction.create({
-                data: {
-                    source: 'SEPAY',
-                    externalId,
-                    amount: Number(transferAmount),
-                    accountNumber: String(accountNumber),
-                    bankName: gateway || null,
-                    content: String(content),
-                    transferTime: transactionDate ? new Date(transactionDate) : null,
-                    status: 'PROCESSING',
-                }
+        const existingTx = await prisma.processedTransaction.findFirst({
+            where: { OR: [{ externalId }, { fingerprint }] }
+        });
+        if (existingTx && TX_FINAL_STATES.includes(existingTx.status)) {
+            // Đã xử lý (kênh này hoặc kênh email) — bỏ qua
+            return NextResponse.json({ success: true, message: 'Duplicate transaction, already processed' }, { status: 200 });
+        }
+        if (existingTx) {
+            // UNMATCHED | FAILED | DISMISSED → cho xử lý lại, tái sử dụng bản ghi
+            txRecord = await prisma.processedTransaction.update({
+                where: { id: existingTx.id },
+                data: { status: 'PROCESSING', reason: null, source: 'SEPAY', externalId }
             });
-        } catch (dupErr: any) {
-            if (dupErr?.code === 'P2002') {
-                const existing = await prisma.processedTransaction.findUnique({ where: { externalId } });
-                // Giao dịch từng thất bại thì cho phép retry xử lý lại
-                if (existing && existing.status === 'FAILED') {
-                    txRecord = existing;
-                    txRecordId = existing.id;
-                } else {
+        } else {
+            try {
+                txRecord = await prisma.processedTransaction.create({
+                    data: {
+                        source: 'SEPAY',
+                        externalId,
+                        fingerprint,
+                        amount: Number(transferAmount),
+                        accountNumber: String(accountNumber),
+                        bankName: gateway || null,
+                        content: String(content),
+                        transferTime,
+                        status: 'PROCESSING',
+                    }
+                });
+            } catch (dupErr: any) {
+                if (dupErr?.code === 'P2002') {
+                    // Race: tiến trình/kênh khác vừa ghi nhận
                     return NextResponse.json({ success: true, message: 'Duplicate transaction, already processed' }, { status: 200 });
                 }
-            } else {
                 throw dupErr;
             }
         }
@@ -122,10 +167,8 @@ export async function POST(req: NextRequest) {
             });
         };
 
-        // 1. Tìm Teacher dựa trên accountNumber
-        const bankAccount = await prisma.userBankAccount.findFirst({
-            where: { accountNumber: String(accountNumber) }
-        });
+        // 1. Tìm Teacher dựa trên accountNumber (đã tra ở bước xác thực → tái sử dụng)
+        const bankAccount = authAccount;
 
         if (!bankAccount) {
             const reason = `Không tìm thấy tài khoản ngân hàng khớp với accountNumber: ${accountNumber}`;
