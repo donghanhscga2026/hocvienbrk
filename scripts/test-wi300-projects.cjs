@@ -60,6 +60,9 @@ async function run() {
   const newlyCreated = (await service.readProjects(db)).find(project => project.slug === 'wi-test')
   assert.equal(newlyCreated.published, true, 'New project is public immediately')
   assert.equal(newlyCreated.featured, false, 'Featuring remains an explicit admin choice')
+  assert.equal(newlyCreated.category, 'OTHER')
+  assert.equal(shared.projectContent.safeParse({ ...content, category: 'invented' }).success, false)
+  assert.equal(newlyCreated.showOnHomepage, false, 'New projects require an explicit homepage selection')
   assert.equal((await service.readPublicProjects(db)).some(project => project.slug === 'wi-test'), true, 'Public projects appear without a featured flag')
   await assert.rejects(() => service.createProject(db, 0, { ...newInput, slug: 'wi-invalid-owner', ownerId: 999 }), /không tồn tại/)
   assert.equal(rows.has(shared.PROJECT_PREFIX + 'wi-invalid-owner'), false)
@@ -67,12 +70,15 @@ async function run() {
   assert.equal(fullProject.ownerId, 8); assert.equal(fullProject.introduction, 'Giới thiệu'); assert.equal(fullProject.members[0].userId, 9)
   assert.ok((await service.readPublicProjects(db)).some(project => project.slug === 'wi-full'))
   await service.deleteProject(db, 0, 'wi-full', { revision: 1 })
-  await service.saveProject(db, 0, 'wi-test', { revision: 1, content, controls: { ownerId: 8, published: true, featured: false, order: 100 } })
+  await service.saveProject(db, 0, 'wi-test', { revision: 1, content, controls: { ownerId: 8, published: true, featured: false, showOnHomepage: false, order: 100 } })
+  assert.equal((await service.readProjects(db)).find(project => project.slug === 'wi-test').showOnHomepage, false)
+  await service.saveProject(db, 8, 'wi-test', { revision: 2, content })
+  assert.equal((await service.readProjects(db)).find(project => project.slug === 'wi-test').showOnHomepage, false, 'Owner content edits preserve admin homepage choice')
   assert.ok((await service.managedProjects(db, 8)).projects.some(project => project.slug === 'wi-test'))
   assert.equal((await service.readPublicProjects(db)).some(project => project.slug === 'wi-test'), true, 'Public non-featured project appears on home')
   await assert.rejects(() => service.deleteProject(db, 8, 'wi-test', { revision: 2 }), error => error.status === 403)
   await assert.rejects(() => service.deleteProject(db, 0, 'wi-test', { revision: 1 }), error => error.status === 409)
-  await service.deleteProject(db, 0, 'wi-test', { revision: 2 })
+  await service.deleteProject(db, 0, 'wi-test', { revision: 3 })
   assert.equal((await service.readProjects(db)).some(project => project.slug === 'wi-test'), false)
   await assert.rejects(() => service.saveProject(db, 0, 'wi-test', { revision: 2, content }), error => error.status === 404)
   await assert.rejects(() => service.createProject(db, 0, newInput), error => error.status === 409)
@@ -124,7 +130,7 @@ async function run() {
   global.window = dom.window; global.document = dom.window.document; global.FormData = dom.window.FormData; global.IS_REACT_ACT_ENVIRONMENT = true
   const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
   const navigationCalls = []
-  const Manager = load('components/wi300/WiProjectManager.tsx', { 'next/link': link, 'next/image': { __esModule: true, default: props => React.createElement('img', props) }, 'next/navigation': { useRouter: () => ({ refresh: () => navigationCalls.push(['refresh']), push: url => navigationCalls.push(['push', url]), replace: url => navigationCalls.push(['replace', url]) }) } }).default
+  const Manager = load('components/wi300/WiProjectManager.tsx', { '@/lib/wi300/projects': shared, 'next/link': link, 'next/image': { __esModule: true, default: props => React.createElement('img', props) }, 'next/navigation': { useRouter: () => ({ refresh: () => navigationCalls.push(['refresh']), push: url => navigationCalls.push(['push', url]), replace: url => navigationCalls.push(['replace', url]) }) } }).default
   const { createRoot } = require('react-dom/client'), root = createRoot(document.getElementById('root'))
   let payload, fail = true
   const savedFetch = global.fetch
@@ -155,6 +161,24 @@ async function run() {
     assert.equal(document.querySelector('select'), null, 'List is cards rather than a project dropdown')
     assert.equal(document.querySelector('form'), null, 'List does not automatically open the first project')
     assert.equal(document.querySelector('[aria-label="Quản lý Wi.Grow"]').getAttribute('href'), '/du-an/quan-ly?project=wi-grow')
+    const createFetch = global.fetch
+    let togglePayload
+    global.fetch = async (url, options) => {
+      togglePayload = JSON.parse(options.body)
+      return { ok: false, json: async () => ({ error: 'Dữ liệu đã thay đổi. Tải lại.' }) }
+    }
+    const homeToggle = document.querySelector('article input[type="checkbox"]')
+    await React.act(async () => homeToggle.click())
+    assert.equal(togglePayload.controls.showOnHomepage, false)
+    assert.equal(togglePayload.controls.featured, initial.featured, 'Homepage toggle preserves featuring')
+    assert.equal(homeToggle.checked, true, 'Failure does not change the saved homepage choice')
+    global.fetch = async (url, options) => {
+      togglePayload = JSON.parse(options.body)
+      return { ok: true, json: async () => ({ project: { ...initial, ...togglePayload.controls, revision: initial.revision + 1 } }) }
+    }
+    await React.act(async () => homeToggle.click())
+    assert.equal(document.querySelector('article input[type="checkbox"]').checked, false)
+    global.fetch = createFetch
     await React.act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === '+ Thêm dự án').click())
     const createForm = document.querySelector('form')
     createForm.querySelector('[name="name"]').value = 'Wi UI Test'

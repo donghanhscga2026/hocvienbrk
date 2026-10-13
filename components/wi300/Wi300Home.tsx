@@ -39,7 +39,7 @@ const getCatalog = unstable_cache(async (where: Prisma.CourseWhereInput) => pris
   where, select: courseSelect, orderBy: [{ pin: 'asc' }, { updatedAt: 'desc' }],
 }), ['wi300-course-catalog-v4'], { tags: ['site-profile'], revalidate: 600 })
 
-export default async function Wi300Home({ brand, session, view = 'home' }: { brand: DeploymentBrand; session: Session | null; view?: 'home' | 'catalog' | 'discover' | 'space' }) {
+export default async function Wi300Home({ brand, session, view = 'home' }: { brand: DeploymentBrand; session: Session | null; view?: 'home' | 'catalog' | 'discover' | 'space' | 'teachers' }) {
   const projectsReady = view === 'home' || view === 'discover'
     ? readPublicProjects(prisma).then(projects => ({ projects, projectsError: false })).catch(error => { console.error('[WI300 projects]', error instanceof Error ? error.name : 'Unknown'); return { projects: [], projectsError: true } })
     : Promise.resolve({ projects: [], projectsError: false })

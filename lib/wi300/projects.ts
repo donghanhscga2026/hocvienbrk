@@ -9,7 +9,10 @@ export function safeProjectUrl(value: string) {
   try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password } catch { return false }
 }
 const url = z.string().trim().max(1000).refine(safeProjectUrl, 'Dùng đường dẫn nội bộ hoặc https://, không chứa khoảng trắng.')
+export const PROJECT_CATEGORIES = ['TECH', 'FINANCE', 'MARKETING', 'EDUCATION', 'ART', 'HEALTH', 'BUSINESS', 'OTHER'] as const
+export const projectCategoryLabels: Record<(typeof PROJECT_CATEGORIES)[number], string> = { TECH: 'Công nghệ', FINANCE: 'Tài chính', MARKETING: 'Marketing', EDUCATION: 'Giáo dục', ART: 'Nghệ thuật', HEALTH: 'Sức khỏe', BUSINESS: 'Kinh doanh', OTHER: 'Khác' }
 export const projectContent = z.object({
+  category: z.enum(PROJECT_CATEGORIES).optional(),
   name: z.string().trim().min(2).max(100),
   description: z.string().trim().min(3).max(300),
   introduction: z.string().trim().max(10000),
@@ -18,7 +21,7 @@ export const projectContent = z.object({
   courseIds: z.array(z.number().int().positive()).max(100).refine(ids => new Set(ids).size === ids.length, 'Khóa học bị trùng.'),
   offerings: z.array(z.object({ kind: z.enum(['PRODUCT', 'SERVICE']), name: z.string().trim().min(2).max(150), description: z.string().trim().max(500), url: url.refine(value => !!value, 'Vui lòng nhập đường dẫn.') }).strict()).max(30),
 }).strict()
-export const projectControls = z.object({ ownerId: z.number().int().min(0).nullable(), published: z.boolean(), featured: z.boolean(), order: z.number().int().min(0).max(999) }).strict()
+export const projectControls = z.object({ ownerId: z.number().int().min(0).nullable(), published: z.boolean(), featured: z.boolean(), showOnHomepage: z.boolean().default(true), order: z.number().int().min(0).max(999) }).strict()
 export const projectMembers = z.array(z.object({ userId: z.number().int().min(0), title: z.string().trim().max(100), visible: z.boolean(), canManage: z.boolean() }).strict()).max(50).refine(items => new Set(items.map(item => item.userId)).size === items.length, 'Thành viên bị trùng.')
 export function canManageProject(project: WiProject, id: number, admin = false) {
   return admin || project.ownerId === id || !!project.members?.some(member => member.userId === id && member.canManage)
@@ -34,7 +37,7 @@ export const projectDefaults: WiProject[] = [
   ['wi-finance', 'Wi.Finance', 'Tài chính và dòng tiền', '/wi300/businesses/wi-finance.webp'],
   ['wi-marketing', 'Wi.Marketing', 'Marketing và kết nối khách hàng', '/wi300/businesses/wi-marketing.webp'],
   ['wi-can', 'WiCan', 'Kết nối trong hệ sinh thái Wi', ''],
-].map(([slug, name, description, logo], order) => ({ slug, name, description, logo, introduction: '', website: '', ownerId: null, published: true, featured: true, order, revision: 0, courseIds: [], offerings: [] }))
+].map(([slug, name, description, logo], order) => ({ slug, name, description, logo, category: projectContent.shape.category.parse(({ 'wi-art': 'ART', 'wi-mentor': 'EDUCATION', 'wi-tech': 'TECH', 'wi-grow': 'BUSINESS', 'wi-finance': 'FINANCE', 'wi-marketing': 'MARKETING' } as Record<string, string>)[slug] || 'OTHER'), introduction: '', website: '', ownerId: null, published: true, featured: true, showOnHomepage: true, order, revision: 0, courseIds: [], offerings: [] }))
 export function mergeProjects(rows: { key: string; value: unknown }[]): WiProject[] {
   const saved = new Map(rows.map(row => [row.key, row.value]))
   const projects = new Map<string, WiProject>(projectDefaults.map(project => [project.slug, { ...project, courseIds: [...project.courseIds], offerings: project.offerings.map(item => ({ ...item })), members: project.members?.map(member => ({ ...member })) }]))
@@ -43,7 +46,7 @@ export function mergeProjects(rows: { key: string; value: unknown }[]): WiProjec
     // Giữ dấu xóa để dự án mặc định không tự xuất hiện lại khi tải trang.
     const record = projectRecord.parse(value)
     if (record.deleted) projects.delete(slug)
-    else projects.set(slug, { slug, ...record })
+    else projects.set(slug, { slug, ...record, category: record.category ?? projectDefaults.find(project => project.slug === slug)?.category ?? 'OTHER' })
   }
   return [...projects.values()].sort((a, b) => a.order - b.order || a.slug.localeCompare(b.slug))
 }

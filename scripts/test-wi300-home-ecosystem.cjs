@@ -15,8 +15,9 @@ const link = { __esModule: true, default: ({ children, ...props }) => React.crea
 const image = { __esModule: true, default: ({ priority, sizes, unoptimized, ...props }) => React.createElement('img', props) }
 const shared = load('lib/wi300/projects.ts')
 const Businesses = load('components/wi300/Wi300Businesses.tsx', { 'next/link': link, 'next/image': image, '@/lib/wi300/projects': shared })
+const Knowledge = load('components/wi300/WiKnowledgeArt.tsx')
 const Teachers = load('components/wi300/Wi300Teachers.tsx', {
-  'next/link': link, 'next/image': image,
+  'next/link': link, 'next/image': image, './WiKnowledgeArt': Knowledge,
   './Wi300Businesses.module.css': { __esModule: true, default: { viewport: 'viewport', track: 'track', group: 'group', copy: 'copy', paused: 'paused' } },
 })
 let search = ''
@@ -27,7 +28,7 @@ const Home = load('components/wi300/Wi300HomeClient.tsx', {
   '@/app/actions/course-actions': { checkEnrollmentStatusAction: async () => ({ status: 'PENDING' }) },
   '@/lib/wi300/catalog': load('lib/wi300/catalog.ts'), './Wi300Businesses': Businesses,
   './Wi300PersonalSpace': { __esModule: true, default: () => null },
-  './Wi300Teachers': Teachers,
+  './Wi300Teachers': Teachers, './WiKnowledgeArt': Knowledge,
 }).default
 const base = { brand: { name: 'WI300', tagline: 'Cùng phát triển' }, courses: [], enrollments: [], userId: null, userPhone: null, loggedIn: false, catalogError: false, accountError: false }
 function render(props) { return new JSDOM(renderToStaticMarkup(React.createElement(Home, { ...base, ...props }))) }
@@ -51,6 +52,11 @@ async function run() {
   assert.equal(doc.querySelector('[data-teachers]'), null)
   assert.doesNotMatch(doc.body.textContent, /tiêu biểu/)
   dom.window.close()
+  // Homepage selection is independent of featuring and public directory visibility.
+  dom = render({ projects: projects.map((project, i) => ({ ...project, featured: i % 2 === 0, showOnHomepage: i !== 0 && i !== 1, published: i !== 2 })) }); doc = dom.window.document
+  assert.equal(doc.querySelector('#du-an-wi li a').getAttribute('href'), '/du-an/project-3')
+  assert.equal(doc.querySelectorAll('#du-an-wi li').length, 8)
+  dom.window.close()
   for (const props of [{ projects: [] }, { projects, projectsError: true }]) {
     dom = render(props); doc = dom.window.document
     assert.equal(doc.querySelectorAll('#du-an-wi li').length, 0, 'Empty/error does not show default or stale projects')
@@ -65,7 +71,8 @@ async function run() {
     assert.match(cta.textContent, /Bạn muốn chia sẻ chuyên môn/)
     assert.equal(cta.querySelector('a').getAttribute('href'), '/doi-tac')
     assert.ok(doc.querySelector('#khoa-hoc').compareDocumentPosition(cta) & 4)
-    assert.equal(doc.querySelector('#giang-vien'), null, 'Empty catalog does not invent teacher profiles')
+    assert.equal(doc.querySelectorAll('#giang-vien li').length, 0, 'Empty catalog does not invent teacher profiles')
+    if (props.catalogError) assert.ok(doc.querySelector('#giang-vien [role="alert"]'))
     dom.window.close()
   }
   const courses = [
@@ -80,14 +87,122 @@ async function run() {
   assert.equal(teachers.querySelectorAll('ul[aria-label] li').length, 2, 'Only selected teachers with photos appear')
   assert.match(teachers.querySelector('h2').textContent, /Đội ngũ giảng viên/)
   assert.ok(teachers.querySelector('a[href="/khoa-hoc?q=H%C6%B0%C6%A1ng%20Lucy"]'))
-  assert.ok([...teachers.querySelectorAll('ul[aria-hidden="true"] a')].every(a => a.tabIndex === -1))
+  assert.equal(teachers.querySelectorAll('ul[aria-hidden="true"]').length, 0, 'No repeated marquee copies')
+  assert.ok(teachers.querySelector('a[href="/giang-vien"]'))
   dom.window.close()
+  // Danh sách giới thiệu không cố định ba người, khử trùng và giới hạn tám.
+  const profiles = Array.from({ length: 12 }, (_, i) => ({ id: i, name: 'Giảng viên ' + i, image: '/teacher.png', count: 1 }))
+  for (const directory of [false, true]) {
+    dom = new JSDOM(renderToStaticMarkup(React.createElement(Teachers.default, { teachers: [...profiles, profiles[0], { id: 99, name: 'Không ảnh', count: 1, image: '' }], catalogError: false, directory })))
+    doc = dom.window.document
+    assert.equal(doc.querySelectorAll('ul li').length, directory ? 12 : 8)
+    assert.equal(doc.querySelectorAll('ul[aria-hidden]').length, 0)
+    if (directory) assert.equal(doc.querySelector('h1').textContent, 'Đội ngũ giảng viên')
+    dom.window.close()
+  }
+  dom = render({ view: 'teachers', courses }); doc = dom.window.document
+  assert.ok(doc.querySelector('#giang-vien h1'))
+  assert.equal(doc.querySelector('#khoa-hoc'), null)
+  assert.equal(doc.querySelector('[aria-labelledby="wi300-course-partner-title"] a').getAttribute('href'), '/doi-tac')
+  dom.window.close()
+  // Giảng viên ngoài danh sách tên cũ vẫn hiện; khóa cùng ID chỉ tạo một thẻ.
+  const newCourses = [
+    { id: 51, teacherId: 50, name_lop: 'Khóa mới', phi_coc: 0, teacher: { name: 'Giảng viên mới', image: null } },
+    { id: 52, teacherId: 50, name_lop: 'Khóa tiếp theo', phi_coc: 0, teacher: { name: 'Giảng viên mới', image: '/new.png' } },
+    { id: 53, teacherId: 51, name_lop: 'Khóa người trùng tên', phi_coc: 0, teacher: { name: 'Giảng viên mới', image: '/other.png' } },
+    { id: 54, teacherId: 52, name_lop: 'Không ảnh', phi_coc: 0, teacher: { name: 'Người không ảnh', image: '' } },
+  ]
+  dom = render({ view: 'teachers', courses: newCourses }); doc = dom.window.document
+  assert.equal(doc.querySelectorAll('#giang-vien li').length, 2)
+  assert.match(doc.querySelector('#giang-vien li').textContent, /2 khóa học/)
+  assert.ok(doc.querySelector('#giang-vien img[src="/new.png"]'))
+  assert.equal(doc.querySelector('#wi300-course-partner-title br'), null)
+  assert.equal(doc.querySelector('#wi300-course-partner-title').textContent, 'Bạn muốn chia sẻ chuyên môn?')
+  dom.window.close()
+  let directoryBrand = null
+  const DirectoryPage = load('app/giang-vien/page.tsx', {
+    'next/navigation': { notFound: () => { throw Error('404') } },
+    '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => directoryBrand },
+    '@/lib/get-session': { getSession: async () => null },
+    '@/components/wi300/Wi300Home': { __esModule: true, default: () => null },
+  }).default
+  await assert.rejects(() => DirectoryPage(), /404/)
+  directoryBrand = base.brand
+  assert.equal((await DirectoryPage()).props.view, 'teachers')
   // Chuyển URL trên cùng component phải đổi kết quả, không giữ từ khóa cũ.
   const ui = new JSDOM('<div id="root"></div>', { url: 'https://example.com/khoa-hoc' })
   global.window = ui.window; global.document = ui.window.document; global.IS_REACT_ACT_ENVIRONMENT = true
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: ui.window.navigator })
   const renderer = require('react-dom/client').createRoot(document.getElementById('root'))
   try {
+    const Directory = load('components/wi300/WiProjectDirectory.tsx', { 'next/link': link, 'next/image': image, './WiKnowledgeArt': Knowledge, '@/lib/wi300/projects': shared }).default
+    await React.act(async () => renderer.render(React.createElement(Directory, { projects: [{ ...projects[0], name: 'Wi Kết nối', showOnHomepage: false }, { ...projects[1], published: false }] })))
+    assert.equal(document.querySelectorAll('li h3').length, 1, 'Public directory includes a project omitted from homepage')
+    const searchInput = document.querySelector('input[type="search"]')
+    await React.act(async () => {
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(searchInput, 'ket noi')
+      searchInput.dispatchEvent(new window.Event('input', { bubbles: true }))
+    })
+    assert.equal(document.querySelectorAll('li h3').length, 1)
+    await React.act(async () => renderer.render(React.createElement(Directory, { projects: [{ ...projects[0], category: 'TECH' }, { ...projects[1], category: 'ART', published: false }] })))
+    await React.act(async () => [...document.querySelectorAll('[aria-label="Lĩnh vực dự án"] button')].find(button => button.textContent.startsWith('Công nghệ')).click())
+    assert.equal(document.querySelectorAll('li h3').length, 0, 'Search and category combine')
+    await React.act(async () => {
+      const input = document.querySelector('input[type="search"]')
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, '')
+      input.dispatchEvent(new window.Event('input', { bubbles: true }))
+    })
+    assert.equal(document.querySelectorAll('li h3').length, 1)
+    assert.ok([...document.querySelectorAll('[aria-label="Lĩnh vực dự án"] button')].find(button => button.textContent === 'Nghệ thuật (0)'), 'Private projects do not affect public filter counts')
+    await React.act(async () => renderer.render(React.createElement(Teachers.default, { teachers: profiles, catalogError: false })))
+    const track = document.querySelector('#wi300-teacher-track')
+    Object.defineProperties(track, { clientWidth: { value: 1000 }, scrollWidth: { value: 2020 }, scrollLeft: { value: 0, writable: true } })
+    Object.defineProperty(track.children[0], 'offsetWidth', { value: 235 })
+    global.getComputedStyle = () => ({ columnGap: '20px' })
+    window.matchMedia = () => ({ matches: false })
+    await React.act(async () => window.dispatchEvent(new window.Event('resize')))
+    let scrolled
+    track.scrollTo = options => { scrolled = options; track.scrollLeft = options.left }
+    await React.act(async () => document.querySelector('[aria-label="Giảng viên tiếp theo"]').click())
+    assert.equal(scrolled.left, 255)
+    assert.ok(document.querySelector('[aria-label="Chạy slide giảng viên"]'), 'Manual navigation pauses autoplay')
+    track.scrollLeft = 1020
+    await React.act(async () => document.querySelector('[aria-label="Giảng viên tiếp theo"]').click())
+    assert.equal(scrolled.left, 0, 'Last slide wraps without copying profiles')
+    await React.act(async () => document.querySelector('[aria-label="Giảng viên trước"]').click())
+    assert.equal(scrolled.left, 1020)
+    let tick
+    const originalTimer = window.setInterval
+    window.setInterval = callback => { tick = callback; return 12345 }
+    const motionPreference = { matches: false }
+    window.matchMedia = () => motionPreference
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false })
+    await React.act(async () => document.querySelector('[aria-label="Chạy slide giảng viên"]').click())
+    tick()
+    assert.equal(scrolled.left, 0, 'Autoplay wraps to first profile')
+    tick()
+    assert.equal(scrolled.left, 255, 'Autoplay advances one card')
+    motionPreference.matches = true
+    tick()
+    assert.equal(scrolled.left, 255, 'Reduced motion stops autoplay')
+    motionPreference.matches = false
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true })
+    tick()
+    assert.equal(scrolled.left, 255, 'Hidden tab stops autoplay')
+    window.setInterval = originalTimer
+    await React.act(async () => renderer.render(React.createElement(Teachers.default, { teachers: profiles, catalogError: false, directory: true })))
+    assert.equal(document.querySelector('.wi300-teacher-directory-art img'), null, 'Hero never uses teacher portraits')
+    await React.act(async () => {
+      const input = document.querySelector('input[type="search"]')
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, 'giang vien 10')
+      input.dispatchEvent(new window.Event('input', { bubbles: true }))
+    })
+    assert.equal(document.querySelectorAll('#giang-vien li').length, 1, 'Teacher search supports unaccented text')
+    await React.act(async () => {
+      document.querySelector('select').value = 'multiple'
+      document.querySelector('select').dispatchEvent(new window.Event('change', { bubbles: true }))
+    })
+    assert.equal(document.querySelectorAll('#giang-vien li').length, 0, 'Course-count filter combines with search')
     await React.act(async () => renderer.render(React.createElement(Home, { ...base, view: 'catalog', courses })))
     assert.equal(document.querySelectorAll('[data-course]').length, 3)
     search = 'q=' + encodeURIComponent('Hương Lucy')
