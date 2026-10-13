@@ -17,7 +17,9 @@ const courseSelect = {
   teacherId: true, categoryId: true, teacherBankAccountId: true, vipExempt: true,
   feeType: true, voucherConfig: true, allowMbvDeduction: true,
   requiresReferralActivation: true, referralActivationThreshold: true,
-  courseCategory: { select: { name: true } }, teacherBankAccount: true,
+  courseCategory: { select: { name: true } },
+  // Chỉ dữ liệu nhận chuyển khoản; không gửi metadata/key webhook tới preview/client.
+  teacherBankAccount: { select: { id: true, accountHolder: true, accountNumber: true, bankName: true, qrCodeUrl: true } },
   teacher: { select: { name: true, image: true } },
   _count: { select: { enrollments: { where: { status: 'ACTIVE' as const } }, lessons: true } },
 } satisfies Prisma.CourseSelect
@@ -37,7 +39,7 @@ export type Wi300Enrollment = {
 // Cùng phạm vi khóa học của SITE_PROFILE_KEY; cache không phụ thuộc nhận diện giao diện.
 const getCatalog = unstable_cache(async (where: Prisma.CourseWhereInput) => prisma.course.findMany({
   where, select: courseSelect, orderBy: [{ pin: 'asc' }, { updatedAt: 'desc' }],
-}), ['wi300-course-catalog-v4'], { tags: ['site-profile'], revalidate: 600 })
+}), ['wi300-course-catalog-v5'], { tags: ['site-profile'], revalidate: 600 })
 
 export default async function Wi300Home({ brand, session, view = 'home' }: { brand: DeploymentBrand; session: Session | null; view?: 'home' | 'catalog' | 'discover' | 'space' | 'teachers' }) {
   const projectsReady = view === 'home' || view === 'discover'
@@ -107,5 +109,5 @@ export default async function Wi300Home({ brand, session, view = 'home' }: { bra
   }
   const { teachingCourses, teachingError } = await teachingReady
   const { projects, projectsError } = await projectsReady
-  return <Wi300HomeClient projects={projects} projectsError={projectsError} brand={brand} courses={courses} enrollments={enrollments} teachingCourses={teachingCourses.map(course => ({ ...course, status: preferences.get(course.id) ?? false }))} teachingError={teachingError} userId={userId} userPhone={userPhone} loggedIn={!!session?.user} catalogError={catalogError} accountError={accountError} view={view} />
+  return <Wi300HomeClient appearance={brand.appearance} projects={projects} projectsError={projectsError} brand={brand} courses={courses} enrollments={enrollments} teachingCourses={teachingCourses.map(course => ({ ...course, status: preferences.get(course.id) ?? false }))} teachingError={teachingError} userId={userId} userPhone={userPhone} loggedIn={!!session?.user} catalogError={catalogError} accountError={accountError} view={view} />
 }

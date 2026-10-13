@@ -6,7 +6,8 @@ import WiProjectDirectory from '@/components/wi300/WiProjectDirectory'
 
 export const metadata = { title: 'Các dự án Wi' }
 export default async function Page() {
-  if (!await getCurrentDeploymentBrand()) notFound()
+  const brand = await getCurrentDeploymentBrand()
+  if (!brand) notFound()
   const projects = await readPublicProjects(prisma)
-  return <WiProjectDirectory projects={projects} />
+  return <WiProjectDirectory settings={brand.appearance?.projects} projects={projects} />
 }

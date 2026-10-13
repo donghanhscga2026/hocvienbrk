@@ -8,7 +8,7 @@ function load(file, mocks = {}) {
   const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
   }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : require(name), mod, mod.exports)
+  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name === '@/lib/wi300/appearance' ? load('lib/wi300/appearance.ts', { './projects': load('lib/wi300/projects.ts') }) : require(name), mod, mod.exports)
   return mod.exports
 }
 const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
@@ -90,12 +90,12 @@ async function run() {
   assert.equal(teachers.querySelectorAll('ul[aria-hidden="true"]').length, 0, 'No repeated marquee copies')
   assert.ok(teachers.querySelector('a[href="/giang-vien"]'))
   dom.window.close()
-  // Danh sách giới thiệu không cố định ba người, khử trùng và giới hạn tám.
-  const profiles = Array.from({ length: 12 }, (_, i) => ({ id: i, name: 'Giảng viên ' + i, image: '/teacher.png', count: 1 }))
+  // Khử trùng và giới hạn 20 hồ sơ; trang đầy đủ không bị giới hạn.
+  const profiles = Array.from({ length: 24 }, (_, i) => ({ id: i, name: 'Giảng viên ' + i, image: '/teacher.png', count: 1, fields: ['Công nghệ'] }))
   for (const directory of [false, true]) {
     dom = new JSDOM(renderToStaticMarkup(React.createElement(Teachers.default, { teachers: [...profiles, profiles[0], { id: 99, name: 'Không ảnh', count: 1, image: '' }], catalogError: false, directory })))
     doc = dom.window.document
-    assert.equal(doc.querySelectorAll('ul li').length, directory ? 12 : 8)
+    assert.equal(doc.querySelectorAll('ul li').length, directory ? 24 : 20)
     assert.equal(doc.querySelectorAll('ul[aria-hidden]').length, 0)
     if (directory) assert.equal(doc.querySelector('h1').textContent, 'Đội ngũ giảng viên')
     dom.window.close()
@@ -199,10 +199,10 @@ async function run() {
     })
     assert.equal(document.querySelectorAll('#giang-vien li').length, 1, 'Teacher search supports unaccented text')
     await React.act(async () => {
-      document.querySelector('select').value = 'multiple'
-      document.querySelector('select').dispatchEvent(new window.Event('change', { bubbles: true }))
+      [...document.querySelectorAll('[aria-label="Lĩnh vực giảng dạy"] button')].find(button => button.textContent === 'Công nghệ').click()
     })
-    assert.equal(document.querySelectorAll('#giang-vien li').length, 0, 'Course-count filter combines with search')
+    assert.equal(document.querySelectorAll('#giang-vien li').length, 1, 'Teaching-field filter combines with search')
+    assert.equal(document.querySelector('#wi-teacher-course-count'), null, 'Course-count filter removed')
     await React.act(async () => renderer.render(React.createElement(Home, { ...base, view: 'catalog', courses })))
     assert.equal(document.querySelectorAll('[data-course]').length, 3)
     search = 'q=' + encodeURIComponent('Hương Lucy')

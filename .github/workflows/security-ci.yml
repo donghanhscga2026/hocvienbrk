@@ -72,6 +72,7 @@ jobs:
           node scripts/test-wi300-catalog-partners.cjs
           node scripts/test-wi300-performance.cjs
           node scripts/test-wi300-home-ecosystem.cjs
+          node scripts/test-wi300-appearance.cjs
 
       - name: Member ID change transaction and font checks
         run: |

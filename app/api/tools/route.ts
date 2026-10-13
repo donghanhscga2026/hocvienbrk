@@ -29,6 +29,10 @@ export async function GET() {
       const id = session?.user?.id == null ? NaN : Number(session.user.id)
       if (Number.isSafeInteger(id) && id >= 0) {
         const managed = await managedProjects(prisma, id)
+        if (managed.admin) tools.push({
+          id: -4, slug: 'wi-appearance', name: 'Giao diện website', description: 'Tùy chỉnh giao diện Wi, bản nháp và xem trước', icon: 'Palette',
+          url: '/tools/wi-appearance', roles: ['ADMIN'], order: 103, isActive: true, createdAt: new Date(), updatedAt: new Date(),
+        })
         if (managed.admin || managed.projects.length) tools.push({
           id: -3, slug: 'wi-projects', name: 'Quản lý dự án', description: 'Quản lý các dự án được giao', icon: 'Handshake',
           url: '/du-an/quan-ly', roles: [], order: 102, isActive: true, createdAt: new Date(), updatedAt: new Date(),

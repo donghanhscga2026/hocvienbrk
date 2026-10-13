@@ -7,7 +7,7 @@ import { useWi300Brand } from './Wi300BrandContext'
 /** Footer dùng chung cho WI300, nằm trong luồng trang và không che nội dung. */
 export default function Wi300Footer() {
   const brand = useWi300Brand()
-  if (!brand) return null
+  if (!brand || brand.appearance?.common.showFooter === false) return null
   return <footer className="shrink-0 border-t border-brk-outline bg-white text-brk-on-surface">
     <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:grid-cols-2 sm:px-6 lg:grid-cols-[2fr_1fr_1fr] lg:px-8">
       <div className="sm:col-span-2 lg:col-span-1">

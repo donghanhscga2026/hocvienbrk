@@ -14,7 +14,7 @@ export const toolGroups = [
   { id: 'members', label: 'Thành viên & liên kết', description: 'Affiliate và mạng lưới thành viên.', slugs: ['affiliate', 'genealogy'] },
   { id: 'payments', label: 'Thanh toán & quyền lợi', description: 'Thanh toán, ngân hàng, ví và voucher.', slugs: ['payments', 'bank-accounts', 'vouchers', 'brk', 'reserved-ids'] },
   { id: 'utilities', label: 'Tiện ích', description: 'Công cụ hỗ trợ công việc hằng ngày.', slugs: ['youtube-tools'] },
-  { id: 'system', label: 'Quản trị & hỗ trợ', description: 'Cài đặt, sao lưu, hỗ trợ và đồng bộ.', slugs: ['settings', 'backup', 'tca-sync', 'dev-flow', 'ho-tro', 'system-admin', 'email-settings', 'account-assistant', 'assistant-guide'] },
+  { id: 'system', label: 'Quản trị & hỗ trợ', description: 'Cài đặt, sao lưu, hỗ trợ và đồng bộ.', slugs: ['wi-appearance', 'settings', 'backup', 'tca-sync', 'dev-flow', 'ho-tro', 'system-admin', 'email-settings', 'account-assistant', 'assistant-guide'] },
   { id: 'other', label: 'Công cụ khác', description: 'Các công cụ bổ sung của hệ thống.', slugs: [] },
 ]
 const contentSlugs = ['pages', 'page', 'landings', 'posts', 'my-site', 'site-profiles']

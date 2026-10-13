@@ -1,3 +1,4 @@
+import { appearanceStyle, defaultAppearance } from '@/lib/wi300/appearance'
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import Script from "next/script";
@@ -159,7 +160,7 @@ export default async function RootLayout({
     const theme = websiteTheme(brand.palette.primary, brand.palette.background, brand.palette)
     const session = await getSession()
     // Bảng màu riêng lấy từ server, không dùng lựa chọn theme đã lưu của web cũ.
-    return <html lang="vi" data-website-theme="light" data-site-variant="wi300" style={theme.style}><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website accountAssistant={false} assistantToast={false} attentionHighlight={{ config: DEFAULT_ATTENTION_CONFIG, items: [] }}><Wi300BrandProvider brand={brand}><PwaInstallProvider><Wi300Shell>{children}</Wi300Shell></PwaInstallProvider></Wi300BrandProvider></Providers></body></html>
+    return <html lang="vi" data-website-theme="light" data-site-variant="wi300" style={{ ...theme.style, ...appearanceStyle(brand.appearance || defaultAppearance) }}><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website accountAssistant={false} assistantToast={false} attentionHighlight={{ config: DEFAULT_ATTENTION_CONFIG, items: [] }}><Wi300BrandProvider brand={brand}><PwaInstallProvider><Wi300Shell>{children}</Wi300Shell></PwaInstallProvider></Wi300BrandProvider></Providers></body></html>
   }
   const [siteProfile, themeRows] = await Promise.all([
     getCurrentSiteProfile(),
