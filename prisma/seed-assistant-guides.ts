@@ -218,6 +218,7 @@ const GUIDES: SeedGuide[] = [
           'Hệ thống sẽ cho biết tài khoản có tồn tại không, đồng thời hiện mã thành viên ' +
           'và email dạng che để bạn nhận ra đúng tài khoản của mình.\n\n' +
           'Nhập sai thông tin ở bước này thì bấm "Nhập lại thông tin" để làm lại.',
+        imageUrl: '/help/login-s1.jpg',
         targetSelector: '[data-help-id="btn-check-phone"]',
       },
       {
@@ -359,15 +360,17 @@ const GUIDES: SeedGuide[] = [
       {
         title: 'Bước 1: Điền thông tin đăng ký',
         body:
-          'Điền họ tên, số điện thoại và mật khẩu.\n\n' +
+          'Điền họ tên, địa chỉ email, số điện thoại và mật khẩu.\n\n' +
           'Số điện thoại: nhập số Việt Nam (bỏ số 0 ở đầu, ví dụ 912345678), nên dùng số có Zalo/Telegram ' +
-          'để nhận mã OTP nhanh nhất. Mật khẩu phải đạt tiêu chuẩn (đủ độ dài, có chữ và số).',
+          'để nhận mã OTP nhanh nhất. Email cần xác minh sau khi đăng ký — nhập đúng email bạn đang dùng. ' +
+          'Mật khẩu phải đạt tiêu chuẩn (đủ độ dài, có chữ và số).\n\n' +
+          'Nếu bạn bấm link giới thiệu của ai đó, ô "Mã giới thiệu" sẽ tự điền sẵn và hiện tên người giới thiệu.',
+        imageUrl: '/help/register-s1.jpg',
       },
       {
         title: 'Bước 2: Bấm Đăng ký',
-        body:
-          'Kiểm tra lại thông tin rồi bấm nút "Đăng ký".\n\n' +
-          'Hoặc bấm "Đăng ký bằng Google" để tạo tài khoản nhanh bằng tài khoản Google của bạn.',
+        body: 'Kiểm tra lại thông tin rồi bấm nút "Đăng ký".',
+        imageUrl: '/help/register-s2.jpg',
         targetSelector: '[data-help-id="btn-register"]',
       },
       {
@@ -389,6 +392,7 @@ const GUIDES: SeedGuide[] = [
         body:
           'Nhập đúng email bạn đã dùng để đăng ký tài khoản, rồi bấm "Gửi mã xác minh".\n\n' +
           'Hệ thống sẽ gửi mã xác minh về email đó. Kiểm tra cả hộp thư rác nếu không thấy.',
+        imageUrl: '/help/forgot-s1.jpg',
         targetSelector: '[data-help-id="btn-send-reset-code"]',
       },
       {
