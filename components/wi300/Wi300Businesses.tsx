@@ -8,28 +8,31 @@ import { projectDefaults, publicProject, type PublicWiProject } from '@/lib/wi30
 const businesses = projectDefaults.map(publicProject)
 export const featuredBusinesses = businesses.map(business => business.name)
 
-/** Tối đa ba hàng trên desktop; danh sách đầy đủ nằm ở trang Dự án. */
+/** Thẻ ngang hai cột trên desktop; danh sách đầy đủ nằm ở trang Dự án. */
 export default function Wi300Businesses({ projects = businesses, error = false }: { projects?: PublicWiProject[]; error?: boolean }) {
   return <section id="du-an-wi" aria-labelledby="wi300-businesses-title" className="mx-auto max-w-7xl scroll-mt-40 px-4 py-10 sm:py-12 lg:scroll-mt-24 lg:px-6">
-    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-      <h2 id="wi300-businesses-title" className="text-2xl font-bold text-brk-on-surface sm:text-3xl">Khám phá hệ sinh thái Wi</h2>
-      <Link href="/du-an" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-brk-primary">Xem tất cả<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
+    <div className="relative mb-6 text-center sm:mb-8">
+      <p className="wi300-project-action mb-3 text-xs font-semibold tracking-[0.12em] sm:text-sm">Cùng kết nối, cùng phát triển</p>
+      <h2 id="wi300-businesses-title" className="text-2xl font-bold text-brk-on-surface sm:text-3xl lg:px-32">Khám phá hệ sinh thái Wi</h2>
+      <Link href="/du-an" className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-brk-primary lg:absolute lg:bottom-0 lg:right-0 lg:mt-0">Xem tất cả<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
     </div>
-    <p className="mt-2 max-w-2xl text-sm leading-6 text-brk-muted">Tìm hiểu từng dự án và khám phá các khóa học, sản phẩm, dịch vụ liên quan.</p>
-    {error ? <p role="alert" className="mt-6 rounded-2xl border border-brk-outline bg-white p-6 text-brk-muted">Chưa tải được thông tin dự án. Vui lòng tải lại trang.</p> : projects.length ? <ul aria-label="Các dự án Wi" className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    {error ? <p role="alert" className="rounded-2xl border border-brk-outline bg-white p-6 text-brk-muted">Chưa tải được thông tin dự án. Vui lòng tải lại trang.</p> : projects.length ? <ul aria-label="Các dự án Wi" className="grid gap-4 lg:grid-cols-2 lg:gap-5">
       {projects.slice(0, 9).map(project => <li key={project.slug} className="min-w-0">
-        <Link href={`/du-an/${project.slug}`} className="wi300-project-card group flex h-full min-w-0 flex-col rounded-[1.25rem] border border-brk-outline bg-white p-5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brk-primary sm:p-6">
-          {/* Giữ nguyên tỷ lệ logo, bỏ cắt tròn để logo ngang dễ đọc. */}
-          <div className="relative flex h-36 w-full items-center justify-center">
-            {project.logo ? <Image src={project.logo} alt="" width={320} height={144} sizes="(max-width: 639px) calc(100vw - 80px), (max-width: 1023px) 40vw, 330px" className="h-full w-full object-contain" /> : <span aria-hidden="true" className="text-2xl font-extrabold text-brk-on-surface">{project.name}</span>}
+        <Link href={`/du-an/${project.slug}`} className="wi300-project-card wi300-project-horizontal group grid h-full min-w-0 overflow-hidden rounded-[1.25rem] border border-brk-outline bg-white p-2 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brk-primary">
+          {/* Họa tiết CSS nhẹ; logo nguồn giữ nguyên tỷ lệ, không cắt tròn. */}
+          <div className="wi300-project-media relative flex min-w-0 items-center justify-center overflow-hidden rounded-l-[0.85rem] p-3 sm:p-4">
+            <div className="relative z-10 flex h-28 w-full items-center justify-center rounded-2xl bg-white/80 p-2 sm:h-36 sm:p-3">
+              {project.logo ? <Image src={project.logo} alt="" width={240} height={144} sizes="(max-width: 639px) 35vw, (max-width: 1023px) 240px, 220px" className="h-full w-full object-contain" /> : <span aria-hidden="true" className="break-words text-center text-lg font-extrabold text-brk-on-surface">{project.name}</span>}
+            </div>
           </div>
-          <div className="mt-5 border-t border-brk-outline pt-4">
-            <h3 className="break-words text-xl font-bold text-brk-on-surface">{project.name}</h3>
-            <p className="mt-2 line-clamp-2 break-words text-sm leading-6 text-brk-muted">{project.description}</p>
+          <div className="flex min-w-0 flex-col justify-center px-3 py-4 sm:px-5 sm:py-5">
+            <h3 className="break-words text-lg font-bold text-brk-on-surface sm:text-xl">{project.name}</h3>
+            <p className="mt-2 line-clamp-3 break-words text-sm leading-6 text-brk-muted">{project.description}</p>
+            <span className="wi300-project-action mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold sm:mt-4">Khám phá dự án<ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" /></span>
           </div>
-          <span className="wi300-project-action mt-auto inline-flex min-h-11 items-center gap-2 pt-4 text-sm font-semibold">Khám phá dự án<ArrowRight className="h-4 w-4" aria-hidden="true" /></span>
         </Link>
       </li>)}
-    </ul> : <p className="mt-6 rounded-2xl border border-brk-outline bg-white p-6 text-brk-muted">Các dự án sẽ được cập nhật tại đây.</p>}
+    </ul> : <p className="rounded-2xl border border-brk-outline bg-white p-6 text-brk-muted">Các dự án sẽ được cập nhật tại đây.</p>}
+    {!error && projects.length > 0 && <p className="mt-6 text-center text-sm leading-6 text-brk-muted">Khám phá những dự án phù hợp với bạn.</p>}
   </section>
 }
