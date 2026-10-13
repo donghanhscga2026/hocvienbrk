@@ -929,7 +929,7 @@ export async function createCourseAction(formData: FormData) {
             const bankAccountId = (courseData as any).teacherBankAccountId
             if (feeCoc > 0 && bankAccountId) {
                 const bankAcc = await prisma.userBankAccount.findUnique({ where: { id: bankAccountId } })
-                const { getBankSenderDefaults } = await import('@/app/actions/auto-verify-actions')
+                const { getBankSenderDefaults } = await import('@/lib/bank-sender-defaults')
                 const defaults = getBankSenderDefaults(bankAcc?.bankName)
                 await prisma.autoVerifyConfig.upsert({
                     where: { courseId: newCourse.id },
