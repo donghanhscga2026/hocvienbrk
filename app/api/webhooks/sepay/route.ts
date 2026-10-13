@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual, createHash } from 'crypto';
 import prisma from '@/lib/prisma';
 import { isTestAccount } from '@/lib/test-account';
 import { processEnrollmentActivation } from '@/lib/enrollment-activation';
@@ -36,14 +37,33 @@ function extractInfoFromDescription(description: string) {
     return { phone, userId, courseCode };
 }
 
+// Xác thực webhook theo chuẩn SePay: header "Authorization: Apikey <key>"
+// Key do user tự đặt khi tạo webhook trên SePay dashboard, lưu trong env SEPAY_WEBHOOK_API_KEY.
+function isAuthorizedWebhook(req: NextRequest): boolean {
+    const expected = process.env.SEPAY_WEBHOOK_API_KEY?.trim();
+    if (!expected) return false;
+    const header = req.headers.get('authorization');
+    if (!header) return false;
+    const a = Buffer.from(header);
+    const b = Buffer.from(`Apikey ${expected}`);
+    return a.length === b.length && timingSafeEqual(a, b);
+}
+
 export async function POST(req: NextRequest) {
+    // 0. Xác thực — chặn request giả mạo kích hoạt miễn phí
+    if (!isAuthorizedWebhook(req)) {
+        console.warn('⚠️ [SEPAY WEBHOOK] Unauthorized access attempt');
+        return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    let txRecordId: number | null = null;
     try {
         const body = await req.json();
-        console.log('🔔 [SEPAY WEBHOOK] Nhận được payload:', body);
 
         // SePay webhook format
         // https://docs.sepay.vn/tich-hop-he-thong/webhook
         const {
+            id: sepayId,
             gateway,
             transactionDate,
             accountNumber,
@@ -52,27 +72,76 @@ export async function POST(req: NextRequest) {
             transferAmount
         } = body;
 
+        console.log(`🔔 [SEPAY WEBHOOK] id=${sepayId || 'n/a'} amount=${transferAmount} type=${transferType}`);
+
         // Chỉ xử lý giao dịch nhận tiền
         if (transferType !== 'in' || !accountNumber || !transferAmount || !content) {
             return NextResponse.json({ success: true, message: 'Ignored or invalid payload' }, { status: 200 });
         }
 
+        // Dedup key: ưu tiên id của SePay (docs khuyến nghị), fallback hash nội dung+số tiền+thời gian
+        const externalId = sepayId
+            ? `sepay:${sepayId}`
+            : `sepay:${createHash('sha256').update(`${accountNumber}|${transferAmount}|${content}|${transactionDate || ''}`).digest('hex')}`;
+
+        // Ghi nhận giao dịch trước khi xử lý để chống retry/trùng lặp (SePay retry tối đa 7 lần)
+        let txRecord;
+        try {
+            txRecord = await prisma.processedTransaction.create({
+                data: {
+                    source: 'SEPAY',
+                    externalId,
+                    amount: Number(transferAmount),
+                    accountNumber: String(accountNumber),
+                    bankName: gateway || null,
+                    content: String(content),
+                    transferTime: transactionDate ? new Date(transactionDate) : null,
+                    status: 'PROCESSING',
+                }
+            });
+        } catch (dupErr: any) {
+            if (dupErr?.code === 'P2002') {
+                const existing = await prisma.processedTransaction.findUnique({ where: { externalId } });
+                // Giao dịch từng thất bại thì cho phép retry xử lý lại
+                if (existing && existing.status === 'FAILED') {
+                    txRecord = existing;
+                    txRecordId = existing.id;
+                } else {
+                    return NextResponse.json({ success: true, message: 'Duplicate transaction, already processed' }, { status: 200 });
+                }
+            } else {
+                throw dupErr;
+            }
+        }
+        txRecordId = txRecord.id;
+
+        const markUnmatched = async (reason: string) => {
+            await prisma.processedTransaction.update({
+                where: { id: txRecord.id },
+                data: { status: 'UNMATCHED', reason }
+            });
+        };
+
         // 1. Tìm Teacher dựa trên accountNumber
         const bankAccount = await prisma.userBankAccount.findFirst({
-            where: { accountNumber: accountNumber }
+            where: { accountNumber: String(accountNumber) }
         });
 
         if (!bankAccount) {
-            console.log(`❌ [SEPAY] Không tìm thấy tài khoản ngân hàng nào khớp với accountNumber: ${accountNumber}`);
+            const reason = `Không tìm thấy tài khoản ngân hàng khớp với accountNumber: ${accountNumber}`;
+            console.log(`❌ [SEPAY] ${reason}`);
+            await markUnmatched(reason);
             return NextResponse.json({ success: true, message: 'Account not found' }, { status: 200 });
         }
 
         const teacherId = bankAccount.userId;
 
         // 2. Trích xuất thông tin từ nội dung chuyển khoản
-        const parsed = extractInfoFromDescription(content);
+        const parsed = extractInfoFromDescription(String(content));
         if (!parsed.userId && !parsed.phone) {
-            console.log(`❌ [SEPAY] Không trích xuất được số điện thoại hoặc mã HV từ nội dung: ${content}`);
+            const reason = `Không trích xuất được số điện thoại hoặc mã HV từ nội dung: ${content}`;
+            console.log(`❌ [SEPAY] ${reason}`);
+            await markUnmatched(reason);
             return NextResponse.json({ success: true, message: 'Missing user identifier in content' }, { status: 200 });
         }
 
@@ -96,6 +165,9 @@ export async function POST(req: NextRequest) {
         });
 
         if (pendingEnrollments.length === 0) {
+            const reason = `Không có enrollment PENDING nào của giảng viên #${teacherId} để khớp`;
+            console.log(`❌ [SEPAY] ${reason}`);
+            await markUnmatched(reason);
             return NextResponse.json({ success: true, message: 'No pending enrollments for this teacher' }, { status: 200 });
         }
 
@@ -110,9 +182,9 @@ export async function POST(req: NextRequest) {
             const userIdMatch = parsed.userId && parsed.userId === enrollment.userId;
             const phoneMatch = userPhone && emailPhone && userPhone.includes(emailPhone);
             const normalizeCode = (s: string) => s.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-            
+
             let courseCodeMatch = parsed.courseCode && normalizeCode(enrollment.course.id_khoa).includes(normalizeCode(parsed.courseCode));
-            
+
             if (!courseCodeMatch && parsed.courseCode) {
                 const altCodes: string[] = enrollment.course.autoVerifyConfig?.alternativeCodes
                     ? JSON.parse(enrollment.course.autoVerifyConfig.alternativeCodes)
@@ -128,7 +200,7 @@ export async function POST(req: NextRequest) {
 
             // Tiến hành kích hoạt
             console.log(`✅ [SEPAY] Khớp giao dịch! Tiến hành duyệt cho HV ${enrollment.userId}, khóa ${enrollment.course.id_khoa}`);
-            
+
             const activationResult = await processEnrollmentActivation({
                 enrollmentId: enrollment.id,
                 method: 'AUTO_SEPAY',
@@ -137,23 +209,43 @@ export async function POST(req: NextRequest) {
                     phone: parsed.phone,
                     courseCode: parsed.courseCode,
                     bankName: gateway || bankAccount.bankName || 'SePay',
-                    accountNumber: accountNumber,
+                    accountNumber: String(accountNumber),
                     transferTime: transactionDate ? new Date(transactionDate) : new Date(),
-                    content: content,
+                    content: String(content),
                 }
             });
 
             if (activationResult.success) {
                 matched++;
+                await prisma.processedTransaction.update({
+                    where: { id: txRecord.id },
+                    data: { status: 'PROCESSED', enrollmentId: enrollment.id }
+                });
                 break; // Xử lý xong 1 enrollment, thoát khỏi loop (1 giao dịch = 1 khóa học)
             } else {
                 console.error(`❌ [SEPAY] Lỗi khi kích hoạt: ${activationResult.error}`);
             }
         }
 
+        if (matched === 0) {
+            const reason = `Không khớp enrollment PENDING nào (định danh: ${parsed.userId ? 'HV ' + parsed.userId : 'SĐT ' + parsed.phone}, mã khóa: ${parsed.courseCode || 'không có'}, số tiền: ${Number(transferAmount).toLocaleString()}đ)`;
+            await markUnmatched(reason);
+        }
+
         return NextResponse.json({ success: true, matched, message: 'Processed webhook' }, { status: 200 });
     } catch (error: any) {
         console.error('❌ [SEPAY WEBHOOK ERROR]:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        // Đánh dấu FAILED để lần retry sau của SePay được xử lý lại (SePay retry tối đa 7 lần)
+        if (txRecordId) {
+            try {
+                await prisma.processedTransaction.update({
+                    where: { id: txRecordId },
+                    data: { status: 'FAILED', reason: error.message?.slice(0, 500) || 'Unknown error' }
+                });
+            } catch (markErr) {
+                console.error('⚠️ [SEPAY] Không đánh dấu được FAILED:', markErr);
+            }
+        }
+        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 }

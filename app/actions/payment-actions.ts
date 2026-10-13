@@ -20,6 +20,25 @@ export async function getPaymentByEnrollmentId(enrollmentId: number) {
 
 export async function createPaymentForEnrollment(enrollmentId: number, courseFee: number) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return { success: false, error: "Unauthorized" }
+    }
+    const callerId = parseInt(session.user.id)
+    const enrollment = await prisma.enrollment.findUnique({
+      where: { id: enrollmentId },
+      include: { course: { select: { teacherId: true } } }
+    })
+    if (!enrollment) {
+      return { success: false, error: "Enrollment not found" }
+    }
+    const isAdmin = session.user.role === Role.ADMIN
+    const isOwner = enrollment.userId === callerId
+    const isCourseTeacher = session.user.role === Role.TEACHER && enrollment.course.teacherId === callerId
+    if (!isAdmin && !isOwner && !isCourseTeacher) {
+      return { success: false, error: "Forbidden" }
+    }
+
     const existingPayment = await prisma.payment.findUnique({
       where: { enrollmentId }
     })
@@ -45,6 +64,25 @@ export async function createPaymentForEnrollment(enrollmentId: number, courseFee
 
 export async function updatePaymentProof(enrollmentId: number, proofImageUrl: string) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return { success: false, error: "Unauthorized" }
+    }
+    const callerId = parseInt(session.user.id)
+    const enrollment = await prisma.enrollment.findUnique({
+      where: { id: enrollmentId },
+      include: { course: { select: { teacherId: true } } }
+    })
+    if (!enrollment) {
+      return { success: false, error: "Enrollment not found" }
+    }
+    const isAdmin = session.user.role === Role.ADMIN
+    const isOwner = enrollment.userId === callerId
+    const isCourseTeacher = session.user.role === Role.TEACHER && enrollment.course.teacherId === callerId
+    if (!isAdmin && !isOwner && !isCourseTeacher) {
+      return { success: false, error: "Forbidden" }
+    }
+
     const { saveBase64Image } = await import("@/lib/image-utils")
     let finalImageUrl = proofImageUrl
     if (finalImageUrl && finalImageUrl.startsWith('data:image')) {
@@ -508,6 +546,124 @@ export async function revertToPendingAction(enrollmentIds: number[]) {
     return { success: true, count, brkReverted, errors, message: messages.join('\n') }
   } catch (error: any) {
     console.error('Revert To Pending Error:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+// ============================================================
+// ADMIN-ONLY: Giao dịch không khớp (Unmatched transactions)
+// Tiền đã về nhưng không tự khớp được enrollment nào — admin đối soát tay.
+// ============================================================
+export async function getUnmatchedTransactions() {
+  try {
+    const session = await auth()
+    if (!session?.user?.id || session.user.role !== Role.ADMIN) {
+      return { success: false, error: 'Chỉ Admin mới có quyền thực hiện thao tác này.' }
+    }
+
+    const transactions = await prisma.processedTransaction.findMany({
+      where: { status: 'UNMATCHED' },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    })
+
+    return { success: true, transactions }
+  } catch (error: any) {
+    console.error('Get Unmatched Transactions Error:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+export async function assignUnmatchedTransactionAction(transactionId: number, enrollmentId: number) {
+  try {
+    const session = await auth()
+    if (!session?.user?.id || session.user.role !== Role.ADMIN) {
+      return { success: false, error: 'Chỉ Admin mới có quyền thực hiện thao tác này.' }
+    }
+
+    const tx = await prisma.processedTransaction.findUnique({ where: { id: transactionId } })
+    if (!tx || tx.status !== 'UNMATCHED') {
+      return { success: false, error: 'Giao dịch không tồn tại hoặc đã được xử lý.' }
+    }
+
+    const enrollment = await prisma.enrollment.findUnique({
+      where: { id: enrollmentId },
+      include: { course: { select: { name_lop: true, id_khoa: true } } }
+    })
+    if (!enrollment) {
+      return { success: false, error: `Không tìm thấy enrollment #${enrollmentId}.` }
+    }
+    if (enrollment.status === 'ACTIVE') {
+      return { success: false, error: `Enrollment #${enrollmentId} đã ACTIVE — không cần gán.` }
+    }
+
+    const { processEnrollmentActivation } = await import('@/lib/enrollment-activation')
+    const result = await processEnrollmentActivation({
+      enrollmentId,
+      method: 'MANUAL_ADMIN',
+      note: `Gán tay từ giao dịch ${tx.source} #${tx.id} (${tx.externalId})`,
+      transferData: {
+        amount: tx.amount || 0,
+        phone: null,
+        courseCode: null,
+        bankName: tx.bankName,
+        accountNumber: tx.accountNumber,
+        transferTime: tx.transferTime,
+        content: tx.content || '',
+      }
+    })
+
+    if (!result.success) {
+      return { success: false, error: result.error }
+    }
+
+    await prisma.processedTransaction.update({
+      where: { id: transactionId },
+      data: { status: 'PROCESSED', enrollmentId, reason: `Admin gán tay cho enrollment #${enrollmentId}` }
+    })
+
+    const { logActivity } = await import('@/lib/activity-logger')
+    await logActivity({
+      userId: enrollment.userId,
+      action: 'PAYMENT_VERIFIED',
+      detail: `Gán tay giao dịch ${tx.source}: ${enrollment.course.name_lop} - ${(tx.amount || 0).toLocaleString()}đ`,
+      metadata: { courseId: enrollment.courseId, enrollmentId, amount: tx.amount || 0, transactionId, adminId: parseInt(session.user.id) }
+    })
+
+    const { sendTelegramAdmin } = await import('@/lib/notifications')
+    await sendTelegramAdmin(
+      `🔧 <b>GÁN TAY GIAO DỊCH THÀNH CÔNG</b>\n\n` +
+      `💰 Số tiền: ${(tx.amount || 0).toLocaleString()}đ (${tx.source})\n` +
+      `👤 Thành viên: <b>${result.studentName || 'N/A'}</b> (#${result.studentId})\n` +
+      `🎓 Khóa học: <b>${result.courseName} (${result.courseCode})</b>\n` +
+      `📝 Nội dung CK: ${tx.content || 'N/A'}`
+    )
+
+    revalidatePath('/tools/payments/unmatched')
+    revalidatePath('/tools/payments')
+    return { success: true, message: `Đã gán giao dịch cho enrollment #${enrollmentId} và kích hoạt thành công.` }
+  } catch (error: any) {
+    console.error('Assign Unmatched Transaction Error:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+export async function dismissUnmatchedTransactionAction(transactionId: number) {
+  try {
+    const session = await auth()
+    if (!session?.user?.id || session.user.role !== Role.ADMIN) {
+      return { success: false, error: 'Chỉ Admin mới có quyền thực hiện thao tác này.' }
+    }
+
+    await prisma.processedTransaction.update({
+      where: { id: transactionId },
+      data: { status: 'DISMISSED', reason: 'Admin bỏ qua' }
+    })
+
+    revalidatePath('/tools/payments/unmatched')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Dismiss Unmatched Transaction Error:', error)
     return { success: false, error: error.message }
   }
 }
