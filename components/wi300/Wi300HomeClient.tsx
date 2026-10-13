@@ -99,7 +99,7 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
             <a href="/wi300/ecosystem-banner.webp" target="_blank" rel="noopener noreferrer" className="wi300-ecosystem-art mx-auto block w-full max-w-[36rem] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brk-primary" aria-label="Xem ảnh hệ sinh thái Wi đầy đủ (mở tab mới)">
               <Image src="/wi300/ecosystem-banner.webp" alt="WI.CAN kết nối Wi.Grow, Wi.Mentor, Wi.Tech, Wi.Art, Wi.Finance, Wi.Marketing, Wi.Yoga, Wi.Book và Wi.Wellness" width={1280} height={720} priority sizes="(max-width: 639px) 210vw, (max-width: 1023px) 1200px, 1150px" className="wi300-ecosystem-source" />
             </a>
-            <figcaption className="mx-auto mt-3 max-w-md text-center text-xs leading-5 text-brk-muted">300DNS là dự án của WIPA. Các dự án thuộc 300DNS được WIPA cố vấn.</figcaption>
+            <figcaption className="mx-auto mt-3 max-w-md text-center text-xs leading-5 text-brk-muted">Hệ sinh thái Wi - kết nối con người - lan tỏa tri thức - kiến tạo tương lai</figcaption>
           </figure>
         </div>
       </section>
