@@ -81,6 +81,7 @@ async function run() {
   assert.ok(html.includes('Website service')); assert.ok(!html.includes('Private draft'))
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://wi300.vn/du-an/noi-dung' })
   global.window = dom.window; global.document = dom.window.document; global.FormData = dom.window.FormData; global.IS_REACT_ACT_ENVIRONMENT = true
+  Object.defineProperty(global, 'navigator', { configurable: true, value: dom.window.navigator })
   const { createRoot } = require('react-dom/client'), root = createRoot(document.getElementById('root'))
   const Manager = load('components/wi300/WiOfferingManager.tsx').default
   const Team = load('components/wi300/WiProjectTeamEditor.tsx').default

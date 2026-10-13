@@ -86,6 +86,7 @@ async function run() {
 
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://test.invalid/tools/courses/new?id=1' })
   global.window = dom.window; global.document = dom.window.document; global.IS_REACT_ACT_ENVIRONMENT = true
+  Object.defineProperty(global, 'navigator', { configurable: true, value: dom.window.navigator })
   const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
   const Panel = load('components/course/CourseManagementActivity.tsx', { 'next/link': link }).default
   const savedFetch = global.fetch

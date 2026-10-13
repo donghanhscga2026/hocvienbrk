@@ -4,6 +4,7 @@ const React = require('react'), { JSDOM } = require('jsdom')
 const repo = path.resolve(__dirname, '..'), cache = new Map()
 const dom = new JSDOM('<div id="root"></div>', { url: 'https://test.invalid/tools/courses/new?id=1' })
 global.window = dom.window; global.document = dom.window.document; global.FormData = dom.window.FormData; global.IS_REACT_ACT_ENVIRONMENT = true
+Object.defineProperty(global, 'navigator', { configurable: true, value: dom.window.navigator })
 dom.window.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
 dom.window.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open') }
 const course = { id: 1, id_khoa: 'AI', name_lop: 'Khóa thực hành AI', name_khoa: 'AI', type: 'NORMAL', status: true, pin: 0, teacherId: 8, categoryId: 1, category: 'Công nghệ', courseCategory: { name: 'Công nghệ' }, phi_coc: 1000000, mo_ta_ngan: 'Mô tả ngắn', mo_ta_dai: 'Mô tả dài', link_anh_bia: '', lessons: [{ id: 'l1', title: 'Bài thực hành', order: 1 }], _count: { lessons: 1, enrollments: 12 }, teacher: { name: 'Hương Lucy' } }

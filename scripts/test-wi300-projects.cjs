@@ -134,6 +134,7 @@ async function run() {
 
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://wi300.vn/du-an/quan-ly' })
   global.window = dom.window; global.document = dom.window.document; global.FormData = dom.window.FormData; global.IS_REACT_ACT_ENVIRONMENT = true
+  Object.defineProperty(global, 'navigator', { configurable: true, value: dom.window.navigator })
   const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
   const navigationCalls = []
   const Manager = load('components/wi300/WiProjectManager.tsx', { '@/lib/wi300/projects': shared, 'next/link': link, 'next/image': { __esModule: true, default: props => React.createElement('img', props) }, 'next/navigation': { useRouter: () => ({ refresh: () => navigationCalls.push(['refresh']), push: url => navigationCalls.push(['push', url]), replace: url => navigationCalls.push(['replace', url]) }) } }).default
