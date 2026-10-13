@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
-import { ArrowRight, BookOpen, Search, Sparkles, BriefcaseBusiness, Package } from 'lucide-react'
+import { ArrowRight, BookOpen, Search, Sparkles, BriefcaseBusiness, Package, UsersRound, Sprout } from 'lucide-react'
 import CourseCard from '@/components/course/CourseCard'
 import { checkEnrollmentStatusAction } from '@/app/actions/course-actions'
 import { categoryName, filterCourses, searchText, sortCourses, type CourseSort } from '@/lib/wi300/catalog'
@@ -92,14 +92,20 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
               <Link href="/khoa-hoc" className="wi300-hero-primary inline-flex min-h-12 items-center justify-center gap-3 rounded-xl px-5 py-3 font-semibold transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brk-accent">Khám phá khóa học<ArrowRight className="h-5 w-5" aria-hidden="true" /></Link>
               <Link href="/#du-an-wi" className="wi300-hero-secondary inline-flex min-h-12 items-center justify-center rounded-xl border px-5 py-3 font-semibold hover:bg-brk-background focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brk-primary">Khám phá hệ sinh thái</Link>
             </div>
-            <p className="mt-6 flex flex-wrap items-center gap-2 text-sm text-brk-muted"><span>Học tập</span><span aria-hidden="true" className="text-brk-accent">•</span><span>Kết nối</span><span aria-hidden="true" className="text-brk-accent">•</span><span>Hợp tác</span></p>
+            {/* Ba thông điệp có icon riêng, tự xuống hàng khi màn hình hẹp. */}
+            <ul aria-label="Giá trị hệ sinh thái Wi" className="mt-6 grid gap-3 sm:grid-cols-3">
+              {[{ label: 'Kết nối con người', icon: UsersRound }, { label: 'Lan tỏa tri thức', icon: BookOpen }, { label: 'Kiến tạo tương lai', icon: Sprout }].map(({ label, icon: Icon }) => <li key={label} className="flex min-w-0 items-center gap-2 rounded-xl border border-brk-outline bg-brk-surface/80 px-3 py-3">
+                <span className="wi300-hero-title flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brk-background"><Icon className="h-4 w-4" aria-hidden="true" /></span>
+                <span className="text-sm font-semibold leading-5 text-brk-on-surface">{label}</span>
+              </li>)}
+            </ul>
           </div>
           <figure className="min-w-0">
             {/* Mặt nạ ẩn nền poster, giữ nguyên chữ và biểu tượng từ ảnh gốc. */}
             <a href="/wi300/ecosystem-banner.webp" target="_blank" rel="noopener noreferrer" className="wi300-ecosystem-art mx-auto block w-full max-w-[36rem] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brk-primary" aria-label="Xem ảnh hệ sinh thái Wi đầy đủ (mở tab mới)">
               <Image src="/wi300/ecosystem-banner.webp" alt="WI.CAN kết nối Wi.Grow, Wi.Mentor, Wi.Tech, Wi.Art, Wi.Finance, Wi.Marketing, Wi.Yoga, Wi.Book và Wi.Wellness" width={1280} height={720} priority sizes="(max-width: 639px) 210vw, (max-width: 1023px) 1200px, 1150px" className="wi300-ecosystem-source" />
             </a>
-            <figcaption className="mx-auto mt-3 max-w-md text-center text-xs leading-5 text-brk-muted">Hệ sinh thái Wi - kết nối con người - lan tỏa tri thức - kiến tạo tương lai</figcaption>
+            <figcaption className="wi300-hero-title mx-auto mt-5 max-w-md text-center text-xl font-extrabold uppercase tracking-[0.1em] sm:text-2xl">Hệ sinh thái Wi</figcaption>
           </figure>
         </div>
       </section>

@@ -327,6 +327,37 @@ body {
   box-shadow: 0 3px 16px color-mix(in srgb, var(--color-primary) 4%, transparent);
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
 }
+/* Thẻ ngang xanh–kem Wi300, khung logo không cắt ảnh. */
+.wi300-project-horizontal { grid-template-columns: minmax(0, 40%) minmax(0, 1fr); }
+.wi300-project-media {
+  min-height: 10.5rem;
+  isolation: isolate;
+  background: linear-gradient(140deg, var(--color-background), var(--color-surface) 45%, color-mix(in srgb, var(--color-primary) 12%, var(--color-background)));
+}
+.wi300-project-media::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 1rem;
+  height: 2.75rem;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--color-primary);
+}
+.wi300-project-media::after {
+  content: "";
+  position: absolute;
+  width: 17rem;
+  height: 17rem;
+  left: -7rem;
+  bottom: -13rem;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 22%, transparent);
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-primary) 3%, transparent),
+    0 0 0 16px color-mix(in srgb, var(--color-primary) 3%, transparent),
+    0 0 0 24px color-mix(in srgb, var(--color-primary) 3%, transparent),
+    0 0 0 32px color-mix(in srgb, var(--color-primary) 3%, transparent);
+}
 @media (hover: hover) {
   .wi300-project-card:hover {
     transform: translateY(-3px);

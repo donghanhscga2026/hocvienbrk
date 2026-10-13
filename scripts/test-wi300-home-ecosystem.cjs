@@ -44,8 +44,7 @@ async function run() {
     assert.equal(card.querySelector('a').getAttribute('href'), '/du-an/project-' + i)
   }
   assert.ok(doc.querySelector('#du-an-wi a[href="/du-an"]'))
-  assert.ok(doc.querySelector('#du-an-wi ul').classList.contains('sm:grid-cols-2'))
-  assert.ok(doc.querySelector('#du-an-wi ul').classList.contains('lg:grid-cols-3'))
+  assert.ok(doc.querySelector('#du-an-wi ul').classList.contains('lg:grid-cols-2'))
   assert.ok(doc.querySelector('[aria-labelledby="wi300-partner-title"] a[href="/doi-tac"]'))
   assert.equal(doc.querySelectorAll('[aria-label="Tìm giải pháp phù hợp"] a').length, 3)
   assert.equal(doc.querySelector('[data-course]'), null)
