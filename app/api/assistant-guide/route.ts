@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { requireAdmin } from '@/lib/api-auth'
 
 const stepsInclude = {
   steps: { where: { isActive: true }, orderBy: { stepOrder: 'asc' as const } },
 }
 
 function roleFilter(role: string | null) {
-  if (!role) return {}
-  // roles rỗng = hiển thị cho mọi vai trò
+  // roles rỗng = hiển thị cho mọi vai trò.
+  // Chưa đăng nhập (không có role) chỉ thấy bài công khai — tránh lộ bài giới hạn vai trò.
+  if (!role) return { roles: { isEmpty: true } }
   return { OR: [{ roles: { isEmpty: true } }, { roles: { has: role } }] }
 }
 
@@ -77,6 +79,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const denied = await requireAdmin()
+  if (denied) return denied
   try {
     const body = await request.json()
     const { id, pagePath, title, script, textContent, videoUrl, agentVideoUrl, toolSlug, sections, roles, isActive } = body
@@ -122,6 +126,8 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const denied = await requireAdmin()
+  if (denied) return denied
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')

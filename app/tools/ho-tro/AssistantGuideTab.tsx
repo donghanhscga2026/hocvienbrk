@@ -274,7 +274,7 @@ function GuideStepsManager({ guide, onClose }: { guide: GuideData; onClose: () =
   const load = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/assistant-guide/steps?guideId=${guide.id}`)
+      const res = await fetch(`/api/assistant-guide/steps?guideId=${guide.id}&includeInactive=1`)
       const json = await res.json()
       if (json.success) setSteps(json.data)
     } catch {}
