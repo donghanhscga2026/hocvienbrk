@@ -15,8 +15,9 @@ const link = { __esModule: true, default: ({ children, ...props }) => React.crea
 const image = { __esModule: true, default: ({ priority, sizes, unoptimized, ...props }) => React.createElement('img', props) }
 const shared = load('lib/wi300/projects.ts')
 const Businesses = load('components/wi300/Wi300Businesses.tsx', { 'next/link': link, 'next/image': image, '@/lib/wi300/projects': shared })
+const Knowledge = load('components/wi300/WiKnowledgeArt.tsx')
 const Teachers = load('components/wi300/Wi300Teachers.tsx', {
-  'next/link': link, 'next/image': image,
+  'next/link': link, 'next/image': image, './WiKnowledgeArt': Knowledge,
   './Wi300Businesses.module.css': { __esModule: true, default: { viewport: 'viewport', track: 'track', group: 'group', copy: 'copy', paused: 'paused' } },
 })
 let search = ''
@@ -27,7 +28,7 @@ const Home = load('components/wi300/Wi300HomeClient.tsx', {
   '@/app/actions/course-actions': { checkEnrollmentStatusAction: async () => ({ status: 'PENDING' }) },
   '@/lib/wi300/catalog': load('lib/wi300/catalog.ts'), './Wi300Businesses': Businesses,
   './Wi300PersonalSpace': { __esModule: true, default: () => null },
-  './Wi300Teachers': Teachers,
+  './Wi300Teachers': Teachers, './WiKnowledgeArt': Knowledge,
 }).default
 const base = { brand: { name: 'WI300', tagline: 'Cùng phát triển' }, courses: [], enrollments: [], userId: null, userPhone: null, loggedIn: false, catalogError: false, accountError: false }
 function render(props) { return new JSDOM(renderToStaticMarkup(React.createElement(Home, { ...base, ...props }))) }
@@ -134,7 +135,7 @@ async function run() {
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: ui.window.navigator })
   const renderer = require('react-dom/client').createRoot(document.getElementById('root'))
   try {
-    const Directory = load('components/wi300/WiProjectDirectory.tsx', { 'next/link': link, 'next/image': image }).default
+    const Directory = load('components/wi300/WiProjectDirectory.tsx', { 'next/link': link, 'next/image': image, './WiKnowledgeArt': Knowledge, '@/lib/wi300/projects': shared }).default
     await React.act(async () => renderer.render(React.createElement(Directory, { projects: [{ ...projects[0], name: 'Wi Kết nối', showOnHomepage: false }, { ...projects[1], published: false }] })))
     assert.equal(document.querySelectorAll('li h3').length, 1, 'Public directory includes a project omitted from homepage')
     const searchInput = document.querySelector('input[type="search"]')
@@ -143,12 +144,23 @@ async function run() {
       searchInput.dispatchEvent(new window.Event('input', { bubbles: true }))
     })
     assert.equal(document.querySelectorAll('li h3').length, 1)
+    await React.act(async () => renderer.render(React.createElement(Directory, { projects: [{ ...projects[0], category: 'TECH' }, { ...projects[1], category: 'ART', published: false }] })))
+    await React.act(async () => [...document.querySelectorAll('[aria-label="Lĩnh vực dự án"] button')].find(button => button.textContent.startsWith('Công nghệ')).click())
+    assert.equal(document.querySelectorAll('li h3').length, 0, 'Search and category combine')
+    await React.act(async () => {
+      const input = document.querySelector('input[type="search"]')
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, '')
+      input.dispatchEvent(new window.Event('input', { bubbles: true }))
+    })
+    assert.equal(document.querySelectorAll('li h3').length, 1)
+    assert.ok([...document.querySelectorAll('[aria-label="Lĩnh vực dự án"] button')].find(button => button.textContent === 'Nghệ thuật (0)'), 'Private projects do not affect public filter counts')
     await React.act(async () => renderer.render(React.createElement(Teachers.default, { teachers: profiles, catalogError: false })))
     const track = document.querySelector('#wi300-teacher-track')
     Object.defineProperties(track, { clientWidth: { value: 1000 }, scrollWidth: { value: 2020 }, scrollLeft: { value: 0, writable: true } })
     Object.defineProperty(track.children[0], 'offsetWidth', { value: 235 })
     global.getComputedStyle = () => ({ columnGap: '20px' })
     window.matchMedia = () => ({ matches: false })
+    await React.act(async () => window.dispatchEvent(new window.Event('resize')))
     let scrolled
     track.scrollTo = options => { scrolled = options; track.scrollLeft = options.left }
     await React.act(async () => document.querySelector('[aria-label="Giảng viên tiếp theo"]').click())
@@ -159,6 +171,38 @@ async function run() {
     assert.equal(scrolled.left, 0, 'Last slide wraps without copying profiles')
     await React.act(async () => document.querySelector('[aria-label="Giảng viên trước"]').click())
     assert.equal(scrolled.left, 1020)
+    let tick
+    const originalTimer = window.setInterval
+    window.setInterval = callback => { tick = callback; return 12345 }
+    const motionPreference = { matches: false }
+    window.matchMedia = () => motionPreference
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false })
+    await React.act(async () => document.querySelector('[aria-label="Chạy slide giảng viên"]').click())
+    tick()
+    assert.equal(scrolled.left, 0, 'Autoplay wraps to first profile')
+    tick()
+    assert.equal(scrolled.left, 255, 'Autoplay advances one card')
+    motionPreference.matches = true
+    tick()
+    assert.equal(scrolled.left, 255, 'Reduced motion stops autoplay')
+    motionPreference.matches = false
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true })
+    tick()
+    assert.equal(scrolled.left, 255, 'Hidden tab stops autoplay')
+    window.setInterval = originalTimer
+    await React.act(async () => renderer.render(React.createElement(Teachers.default, { teachers: profiles, catalogError: false, directory: true })))
+    assert.equal(document.querySelector('.wi300-teacher-directory-art img'), null, 'Hero never uses teacher portraits')
+    await React.act(async () => {
+      const input = document.querySelector('input[type="search"]')
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, 'giang vien 10')
+      input.dispatchEvent(new window.Event('input', { bubbles: true }))
+    })
+    assert.equal(document.querySelectorAll('#giang-vien li').length, 1, 'Teacher search supports unaccented text')
+    await React.act(async () => {
+      document.querySelector('select').value = 'multiple'
+      document.querySelector('select').dispatchEvent(new window.Event('change', { bubbles: true }))
+    })
+    assert.equal(document.querySelectorAll('#giang-vien li').length, 0, 'Course-count filter combines with search')
     await React.act(async () => renderer.render(React.createElement(Home, { ...base, view: 'catalog', courses })))
     assert.equal(document.querySelectorAll('[data-course]').length, 3)
     search = 'q=' + encodeURIComponent('Hương Lucy')

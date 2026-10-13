@@ -60,6 +60,8 @@ async function run() {
   const newlyCreated = (await service.readProjects(db)).find(project => project.slug === 'wi-test')
   assert.equal(newlyCreated.published, true, 'New project is public immediately')
   assert.equal(newlyCreated.featured, false, 'Featuring remains an explicit admin choice')
+  assert.equal(newlyCreated.category, 'OTHER')
+  assert.equal(shared.projectContent.safeParse({ ...content, category: 'invented' }).success, false)
   assert.equal(newlyCreated.showOnHomepage, false, 'New projects require an explicit homepage selection')
   assert.equal((await service.readPublicProjects(db)).some(project => project.slug === 'wi-test'), true, 'Public projects appear without a featured flag')
   await assert.rejects(() => service.createProject(db, 0, { ...newInput, slug: 'wi-invalid-owner', ownerId: 999 }), /không tồn tại/)
@@ -128,7 +130,7 @@ async function run() {
   global.window = dom.window; global.document = dom.window.document; global.FormData = dom.window.FormData; global.IS_REACT_ACT_ENVIRONMENT = true
   const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
   const navigationCalls = []
-  const Manager = load('components/wi300/WiProjectManager.tsx', { 'next/link': link, 'next/image': { __esModule: true, default: props => React.createElement('img', props) }, 'next/navigation': { useRouter: () => ({ refresh: () => navigationCalls.push(['refresh']), push: url => navigationCalls.push(['push', url]), replace: url => navigationCalls.push(['replace', url]) }) } }).default
+  const Manager = load('components/wi300/WiProjectManager.tsx', { '@/lib/wi300/projects': shared, 'next/link': link, 'next/image': { __esModule: true, default: props => React.createElement('img', props) }, 'next/navigation': { useRouter: () => ({ refresh: () => navigationCalls.push(['refresh']), push: url => navigationCalls.push(['push', url]), replace: url => navigationCalls.push(['replace', url]) }) } }).default
   const { createRoot } = require('react-dom/client'), root = createRoot(document.getElementById('root'))
   let payload, fail = true
   const savedFetch = global.fetch

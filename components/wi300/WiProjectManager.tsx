@@ -4,7 +4,7 @@ import { useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import type { WiProject } from '@/lib/wi300/projects'
+import { PROJECT_CATEGORIES, projectCategoryLabels, type WiProject } from '@/lib/wi300/projects'
 import WiProjectTeamEditor from './WiProjectTeamEditor'
 
 const field = 'mt-1 min-h-11 w-full rounded-xl border border-brk-outline bg-white px-3 py-2 text-sm'
@@ -47,7 +47,7 @@ export default function WiProjectManager({ courses, initial, initialSlug }: { co
     setBusy(true); setError(''); setMessage('')
     try {
       const response = await fetch('/api/wi300/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-        slug: text('slug'), name: text('name'), description: text('description'), introduction: text('introduction'), logo: text('logo'), website: text('website'),
+        slug: text('slug'), category: text('category'), name: text('name'), description: text('description'), introduction: text('introduction'), logo: text('logo'), website: text('website'),
         ownerId: text('ownerId') === '' ? null : Number(text('ownerId')), order: Number(text('order')),
         published: data.has('published'), featured: data.has('featured'), showOnHomepage: data.has('showOnHomepage'), members: JSON.parse(String(data.get('members') || '[]')),
       }) })
@@ -93,7 +93,7 @@ export default function WiProjectManager({ courses, initial, initialSlug }: { co
     const data = new FormData(event.currentTarget)
     const text = (key: string) => String(data.get(key) || '').trim()
     const offerings = project.offerings
-    const content = { name: text('name'), description: text('description'), introduction: text('introduction'), logo: text('logo'), website: text('website'), offerings,
+    const content = { category: text('category'), name: text('name'), description: text('description'), introduction: text('introduction'), logo: text('logo'), website: text('website'), offerings,
       // Giữ liên kết; chỉ màn quản lý nội dung mới thay đổi liên kết khóa học.
       courseIds: project.courseIds,
     }
@@ -128,6 +128,7 @@ export default function WiProjectManager({ courses, initial, initialSlug }: { co
           <label className="text-sm font-semibold">Mã thành viên chủ dự án<input name="ownerId" type="number" min={0} step={1} placeholder="Để trống nếu chưa giao chủ" className={field} /></label>
           <label className="text-sm font-semibold">Thứ tự (số nhỏ đứng trước)<input name="order" type="number" required min={0} max={999} step={1} defaultValue={100} className={field} /></label>
         </div>
+        <label className="block text-sm font-semibold">Lĩnh vực dự án<select name="category" defaultValue="OTHER" className={field}>{PROJECT_CATEGORIES.map(value => <option key={value} value={value}>{projectCategoryLabels[value]}</option>)}</select></label>
         <WiProjectTeamEditor members={[]} names={ownerNames} editable />
         <div className="flex flex-wrap gap-4">
           <label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="published" defaultChecked />Công khai hồ sơ</label>
@@ -152,6 +153,7 @@ export default function WiProjectManager({ courses, initial, initialSlug }: { co
           <div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold">Tên dự án<input name="name" required minLength={2} maxLength={100} defaultValue={project.name} className={field} /></label><label className="text-sm font-semibold">Mô tả ngắn<input name="description" required minLength={3} maxLength={300} defaultValue={project.description} className={field} /></label></div>
           <label className="block text-sm font-semibold">Giới thiệu chi tiết<textarea name="introduction" rows={7} maxLength={10000} defaultValue={project.introduction} className={field} /><span className="text-xs font-normal text-brk-muted">Nhập văn bản, xuống dòng để chia đoạn.</span></label>
           <div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold">Đường dẫn ảnh logo<input name="logo" maxLength={1000} defaultValue={project.logo} placeholder="https://…" className={field} /></label><label className="text-sm font-semibold">Website / liên hệ<input name="website" maxLength={1000} defaultValue={project.website} placeholder="https://…" className={field} /></label></div>
+          <label className="block text-sm font-semibold">Lĩnh vực dự án<select name="category" defaultValue={project.category || "OTHER"} className={field}>{PROJECT_CATEGORIES.map(value => <option key={value} value={value}>{projectCategoryLabels[value]}</option>)}</select></label>
           <WiProjectTeamEditor members={project.members || []} names={ownerNames} editable={admin || project.ownerId === initial.actorId} />
           {admin && <div className="space-y-4 rounded-xl bg-brk-background p-4"><h3 className="font-bold">Quyền quản lý & hiển thị</h3><div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold">Mã thành viên chủ dự án<input name="ownerId" type="number" min={0} step={1} defaultValue={project.ownerId ?? ''} placeholder="Để trống nếu chưa giao chủ" className={field} /></label><label className="text-sm font-semibold">Thứ tự (số nhỏ đứng trước)<input name="order" type="number" required min={0} max={999} step={1} defaultValue={project.order} className={field} /></label></div><div className="flex flex-wrap gap-5"><label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="published" defaultChecked={project.published} />Công khai hồ sơ</label><label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="featured" defaultChecked={project.featured} />Tiêu biểu</label><label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="showOnHomepage" defaultChecked={project.showOnHomepage} />Hiển thị trên trang chủ</label></div><p className="text-xs leading-5 text-brk-muted">Chủ dự án không được đổi quyền hoặc chế độ hiển thị. Công khai đưa dự án vào danh sách. Trang chủ chỉ hiện dự án công khai được tick Hiển thị trên trang chủ, tối đa 8 theo thứ tự. Tiêu biểu là nhãn riêng.</p></div>}
           <section className="space-y-3"><h3 className="font-bold">Khóa học liên quan</h3><p className="text-sm text-brk-muted">Mở màn sửa khóa học → Thuộc dự án để gắn hoặc gỡ liên kết. Khóa bị ẩn trong danh mục vẫn giữ liên kết cũ.</p><div className="flex flex-wrap gap-3">{courses.filter(course => project.courseIds.includes(course.id)).map(course => <Link key={course.id} href={`/tools/courses/new?id=${course.id}`} className="inline-flex min-h-11 items-center rounded-xl border border-brk-outline px-3 text-sm text-brk-primary">{course.name_lop} →</Link>)}</div><Link href="/tools/courses" className="inline-flex min-h-11 items-center font-semibold text-brk-primary">Đến quản lý khóa học →</Link></section>
