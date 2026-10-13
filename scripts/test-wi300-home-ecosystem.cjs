@@ -86,6 +86,7 @@ async function run() {
   // Chuyển URL trên cùng component phải đổi kết quả, không giữ từ khóa cũ.
   const ui = new JSDOM('<div id="root"></div>', { url: 'https://example.com/khoa-hoc' })
   global.window = ui.window; global.document = ui.window.document; global.IS_REACT_ACT_ENVIRONMENT = true
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: ui.window.navigator })
   const renderer = require('react-dom/client').createRoot(document.getElementById('root'))
   try {
     await React.act(async () => renderer.render(React.createElement(Home, { ...base, view: 'catalog', courses })))
