@@ -10,7 +10,7 @@ const links = [
   { key: 'settings', href: '/tools', label: 'Công cụ quản lý', icon: Settings },
 ]
 export default function ManagementWorkspace({ children, active }: { children: ReactNode; active: 'courses' | 'projects' }) {
-  return <div className="min-h-screen bg-[linear-gradient(120deg,var(--color-background,#f3f7df),#f8faf7)] text-brk-on-surface">
+  return <div data-management-workspace className="min-h-screen bg-[linear-gradient(120deg,var(--color-background,#f3f7df),#f8faf7)] text-brk-on-surface">
     <div className="mx-auto grid max-w-[1600px] grid-cols-1 lg:grid-cols-[208px_minmax(0,1fr)]">
       <aside className="border-b border-brk-outline px-3 py-3 lg:border-b-0 lg:border-r lg:py-6"><p className="mb-5 hidden px-3 text-sm font-semibold text-brk-muted lg:block">Không gian quản lý</p><nav aria-label="Khu vực quản lý" className="flex gap-2 overflow-x-auto lg:sticky lg:top-28 lg:flex-col">{links.map(item => { const Icon = item.icon; return <Link key={item.key} href={item.href} aria-current={active === item.key ? 'page' : undefined} className={`flex min-h-12 shrink-0 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${active === item.key ? 'bg-brk-primary text-white' : 'text-brk-muted hover:bg-white/70'}`}><Icon size={19} /><span>{item.label}</span></Link> })}</nav></aside>
       <main className="min-w-0 space-y-5 p-4 pb-24 sm:p-6 xl:p-7">{children}</main>

@@ -191,6 +191,13 @@ async function run() {
   assert.equal(document.querySelector('h1').textContent, 'Bài viết cộng đồng')
   assert.ok(document.querySelector('div.max-w-7xl.px-4'), 'Trang mặc định có khung và khoảng lề')
   assert.match(document.querySelector('[aria-label="Đường dẫn trang"]').textContent, /Không gian của tôi/)
+  for (const managementPath of ['/tools/courses', '/tools/courses/new', '/du-an/quan-ly']) {
+    pathname = managementPath
+    await act(async () => renderShell())
+    assert.equal(document.querySelector('[aria-label="Đường dẫn trang"]'), null, 'Khung quản lý sở hữu bố cục')
+    assert.equal(document.querySelector('h1'), null, 'Không thêm tiêu đề khóa học trùng lặp')
+    assert.equal(document.querySelectorAll('header').length, 1, 'Giữ menu Wi300 dùng chung')
+  }
   pathname = '/page/custom-template'
   await act(async () => renderShell())
   assert.equal(document.querySelector('[aria-label="Đường dẫn trang"]'), null, 'Không bọc trang template riêng')
