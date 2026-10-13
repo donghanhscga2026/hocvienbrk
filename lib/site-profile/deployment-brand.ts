@@ -1,3 +1,4 @@
+import type { WiAppearance } from '@/lib/wi300/appearance'
 /** Chỉ đọc cấu hình Vercel project; không thay đổi nhận diện trong database chung. */
 function asset(value: string | undefined, fallback: string) {
   const url = value?.trim()
@@ -29,4 +30,4 @@ export function getDeploymentBrand(env: Record<string, string | undefined> = pro
   }
 }
 
-export type DeploymentBrand = NonNullable<ReturnType<typeof getDeploymentBrand>>
+export type DeploymentBrand = NonNullable<ReturnType<typeof getDeploymentBrand>> & { appearance?: WiAppearance }

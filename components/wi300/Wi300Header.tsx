@@ -45,7 +45,7 @@ export default function Wi300Header() {
     { href: '/dich-vu', label: 'Dịch vụ', icon: BriefcaseBusiness },
   ]
   const accountLink = 'flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-brk-background focus-visible:outline-brk-primary'
-  return <><header className="sticky top-0 z-50 shrink-0 border-b border-brk-outline bg-white/95 backdrop-blur-xl">
+  return <><header className={`${brand.appearance?.common.stickyHeader !== false ? "sticky top-0" : "relative"} z-50 shrink-0 border-b border-brk-outline bg-white/95 backdrop-blur-xl`}>
     <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-2 sm:px-4 lg:flex lg:justify-between lg:px-6">
       <Link href="/" aria-label={`${brand.name} — Trang chủ`} className="flex shrink-0 items-center gap-2">
         <Image src={brand.logoUrl} alt={`${brand.name} — Liên minh 300 doanh nghiệp số, WIPA cố vấn`} width={2089} height={753} priority unoptimized className="h-auto w-24 object-contain min-[360px]:w-32 sm:w-44" />
