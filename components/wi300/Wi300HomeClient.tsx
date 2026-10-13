@@ -8,7 +8,7 @@ import { useSearchParams } from 'next/navigation'
 import { ArrowRight, BookOpen, Search, Sparkles, BriefcaseBusiness, Package, UsersRound, Sprout, Handshake } from 'lucide-react'
 import CourseCard from '@/components/course/CourseCard'
 import { checkEnrollmentStatusAction } from '@/app/actions/course-actions'
-import { categoryName, filterCourses, searchText, sortCourses, type CourseSort } from '@/lib/wi300/catalog'
+import { categoryName, filterCourses, sortCourses, type CourseSort } from '@/lib/wi300/catalog'
 import type { DeploymentBrand } from '@/lib/site-profile/deployment-brand'
 import type { Wi300Course, Wi300Enrollment, Wi300TeachingCourse } from './Wi300Home'
 import Wi300PersonalSpace from './Wi300PersonalSpace'
@@ -48,10 +48,20 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
   const enrollmentMap = new Map(enrollments.map(enrollment => [enrollment.courseId, enrollment]))
   const categories = Array.from(new Set(courses.map(categoryName)))
   const filtered = sortCourses(filterCourses(courses, query, category, fee), sort)
-  const teachers = ['Cương Leo', 'Hoàng Thu Hà', 'Võ Thị Kim Hồng', 'Nguyễn Hải Yến', 'Nhàn Victory', 'Hương Lucy'].map(name => {
-    const ownCourses = courses.filter(course => searchText(course.teacher?.name || '') === searchText(name))
-    return { id: ownCourses[0]?.teacherId ?? name, name, image: ownCourses[0]?.teacher?.image, count: ownCourses.length || null }
-  })
+  // Lấy giảng viên từ danh mục hiện có, gom theo mã tài khoản thay vì danh sách tên.
+  const teacherMap = new Map<number, { id: number; name: string; image: string | null; count: number }>()
+  for (const course of courses) {
+    const name = course.teacher?.name?.trim()
+    if (course.teacherId == null || !name) continue
+    const current = teacherMap.get(course.teacherId)
+    if (current) {
+      current.count += 1
+      current.image ||= course.teacher?.image?.trim() || null
+    } else {
+      teacherMap.set(course.teacherId, { id: course.teacherId, name, image: course.teacher?.image?.trim() || null, count: 1 })
+    }
+  }
+  const teachers = [...teacherMap.values()]
   const paymentCourseId = paymentCourse?.id
   const paymentEnrollmentStatus = paymentCourseId != null ? enrollmentMap.get(paymentCourseId)?.status : undefined
 
@@ -145,10 +155,10 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
     {view === 'catalog' && <Wi300Teachers teachers={teachers} catalogError={catalogError} />}
     {/* CTA cuối danh mục: dẫn tới form đối tác hiện có, không thay đổi luồng học. */}
     {(view === 'catalog' || view === 'teachers') && <section aria-labelledby="wi300-course-partner-title" className="mx-auto max-w-7xl px-4 pb-12 lg:px-6">
-      <div className="wi300-teacher-cta wi300-partner-card flex flex-col gap-6 rounded-3xl p-6 text-white sm:p-8 lg:flex-row lg:items-center lg:justify-between">
+      <div className="wi300-teacher-cta wi300-partner-card flex flex-col gap-6 rounded-3xl p-6 text-white sm:p-8 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex min-w-0 items-start gap-4 sm:gap-5">
           <span aria-hidden="true" className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-2xl border border-white/25 bg-white/10"><Sparkles className="h-4 w-4" /><BookOpen className="mt-1 h-8 w-8" /></span>
-          <div><h2 id="wi300-course-partner-title" className="text-xl font-bold leading-snug sm:text-2xl">Chia sẻ chuyên môn.<br />Lan tỏa giá trị.</h2><p className="mt-3 max-w-xl text-sm leading-6 text-white/90">Đồng hành cùng Wi để đưa kiến thức và kinh nghiệm của bạn đến cộng đồng.</p></div>
+          <div><h2 id="wi300-course-partner-title" className="text-xl font-bold leading-snug sm:whitespace-nowrap sm:text-2xl">Bạn muốn chia sẻ chuyên môn?</h2><p className="mt-3 max-w-xl text-sm leading-6 text-white/90">Đồng hành cùng Wi để lan tỏa kiến thức và tạo giá trị cho cộng đồng</p></div>
         </div>
         <Link href="/doi-tac" className="wi300-teacher-register inline-flex min-h-14 shrink-0 items-center justify-center gap-3 rounded-xl bg-brk-surface px-5 py-3 font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Đăng ký làm giảng viên<ArrowRight className="h-5 w-5" aria-hidden="true" /></Link>
       </div>

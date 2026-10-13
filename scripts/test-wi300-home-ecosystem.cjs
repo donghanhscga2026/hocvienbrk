@@ -62,7 +62,7 @@ async function run() {
     dom = render(props); doc = dom.window.document
     const cta = doc.querySelector('[aria-labelledby="wi300-course-partner-title"]')
     assert.ok(cta)
-    assert.match(cta.textContent, /Chia sẻ chuyên môn/)
+    assert.match(cta.textContent, /Bạn muốn chia sẻ chuyên môn/)
     assert.equal(cta.querySelector('a').getAttribute('href'), '/doi-tac')
     assert.ok(doc.querySelector('#khoa-hoc').compareDocumentPosition(cta) & 4)
     assert.equal(doc.querySelector('#giang-vien'), null, 'Empty catalog does not invent teacher profiles')
@@ -97,6 +97,20 @@ async function run() {
   assert.ok(doc.querySelector('#giang-vien h1'))
   assert.equal(doc.querySelector('#khoa-hoc'), null)
   assert.equal(doc.querySelector('[aria-labelledby="wi300-course-partner-title"] a').getAttribute('href'), '/doi-tac')
+  dom.window.close()
+  // Giảng viên ngoài danh sách tên cũ vẫn hiện; khóa cùng ID chỉ tạo một thẻ.
+  const newCourses = [
+    { id: 51, teacherId: 50, name_lop: 'Khóa mới', phi_coc: 0, teacher: { name: 'Giảng viên mới', image: null } },
+    { id: 52, teacherId: 50, name_lop: 'Khóa tiếp theo', phi_coc: 0, teacher: { name: 'Giảng viên mới', image: '/new.png' } },
+    { id: 53, teacherId: 51, name_lop: 'Khóa người trùng tên', phi_coc: 0, teacher: { name: 'Giảng viên mới', image: '/other.png' } },
+    { id: 54, teacherId: 52, name_lop: 'Không ảnh', phi_coc: 0, teacher: { name: 'Người không ảnh', image: '' } },
+  ]
+  dom = render({ view: 'teachers', courses: newCourses }); doc = dom.window.document
+  assert.equal(doc.querySelectorAll('#giang-vien li').length, 2)
+  assert.match(doc.querySelector('#giang-vien li').textContent, /2 khóa học/)
+  assert.ok(doc.querySelector('#giang-vien img[src="/new.png"]'))
+  assert.equal(doc.querySelector('#wi300-course-partner-title br'), null)
+  assert.equal(doc.querySelector('#wi300-course-partner-title').textContent, 'Bạn muốn chia sẻ chuyên môn?')
   dom.window.close()
   let directoryBrand = null
   const DirectoryPage = load('app/giang-vien/page.tsx', {
