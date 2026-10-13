@@ -53,6 +53,17 @@ async function run() {
     if (props.projectsError) assert.ok(doc.querySelector('#du-an-wi [role="alert"]'))
     dom.window.close()
   }
+  // CTA đứng sau danh sách, hoạt động cả khi danh mục trống hoặc tạm lỗi.
+  for (const props of [{ view: 'catalog' }, { view: 'catalog', catalogError: true }]) {
+    dom = render(props); doc = dom.window.document
+    const cta = doc.querySelector('[aria-labelledby="wi300-course-partner-title"]')
+    assert.ok(cta)
+    assert.match(cta.textContent, /Bạn muốn chia sẻ chuyên môn/)
+    assert.equal(cta.querySelector('a').getAttribute('href'), '/doi-tac')
+    assert.ok(doc.querySelector('#khoa-hoc').compareDocumentPosition(cta) & 4)
+    assert.equal(doc.querySelector('[data-teachers]'), null, 'Teacher placement remains a proposal')
+    dom.window.close()
+  }
   let brand = null
   const source = [
     { slug: 'public', name: 'Public', published: true, offerings: [{ kind: 'PRODUCT', name: 'Sản phẩm thật', description: 'Sản phẩm', url: 'https://example.com/product' }, { kind: 'SERVICE', name: 'Dịch vụ thật', description: 'Dịch vụ', url: 'https://example.com/service' }] },
