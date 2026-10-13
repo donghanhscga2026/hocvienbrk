@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
-import { ArrowRight, BookOpen, Search, Sparkles, BriefcaseBusiness, Package, UsersRound, Sprout } from 'lucide-react'
+import { ArrowRight, BookOpen, Search, Sparkles, BriefcaseBusiness, Package, UsersRound, Sprout, Handshake } from 'lucide-react'
 import CourseCard from '@/components/course/CourseCard'
 import { checkEnrollmentStatusAction } from '@/app/actions/course-actions'
 import { categoryName, filterCourses, searchText, sortCourses, type CourseSort } from '@/lib/wi300/catalog'
@@ -152,13 +152,22 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
     </section>}
     {view === 'home' && <section className="mx-auto max-w-7xl px-4 pb-12 lg:px-6" aria-labelledby="wi300-start-title">
       <h2 id="wi300-start-title" className="text-2xl font-bold sm:text-3xl">Bắt đầu cùng Wi</h2>
+      <p className="mt-2 text-sm leading-6 text-brk-muted">Chọn cách đồng hành phù hợp với bạn.</p>
       <div className="mt-6 grid gap-5 lg:grid-cols-2">
         <div className="wi300-solution-card flex flex-col rounded-3xl border border-brk-outline bg-white p-6 sm:p-8">
-          <Sparkles className="h-8 w-8 text-brk-primary" aria-hidden="true" /><h3 className="mt-4 text-2xl font-bold">Bạn đang tìm giải pháp phù hợp?</h3>
+          <span className="wi300-project-action flex h-14 w-14 items-center justify-center rounded-2xl bg-brk-primary/10"><BookOpen className="h-7 w-7" aria-hidden="true" /></span><h3 className="mt-4 text-2xl font-bold">Bạn đang tìm giải pháp phù hợp?</h3>
           <p className="mt-4 leading-7 text-brk-muted">Khám phá khóa học, sản phẩm và dịch vụ phù hợp với nhu cầu của bạn từ các dự án trong hệ sinh thái Wi.</p>
-          <nav aria-label="Tìm giải pháp phù hợp" className="mt-auto flex flex-wrap gap-3 pt-6">{[{ href: '/khoa-hoc', label: 'Khóa học' }, { href: '/san-pham', label: 'Sản phẩm' }, { href: '/dich-vu', label: 'Dịch vụ' }].map(({ href, label }) => <Link key={href} href={href} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-brk-outline bg-white px-4 text-sm font-semibold text-brk-primary hover:bg-brk-background">{label}<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>)}</nav>
+          {/* Ba lối vào rõ ràng, nút rộng dễ bấm trên điện thoại. */}
+          <nav aria-label="Tìm giải pháp phù hợp" className="mt-auto grid gap-3 pt-6">{[{ href: '/khoa-hoc', label: 'Khóa học', icon: BookOpen }, { href: '/san-pham', label: 'Sản phẩm', icon: Package }, { href: '/dich-vu', label: 'Dịch vụ', icon: BriefcaseBusiness }].map(({ href, label, icon: Icon }) => <Link key={href} href={href} className="wi300-solution-link flex min-h-14 items-center gap-3 rounded-xl border border-brk-outline bg-brk-surface px-4 py-3 text-sm font-semibold transition-colors hover:bg-brk-background focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brk-primary"><Icon className="wi300-project-action h-6 w-6 shrink-0" aria-hidden="true" /><span className="min-w-0 flex-1 text-brk-on-surface">{label}</span><ArrowRight className="h-5 w-5 shrink-0 text-brk-accent" aria-hidden="true" /></Link>)}</nav>
         </div>
-        <div aria-labelledby="wi300-partner-title" className="wi300-partner-card flex flex-col rounded-3xl bg-brk-primary p-6 text-white sm:p-8"><p className="text-sm font-semibold text-white/80">Dành cho giảng viên và doanh nghiệp</p><h3 id="wi300-partner-title" className="mt-3 text-2xl font-bold">Trở thành đối tác {brand.name}</h3><p className="mt-4 leading-7 text-white/90">Chia sẻ chuyên môn, giới thiệu giá trị của doanh nghiệp và cùng mở rộng cơ hội hợp tác trong Liên minh 300 doanh nghiệp số.</p><p className="mt-3 text-sm leading-6 text-white/80">Gửi yêu cầu tham gia. Ban điều phối sẽ xem hồ sơ và trao đổi trực tiếp trước khi cấp quyền.</p><div className="mt-auto pt-6"><Link href="/doi-tac" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 font-semibold text-brk-primary">Gửi yêu cầu tham gia<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link></div></div>
+        <div aria-labelledby="wi300-partner-title" className="wi300-partner-card flex flex-col rounded-3xl bg-brk-primary p-6 text-white sm:p-8">
+          <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/30 bg-white/10"><Handshake className="h-7 w-7" aria-hidden="true" /></span>
+          <p className="mt-4 text-sm font-semibold text-white/80">Dành cho giảng viên và doanh nghiệp</p>
+          <h3 id="wi300-partner-title" className="mt-3 text-2xl font-bold">Trở thành đối tác {brand.name}</h3>
+          <p className="mt-4 leading-7 text-white/90">Chia sẻ chuyên môn, giới thiệu giá trị của doanh nghiệp và cùng mở rộng cơ hội hợp tác trong Liên minh 300 doanh nghiệp số.</p>
+          <p className="mt-3 text-sm leading-6 text-white/80">Gửi yêu cầu tham gia. Ban điều phối sẽ xem hồ sơ và trao đổi trực tiếp trước khi cấp quyền.</p>
+          <div className="mt-auto pt-6"><Link href="/doi-tac" className="wi300-hero-primary inline-flex min-h-14 items-center justify-center gap-3 rounded-xl px-6 py-3 font-semibold transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Gửi yêu cầu tham gia<ArrowRight className="h-5 w-5 shrink-0" aria-hidden="true" /></Link></div>
+        </div>
       </div>
     </section>}
     {paymentCourse && <PaymentModal course={paymentCourse} enrollment={enrollmentMap.get(paymentCourse.id)} userId={userId} userPhone={userPhone} onClose={closePayment} />}

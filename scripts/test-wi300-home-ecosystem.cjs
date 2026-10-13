@@ -37,7 +37,7 @@ async function run() {
   assert.deepEqual([...doc.querySelectorAll('h2')].map(el => el.textContent), ['Bạn đang tìm gì?', 'Khám phá hệ sinh thái Wi', 'Bắt đầu cùng Wi'])
   assert.deepEqual([...doc.querySelectorAll('[aria-label="Nội dung khám phá"] a')].map(el => el.getAttribute('href')), ['/khoa-hoc', '/san-pham', '/dich-vu'])
   const cards = [...doc.querySelectorAll('#du-an-wi li')]
-  assert.equal(cards.length, 9)
+  assert.equal(cards.length, 8)
   for (const [i, card] of cards.entries()) {
     assert.equal(card.querySelector('h3').textContent, 'Dự án ' + i)
     assert.match(card.textContent, /Khám phá dự án/)
@@ -120,6 +120,6 @@ async function run() {
     assert.equal(doc.querySelector('article a[target="_blank"]').getAttribute('rel'), 'noopener noreferrer')
     dom.window.close()
   }
-  console.log('WI homepage: section order, real destinations, nine unique project cards, empty/error states, partner CTA, brand isolation and separate offering catalogs passed.')
+  console.log('WI homepage: section order, real destinations, eight unique project cards, empty/error states, partner CTA, brand isolation and separate offering catalogs passed.')
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })

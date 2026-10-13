@@ -270,6 +270,19 @@ body {
   top: -8rem;
   border-color: #ffffff12;
 }
+.wi300-partner-card::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 10rem;
+  height: 16rem;
+  right: -5rem;
+  top: 3rem;
+  border-radius: 3rem;
+  border: 1px solid #ffffff30;
+  background: linear-gradient(145deg, #ffffff12, transparent);
+  transform: rotate(-12deg);
+}
 @media (hover: hover) {
   .wi300-discovery-card:hover {
     transform: translateY(-4px);

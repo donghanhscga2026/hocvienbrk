@@ -17,7 +17,7 @@ export default function Wi300Businesses({ projects = businesses, error = false }
       <Link href="/du-an" className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-brk-primary lg:absolute lg:bottom-0 lg:right-0 lg:mt-0">Xem tất cả<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
     </div>
     {error ? <p role="alert" className="rounded-2xl border border-brk-outline bg-white p-6 text-brk-muted">Chưa tải được thông tin dự án. Vui lòng tải lại trang.</p> : projects.length ? <ul aria-label="Các dự án Wi" className="grid gap-4 lg:grid-cols-2 lg:gap-5">
-      {projects.slice(0, 9).map(project => <li key={project.slug} className="min-w-0">
+      {projects.slice(0, 8).map(project => <li key={project.slug} className="min-w-0">
         <Link href={`/du-an/${project.slug}`} className="wi300-project-card wi300-project-horizontal group grid h-full min-w-0 overflow-hidden rounded-[1.25rem] border border-brk-outline bg-white p-2 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brk-primary">
           {/* Họa tiết CSS nhẹ; logo nguồn giữ nguyên tỷ lệ, không cắt tròn. */}
           <div className="wi300-project-media relative flex min-w-0 items-center justify-center overflow-hidden rounded-l-[0.85rem] p-3 sm:p-4">
