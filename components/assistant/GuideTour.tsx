@@ -27,15 +27,28 @@ export default function GuideTour({ steps, onDone }: { steps: AssistantGuideStep
     const selector = step.targetSelector
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | undefined
+    let attempts = 0
+    let targetEl: HTMLElement | null = null
+
+    // Bấm đúng vào phần tử được khoanh sáng cũng sang bước tiếp (đợi handler gốc chạy xong)
+    const onClick = () => { timer = setTimeout(() => { if (!cancelled) next() }, 450) }
 
     const place = () => {
+      if (cancelled) return
       const el = document.querySelector(selector) as HTMLElement | null
-      // Không tìm thấy hoặc đang ẩn (VD: trong modal chưa mở) -> bỏ qua bước này
       if (!el || el.offsetParent === null) {
-        if (!cancelled) next()
+        // Chưa thấy phần tử (VD: modal đang mở dần, hoặc bước sau của form nhiều giai đoạn
+        // như đăng nhập): thử lại vài lần. Nếu vẫn không có thì giữ thẻ ở giữa màn hình
+        // để user đọc và tự bấm Tiếp — không tự bỏ qua bước nữa, tránh cảm giác tour "tự thoát".
+        if (attempts < 6) {
+          attempts += 1
+          timer = setTimeout(place, 500)
+        }
         return
       }
+      targetEl = el
       el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      el.addEventListener('click', onClick)
       timer = setTimeout(() => {
         if (cancelled) return
         const r = el.getBoundingClientRect()
@@ -45,10 +58,6 @@ export default function GuideTour({ steps, onDone }: { steps: AssistantGuideStep
     }
 
     place()
-    const el = document.querySelector(selector) as HTMLElement | null
-    // Bấm đúng vào phần tử được khoanh sáng cũng sang bước tiếp (đợi handler gốc chạy xong)
-    const onClick = () => { timer = setTimeout(() => { if (!cancelled) next() }, 450) }
-    el?.addEventListener('click', onClick)
     window.addEventListener('resize', place)
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onDone() }
     window.addEventListener('keydown', onKey)
@@ -56,8 +65,8 @@ export default function GuideTour({ steps, onDone }: { steps: AssistantGuideStep
     return () => {
       cancelled = true
       if (timer) clearTimeout(timer)
-      el?.removeEventListener('click', onClick)
-      el?.classList.remove('guide-tour-target')
+      targetEl?.removeEventListener('click', onClick)
+      targetEl?.classList.remove('guide-tour-target')
       window.removeEventListener('resize', place)
       window.removeEventListener('keydown', onKey)
     }
@@ -105,7 +114,7 @@ export default function GuideTour({ steps, onDone }: { steps: AssistantGuideStep
         )}
         <div className="flex items-center gap-1.5 mt-2.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
           <MousePointerClick className="w-3.5 h-3.5 shrink-0" />
-          Bấm vào phần đang khoanh sáng, hoặc bấm Tiếp
+          {rect ? 'Bấm vào phần đang khoanh sáng, hoặc bấm Tiếp' : 'Thực hiện bước này trên trang, rồi bấm Tiếp để tiếp tục'}
         </div>
         <div className="flex items-center gap-2 mt-3">
           <span className="text-[11px] text-slate-400 font-bold flex-1">

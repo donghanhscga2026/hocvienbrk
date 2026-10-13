@@ -163,11 +163,7 @@ function AssistantToast({
   onOpen: () => void
   onDismiss: () => void
 }) {
-  useEffect(() => {
-    const timer = setTimeout(onDismiss, 5000)
-    return () => clearTimeout(timer)
-  }, [onDismiss])
-
+  // Không tự tắt nữa — giữ đến khi user bấm "Xem" hoặc "Để sau" (trước đây tự tắt sau 5s nên dễ bỏ lỡ)
   return (
     <div className="fixed bottom-6 right-6 z-[300] animate-slide-up">
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 max-w-xs">
