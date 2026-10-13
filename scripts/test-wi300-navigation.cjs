@@ -68,7 +68,7 @@ async function run() {
   assert.equal(document.querySelector('[data-wi300-shell]').lastElementChild.tagName, 'FOOTER')
   assert.ok(document.querySelector('footer a[href="/du-an"]'))
   const navLinks = [...document.querySelectorAll('header nav a')].map(a => a.getAttribute('href'))
-  assert.deepEqual(navLinks, ['/', '/du-an', '/khoa-hoc', '/san-pham', '/dich-vu'])
+  assert.deepEqual(navLinks, ['/', '/khoa-hoc', '/san-pham', '/dich-vu'])
   assert.ok(navLinks.every(href => !href.includes('#')))
   assert.equal(document.querySelector('header a[href="/my-space"]').textContent, 'Không gian của tôi')
   assert.equal(document.querySelector('header details'), null)

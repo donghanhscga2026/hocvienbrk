@@ -40,7 +40,6 @@ export default function Wi300Header() {
   if (!brand) return null
   const links = [
     { href: '/', label: 'Trang chủ', icon: Home },
-    { href: '/du-an', label: 'Dự án', icon: LayoutGrid },
     { href: '/khoa-hoc', label: 'Khóa học', icon: BookOpen },
     { href: '/san-pham', label: 'Sản phẩm', icon: Package },
     { href: '/dich-vu', label: 'Dịch vụ', icon: BriefcaseBusiness },
@@ -53,7 +52,7 @@ export default function Wi300Header() {
       </Link>
       <nav aria-label="Điều hướng chính" className="col-span-2 row-start-2 flex w-full justify-between gap-1 lg:justify-start py-1 lg:w-auto">
         {links.map(({ href, label, icon: Icon }) => {
-          const selected = path === href || ((href === '/khoa-hoc' || href === '/du-an') && path.startsWith(href + '/'))
+          const selected = path === href || (href === '/khoa-hoc' && path.startsWith(href + '/'))
           return <Link key={href} href={href} aria-current={selected ? 'page' : undefined} className={`inline-flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1.5 text-[11px] font-semibold sm:px-2.5 sm:text-sm lg:flex-none ${selected ? 'bg-brk-background text-brk-primary' : 'text-brk-muted hover:bg-brk-background hover:text-brk-primary'}`}><Icon className="h-4 w-4" aria-hidden="true" />{label}</Link>
         })}
       </nav>

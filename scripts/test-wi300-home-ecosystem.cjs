@@ -12,17 +12,22 @@ function load(file, mocks = {}) {
   return mod.exports
 }
 const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
-const image = { __esModule: true, default: ({ priority, sizes, ...props }) => React.createElement('img', props) }
+const image = { __esModule: true, default: ({ priority, sizes, unoptimized, ...props }) => React.createElement('img', props) }
 const shared = load('lib/wi300/projects.ts')
 const Businesses = load('components/wi300/Wi300Businesses.tsx', { 'next/link': link, 'next/image': image, '@/lib/wi300/projects': shared })
+const Teachers = load('components/wi300/Wi300Teachers.tsx', {
+  'next/link': link, 'next/image': image,
+  './Wi300Businesses.module.css': { __esModule: true, default: { viewport: 'viewport', track: 'track', group: 'group', copy: 'copy', paused: 'paused' } },
+})
+let search = ''
 const Home = load('components/wi300/Wi300HomeClient.tsx', {
   'next/link': link, 'next/image': image, 'next/dynamic': { __esModule: true, default: () => () => null },
-  'next/navigation': { useSearchParams: () => new URLSearchParams() },
-  '@/components/course/CourseCard': { __esModule: true, default: () => React.createElement('article', { 'data-course': true }) },
+  'next/navigation': { useSearchParams: () => new URLSearchParams(search) },
+  '@/components/course/CourseCard': { __esModule: true, default: ({ course }) => React.createElement('article', { 'data-course': course.id }, course.name_lop) },
   '@/app/actions/course-actions': { checkEnrollmentStatusAction: async () => ({ status: 'PENDING' }) },
   '@/lib/wi300/catalog': load('lib/wi300/catalog.ts'), './Wi300Businesses': Businesses,
   './Wi300PersonalSpace': { __esModule: true, default: () => null },
-  './Wi300Teachers': { __esModule: true, default: () => React.createElement('div', { 'data-teachers': true }) },
+  './Wi300Teachers': Teachers,
 }).default
 const base = { brand: { name: 'WI300', tagline: 'Cùng phát triển' }, courses: [], enrollments: [], userId: null, userPhone: null, loggedIn: false, catalogError: false, accountError: false }
 function render(props) { return new JSDOM(renderToStaticMarkup(React.createElement(Home, { ...base, ...props }))) }
@@ -53,6 +58,48 @@ async function run() {
     if (props.projectsError) assert.ok(doc.querySelector('#du-an-wi [role="alert"]'))
     dom.window.close()
   }
+  // CTA đứng sau danh sách, hoạt động cả khi danh mục trống hoặc tạm lỗi.
+  for (const props of [{ view: 'catalog' }, { view: 'catalog', catalogError: true }]) {
+    dom = render(props); doc = dom.window.document
+    const cta = doc.querySelector('[aria-labelledby="wi300-course-partner-title"]')
+    assert.ok(cta)
+    assert.match(cta.textContent, /Bạn muốn chia sẻ chuyên môn/)
+    assert.equal(cta.querySelector('a').getAttribute('href'), '/doi-tac')
+    assert.ok(doc.querySelector('#khoa-hoc').compareDocumentPosition(cta) & 4)
+    assert.equal(doc.querySelector('#giang-vien'), null, 'Empty catalog does not invent teacher profiles')
+    dom.window.close()
+  }
+  const courses = [
+    { id: 1, teacherId: 8, name_lop: 'Khóa AI', teacher: { name: 'Hương Lucy', image: '/lucy.png' }, phi_coc: 0 },
+    { id: 2, teacherId: 9, name_lop: 'Khóa kỹ năng', teacher: { name: 'Hoàng Thu Hà', image: '/ha.png' }, phi_coc: 0 },
+    { id: 3, teacherId: 10, name_lop: 'Khóa kinh doanh', teacher: { name: 'Cương Leo', image: null }, phi_coc: 0 },
+  ]
+  dom = render({ view: 'catalog', courses }); doc = dom.window.document
+  const teachers = doc.querySelector('#giang-vien')
+  assert.ok(doc.querySelector('#khoa-hoc').compareDocumentPosition(teachers) & 4)
+  assert.ok(teachers.compareDocumentPosition(doc.querySelector('[aria-labelledby="wi300-course-partner-title"]')) & 4)
+  assert.equal(teachers.querySelectorAll('ul[aria-label] li').length, 2, 'Only selected teachers with photos appear')
+  assert.match(teachers.querySelector('h2').textContent, /Đội ngũ giảng viên/)
+  assert.ok(teachers.querySelector('a[href="/khoa-hoc?q=H%C6%B0%C6%A1ng%20Lucy"]'))
+  assert.ok([...teachers.querySelectorAll('ul[aria-hidden="true"] a')].every(a => a.tabIndex === -1))
+  dom.window.close()
+  // Chuyển URL trên cùng component phải đổi kết quả, không giữ từ khóa cũ.
+  const ui = new JSDOM('<div id="root"></div>', { url: 'https://example.com/khoa-hoc' })
+  global.window = ui.window; global.document = ui.window.document; global.IS_REACT_ACT_ENVIRONMENT = true
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: ui.window.navigator })
+  const renderer = require('react-dom/client').createRoot(document.getElementById('root'))
+  try {
+    await React.act(async () => renderer.render(React.createElement(Home, { ...base, view: 'catalog', courses })))
+    assert.equal(document.querySelectorAll('[data-course]').length, 3)
+    search = 'q=' + encodeURIComponent('Hương Lucy')
+    await React.act(async () => renderer.render(React.createElement(Home, { ...base, view: 'catalog', courses })))
+    assert.equal(document.querySelectorAll('[data-course]').length, 1)
+    assert.equal(document.querySelector('[data-course]').getAttribute('data-course'), '1')
+    assert.equal(document.querySelector('input[type="search"]').value, 'Hương Lucy')
+    search = ''
+    await React.act(async () => renderer.render(React.createElement(Home, { ...base, view: 'catalog', courses })))
+    assert.equal(document.querySelectorAll('[data-course]').length, 3)
+  } finally { await React.act(async () => renderer.unmount()); ui.window.close(); search = '' }
   let brand = null
   const source = [
     { slug: 'public', name: 'Public', published: true, offerings: [{ kind: 'PRODUCT', name: 'Sản phẩm thật', description: 'Sản phẩm', url: 'https://example.com/product' }, { kind: 'SERVICE', name: 'Dịch vụ thật', description: 'Dịch vụ', url: 'https://example.com/service' }] },
