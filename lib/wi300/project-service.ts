@@ -7,7 +7,8 @@ export async function readProjects(db: PrismaClient) {
   return mergeProjects(await db.systemConfig.findMany({ where: { key: { startsWith: PROJECT_PREFIX } }, select: { key: true, value: true } }))
 }
 export async function readPublicProjects(db: PrismaClient) {
-  return (await readProjects(db)).filter(project => project.published && project.featured).map(publicProject)
+  // Trang chủ giới thiệu các dự án công khai, không yêu cầu nhãn tiêu biểu.
+  return (await readProjects(db)).filter(project => project.published).map(publicProject)
 }
 export async function projectActor(db: PrismaClient, id: number) {
   if (!Number.isSafeInteger(id) || id < 0) throw new CrmError('Vui lòng đăng nhập.', 401)

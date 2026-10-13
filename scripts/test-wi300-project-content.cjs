@@ -70,14 +70,14 @@ async function run() {
   session = null; assert.equal((await api.GET(new Request('https://wi300.vn/api/wi300/project-content?course=1'))).status, 401)
   brand = null; assert.equal((await api.PUT(request('https://wi300.vn'))).status, 404)
   const React = require('react'), { JSDOM } = require('jsdom')
-  const publicCatalog = load('app/san-pham/page.tsx', {
+  const publicCatalog = load('components/wi300/WiOfferingCatalog.tsx', {
     'next/link': { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) },
     'next/navigation': { notFound: () => { throw new Error('404') } },
     '@/lib/prisma': { __esModule: true, default: {} },
     '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => ({ name: 'Wi300' }) },
     '@/lib/wi300/project-service': { readProjects: async () => [{ ...grow, published: true, offerings: [offering] }, { ...grow, slug: 'wi-hidden', published: false, offerings: [{ ...offering, name: 'Private draft' }] }] },
   }).default
-  const html = require('react-dom/server').renderToStaticMarkup(await publicCatalog())
+  const html = require('react-dom/server').renderToStaticMarkup(await publicCatalog({ kind: 'SERVICE' }))
   assert.ok(html.includes('Website service')); assert.ok(!html.includes('Private draft'))
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://wi300.vn/du-an/noi-dung' })
   global.window = dom.window; global.document = dom.window.document; global.FormData = dom.window.FormData; global.IS_REACT_ACT_ENVIRONMENT = true
