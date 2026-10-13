@@ -38,28 +38,54 @@ function extractInfoFromDescription(description: string) {
     return { phone, userId, courseCode };
 }
 
-// Xác thực webhook theo chuẩn SePay: header "Authorization: Apikey <key>"
-// Key do user tự đặt khi tạo webhook trên SePay dashboard, lưu trong env SEPAY_WEBHOOK_API_KEY.
-function isAuthorizedWebhook(req: NextRequest): boolean {
-    const expected = process.env.SEPAY_WEBHOOK_API_KEY?.trim();
-    if (!expected) return false;
+// So sánh timing-safe 2 chuỗi
+function safeEqual(a: string, b: string): boolean {
+    const ba = Buffer.from(a);
+    const bb = Buffer.from(b);
+    return ba.length === bb.length && timingSafeEqual(ba, bb);
+}
+
+// Lấy key từ header "Authorization: Apikey <key>" theo chuẩn SePay
+function extractApiKey(req: NextRequest): string | null {
     const header = req.headers.get('authorization');
-    if (!header) return false;
-    const a = Buffer.from(header);
-    const b = Buffer.from(`Apikey ${expected}`);
-    return a.length === b.length && timingSafeEqual(a, b);
+    if (!header || !header.startsWith('Apikey ')) return null;
+    return header.slice('Apikey '.length).trim() || null;
+}
+
+// Xác thực webhook:
+//  - Ưu tiên key RIÊNG của tài khoản ngân hàng (admin cấp cho từng GV,
+//    lưu dạng SHA-256 trong UserBankAccount.webhookApiKeyHash).
+//  - Fallback key CHUNG trong env SEPAY_WEBHOOK_API_KEY (cho TK của admin
+//    hoặc khi TK chưa được cấp key riêng).
+function isAuthorizedWebhook(providedKey: string | null, bankAccount: { webhookApiKeyHash: string | null } | null): boolean {
+    if (!providedKey) return false;
+    if (bankAccount?.webhookApiKeyHash) {
+        const providedHash = createHash('sha256').update(providedKey).digest('hex');
+        return safeEqual(providedHash, bankAccount.webhookApiKeyHash);
+    }
+    const globalKey = process.env.SEPAY_WEBHOOK_API_KEY?.trim();
+    if (!globalKey) return false;
+    return safeEqual(providedKey, globalKey);
 }
 
 export async function POST(req: NextRequest) {
-    // 0. Xác thực — chặn request giả mạo kích hoạt miễn phí
-    if (!isAuthorizedWebhook(req)) {
-        console.warn('⚠️ [SEPAY WEBHOOK] Unauthorized access attempt');
-        return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
-
     let txRecordId: number | null = null;
     try {
         const body = await req.json();
+
+        // 0. Xác thực — chặn request giả mạo kích hoạt miễn phí.
+        // Cần accountNumber trước để biết dùng key riêng của TK nào.
+        const providedKey = extractApiKey(req);
+        const authAccount = body?.accountNumber
+            ? await prisma.userBankAccount.findFirst({
+                where: { accountNumber: String(body.accountNumber) },
+                select: { id: true, userId: true, bankName: true, webhookApiKeyHash: true }
+            })
+            : null;
+        if (!isAuthorizedWebhook(providedKey, authAccount)) {
+            console.warn('⚠️ [SEPAY WEBHOOK] Unauthorized access attempt');
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
 
         // SePay webhook format
         // https://docs.sepay.vn/tich-hop-he-thong/webhook
@@ -141,10 +167,8 @@ export async function POST(req: NextRequest) {
             });
         };
 
-        // 1. Tìm Teacher dựa trên accountNumber
-        const bankAccount = await prisma.userBankAccount.findFirst({
-            where: { accountNumber: String(accountNumber) }
-        });
+        // 1. Tìm Teacher dựa trên accountNumber (đã tra ở bước xác thực → tái sử dụng)
+        const bankAccount = authAccount;
 
         if (!bankAccount) {
             const reason = `Không tìm thấy tài khoản ngân hàng khớp với accountNumber: ${accountNumber}`;
