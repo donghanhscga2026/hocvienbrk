@@ -288,7 +288,6 @@ body {
     linear-gradient(155deg, var(--color-surface), var(--color-background));
 }
 .wi300-hero-title,
-.wi300-hero-eyebrow,
 .wi300-hero-secondary,
 .wi300-project-action { color: var(--color-primary); }
 .wi300-hero-primary { background: var(--color-accent); color: var(--color-on-primary); }
@@ -298,6 +297,16 @@ body {
   aspect-ratio: 600 / 540;
   overflow: hidden;
   background: radial-gradient(ellipse, #fff5aa90, transparent 72%);
+}
+/* Di chuyển cả vòng cùng nhau để chữ luôn ngay ngắn, không quay hoặc biến dạng. */
+@media (prefers-reduced-motion: no-preference) {
+  .wi300-ecosystem-art { animation: wi300-ecosystem-float 7s ease-in-out infinite; }
+}
+.wi300-ecosystem-art:hover,
+.wi300-ecosystem-art:focus-visible { animation-play-state: paused; }
+@keyframes wi300-ecosystem-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
 /* Ảnh 1280×720: vùng vòng tròn tại (575, 25), kích thước 600×540. */
 .wi300-ecosystem-source {

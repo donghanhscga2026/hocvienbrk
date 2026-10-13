@@ -84,10 +84,10 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
       <section aria-labelledby="wi300-hero-title" className="wi300-hero relative overflow-hidden border-b border-brk-outline">
         <div className="relative mx-auto grid max-w-7xl items-center gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-[1.1fr_1fr] lg:gap-10 lg:py-16">
           <div className="min-w-0">
-            <p className="wi300-hero-eyebrow text-xs font-bold tracking-[0.12em] sm:text-sm">{brand.tagline}</p>
-            <h1 id="wi300-hero-title" className="wi300-hero-title mt-5 max-w-2xl text-4xl font-extrabold leading-[1.15] tracking-tight sm:text-5xl lg:text-[3.4rem] xl:text-6xl">Kết nối tri thức.<br />Đồng hành phát triển.</h1>
+            <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-brk-outline bg-brk-background px-3 py-2 text-xs font-semibold text-brk-primary"><Sparkles className="h-4 w-4" aria-hidden="true" />{brand.tagline}</p>
+            <h1 id="wi300-hero-title" className="wi300-hero-title mt-5 max-w-2xl text-4xl font-extrabold leading-[1.15] tracking-tight sm:text-5xl lg:text-[3.4rem] xl:text-6xl">Kết nối con người.<br />Lan tỏa giá trị.</h1>
             <div aria-hidden="true" className="mt-5 h-1.5 w-16 rounded-full bg-brk-accent" />
-            <p className="mt-6 max-w-xl text-base leading-7 text-brk-muted sm:text-lg">Khám phá khóa học, sản phẩm và dịch vụ từ các dự án trong hệ sinh thái Wi.<br />Kết nối chuyên gia và tìm giải pháp phù hợp với bạn.</p>
+            <p className="mt-6 max-w-xl text-base leading-7 text-brk-muted sm:text-lg">{brand.name} kết nối cá nhân và doanh nghiệp với tri thức, sản phẩm, dịch vụ và cơ hội hợp tác trong hệ sinh thái Wi.</p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <Link href="/khoa-hoc" className="wi300-hero-primary inline-flex min-h-12 items-center justify-center gap-3 rounded-xl px-5 py-3 font-semibold transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brk-accent">Khám phá khóa học<ArrowRight className="h-5 w-5" aria-hidden="true" /></Link>
               <Link href="/#du-an-wi" className="wi300-hero-secondary inline-flex min-h-12 items-center justify-center rounded-xl border px-5 py-3 font-semibold hover:bg-brk-background focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brk-primary">Khám phá hệ sinh thái</Link>
