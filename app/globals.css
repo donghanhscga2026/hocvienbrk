@@ -281,3 +281,51 @@ body {
   .wi300-discovery-card { transition: none; }
   .wi300-discovery-card:hover { transform: none; }
 }
+
+/* Hero và dự án chỉ dùng biến nhận diện của deployment Wi300 hiện tại. */
+.wi300-hero {
+  background: radial-gradient(ellipse at 82% 45%, color-mix(in srgb, var(--color-primary) 9%, transparent), transparent 58%),
+    linear-gradient(155deg, var(--color-surface), var(--color-background));
+}
+.wi300-hero-title,
+.wi300-hero-eyebrow,
+.wi300-hero-secondary,
+.wi300-project-action { color: var(--color-primary); }
+.wi300-hero-primary { background: var(--color-accent); color: var(--color-on-primary); }
+.wi300-hero-secondary { border-color: var(--color-primary); background: var(--color-surface); }
+.wi300-ecosystem-art {
+  position: relative;
+  aspect-ratio: 600 / 540;
+  overflow: hidden;
+  background: radial-gradient(ellipse, #fff5aa90, transparent 72%);
+}
+/* Ảnh 1280×720: vùng vòng tròn tại (575, 25), kích thước 600×540. */
+.wi300-ecosystem-source {
+  position: absolute;
+  width: 213.333333%;
+  max-width: none;
+  height: auto;
+  left: -95.833333%;
+  top: -4.62963%;
+  -webkit-mask-image: url('/wi300/ecosystem-mask.svg');
+  mask-image: url('/wi300/ecosystem-mask.svg');
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+.wi300-project-card {
+  box-shadow: 0 3px 16px color-mix(in srgb, var(--color-primary) 4%, transparent);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+@media (hover: hover) {
+  .wi300-project-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--color-primary);
+    box-shadow: 0 12px 28px color-mix(in srgb, var(--color-primary) 10%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wi300-project-card { transition: none; }
+  .wi300-project-card:hover { transform: none; }
+}

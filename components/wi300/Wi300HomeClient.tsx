@@ -80,17 +80,26 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
 
   return <main className="overflow-x-clip bg-brk-background text-brk-on-surface">
     {view === 'home' && <>
-      <section className="relative overflow-hidden border-b border-brk-outline bg-white">
-        <div aria-hidden="true" className="absolute -right-32 -top-32 h-[36rem] w-[36rem] rounded-full bg-brk-primary/5" />
-        <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 py-12 sm:py-16 lg:grid-cols-[1.15fr_1fr] lg:px-6 lg:py-20">
-          <div><p className="mb-5 inline-flex items-center gap-2 rounded-full border border-brk-outline bg-brk-background px-3 py-2 text-xs font-semibold text-brk-primary"><Sparkles className="h-4 w-4" />{brand.tagline}</p>
-            <h1 className="max-w-2xl text-4xl font-extrabold leading-[1.15] tracking-tight sm:text-5xl lg:text-6xl">Kết nối con người.<br /><span className="text-brk-primary">Lan tỏa giá trị.</span></h1>
-            <p className="mt-6 max-w-xl text-base leading-7 text-brk-muted sm:text-lg">{brand.name} kết nối cá nhân và doanh nghiệp với tri thức, sản phẩm, dịch vụ và cơ hội hợp tác trong hệ sinh thái Wi.</p>
-            <div className="mt-7 flex flex-wrap gap-3"><Link href="/#du-an-wi" className={action}>Khám phá dự án<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link><Link href="/khoa-hoc" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-brk-outline px-5 font-semibold hover:bg-brk-background">Xem khóa học</Link></div>
+      {/* Chữ và nút dựng trực tiếp trên web, kế thừa màu/font của Wi300. */}
+      <section aria-labelledby="wi300-hero-title" className="wi300-hero relative overflow-hidden border-b border-brk-outline">
+        <div className="relative mx-auto grid max-w-7xl items-center gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-[1.1fr_1fr] lg:gap-10 lg:py-16">
+          <div className="min-w-0">
+            <p className="wi300-hero-eyebrow text-xs font-bold tracking-[0.12em] sm:text-sm">{brand.tagline}</p>
+            <h1 id="wi300-hero-title" className="wi300-hero-title mt-5 max-w-2xl text-4xl font-extrabold leading-[1.15] tracking-tight sm:text-5xl lg:text-[3.4rem] xl:text-6xl">Kết nối tri thức.<br />Đồng hành phát triển.</h1>
+            <div aria-hidden="true" className="mt-5 h-1.5 w-16 rounded-full bg-brk-accent" />
+            <p className="mt-6 max-w-xl text-base leading-7 text-brk-muted sm:text-lg">Khám phá khóa học, sản phẩm và dịch vụ từ các dự án trong hệ sinh thái Wi.<br />Kết nối chuyên gia và tìm giải pháp phù hợp với bạn.</p>
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <Link href="/khoa-hoc" className="wi300-hero-primary inline-flex min-h-12 items-center justify-center gap-3 rounded-xl px-5 py-3 font-semibold transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brk-accent">Khám phá khóa học<ArrowRight className="h-5 w-5" aria-hidden="true" /></Link>
+              <Link href="/#du-an-wi" className="wi300-hero-secondary inline-flex min-h-12 items-center justify-center rounded-xl border px-5 py-3 font-semibold hover:bg-brk-background focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brk-primary">Khám phá hệ sinh thái</Link>
+            </div>
+            <p className="mt-6 flex flex-wrap items-center gap-2 text-sm text-brk-muted"><span>Học tập</span><span aria-hidden="true" className="text-brk-accent">•</span><span>Kết nối</span><span aria-hidden="true" className="text-brk-accent">•</span><span>Hợp tác</span></p>
           </div>
-          <figure className="rounded-[2rem] border border-brk-outline bg-brk-background p-3 sm:p-5">
-            <a href="/wi300/ecosystem-banner.webp" target="_blank" rel="noopener noreferrer" aria-label="Xem ảnh hệ sinh thái Wi đầy đủ (mở tab mới)"><Image src="/wi300/ecosystem-banner.webp" alt="Hệ sinh thái Wi: kết nối con người, lan tỏa giá trị, kiến tạo tương lai" width={1280} height={720} priority sizes="(max-width: 1023px) 100vw, 600px" className="h-auto w-full rounded-2xl" /></a>
-            <figcaption className="px-2 pt-4 text-sm leading-6 text-brk-muted">300DNS là dự án của WIPA. Các dự án thuộc 300DNS được WIPA cố vấn.</figcaption>
+          <figure className="min-w-0">
+            {/* Mặt nạ ẩn nền poster, giữ nguyên chữ và biểu tượng từ ảnh gốc. */}
+            <a href="/wi300/ecosystem-banner.webp" target="_blank" rel="noopener noreferrer" className="wi300-ecosystem-art mx-auto block w-full max-w-[36rem] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brk-primary" aria-label="Xem ảnh hệ sinh thái Wi đầy đủ (mở tab mới)">
+              <Image src="/wi300/ecosystem-banner.webp" alt="WI.CAN kết nối Wi.Grow, Wi.Mentor, Wi.Tech, Wi.Art, Wi.Finance, Wi.Marketing, Wi.Yoga, Wi.Book và Wi.Wellness" width={1280} height={720} priority sizes="(max-width: 639px) 210vw, (max-width: 1023px) 1200px, 1150px" className="wi300-ecosystem-source" />
+            </a>
+            <figcaption className="mx-auto mt-3 max-w-md text-center text-xs leading-5 text-brk-muted">300DNS là dự án của WIPA. Các dự án thuộc 300DNS được WIPA cố vấn.</figcaption>
           </figure>
         </div>
       </section>

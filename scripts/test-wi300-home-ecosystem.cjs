@@ -34,13 +34,13 @@ function render(props) { return new JSDOM(renderToStaticMarkup(React.createEleme
 async function run() {
   const projects = Array.from({ length: 12 }, (_, i) => ({ ...shared.publicProject(shared.projectDefaults[0]), slug: 'project-' + i, name: 'Dự án ' + i, description: 'Mô tả ' + i, logo: i === 0 ? '' : '/logo.png' }))
   let dom = render({ projects }), doc = dom.window.document
-  assert.deepEqual([...doc.querySelectorAll('h2')].map(el => el.textContent), ['Bạn đang tìm gì?', 'Các dự án trong hệ sinh thái Wi', 'Bắt đầu cùng Wi'])
+  assert.deepEqual([...doc.querySelectorAll('h2')].map(el => el.textContent), ['Bạn đang tìm gì?', 'Khám phá hệ sinh thái Wi', 'Bắt đầu cùng Wi'])
   assert.deepEqual([...doc.querySelectorAll('[aria-label="Nội dung khám phá"] a')].map(el => el.getAttribute('href')), ['/khoa-hoc', '/san-pham', '/dich-vu'])
   const cards = [...doc.querySelectorAll('#du-an-wi li')]
   assert.equal(cards.length, 9)
   for (const [i, card] of cards.entries()) {
     assert.equal(card.querySelector('h3').textContent, 'Dự án ' + i)
-    assert.match(card.textContent, /Xem dự án/)
+    assert.match(card.textContent, /Khám phá dự án/)
     assert.equal(card.querySelector('a').getAttribute('href'), '/du-an/project-' + i)
   }
   assert.ok(doc.querySelector('#du-an-wi a[href="/du-an"]'))
