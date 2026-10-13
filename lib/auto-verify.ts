@@ -279,6 +279,14 @@ export async function processPaymentEmails() {
           const parsed = parseBankEmail(body, fromAddress, subject);
           if (!parsed || !parsed.amount || (!parsed.userId && !parsed.phone)) continue;
 
+          // Xác định config khớp email này để lấy đúng tên ngân hàng (đa GV, đa ngân hàng)
+          const fromLower = fromAddress.toLowerCase();
+          const matchedConfig = configs.find(c => {
+            const cfgFrom = (c.emailFrom || '').toLowerCase();
+            return cfgFrom && (fromLower.includes(cfgFrom) || cfgFrom.includes(fromLower));
+          });
+          const txBankName = matchedConfig?.bankName || 'Sacombank';
+
           // Dedup: mỗi email chỉ xử lý 1 lần (tránh quét lặp / kích hoạt trùng)
           const gmailExternalId = `gmail:${msg.id || ''}`;
           let txRecord: { id: number } | null = null;
@@ -295,7 +303,7 @@ export async function processPaymentEmails() {
                   source: 'EMAIL',
                   externalId: gmailExternalId,
                   amount: parsed.amount,
-                  bankName: 'Sacombank',
+                  bankName: txBankName,
                   content: parsed.content,
                   transferTime: parsed.transferTime,
                   status: 'PROCESSING',
@@ -344,7 +352,7 @@ export async function processPaymentEmails() {
                 amount: parsed.amount,
                 phone: parsed.phone,
                 courseCode: parsed.courseCode,
-                bankName: 'Sacombank',
+                bankName: txBankName,
                 accountNumber: null,
                 transferTime: parsed.transferTime,
                 content: parsed.content,
@@ -369,7 +377,7 @@ export async function processPaymentEmails() {
                 userId: enrollment.userId,
                 action: 'PAYMENT_VERIFIED',
                 detail: `Xác minh thanh toán tự động: ${enrollment.course.name_lop} - ${parsed.amount.toLocaleString()}đ`,
-                metadata: { courseId: enrollment.courseId, enrollmentId: enrollment.id, amount: parsed.amount, bankName: 'Sacombank' },
+                metadata: { courseId: enrollment.courseId, enrollmentId: enrollment.id, amount: parsed.amount, bankName: txBankName },
                 createdAt: parsed.transferTime || new Date(),
               });
             } catch (logErr) {
@@ -395,7 +403,7 @@ export async function processPaymentEmails() {
               `📞 SĐT: ${enrollment.user.phone}\n` +
               `🎓 Khóa học: <b>${enrollment.course.name_lop} (${enrollment.course.id_khoa})</b>\n` +
               `${refLink}💰 Số tiền: ${parsed.amount.toLocaleString()}đ\n` +
-              `🏦 Ngân hàng: Sacombank\n` +
+              `🏦 Ngân hàng: ${txBankName}\n` +
               `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}\n` +
               brkPlacementMsg;
             await sendTelegram(msgAdmin, 'ACTIVATE');

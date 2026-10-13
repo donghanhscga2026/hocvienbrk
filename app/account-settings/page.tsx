@@ -507,6 +507,30 @@ export default function AccountSettingsPage() {
                 {/* Change Password */}
                 {/* Bank Accounts */}
                 <div className="bg-brk-background rounded-2xl border border-brk-outline p-6 mb-6">
+                    <details className="mb-4 bg-blue-50/60 border border-blue-200 rounded-xl px-4 py-3">
+                        <summary className="cursor-pointer text-sm font-bold text-blue-800">
+                            💡 Muốn học viên chuyển khoản là tự động kích hoạt? Làm 3 bước sau
+                        </summary>
+                        <ol className="mt-2 ml-4 list-decimal text-xs text-blue-900 space-y-1.5 leading-relaxed">
+                            <li>
+                                <b>Thêm tài khoản ngân hàng</b> của bạn ở bên dưới (nút "Thêm"), rồi chọn TK này khi tạo khóa học.
+                                Hệ thống sẽ tự sinh mã QR đúng TK của bạn cho học viên quét.
+                            </li>
+                            <li>
+                                <b>Forward email biến động số dư</b> về Gmail trung tâm của hệ thống:
+                                vào Gmail của bạn → Cài đặt → Bộ lọc → tạo bộ lọc với điều kiện
+                                <span className="font-mono"> From: (địa chỉ email thông báo của ngân hàng bạn)</span> →
+                                chọn <b>Chuyển tiếp tới</b> địa chỉ Gmail trung tâm (hỏi admin để lấy địa chỉ).
+                                <br />Ví dụ Sacombank: From là <span className="font-mono">info@sacombank.com.vn</span>.
+                            </li>
+                            <li>
+                                <b>Báo cho admin</b> sau khi xong 2 bước trên để admin bật "Tự động xác minh"
+                                cho khóa học của bạn. Từ đó học viên chuyển khoản đúng cú pháp
+                                <span className="font-mono"> SDT ... HV ... COC ...</span> là được kích hoạt ngay,
+                                không cần duyệt tay.
+                            </li>
+                        </ol>
+                    </details>
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-semibold text-brk-on-surface">Tài khoản nhận tiền</h2>
                         <button onClick={() => openBankForm()} className="flex items-center gap-2 px-4 py-2 bg-brk-primary text-brk-on-surface text-sm font-bold rounded-xl hover:bg-brk-primary-hover transition-colors">
