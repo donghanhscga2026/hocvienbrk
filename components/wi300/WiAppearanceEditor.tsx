@@ -121,7 +121,7 @@ export default function WiAppearanceEditor({ initial, previewData, previewOnly =
                <button type="button" aria-label="Di chuyển lên" disabled={index === 0} onClick={() => { const next = [...settings.headerMenu]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; change('headerMenu', next) }} className="rounded-lg border p-2 disabled:opacity-30"><ArrowUp className="h-4 w-4"/></button>
                <button type="button" aria-label="Di chuyển xuống" disabled={index === settings.headerMenu.length - 1} onClick={() => { const next = [...settings.headerMenu]; [next[index], next[index + 1]] = [next[index + 1], next[index]]; change('headerMenu', next) }} className="rounded-lg border p-2 disabled:opacity-30"><ArrowDown className="h-4 w-4"/></button>
                <button type="button" onClick={() => change('headerMenu', settings.headerMenu.filter((_, i) => i !== index))} className="rounded-lg border px-3 text-sm text-red-700">Xóa</button>
-             </div></div>
+             </div>
              {input(`headerMenu.${index}.label`, 'Tên menu')}
              {input(`headerMenu.${index}.url`, 'Đường dẫn nội bộ hoặc https://')}
              {toggle(`headerMenu.${index}.visible`, 'Hiển thị trên website')}
