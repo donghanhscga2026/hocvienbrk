@@ -10,6 +10,7 @@ dom.window.HTMLDialogElement.prototype.close = function () { this.removeAttribut
 const course = { id: 1, id_khoa: 'AI', name_lop: 'Khóa thực hành AI', name_khoa: 'AI', type: 'NORMAL', status: true, pin: 0, teacherId: 8, categoryId: 1, category: 'Công nghệ', courseCategory: { name: 'Công nghệ' }, phi_coc: 1000000, mo_ta_ngan: 'Mô tả ngắn', mo_ta_dai: 'Mô tả dài', link_anh_bia: '/wi300/businesses/wi-tech.png', lessons: [{ id: 'l1', title: 'Bài thực hành', order: 1 }], _count: { lessons: 1, enrollments: 12 }, teacher: { name: 'Hương Lucy' } }
 const templates = [{ id: 'external-html', name: 'Mẫu HTML bên ngoài', description: 'Giữ nguồn HTML' }]
 const applied = []
+let courseLoad = async () => ({ success: true, courses: Array.from({ length: 12 }, (_, index) => ({ ...course, id: index + 1, name_lop: course.name_lop + ' ' + (index + 1) })), isAdmin: true, userId: 8 })
 const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
 const stub = name => ({ __esModule: true, default: props => React.createElement('div', { 'data-panel': name }, name + (props.courseId || '')) })
 let params = new URLSearchParams('id=1')
@@ -29,7 +30,7 @@ const mocks = {
   '@/components/admin/courses/AddLessonModal': { AddLessonModal: () => null },
   '@/components/admin/courses/LessonAnnouncementModal': { LessonAnnouncementModal: () => null },
   '@/app/actions/course-actions': { getTeachersAction: async () => ({ success: true, teachers: [{ id: 8, name: 'Hương Lucy' }] }) },
-  '@/app/actions/admin-actions': { getAdminCoursesAction: async () => ({ success: true, courses: Array.from({ length: 12 }, (_, index) => ({ ...course, id: index + 1, name_lop: course.name_lop + ' ' + (index + 1) })), isAdmin: true, userId: 8 }) },
+  '@/app/actions/admin-actions': { getAdminCoursesAction: (...args) => courseLoad(...args) },
   '@/app/actions/course-page-actions': { getCoursePages: async () => [{ id: 'page-1', slug: 'AI', useTemplate: true, status: 'draft' }], getCoursePage: async () => ({ id: 'page-1', slug: 'AI', useTemplate: true, status: 'draft', name: 'AI', sections: [] }), applyCoursePageTemplate: async (...args) => { applied.push(args); return { success: true } } },
   '@/app/actions/course-page-template-actions': { getStoredCoursePageTemplateOptions: async () => ({ success: true, templates }), applyStoredCoursePageTemplate: async (...args) => { applied.push(args); return { success: true } } },
   '@/lib/course-page/templates': { COURSE_TEMPLATE_LIBRARY: [{ key: 'test', name: 'Mẫu hệ thống', description: 'Mẫu có sẵn' }] },
@@ -60,6 +61,30 @@ async function run() {
     await click('Thẻ'); assert.equal(document.querySelectorAll('article').length, 10); snapshot('course-cards'); await click('Danh sách')
     await click('Xuất học viên các khóa đang lọc'); assert.ok(document.querySelector('dialog[open]')); assert.equal(document.querySelector('dialog input[value="students"]').checked, true); assert.ok(document.querySelector('option[value="GOOGLE"]')); snapshot('course-export'); await click('Đóng lựa chọn xuất')
     await click('Sau'); assert.equal(document.querySelectorAll('article').length, 2)
+    assert.ok(document.body.textContent.includes('Lượt học viên đã kích hoạt'), 'Totals describe the ACTIVE enrollment count')
+    const teacherSelect = document.querySelector('[aria-label="Lọc giảng viên"]')
+    async function teacher(value) {
+      await React.act(async () => {
+        Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set.call(teacherSelect, value)
+        teacherSelect.dispatchEvent(new window.Event('change', { bubbles: true }))
+      })
+    }
+    const pendingLoads = []
+    courseLoad = options => new Promise(resolve => pendingLoads.push({ options, resolve }))
+    await teacher('ALL'); await teacher('SELF')
+    assert.equal(pendingLoads.length, 2)
+    await React.act(async () => pendingLoads[1].resolve({ success: true, courses: [{ ...course, name_lop: 'Newest selection' }], isAdmin: true, userId: 8 }))
+    await React.act(async () => pendingLoads[0].resolve({ success: true, courses: [{ ...course, name_lop: 'Stale selection' }], isAdmin: true, userId: 8 }))
+    assert.ok(document.body.textContent.includes('Newest selection'))
+    assert.ok(!document.body.textContent.includes('Stale selection'), 'Late replies cannot replace the latest teacher scope')
+    courseLoad = async () => { throw new Error('Network failure') }
+    await teacher('ALL')
+    assert.ok(document.querySelector('[role="alert"]').textContent.includes('Không tải được khóa học'))
+    assert.equal(document.querySelectorAll('article').length, 0, 'Failed scope cannot export the previous courses')
+    courseLoad = async () => ({ success: true, courses: [course], isAdmin: true, userId: 8 })
+    await click('Tải lại khóa học')
+    assert.equal(document.querySelectorAll('article').length, 1)
+    assert.equal(document.querySelector('[role="alert"]'), null, 'Retry recovers without a stuck spinner')
     await click('Danh mục'); assert.ok(document.body.textContent.includes('Công nghệ'), 'Category management stays available')
     const Editor = load('app/tools/courses/new/page.tsx').default
     await React.act(async () => root.render(React.createElement(Editor)))
@@ -82,7 +107,7 @@ async function run() {
     await click('Sửa code'); assert.ok(document.querySelector('[data-panel="Trình chỉnh code"]'));
     assert.ok(document.querySelector('iframe[src*="preview?page=page-1"]'), 'Information sidebar shows actual saved page preview');
     assert.ok(!document.querySelector('iframe[src="/tools/courses/templates"]'), 'No nested management page')
-    console.log('PASS management UI: course pagination, category tab, exclusive descriptions, retained edits, teaching tools and dedicated template context')
+    console.log('PASS management UI: course pagination, stale response rejection, load error/retry, factual totals, category tab, exclusive descriptions, retained edits, teaching tools and dedicated template context')
   } finally { await React.act(async () => root.unmount()); dom.window.close(); global.fetch = savedFetch }
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })

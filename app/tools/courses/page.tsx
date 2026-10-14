@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { getAdminCoursesAction, bulkToggleCourseStatusAction, bulkUpdateCoursesOptionsAction } from '@/app/actions/admin-actions'
 import { getTeachersAction } from '@/app/actions/course-actions'
 import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Eye, EyeOff, X, Search, Tag, Trash2, Save, Edit2, Palette } from 'lucide-react'
@@ -47,6 +47,8 @@ export default function ToolsCoursesPage() {
 function CoursesTab() {
     const [courses, setCourses] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
+    const [loadError, setLoadError] = useState('')
+    const courseRequest = useRef(0)
     const [isAdmin, setIsAdmin] = useState(false)
     const [visibilityScope, setVisibilityScope] = useState("shared")
     const [currentUserId, setCurrentUserId] = useState<number | null>(null)
@@ -90,21 +92,29 @@ function CoursesTab() {
     // thay vì tải hết rồi lọc ở client, giúp ADMIN mặc định chỉ tải khoá học của
     // chính mình, đỡ tốn băng thông/DB cho hệ thống nhiều khoá học.
     const fetchCourses = async (teacherFilter: string) => {
-        setLoading(true)
+        const requestId = ++courseRequest.current
+        setLoading(true); setLoadError(''); setCourses([]); setSelectedIds(new Set())
         const teacherId = teacherFilter === 'ALL' || teacherFilter === 'SELF' ? teacherFilter : parseInt(teacherFilter)
-        const res = await getAdminCoursesAction({ teacherId })
-        if (res.success) {
+        try {
+            const res = await getAdminCoursesAction({ teacherId })
+            // Chỉ phản hồi của lựa chọn mới nhất được cập nhật danh sách.
+            if (requestId !== courseRequest.current) return
+            if (!res.success) throw new Error('Không tải được khóa học. Vui lòng thử lại hoặc đăng nhập lại.')
             setCourses(res.courses || [])
             setIsAdmin(res.isAdmin || false)
             setVisibilityScope(res.visibilityScope || "shared")
             setCurrentUserId(res.userId ?? null)
+        } catch {
+            if (requestId === courseRequest.current) setLoadError('Không tải được khóa học. Vui lòng thử lại hoặc đăng nhập lại.')
+        } finally {
+            if (requestId === courseRequest.current) setLoading(false)
         }
-        setLoading(false)
     }
 
     useEffect(() => {
-        fetchCourses(filterTeacher)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        const requests = courseRequest
+        void fetchCourses(filterTeacher)
+        return () => { requests.current++ }
     }, [filterTeacher])
 
     useEffect(() => {
@@ -262,7 +272,7 @@ function CoursesTab() {
                 <div className="flex flex-wrap gap-2"><CourseExportButton courseIds={selectedIds.size ? [...selectedIds] : filteredCourses.map(course => course.id)} label={selectedIds.size ? 'Xuất học viên khóa đã chọn' : 'Xuất học viên các khóa đang lọc'} /><Link data-help-id="link-new-course" href="/tools/courses/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brk-primary px-4 text-sm font-semibold text-white"><Plus size={17} />Tạo khóa học</Link></div>
             </div>
             <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-                {[{ label: 'Tổng số khóa học', value: courses.length, icon: BookOpen, note: 'Trong phạm vi giảng viên đã chọn' }, { label: 'Tổng lượt học viên', value: courses.reduce((sum, course) => sum + (course._count?.enrollments || 0), 0), icon: Users, note: 'Một học viên có thể đăng ký nhiều khóa' }, { label: 'Khóa học đang hiển thị', value: courses.filter(course => course.status).length, icon: Eye, note: 'Các khóa đang được công khai' }, { label: 'Yêu cầu hỗ trợ', value: activity.reduce((sum, item) => sum + item.requests, 0), icon: BookOpen, note: 'Yêu cầu cần trả lời của các khóa ở trang này' }].map(stat => { const Icon = stat.icon; return <div key={stat.label} className="flex items-start gap-3 rounded-xl border border-brk-outline bg-white p-4"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brk-background text-brk-primary"><Icon size={21} /></span><div className="min-w-0"><p className="text-xs text-gray-600">{stat.label}</p><strong className="mt-1 block text-2xl text-brk-primary">{loading || (stat.label === 'Yêu cầu hỗ trợ' && activityLoading) ? '…' : stat.label === 'Yêu cầu hỗ trợ' && activityError ? '—' : stat.value}</strong><p className="mt-1 text-[11px] leading-4 text-gray-500">{stat.note}</p></div></div> })}
+                {[{ label: 'Tổng số khóa học', value: courses.length, icon: BookOpen, note: 'Trong phạm vi giảng viên đã chọn' }, { label: 'Lượt học viên đã kích hoạt', value: courses.reduce((sum, course) => sum + (course._count?.enrollments || 0), 0), icon: Users, note: 'Một học viên có thể được tính ở nhiều khóa' }, { label: 'Khóa học đang hiển thị', value: courses.filter(course => course.status).length, icon: Eye, note: 'Các khóa đang được công khai' }, { label: 'Yêu cầu hỗ trợ', value: activity.reduce((sum, item) => sum + item.requests, 0), icon: BookOpen, note: 'Yêu cầu cần trả lời của các khóa ở trang này' }].map(stat => { const Icon = stat.icon; return <div key={stat.label} className="flex items-start gap-3 rounded-xl border border-brk-outline bg-white p-4"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brk-background text-brk-primary"><Icon size={21} /></span><div className="min-w-0"><p className="text-xs text-gray-600">{stat.label}</p><strong className="mt-1 block text-2xl text-brk-primary">{loading || (stat.label === 'Yêu cầu hỗ trợ' && activityLoading) ? '…' : stat.label === 'Yêu cầu hỗ trợ' && activityError ? '—' : stat.value}</strong><p className="mt-1 text-[11px] leading-4 text-gray-500">{stat.note}</p></div></div> })}
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(240px,2fr)_repeat(4,minmax(120px,1fr))]">
                 <div className="relative self-end"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" /><input aria-label="Tìm khóa học hoặc giảng viên" type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Tìm kiếm khóa học, giảng viên…" className="min-h-11 w-full rounded-xl border border-brk-outline bg-white pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-brk-primary/20" /></div>
@@ -326,6 +336,7 @@ function CoursesTab() {
                 </div>
             )}
 
+            {loadError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><p>{loadError}</p><button type="button" disabled={loading} onClick={() => void fetchCourses(filterTeacher)} className="min-h-11 rounded-lg border border-red-200 bg-white px-4 font-semibold disabled:opacity-50">Tải lại khóa học</button></div>}
             {loading ? (
                 <div className="flex flex-col items-center justify-center py-20 text-gray-500">
                     <Loader2 className="w-8 h-8 animate-spin text-purple-500 mx-auto mb-3" />
