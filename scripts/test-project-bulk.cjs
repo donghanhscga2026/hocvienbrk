@@ -39,6 +39,7 @@ async function run() {
   session = null; assert.equal((await api.POST(request())).status, 401); session = { user: { id: '0' } }; brand = null; assert.equal((await api.POST(request())).status, 404)
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://test.invalid/du-an/quan-ly' })
   global.window = dom.window; global.document = dom.window.document; global.Node = dom.window.Node; global.IS_REACT_ACT_ENVIRONMENT = true
+  Object.defineProperty(global, 'navigator', { configurable: true, value: dom.window.navigator })
   const uiProjects = Array.from({ length: 12 }, (_, i) => ({ ...shared.projectDefaults[0], slug: 'test-' + i, name: 'Project ' + i }))
   let sent, deny = false
   const originalFetch = global.fetch
