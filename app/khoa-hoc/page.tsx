@@ -1,9 +1,13 @@
 import { notFound } from 'next/navigation'
+import { pageMetadata } from '@/lib/wi300/website-config'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import { getSession } from '@/lib/get-session'
 import Wi300Home from '@/components/wi300/Wi300Home'
 
-export const metadata = { title: 'Khám phá khóa học' }
+export async function generateMetadata() {
+  const brand = await getCurrentDeploymentBrand()
+  return brand ? pageMetadata(brand, 'courses') : { title: 'Khám phá khóa học' }
+}
 export default async function Page() {
   const brand = await getCurrentDeploymentBrand()
   if (!brand) notFound()

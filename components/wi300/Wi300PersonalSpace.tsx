@@ -72,7 +72,7 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
   const tabs = spaceNavigation(role, tools)
   // Giữ đường dẫn Website & nội dung cũ cho bookmark đã lưu.
   const requestedTab = params.get('tab')
-  const tab = requestedTab === 'pages' ? 'pages' : tabs.some(item => item.id === requestedTab) ? requestedTab! : 'home'
+  const tab = requestedTab === 'pages' ? 'business' : tabs.some(item => item.id === requestedTab) ? requestedTab! : 'home'
   // Các bookmark cũ vẫn mở đúng tab con trong Tổng quan.
   const overview = teachingAllowed && params.get('view') === 'teaching' ? 'teaching' : 'learning'
   const overviewTabs = [{ id: 'learning', label: 'Học tập' }, ...(teachingAllowed ? [{ id: 'teaching', label: 'Giảng dạy' }] : [])]

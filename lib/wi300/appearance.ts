@@ -22,6 +22,8 @@ export const defaultFooter = {
 const footerSchema = z.object({ logoUrl: url, description, note: description, contact: description, copyright: optionalText,
   socials: z.array(footerLink).max(8), groups: z.array(z.object({ title: text, links: z.array(footerLink).max(12) }).strict()).max(4),
 }).strict()
+export const defaultPageSeo = { title: '', description: '', imageUrl: '', keywords: '', inheritRobots: true, index: true, follow: true }
+const pageSeoSchema = z.object({ title: z.string().trim().max(160), description: z.string().trim().max(500), imageUrl: url, keywords: optionalText, inheritRobots: z.boolean(), index: z.boolean(), follow: z.boolean() }).strict().default(() => ({ ...defaultPageSeo }))
 export const HOME_SECTIONS = ['hero', 'discovery', 'projects', 'start'] as const
 export const homeSectionLabels = { hero: 'Hero', discovery: 'Bạn đang tìm gì?', projects: 'Khám phá hệ sinh thái Wi', start: 'Bắt đầu cùng Wi' }
 export const appearanceSchema = z.object({
@@ -29,6 +31,7 @@ export const appearanceSchema = z.object({
   // Giá trị mặc định giúp đọc nguyên vẹn các bản cấu hình cũ đã mã hóa.
   seo: z.object({ title: z.string().trim().max(160), description: z.string().trim().max(500), imageUrl: url, keywords: optionalText, index: z.boolean(), follow: z.boolean() }).strict().default({ title: '', description: '', imageUrl: '', keywords: '', index: true, follow: true }),
   footer: footerSchema.default(defaultFooter),
+  pageSeo: z.object({ home: pageSeoSchema, courses: pageSeoSchema, projects: pageSeoSchema, teachers: pageSeoSchema }).strict().default(() => ({ home: { ...defaultPageSeo }, courses: { ...defaultPageSeo }, projects: { ...defaultPageSeo }, teachers: { ...defaultPageSeo } })),
   home: z.object({ title: text, description, imageUrl: url, primaryLabel: text, primaryUrl: url.refine(Boolean), secondaryLabel: text, secondaryUrl: url.refine(Boolean), sections: z.object({ hero: z.boolean(), discovery: z.boolean(), projects: z.boolean(), start: z.boolean() }).strict(), order: z.array(z.enum(HOME_SECTIONS)).length(4).refine(values => new Set(values).size === 4, 'Mỗi mục chỉ được xuất hiện một lần.'), projectLimit: z.number().int().min(1).max(40) }).strict(),
   courses: z.object({ title: text, description, columns: z.number().int().min(2).max(4), showSearch: z.boolean(), showCategories: z.boolean(), showFee: z.boolean(), showTeachers: z.boolean(), teacherTotal: z.number().int().min(1).max(50), teacherPerView: z.number().int().min(3).max(5), teacherLayout: z.enum(['grid', 'slide']), autoplay: z.boolean(), interval: z.number().int().min(3).max(20), arrows: z.boolean(), showCTA: z.boolean(), cta }).strict(),
   projects: z.object({ title: text, description, imageUrl: url, layout: z.enum(['vertical', 'horizontal']), columns: z.number().int().min(2).max(4), showHero: z.boolean(), showSearch: z.boolean(), showFilter: z.boolean(), showCounts: z.boolean(), showCTA: z.boolean(), cta }).strict(),

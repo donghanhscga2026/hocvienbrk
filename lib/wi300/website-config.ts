@@ -2,6 +2,14 @@ import type { Metadata } from 'next'
 import type { DeploymentBrand } from '@/lib/site-profile/deployment-brand'
 import type { WiAppearance } from './appearance'
 
+export const WEBSITE_PAGES = [
+  { id: 'home', label: 'Trang chủ', url: '/' },
+  { id: 'courses', label: 'Khóa học', url: '/khoa-hoc' },
+  { id: 'projects', label: 'Dự án', url: '/du-an' },
+  { id: 'teachers', label: 'Giảng viên', url: '/giang-vien' },
+] as const
+export type WebsitePage = (typeof WEBSITE_PAGES)[number]['id']
+
 // Cấu hình đã xuất bản ghi đè thương hiệu; ô trống giữ giá trị Vercel hiện tại.
 export function configuredBrand(brand: DeploymentBrand, appearance: WiAppearance): DeploymentBrand {
   const c = appearance.common, seo = appearance.seo
@@ -18,5 +26,19 @@ export function websiteMetadata(brand: DeploymentBrand): Metadata {
     robots: { index: seo?.index ?? true, follow: seo?.follow ?? true },
     openGraph: { title: brand.seoTitle, description: brand.description, siteName: brand.name, images: [brand.ogImageUrl] },
     twitter: { card: 'summary_large_image', title: brand.seoTitle, description: brand.description, images: [brand.ogImageUrl] },
+  }
+}
+
+// Ô trống kế thừa SEO chung; robots chỉ ghi đè khi admin chọn cấu hình riêng.
+export function pageMetadata(brand: DeploymentBrand, page: WebsitePage): Metadata {
+  const shared = websiteMetadata(brand), own = brand.appearance?.pageSeo?.[page]
+  const fallback = WEBSITE_PAGES.find(item => item.id === page)!
+  const title = own?.title || (page === 'home' ? brand.seoTitle : `${brand.appearance?.[page].title || fallback.label} | ${brand.name}`)
+  const description = own?.description || brand.description
+  const image = own?.imageUrl || brand.ogImageUrl
+  return { ...shared, title: { absolute: title }, description, keywords: own?.keywords || shared.keywords,
+    robots: own && !own.inheritRobots ? { index: own.index, follow: own.follow } : shared.robots,
+    openGraph: { title, description, siteName: brand.name, images: [image] },
+    twitter: { card: 'summary_large_image', title, description, images: [image] },
   }
 }

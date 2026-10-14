@@ -51,7 +51,7 @@ async function run() {
 
   assert.equal(helpers.toolWorkspace(tools[0]), 'business')
   assert.equal(helpers.toolWorkspace(tools[1]), 'tools')
-  assert.equal(helpers.toolWorkspace(tools[2]), 'pages')
+  assert.equal(helpers.toolWorkspace(tools[2]), 'business')
   assert.equal(helpers.toolWorkspace(tools[3]), 'admin')
   for (const [slug, workspace] of [['roadmap', 'learning'], ['affiliate', 'affiliate'], ['genealogy', 'affiliate'], ['bank-accounts', 'account'], ['payments', 'business'], ['email-mkt', 'business'], ['dev-flow', 'admin']]) {
     assert.equal(helpers.toolWorkspace({ id: 20, slug, name: slug, url: `/tools/${slug}`, roles: [], isActive: true }), workspace)
@@ -195,7 +195,7 @@ async function run() {
     assert.ok(document.querySelector('a[href="/tools/backup"]'))
     params = new URLSearchParams('tab=website-admin')
     await act(async () => render())
-    assert.equal(document.querySelector('a[href="/tools/wi-appearance"]').textContent, 'Cấu hình các trang', 'Cards use the same label as sidebar/header even with old API labels')
+    assert.equal(document.querySelector('a[href="/tools/wi-appearance"]').textContent, 'Trang', 'Cards use the same label as sidebar/header even with old API labels')
     assert.ok(document.querySelector('a[href="/tools/posts"]'))
     params = new URLSearchParams('view=teaching')
     await act(async () => render())

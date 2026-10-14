@@ -25,7 +25,7 @@ export function managementLocation(path: string, params: URLSearchParams, groups
   let crumbs: NavigationLocation['crumbs'] = [root]
   let back: NavigationLocation['back'] = { label: 'Về Không gian của tôi', href: root.href }
   if (path === '/my-space') {
-    const tab = params.get('tab') || 'home'
+    const tab = params.get('tab') === 'pages' ? 'business' : params.get('tab') || 'home'
     groupId = groups.some(group => group.id === tab) ? tab : 'home'
     title = groups.find(group => group.id === groupId)?.label || 'Không gian của tôi'
     crumbs = tab === 'home' ? [{ label: root.label }] : [root, { label: title }]
@@ -52,12 +52,17 @@ export function managementLocation(path: string, params: URLSearchParams, groups
     if (params.get('project')) { crumbs.push({ label: 'Dự án đang chỉnh sửa' }); back = { label: 'Về danh sách dự án', href: '/du-an/quan-ly' } }
     if (path.endsWith('/noi-dung') && params.get('project')) back = { label: 'Về dự án này', href: `/du-an/quan-ly?project=${encodeURIComponent(params.get('project')!)}` }
   } else {
-    if (path === '/tools/wi-website') { groupId = 'website-admin'; title = exactTool?.label || 'Quản trị website' }
+    if (path === '/tools/wi-appearance' && params.get('page')) {
+      groupId = 'website-admin'; title = 'Chỉnh sửa trang'
+      crumbs.push({ label: 'Trang', href: '/tools/wi-appearance' })
+    }
+    if (path === '/tools/wi-website') { groupId = 'website-admin'; title = params.get('section') ? 'Cấu hình chung' : 'Quản trị website' }
     if (path === '/account-settings') { groupId = 'account'; title = 'Cài đặt tài khoản' }
     if (path === '/my-requests') { groupId = 'learning'; title = 'Yêu cầu của tôi' }
     const group = groups.find(item => item.id === groupId)
     if (group) back = { label: `Về ${group.label.toLowerCase()}`, href: group.href }
     if (path === '/tools/wi-website' && !params.get('section')) back = { label: 'Về Không gian của tôi', href: root.href }
+    if (path === '/tools/wi-appearance' && params.get('page')) back = { label: 'Về danh sách trang', href: '/tools/wi-appearance' }
     const parent = exactTool?.href.split('?')[0]
     if (parent && path !== parent) { crumbs.push({ label: exactTool!.label, href: parent }); back = { label: `Về ${exactTool!.label.toLowerCase()}`, href: parent } }
     crumbs.push({ label: title })
