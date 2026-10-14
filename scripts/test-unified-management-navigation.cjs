@@ -14,6 +14,8 @@ const tools = [
   { id: 6, slug: 'dev-flow', name: 'Developer only', url: '/tools/dev-flow', roles: ['DEVELOPER'], isActive: true },
   { id: 7, name: 'Unsafe', url: 'javascript:alert(1)', roles: [], isActive: true },
   { id: 8, slug: 'crm', name: 'Duplicate CRM', url: '/tools/crm', roles: ['TEACHER'], isActive: true },
+  { id: 9, slug: 'reserved-ids', name: 'Số đẹp', url: '/tools/reserved-ids', roles: ['ADMIN'], isActive: true },
+  { id: 10, slug: 'wi-appearance', name: 'Giao diện website', url: '/tools/wi-appearance', roles: ['ADMIN'], isActive: true },
 ]
 const mocks = {
   'next/link': { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) },
@@ -45,9 +47,14 @@ for (const role of ['guest', 'STUDENT', 'TEACHER', 'ADMIN', 'DEVELOPER']) {
 for (const pathname of ['/my-space', '/tools', '/tools/crm', '/tools/courses/pages/one', '/du-an/quan-ly', '/account-settings']) assert.equal(model.isManagementRoute(pathname), true)
 for (const pathname of ['/', '/khoa-hoc/AI', '/courses/AI/learn', '/page/lucy', '/tools/courses/templates/preview']) assert.equal(model.isManagementRoute(pathname), false)
 const groups = model.managementNavigation('ADMIN', tools)
+assert.deepEqual(groups, load('lib/wi300/personal-space.ts').spaceNavigation('ADMIN', tools), 'Cards, header and sidebar have one model')
+assert.deepEqual(groups.map(group => group.label), ['Tổng quan', 'Học tập', 'Giảng dạy', 'Cộng tác viên', 'Quản lý & kinh doanh', 'Nội dung & website', 'Công cụ & tiện ích', 'Tài khoản & tài chính', 'Quản trị hệ thống'])
+assert.ok(groups.find(group => group.id === 'admin').items.some(item => item.href === '/tools/reserved-ids'))
+assert.ok(groups.find(group => group.id === 'admin').items.some(item => item.href === '/tools/wi-appearance'))
+assert.ok(groups.find(group => group.id === 'business').items.some(item => item.href === '/du-an/quan-ly'))
 assert.equal(model.managementLocation('/tools/courses/templates/legacy', new URLSearchParams('courseId=7&name=AI'), groups).back.href, '/tools/courses/new?id=7&tab=sales')
 assert.equal(model.managementLocation('/tools/courses/templates', new URLSearchParams('courseId=https://evil.invalid'), groups).back.href, '/tools/courses')
-assert.equal(model.managementLocation('/tools/crm', new URLSearchParams(), groups).groupId, 'marketing')
+assert.equal(model.managementLocation('/tools/crm', new URLSearchParams(), groups).groupId, 'business')
 assert.equal(model.managementLocation('/du-an/quan-ly', new URLSearchParams('project=wi-tech'), groups).back.href, '/du-an/quan-ly')
 assert.equal(model.managementLocation('/du-an/noi-dung', new URLSearchParams('project=wi-tech'), groups).back.href, '/du-an/quan-ly?project=wi-tech')
 assert.equal(model.managementLocation('/tools/courses/7/lib-access', new URLSearchParams(), groups).back.href, '/tools/courses/new?id=7')
@@ -69,7 +76,7 @@ async function run() {
     route = '/tools/crm'; query = new URLSearchParams()
     await React.act(async () => render())
     assert.equal(document.querySelector('[aria-label="Mở hoặc đóng menu quản lý"]').getAttribute('aria-expanded'), 'false', 'Navigation closes mobile menu')
-    assert.equal(document.querySelector('[aria-label="Menu quản lý chung"] a[aria-current="page"]').textContent, 'Khách hàng & Marketing')
+    assert.equal(document.querySelector('[aria-label="Menu quản lý chung"] a[aria-current="page"]').textContent, 'Quản lý & kinh doanh')
     assert.equal(requests, 1, 'Switching areas reuses the same loaded menu')
     route = '/tools/courses/templates/legacy'; query = new URLSearchParams('courseId=7&name=Khóa AI')
     await React.act(async () => render())

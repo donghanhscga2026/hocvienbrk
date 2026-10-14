@@ -185,7 +185,7 @@ async function run() {
   global.fetch = async () => ({ ok: true, json: async () => ({ tools: [] }) })
   try {
     await act(async () => root.render(React.createElement(SpaceModule.default, { courses: courses.map(c => ({ ...c, name_lop: `Khóa ${c.id}` })), enrollments: rows, userId: 1, userPhone: null, accountError: false })))
-    assert.match(document.querySelector('h1').textContent, /Dành cho học viên/)
+    assert.match(document.querySelector('h1').textContent, /Học tập/)
     assert.equal(document.querySelectorAll('article').length, 4)
     assert.deepEqual([...document.querySelectorAll('[aria-label="Trạng thái học tập"] [role="tab"]')].map(h => h.textContent), ['Đang học (4)', 'Đã hoàn thành (2)', 'Chờ xử lý (1)'])
     await act(async () => document.getElementById('learning-tab-completed').click())
@@ -193,7 +193,7 @@ async function run() {
     await act(async () => document.getElementById('learning-tab-pending').click())
     assert.equal(document.querySelectorAll('article').length, 1)
     assert.equal(document.querySelector('a[href="/my-space?tab=pages"]'), null)
-    assert.equal(document.querySelector('a[href="/my-space?tab=affiliate"]').textContent, 'Dành cho cộng tác viên')
+    assert.equal(document.querySelector('a[href="/my-space?tab=affiliate"]').textContent, 'Cộng tác viên')
   } finally { global.fetch = savedFetch }
   pathname = '/tools/posts'
   await act(async () => renderShell())
