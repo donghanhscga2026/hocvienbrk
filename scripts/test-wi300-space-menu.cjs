@@ -8,7 +8,15 @@ const { JSDOM } = require('jsdom')
 function load(file, overrides = {}) {
   const module = { exports: {} }
   const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in overrides ? overrides[name] : require(name), module, module.exports)
+  new Function('require', 'module', 'exports', code)(name => {
+    if (name in overrides) return overrides[name]
+    if (name.startsWith('@/') || name.startsWith('./')) {
+      const base = name.startsWith('@/') ? name.slice(2) : path.posix.join(path.posix.dirname(file), name)
+      const resolved = ['.tsx', '.ts'].map(ext => base + ext).find(candidate => fs.existsSync(path.join(__dirname, '..', candidate)))
+      if (resolved) return load(resolved, overrides)
+    }
+    return require(name)
+  }, module, module.exports)
   return module.exports
 }
 async function run() {
@@ -57,7 +65,7 @@ async function run() {
     await act(async () => enter(document.querySelector('a[aria-label="Không gian của tôi"]')))
     assert.ok(panel(), 'Rê chuột mở menu mà không chuyển trang')
     assert.equal(requests, 1)
-    await act(async () => enter(findButton('Dành cho giảng viên')))
+    await act(async () => enter(findButton('Khách hàng & Marketing')))
     assert.ok(panel().querySelector('a[href="/tools/crm"]'))
     assert.equal(window.location.pathname, '/')
     await act(async () => panel().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
@@ -65,7 +73,7 @@ async function run() {
     assert.equal(document.activeElement.getAttribute('aria-label'), 'Mở lối tắt Không gian của tôi')
     await act(async () => click(findButton('Mở lối tắt Không gian của tôi')))
     assert.equal(requests, 1, 'Danh sách lối tắt được dùng lại')
-    await act(async () => enter(findButton('Dành cho học viên')))
+    await act(async () => enter(findButton('Học tập & Đào tạo')))
     assert.ok(panel().querySelector('a[href*="status=pending"]'))
     await act(async () => click(panel().querySelector('a[href*="status=completed"]')))
     assert.equal(panel(), null)
@@ -74,13 +82,13 @@ async function run() {
     assert.equal(panel(), null, 'Cảm ứng không giả lập hover')
     await act(async () => click(findButton('Mở lối tắt Không gian của tôi')))
     assert.ok(panel())
-    await act(async () => click(findButton('Dành cho giảng viên')))
+    await act(async () => click(findButton('Khách hàng & Marketing')))
     assert.ok(panel().querySelector('a[href="/tools/crm"]'))
     await act(async () => document.body.dispatchEvent(new window.MouseEvent('pointerdown', { bubbles: true })))
     assert.equal(panel(), null)
     await act(async () => render('STUDENT', '9', '/my-space'))
     await act(async () => click(findButton('Mở lối tắt Không gian của tôi')))
-    assert.equal(findButton('Dành cho giảng viên'), undefined)
+    assert.equal(findButton('Khách hàng & Marketing'), undefined)
     assert.equal(findButton('Quản trị hệ thống'), undefined)
     assert.ok(!panel().querySelector('a[href="/tools/crm"]'))
     assert.equal(requests, 2, 'Đổi tài khoản tải lại đúng phạm vi')

@@ -9,7 +9,15 @@ const { act } = React
 function load(file, overrides = {}) {
   const module = { exports: {} }
   const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in overrides ? overrides[name] : require(name), module, module.exports)
+  new Function('require', 'module', 'exports', code)(name => {
+    if (name in overrides) return overrides[name]
+    if (name.startsWith('@/') || name.startsWith('./')) {
+      const base = name.startsWith('@/') ? name.slice(2) : path.posix.join(path.posix.dirname(file), name)
+      const resolved = ['.tsx', '.ts'].map(ext => base + ext).find(candidate => fs.existsSync(path.join(__dirname, '..', candidate)))
+      if (resolved) return load(resolved, overrides)
+    }
+    return require(name)
+  }, module, module.exports)
   return module.exports
 }
 async function run() {
@@ -56,6 +64,7 @@ async function run() {
     'next/dynamic': { __esModule: true, default: () => props => props.shareType ? React.createElement('div', { 'data-header-share': props.affiliateCode, 'data-site-name': props.siteName }, 'Share') : React.createElement('div', { 'data-wallet': props.title }) },
   }).default
   const Shell = load('components/wi300/Wi300Shell.tsx', { 'next/navigation': { usePathname: () => pathname }, './Wi300Header': { __esModule: true, default: Header },
+    './Wi300ManagementFrame': { __esModule: true, default: ({ children }) => React.createElement('div', { 'data-management-frame': true }, children) },
     './Wi300Footer': load('components/wi300/Wi300Footer.tsx', { 'next/link': link, 'next/image': { __esModule: true, default: ({ unoptimized, ...props }) => React.createElement('img', props) }, './Wi300BrandContext': { useWi300Brand: () => brand } }), 'next/link': link, '@/lib/wi300/default-pages': load('lib/wi300/default-pages.ts', { './external-apps': load('lib/wi300/external-apps.ts') }) }).default
   const root = createRoot(document.getElementById('root'))
   const renderShell = () => root.render(React.createElement(Shell, null, React.createElement('div', null, 'Page')))
@@ -188,9 +197,7 @@ async function run() {
   } finally { global.fetch = savedFetch }
   pathname = '/tools/posts'
   await act(async () => renderShell())
-  assert.equal(document.querySelector('h1').textContent, 'Bài viết cộng đồng')
-  assert.ok(document.querySelector('div.max-w-7xl.px-4'), 'Trang mặc định có khung và khoảng lề')
-  assert.match(document.querySelector('[aria-label="Đường dẫn trang"]').textContent, /Không gian của tôi/)
+  assert.ok(document.querySelector('[data-management-frame]'), 'Tool pages delegate layout and breadcrumbs to the shared frame')
   for (const managementPath of ['/tools/courses', '/tools/courses/new', '/tools/courses/templates', '/tools/courses/templates/legacy', '/du-an/quan-ly']) {
     pathname = managementPath
     await act(async () => renderShell())

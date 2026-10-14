@@ -64,6 +64,7 @@ jobs:
           node scripts/test-wi300-personal-space.cjs
           node scripts/test-wi300-navigation.cjs
           node scripts/test-wi300-space-menu.cjs
+          node scripts/test-unified-management-navigation.cjs
           node scripts/test-my-requests-ui.cjs
           node scripts/test-notification-pagination.cjs
           node scripts/test-notification-feed-ui.cjs
