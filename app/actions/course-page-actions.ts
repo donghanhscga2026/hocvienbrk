@@ -435,58 +435,31 @@ export async function applyCoursePageTemplate(slug: string, courseName: string, 
 
   try {
     const preset = createCoursePageFromTemplate(templateKey, slug)
-    const existing = await prisma.coursePage.findUnique({ where: { slug } })
-
-    const seo = { ...(preset.seo as any), templateKey }
-    const page = existing
-      ? await prisma.coursePage.update({
-          where: { id: existing.id },
-          data: {
-            name: courseName || preset.name,
-            status: 'published',
-            seo,
-            theme: preset.theme as any,
-            navigation: preset.navigation as any,
-            checkoutConfig: preset.checkoutConfig as any,
-            useTemplate: true,
-            publishedAt: new Date(),
-          },
-        })
-      : await prisma.coursePage.create({
-          data: {
-            slug,
-            name: courseName || preset.name,
-            status: 'published',
-            seo,
-            theme: preset.theme as any,
-            navigation: preset.navigation as any,
-            checkoutConfig: preset.checkoutConfig as any,
-            useTemplate: true,
-            publishedAt: new Date(),
-          },
-        })
-
-    await prisma.$transaction(async (tx) => {
-      await tx.courseSection.deleteMany({ where: { coursePageId: page.id } })
-      await tx.courseSection.createMany({
-        data: preset.sections.map((section: any) => ({
-          coursePageId: page.id,
-          sectionKey: section.sectionKey,
-          sectionType: section.type,
-          variant: section.variant || null,
-          anchorId: section.anchorId || null,
-          enabled: section.enabled !== false,
-          sortOrder: section.sortOrder,
-          visibility: section.visibility || 'all',
-          content: section.content || {},
-        })),
-      })
+    const name = courseName || preset.name
+    const seo = { ...(preset.seo as any), ...(templateKey === 'wi300-gift' ? { title: name } : {}), templateKey }
+    const sectionData = preset.sections.map((section: any) => ({
+      sectionKey: section.sectionKey, sectionType: section.type, variant: section.variant || null,
+      anchorId: section.anchorId || null, enabled: section.enabled !== false,
+      sortOrder: section.sortOrder, visibility: section.visibility || 'all',
+      content: templateKey === 'wi300-gift' && section.type === 'hero' ? { ...section.content, title: name } : section.content || {},
+    }))
+    // Đổi mẫu và snapshot công khai cùng một transaction: không hiển thị lại mẫu cũ.
+    const page = await prisma.$transaction(async tx => {
+      const existing = await tx.coursePage.findUnique({ where: { slug } })
+      const data = { name, status: 'published', seo, theme: preset.theme as any, navigation: preset.navigation as any, checkoutConfig: preset.checkoutConfig as any, useTemplate: true, publishedAt: new Date() }
+      const saved = existing
+        ? await tx.coursePage.update({ where: { id: existing.id }, data })
+        : await tx.coursePage.create({ data: { slug, ...data } })
+      await tx.courseSection.deleteMany({ where: { coursePageId: saved.id } })
+      await tx.courseSection.createMany({ data: sectionData.map(section => ({ ...section, coursePageId: saved.id })) })
+      const latest = await tx.coursePageVersion.findFirst({ where: { coursePageId: saved.id }, orderBy: { versionNumber: 'desc' }, select: { versionNumber: true } })
+      await tx.coursePageVersion.create({ data: { coursePageId: saved.id, versionNumber: (latest?.versionNumber || 0) + 1, snapshot: { kind: 'published', name, seo, theme: preset.theme, navigation: preset.navigation, checkoutConfig: preset.checkoutConfig, useTemplate: true, sections: sectionData } as any } })
+      return saved
     })
-
     revalidatePath(`/khoa-hoc/${slug}`)
     revalidatePath('/tools/courses')
     revalidatePath('/tools/pages')
-    return { success: true, page: { ...page, seo } }
+    return { success: true, page }
   } catch (error: any) {
     console.error('[CoursePage] Apply template error:', error)
     return { success: false, error: error.message || 'Lỗi khi áp dụng mẫu giao diện' }

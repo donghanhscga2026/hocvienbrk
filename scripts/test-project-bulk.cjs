@@ -3,6 +3,7 @@ const fs = require('node:fs'), path = require('node:path'), assert = require('no
 const repo = path.resolve(__dirname, '..')
 class CrmError extends Error { constructor(message, status = 400) { super(message); this.status = status } }
 function load(file, mocks = {}) {
+  if (!fs.existsSync(path.join(repo, file)) && file.endsWith('.ts')) file += 'x'
   const mod = { exports: {} }, code = ts.transpileModule(fs.readFileSync(path.join(repo, file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
   new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name === '@/lib/crm/service' || name === './service' ? { CrmError } : name.startsWith('@/') || name.startsWith('./') ? load(name.startsWith('@/') ? name.slice(2) + '.ts' : path.posix.join(path.posix.dirname(file), name + '.ts'), mocks) : require(name), mod, mod.exports)
   return mod.exports
