@@ -1,5 +1,17 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { requireAdmin } from '@/lib/api-auth'
+
+const stepsInclude = {
+  steps: { where: { isActive: true }, orderBy: { stepOrder: 'asc' as const } },
+}
+
+function roleFilter(role: string | null) {
+  // roles rỗng = hiển thị cho mọi vai trò.
+  // Chưa đăng nhập (không có role) chỉ thấy bài công khai — tránh lộ bài giới hạn vai trò.
+  if (!role) return { roles: { isEmpty: true } }
+  return { OR: [{ roles: { isEmpty: true } }, { roles: { has: role } }] }
+}
 
 export async function GET(request: Request) {
   try {
@@ -7,15 +19,22 @@ export async function GET(request: Request) {
     const pagePath = searchParams.get('pagePath')
     const toolSlug = searchParams.get('toolSlug')
     const id = searchParams.get('id')
+    const role = searchParams.get('role')
 
     if (id) {
-      const guide = await prisma.assistantGuide.findUnique({ where: { id: Number(id) } })
+      const guide = await prisma.assistantGuide.findUnique({
+        where: { id: Number(id) },
+        include: stepsInclude,
+      })
       if (!guide) return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 })
       return NextResponse.json({ success: true, data: guide })
     }
 
     if (toolSlug) {
-      const guide = await prisma.assistantGuide.findFirst({ where: { toolSlug, isActive: true } })
+      const guide = await prisma.assistantGuide.findFirst({
+        where: { toolSlug, isActive: true, ...roleFilter(role) },
+        include: stepsInclude,
+      })
       if (!guide) {
         return NextResponse.json({ success: false, error: 'Guide not found' }, { status: 404 })
       }
@@ -23,14 +42,35 @@ export async function GET(request: Request) {
     }
 
     if (pagePath) {
-      const [pageGuide, toolGuide] = await Promise.all([
-        prisma.assistantGuide.findFirst({ where: { pagePath, isActive: true } }),
-        prisma.assistantGuide.findFirst({ where: { toolSlug: pagePath.replace('/tools/', ''), isActive: true } }),
+      const [exactGuide, toolGuide] = await Promise.all([
+        prisma.assistantGuide.findFirst({
+          where: { pagePath, isActive: true, ...roleFilter(role) },
+          include: stepsInclude,
+        }),
+        prisma.assistantGuide.findFirst({
+          where: { toolSlug: pagePath.replace('/tools/', ''), isActive: true, ...roleFilter(role) },
+          include: stepsInclude,
+        }),
       ])
+      let pageGuide = exactGuide
+      if (!pageGuide) {
+        // Khớp route động: guide lưu "/khoa-hoc/[id]" khớp "/khoa-hoc/BRK01"
+        const patternGuides = await prisma.assistantGuide.findMany({
+          where: { pagePath: { contains: '[' }, isActive: true, ...roleFilter(role) },
+          include: stepsInclude,
+        })
+        pageGuide = patternGuides.find(g => {
+          const regex = new RegExp('^' + g.pagePath!.replace(/\[.*?\]/g, '[^/]+') + '$')
+          return regex.test(pagePath)
+        }) || null
+      }
       return NextResponse.json({ success: true, data: { pageGuide: pageGuide || null, toolGuide: toolGuide || null } })
     }
 
-    const guides = await prisma.assistantGuide.findMany({ orderBy: { pagePath: 'asc' } })
+    const guides = await prisma.assistantGuide.findMany({
+      orderBy: { pagePath: 'asc' },
+      include: { _count: { select: { steps: true } } },
+    })
     return NextResponse.json({ success: true, data: guides })
   } catch (error) {
     console.error('Error fetching assistant guide:', error)
@@ -39,18 +79,26 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const denied = await requireAdmin()
+  if (denied) return denied
   try {
     const body = await request.json()
-    const { id, pagePath, title, script, textContent, videoUrl, agentVideoUrl, toolSlug, sections, isActive } = body
+    const { id, pagePath, title, script, textContent, videoUrl, agentVideoUrl, toolSlug, sections, roles, isActive } = body
 
     if (!title || (!pagePath && !toolSlug)) {
       return NextResponse.json({ success: false, error: 'Missing required fields: title, and pagePath or toolSlug' }, { status: 400 })
     }
 
+    const data = {
+      pagePath, title, script, textContent, videoUrl, agentVideoUrl, toolSlug, sections,
+      roles: Array.isArray(roles) ? roles : [],
+      isActive,
+    }
+
     if (id) {
       const guide = await prisma.assistantGuide.update({
         where: { id: Number(id) },
-        data: { pagePath, title, script, textContent, videoUrl, agentVideoUrl, toolSlug, sections, isActive },
+        data,
       })
       return NextResponse.json({ success: true, data: guide })
     }
@@ -62,13 +110,13 @@ export async function POST(request: Request) {
     if (existing) {
       const guide = await prisma.assistantGuide.update({
         where: { id: existing.id },
-        data: { pagePath, title, script, textContent, videoUrl, agentVideoUrl, toolSlug, sections, isActive },
+        data,
       })
       return NextResponse.json({ success: true, data: guide })
     }
 
     const guide = await prisma.assistantGuide.create({
-      data: { pagePath: pagePath || null, title, script, textContent, videoUrl, agentVideoUrl, toolSlug, sections, isActive },
+      data: { ...data, pagePath: pagePath || null },
     })
     return NextResponse.json({ success: true, data: guide })
   } catch (error) {
@@ -78,6 +126,8 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const denied = await requireAdmin()
+  if (denied) return denied
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')

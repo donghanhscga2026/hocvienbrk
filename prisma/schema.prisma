@@ -1575,12 +1575,34 @@ model AssistantGuide {
   agentVideoUrl String?
   toolSlug      String?
   sections      Json?
+  // Vai trò được xem guide này. Mảng rỗng = mọi vai trò. VD: ["ADMIN"], ["INSTRUCTOR"]
+  roles         String[] @default([])
+  steps         AssistantGuideStep[]
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   @@index([pagePath])
   @@index([toolSlug])
+}
+
+// Từng bước trong bài hướng dẫn — dùng cho chế độ đọc từng bước và tour "Dẫn tôi làm"
+model AssistantGuideStep {
+  id             Int            @id @default(autoincrement())
+  guideId        Int
+  guide          AssistantGuide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+  stepOrder      Int            @default(0)
+  title          String
+  body           String?
+  imageUrl       String?
+  videoUrl       String?
+  // CSS selector của phần tử cần khoanh sáng ở chế độ tour. VD: "[data-help-id='btn-add']"
+  targetSelector String?
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([guideId, stepOrder])
 }
 
 model UserBankAccount {

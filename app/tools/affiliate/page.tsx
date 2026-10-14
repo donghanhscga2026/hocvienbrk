@@ -133,6 +133,7 @@ function DashboardTab() {
                             className="flex-1 px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm"
                         />
                         <button
+                            data-help-id="btn-copy-affiliate-link"
                             onClick={copyLink}
                             className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium"
                         >

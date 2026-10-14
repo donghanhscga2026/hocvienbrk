@@ -40,7 +40,7 @@ function CreateCourseContent() {
     type ManagementTab = 'info' | 'lessons' | 'members' | 'stats' | 'feed' | 'activity' | 'sales'
     const initialTab = searchParams.get('tab')
     const [activeTab, setActiveTab] = useState<ManagementTab>((['info', 'lessons', 'members', 'stats', 'feed', 'activity', 'sales'] as string[]).includes(initialTab || '') ? initialTab as ManagementTab : 'info')
-    const [infoGroup, setInfoGroup] = useState<'basic' | 'description' | 'payment' | 'voucher' | 'email' | 'projects'>('basic')
+    const [infoGroup, setInfoGroup] = useState<'basic' | 'description' | 'payment' | 'voucher' | 'email'>('basic')
     const [visitedRoster, setVisitedRoster] = useState(initialTab === 'members' || initialTab === 'stats')
     const [initialStudentId, setInitialStudentId] = useState<number | undefined>()
     function selectTab(tab: ManagementTab) {
@@ -384,9 +384,9 @@ function CreateCourseContent() {
                 {isEditMode && activeTab === 'activity' && <CourseManagementActivity courseId={Number(courseId)} onOpenStudent={id => { setInitialStudentId(id); selectTab('members') }} />}
                 {isEditMode && visitedRoster && <div hidden={activeTab !== 'members' && activeTab !== 'stats'}><CourseRosterWorkspace courseId={Number(courseId)} courseName={nameLop} tab={activeTab === 'stats' ? 'stats' : 'members'} initialStudentId={initialStudentId} /></div>}
                 {isEditMode && activeTab === 'feed' && <div className="rounded-2xl border bg-white"><CourseActivityFeedTab courseId={Number(courseId)} showAllActivity /></div>}
-                {isEditMode && activeTab === 'sales' && idKhoa && <CourseSalesPagePanel slug={idKhoa} courseName={nameLop} canEdit={isAdmin} />}
+                {isEditMode && activeTab === 'sales' && idKhoa && <CourseSalesPagePanel slug={idKhoa} courseName={nameLop} courseId={courseId ? Number(courseId) : undefined} canEdit={isAdmin} />}
                 <div hidden={isEditMode && activeTab !== 'info'} className={isEditMode ? "grid grid-cols-1 items-start gap-4 xl:grid-cols-[160px_minmax(0,1fr)_260px]" : "space-y-5"}>
-                {isEditMode && <nav aria-label="Nhóm thông tin khóa học" className="flex gap-1 overflow-x-auto rounded-2xl border border-brk-outline bg-white p-2 xl:flex-col">{([{ id: 'basic', label: 'Thông tin cơ bản' }, { id: 'description', label: 'Mô tả & hình ảnh' }, { id: 'payment', label: 'Thanh toán & kích hoạt' }, { id: 'voucher', label: 'Voucher' }, { id: 'email', label: 'Email & Zalo' }, { id: 'projects', label: 'Liên kết dự án' }] as const).map(group => <button key={group.id} type="button" aria-pressed={infoGroup === group.id} onClick={() => setInfoGroup(group.id)} className={`min-h-11 shrink-0 rounded-xl px-3 text-left text-sm ${infoGroup === group.id ? 'bg-brk-background font-bold text-brk-primary' : 'text-gray-500 hover:bg-gray-50'}`}>{group.label}</button>)}</nav>}
+                {isEditMode && <nav aria-label="Nhóm thông tin khóa học" className="flex gap-1 overflow-x-auto rounded-2xl border border-brk-outline bg-white p-2 xl:flex-col">{([{ id: 'basic', label: 'Thông tin cơ bản' }, { id: 'description', label: 'Mô tả & hình ảnh' }, { id: 'payment', label: 'Thanh toán & kích hoạt' }, { id: 'voucher', label: 'Voucher' }, { id: 'email', label: 'Email & Zalo' }] as const).map(group => <button key={group.id} type="button" aria-pressed={infoGroup === group.id} onClick={() => setInfoGroup(group.id)} className={`min-h-11 shrink-0 rounded-xl px-3 text-left text-sm ${infoGroup === group.id ? 'bg-brk-background font-bold text-brk-primary' : 'text-gray-500 hover:bg-gray-50'}`}>{group.label}</button>)}</nav>}
                 <form id="course-settings-form" onSubmit={handleSubmit} onInvalid={event => { const group = (event.target as HTMLElement).closest<HTMLElement>('[data-info-group]')?.dataset.infoGroup; if (group === 'basic' || group === 'description' || group === 'payment' || group === 'voucher' || group === 'email') { setInfoGroup(group); setActiveTab('info') } }} className="space-y-8">
                 {/* Giữ form được mount để không mất dữ liệu khi chuyển nhóm / tab. */}
                 <div data-info-group="basic" hidden={isEditMode && infoGroup !== 'basic'} className="space-y-5">
@@ -399,13 +399,14 @@ function CreateCourseContent() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên lớp học *</label>
-                            <input 
-                                type="text" 
-                                value={nameLop} 
-                                onChange={(e) => setNameLop(e.target.value)} 
-                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                                placeholder="Tên lớp..." 
-                                required 
+                            <input
+                                data-help-id="input-class-name"
+                                type="text"
+                                value={nameLop}
+                                onChange={(e) => setNameLop(e.target.value)}
+                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
+                                placeholder="Tên lớp..."
+                                required
                             />
                         </div>
                         <div className="space-y-1.5">
@@ -603,7 +604,7 @@ function CreateCourseContent() {
                             </div>
                         </div>
 
-                </div><div data-info-group="description" hidden={isEditMode && !['basic', 'description'].includes(infoGroup)} className="space-y-5">
+                </div><div data-info-group="description" hidden={isEditMode && infoGroup !== 'description'} className="space-y-5">
                 {/* SECTION 2: MÔ TẢ & HÌNH ẢNH */}
                 <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-brk-outline">
                     <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
@@ -700,11 +701,12 @@ function CreateCourseContent() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Học phí (VND)</label>
-                            <input 
-                                type="number" 
-                                value={phiCoc} 
-                                onChange={(e) => setPhiCoc(parseInt(e.target.value) || 0)} 
-                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
+                            <input
+                                data-help-id="input-course-fee"
+                                type="number"
+                                value={phiCoc}
+                                onChange={(e) => setPhiCoc(parseInt(e.target.value) || 0)}
+                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
                             />
                         </div>
                         <div className="space-y-1.5">
@@ -809,15 +811,15 @@ function CreateCourseContent() {
                     </div>
                 )}
                 
-                <button 
-                    type="submit" 
+                <button
+                    data-help-id="btn-create-course"
+                    type="submit"
                     disabled={loading || !idKhoa || !nameLop}
                     className="w-full bg-black text-yellow-400 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <BookOpen className="w-5 h-5" />}
                     {isEditMode ? 'Lưu Khóa học' : 'Tạo Khóa học'}
                 </button>
-                <div hidden={!isEditMode || infoGroup !== 'projects'} className="rounded-2xl border border-brk-outline bg-white p-5"><h2 className="font-bold">Liên kết dự án</h2><p className="mt-2 text-sm text-gray-500">Quản lý dự án liên kết trong bảng bên cạnh.</p></div>
                 </form>
                 {isEditMode && <aside className="space-y-4"><section className="rounded-2xl border border-brk-outline bg-white p-5"><h2 className="font-bold">Hiển thị khóa học</h2><label className="mt-4 flex min-h-11 items-center justify-between gap-3 text-sm"><span>{status ? 'Đang hiển thị công khai' : 'Đang ẩn khóa học'}</span><input type="checkbox" aria-label="Hiển thị khóa học" checked={status} onChange={event => setStatus(event.target.checked)} className="h-5 w-5 accent-green-700" /></label><p className="mt-2 text-xs leading-5 text-gray-500">Bấm Lưu thay đổi để áp dụng.</p><button type="button" onClick={() => selectTab('sales')} className="mt-4 min-h-11 text-sm font-semibold text-brk-primary">Thiết lập trang bán khóa học →</button></section><WiCourseProjects key={courseId} courseId={courseId!} compact /><section className="rounded-2xl border border-brk-outline bg-white p-5"><h2 className="font-bold">Quản lý nhanh</h2><div className="mt-3 flex flex-col gap-2"><button type="button" onClick={() => selectTab('members')} className="min-h-11 text-left text-sm text-brk-primary">Danh sách học viên →</button><button type="button" onClick={() => selectTab('activity')} className="min-h-11 text-left text-sm text-brk-primary">Hoạt động cần xem →</button><CourseExportButton courseIds={[Number(courseId)]} courseName={nameLop} /></div></section></aside>}
                 </div>

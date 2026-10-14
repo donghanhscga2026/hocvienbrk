@@ -8,6 +8,7 @@ export const memberExportInput = z.object({
   courseIds: z.array(z.number().int().positive()).min(1).max(50).refine(ids => new Set(ids).size === ids.length),
   status: z.enum(['ALL', 'ACTIVE', 'PENDING']).default('ALL'),
   reports: z.boolean().default(false),
+  format: z.enum(['EXCEL', 'GOOGLE']).default('EXCEL'),
   userIds: z.array(z.number().int().nonnegative()).min(1).max(10000).optional(),
 }).strict()
 export type MemberExportInput = z.infer<typeof memberExportInput>

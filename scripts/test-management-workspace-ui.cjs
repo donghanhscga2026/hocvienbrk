@@ -36,7 +36,7 @@ function load(file) {
   if (cache.has(file)) return cache.get(file)
   const module = { exports: {} }
   const code = ts.transpileModule(fs.readFileSync(path.join(repo, file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name.startsWith('@/') ? load(name.slice(2) + '.tsx') : require(name), module, module.exports)
+  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name.startsWith('@/') ? load(name.slice(2) + '.tsx') : name.startsWith('./') ? load(path.posix.join(path.posix.dirname(file), name + '.tsx')) : require(name), module, module.exports)
   cache.set(file, module.exports); return module.exports
 }
 const savedFetch = global.fetch
@@ -52,12 +52,14 @@ async function run() {
     assert.equal(document.querySelectorAll('a[href="/tools/courses/templates"]').length, 0, 'Template library is removed from the course list header')
     assert.ok(document.querySelector('a[href$="tab=activity"]')); snapshot('course-list')
     await click('Thẻ'); assert.equal(document.querySelectorAll('article').length, 10); snapshot('course-cards'); await click('Danh sách')
-    await click('Xuất học viên các khóa đang lọc'); assert.ok(document.querySelector('dialog[open]')); assert.equal(document.querySelector('dialog select').value, 'ALL'); snapshot('course-export'); await click('Đóng lựa chọn xuất')
+    await click('Xuất học viên các khóa đang lọc'); assert.ok(document.querySelector('dialog[open]')); assert.equal(document.querySelector('dialog select').value, 'students'); assert.ok(document.querySelector('option[value="GOOGLE"]')); snapshot('course-export'); await click('Đóng lựa chọn xuất')
     await click('Sau'); assert.equal(document.querySelectorAll('article').length, 2)
     await click('Danh mục'); assert.ok(document.body.textContent.includes('Công nghệ'), 'Category management stays available')
     const Editor = load('app/tools/courses/new/page.tsx').default
     await React.act(async () => root.render(React.createElement(Editor)))
     assert.ok(document.querySelector('input[value="Khóa thực hành AI"]'))
+    assert.equal(document.querySelector('[data-info-group="description"]').hidden, true, 'Basic information excludes description/image fields')
+    await click('Mô tả & hình ảnh')
     const shortDescription = [...document.querySelectorAll('textarea')].find(item => item.value === 'Mô tả ngắn')
     const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
     await React.act(async () => { setter.call(shortDescription, 'Nội dung đang sửa chưa lưu'); shortDescription.dispatchEvent(new window.Event('input', { bubbles: true })) })
@@ -70,13 +72,12 @@ async function run() {
     await click('Thống kê'); assert.ok(document.querySelector('[data-panel="Học viên"]'))
     await click('Nhật ký'); assert.ok(document.querySelector('[data-panel="Nhật ký"]'))
     await click('Trang bán khóa học'); snapshot('course-sales')
-    await click('Chọn mẫu'); assert.ok(document.querySelector('dialog[open]'))
-    await click('Nhập mẫu ngoài'); assert.equal(document.querySelector('iframe').getAttribute('src'), '/tools/courses/templates')
-    await click('Mẫu của tôi'); window.confirm = () => false
-    await click('Áp dụng cho khóa này'); assert.equal(applied.length, 0, 'Template replacement requires confirmation')
-    window.confirm = () => true
-    await click('Áp dụng cho khóa này'); assert.deepEqual(applied[0], ['external-html', 'AI', 'Khóa thực hành AI'], 'External template applies only to the selected course')
-    console.log('PASS management UI: course pagination, category tab, retained edits, teaching tools, members/stats/log and HTML/ZIP picker context')
+    const libraryLink = [...document.querySelectorAll('a')].find(item => item.textContent.includes('Đổi mẫu'))
+    const query = new URL(libraryLink.href).searchParams
+    assert.equal(query.get('course'), 'AI'); assert.equal(query.get('courseId'), '1'); assert.equal(query.get('name'), 'Khóa thực hành AI')
+    assert.ok(document.querySelector('iframe[src*="preview?page=page-1"]'), 'Current template uses actual saved course preview')
+    assert.ok(!document.querySelector('iframe[src="/tools/courses/templates"]'), 'No nested management page')
+    console.log('PASS management UI: course pagination, category tab, exclusive descriptions, retained edits, teaching tools and dedicated template context')
   } finally { await React.act(async () => root.unmount()); dom.window.close(); global.fetch = savedFetch }
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })

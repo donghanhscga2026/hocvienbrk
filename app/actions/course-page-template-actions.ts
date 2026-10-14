@@ -61,6 +61,16 @@ function mapImportedSection(section: ImportedSectionCandidate, sortOrder: number
   }
 }
 
+export async function buildEditableTemplateSnapshot(
+  name: string,
+  analysis: WebsiteTemplateAnalysis,
+  selectedSectionIds: string[],
+): Promise<StoredTemplateSnapshot> {
+  const denied = await requireAdminAction()
+  if (denied) throw new Error(denied.error)
+  return buildSnapshot(name, analysis, selectedSectionIds)
+}
+
 function buildSnapshot(
   name: string,
   analysis: WebsiteTemplateAnalysis,

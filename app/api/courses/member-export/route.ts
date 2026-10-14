@@ -13,9 +13,15 @@ export async function POST(request: Request) {
     const session = await auth()
     const id = session?.user?.id == null ? NaN : Number(session.user.id)
     if (!Number.isSafeInteger(id) || id < 0) throw new CrmError('Vui lòng đăng nhập.', 401)
-    const actor = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } })
+    const actor = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true, email: true, emailVerified: true } })
     if (!actor) throw new CrmError('Vui lòng đăng nhập lại.', 401)
     const result = await memberExportSheets(prisma, actor, await crmBody(request, 100000))
+    if (result.input.format === 'GOOGLE') {
+      if (!actor.email || !actor.emailVerified) throw new CrmError('Xác minh email tài khoản để nhận Google Sheet. Bạn vẫn có thể tải Excel.')
+      const { createCourseGoogleSheet } = await import('@/lib/course/google-export')
+      const sheetUrl = await createCourseGoogleSheet(result.sheets, `Học viên - ${result.title} - ${new Date().toLocaleDateString('vi-VN')}`, actor.email)
+      return Response.json({ sheetUrl, total: result.total }, { headers: { 'Cache-Control': 'private, no-store' } })
+    }
     const bytes = courseWorkbook(result.sheets)
     if (bytes.length > 4000000) throw new CrmError('File vượt 4 MB. Hãy xuất ít khóa/học viên hơn hoặc bỏ báo cáo chi tiết.', 413)
     const filename = `HocVien_${new Date().toISOString().slice(0, 10)}.xlsx`

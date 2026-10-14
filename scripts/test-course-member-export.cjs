@@ -50,11 +50,17 @@ async function run() {
   if (process.env.COURSE_EXPORT_TEST_XLSX) fs.writeFileSync(process.env.COURSE_EXPORT_TEST_XLSX, bytes)
   let session = { user: { id: '0' } }, domain = null
   db.user = { findUnique: async () => admin }
-  const http = load('lib/crm/http.ts', { './service': { CrmError } }), api = load('app/api/courses/member-export/route.ts', { '@/auth': { auth: async () => session }, '@/lib/prisma': { __esModule: true, default: db }, '@/lib/website/domain-context': { domainContext: async () => domain }, '@/lib/course/member-export': exportService, '@/lib/course/export-workbook': workbook, '@/lib/crm/http': http })
+  let googleReport, googleRecipient
+  const http = load('lib/crm/http.ts', { './service': { CrmError } }), api = load('app/api/courses/member-export/route.ts', { '@/auth': { auth: async () => session }, '@/lib/prisma': { __esModule: true, default: db }, '@/lib/website/domain-context': { domainContext: async () => domain }, '@/lib/course/member-export': exportService, '@/lib/course/export-workbook': workbook, '@/lib/crm/http': http, '@/lib/course/google-export': { createCourseGoogleSheet: async (sheets, title, recipient) => { googleReport = sheets; googleRecipient = recipient; return 'https://docs.google.com/spreadsheets/d/test' } } })
   const request = (origin = 'https://test.invalid', body = { courseIds: [1] }) => new Request('https://test.invalid/api/courses/member-export', { method: 'POST', headers: { origin, 'content-type': 'application/json' }, body: JSON.stringify(body) })
   assert.equal((await api.POST(request('https://other.invalid'))).status, 403)
   assert.equal((await api.POST(request(undefined, { courseIds: [1], admin: true }))).status, 400)
   const response = await api.POST(request()); assert.equal(response.status, 200); assert.match(response.headers.get('content-type'), /spreadsheetml/); assert.equal(response.headers.get('cache-control'), 'private, no-store')
+  assert.equal((await api.POST(request(undefined, { courseIds: [1], format: 'GOOGLE' }))).status, 400, 'Google requires a verified recipient')
+  db.user.findUnique = async () => ({ ...admin, email: 'requester@example.invalid', emailVerified: now })
+  const googleResponse = await api.POST(request(undefined, { courseIds: [1], status: 'ACTIVE', userIds: [101], reports: true, format: 'GOOGLE' }))
+  assert.equal(googleResponse.status, 200); assert.equal((await googleResponse.json()).sheetUrl, 'https://docs.google.com/spreadsheets/d/test')
+  assert.equal(googleRecipient, 'requester@example.invalid'); assert.equal(googleReport[0].rows.length, 1); assert.equal(googleReport.length, 4, 'Google shares the Excel report filters and detail sheets')
   session = null; assert.equal((await api.POST(request())).status, 401); session = { user: { id: '0' } }; domain = {}; assert.equal((await api.POST(request())).status, 403)
   const priorToken = process.env.GMAIL_REFRESH_TOKEN; process.env.GMAIL_REFRESH_TOKEN = 'fake-only'
   let shared, valueRequest, deleted = 0, denyShare = false
