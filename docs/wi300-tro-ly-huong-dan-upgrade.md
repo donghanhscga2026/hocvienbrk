@@ -26,3 +26,9 @@ Tro ly huong dan). Da bao gom toan bo noi dung da merge:
   rieng tu ke thua bai cua trang cha gan nhat.
 - Them 22 bai huong dan moi (`prisma/seed-assistant-guides.ts`), tong 62 bai.
 - Da seed du lieu len production DB (21 bai moi, 41 bai cu giu nguyen).
+
+## Trang thai merge PR #160
+
+- 2026-10-14 toi: preview Vercel READY tren tai khoan moi (hocvienbrk-4qj3wv0q0-witech2.vercel.app),
+  ni Cuong da kiem tra giao dien va dong y merge.
+- Merge can check CI 'TypeScript, Prisma, Security & Build' xanh — commit nay kich hoat lai workflow.
