@@ -19,3 +19,10 @@ Tro ly huong dan). Da bao gom toan bo noi dung da merge:
 - #157: steps + phan vai tro + tour "Dan toi lam" + 8 bai huong dan
 - #158: cai thien tour va toast
 - #159: anh minh hoa 3 bai dang nhap/dang ky/quen mat khau
+
+## Dot nang cap 2026-10-14: phu kin moi giao dien
+
+- API fallback trang cha (`app/api/assistant-guide/route.ts`): trang con chua co bai
+  rieng tu ke thua bai cua trang cha gan nhat.
+- Them 22 bai huong dan moi (`prisma/seed-assistant-guides.ts`), tong 62 bai.
+- Da seed du lieu len production DB (21 bai moi, 41 bai cu giu nguyen).
