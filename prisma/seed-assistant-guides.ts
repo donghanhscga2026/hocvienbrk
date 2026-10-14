@@ -1147,6 +1147,523 @@ const GUIDES: SeedGuide[] = [
       },
     ],
   },
+  // ===== Đợt bổ sung 2026-10-14: phủ kín mọi giao diện wi300 =====
+  {
+    pagePath: '/',
+    title: 'Trang chủ wi300.vn',
+    roles: [],
+    textContent: 'Tổng quan hệ sinh thái Wi: dự án, khóa học, sản phẩm, dịch vụ, giảng viên.',
+    steps: [
+      {
+        title: 'Bước 1: Xem mục "Bắt đầu cùng Wi"',
+        body:
+          'Ngay dưới phần giới thiệu là mục "Bắt đầu cùng Wi" liệt kê tối đa 8 dự án nổi bật.\n\n' +
+          'Bấm vào từng thẻ dự án để xem chi tiết.',
+      },
+      {
+        title: 'Bước 2: Duyệt khóa học, sản phẩm và dịch vụ',
+        body:
+          'Cuộn xuống để xem các khu vực Khóa học, Sản phẩm và Dịch vụ.\n\n' +
+          'Dùng bộ lọc danh mục để tìm nhanh thứ bạn cần.',
+      },
+      {
+        title: 'Bước 3: Tìm hiểu giảng viên và kiến thức',
+        body:
+          'Khu vực Giảng viên giới thiệu đội ngũ đồng hành cùng bạn.\n\n' +
+          'Khu vực Kiến thức tổng hợp bài viết, tài liệu hữu ích.',
+      },
+    ],
+  },
+  {
+    pagePath: '/dich-vu',
+    title: 'Dịch vụ',
+    roles: [],
+    textContent: 'Danh mục các dịch vụ trong hệ sinh thái Wi.',
+    steps: [
+      {
+        title: 'Bước 1: Duyệt danh sách dịch vụ',
+        body:
+          'Trang liệt kê toàn bộ dịch vụ đang cung cấp kèm mô tả ngắn.\n\n' +
+          'Dùng ô tìm kiếm hoặc bộ lọc để thu hẹp danh sách.',
+      },
+      {
+        title: 'Bước 2: Xem chi tiết dịch vụ',
+        body:
+          'Bấm vào dịch vụ để xem mô tả đầy đủ, quyền lợi và điều kiện áp dụng.',
+      },
+      {
+        title: 'Bước 3: Liên hệ đăng ký',
+        body:
+          'Bấm nút liên hệ/đăng ký trên trang chi tiết và điền thông tin.\n\n' +
+          'Đội ngũ Wi sẽ phản hồi yêu cầu của bạn.',
+      },
+    ],
+  },
+  {
+    pagePath: '/doi-tac',
+    title: 'Đối tác',
+    roles: [],
+    textContent: 'Mạng lưới đối tác đồng hành cùng Wi300.',
+    steps: [
+      {
+        title: 'Bước 1: Xem danh sách đối tác',
+        body:
+          'Trang giới thiệu các đối tác đang đồng hành cùng hệ sinh thái Wi.',
+      },
+      {
+        title: 'Bước 2: Xem hồ sơ đối tác',
+        body:
+          'Bấm vào từng đối tác để xem lĩnh vực hoạt động và cách thức hợp tác.',
+      },
+      {
+        title: 'Bước 3: Đăng ký trở thành đối tác',
+        body:
+          'Điền form đăng ký đối tác với thông tin đơn vị của bạn.\n\n' +
+          'Wi sẽ liên hệ trao đổi sau khi nhận hồ sơ.',
+      },
+    ],
+  },
+  {
+    pagePath: '/du-an',
+    title: 'Dự án Wi',
+    roles: [],
+    textContent: 'Danh sách các dự án trong hệ sinh thái Wi.',
+    steps: [
+      {
+        title: 'Bước 1: Duyệt danh sách dự án',
+        body:
+          'Trang liệt kê các dự án Wi dưới dạng thẻ ngang theo nhận diện thương hiệu.\n\n' +
+          'Dùng bộ lọc để tìm dự án theo lĩnh vực bạn quan tâm.',
+      },
+      {
+        title: 'Bước 2: Mở chi tiết dự án',
+        body:
+          'Bấm vào thẻ dự án để xem tổng quan, đội ngũ và các khóa học, sản phẩm, dịch vụ liên kết.',
+      },
+      {
+        title: 'Bước 3: Tham gia dự án',
+        body:
+          'Trên trang chi tiết có nút tham gia/liên hệ.\n\n' +
+          'Điền thông tin để được kết nối với chủ dự án.',
+      },
+    ],
+  },
+  {
+    pagePath: '/du-an/[slug]',
+    title: 'Chi tiết dự án Wi',
+    roles: [],
+    textContent: 'Hồ sơ chi tiết của một dự án Wi: tổng quan, đội ngũ, nội dung liên kết.',
+    steps: [
+      {
+        title: 'Bước 1: Đọc tổng quan dự án',
+        body:
+          'Phần đầu trang giới thiệu mục tiêu, giá trị và hình ảnh nhận diện của dự án.',
+      },
+      {
+        title: 'Bước 2: Xem khóa học, sản phẩm, dịch vụ liên kết',
+        body:
+          'Bảng nội dung liên kết ở trung tâm trang liệt kê mọi thứ thuộc dự án.\n\n' +
+          'Bấm vào từng mục để xem chi tiết và đăng ký.',
+      },
+      {
+        title: 'Bước 3: Gặp đội ngũ dự án',
+        body:
+          'Phần đội ngũ giới thiệu những người đứng sau dự án.\n\n' +
+          'Bấm vào hồ sơ để xem thêm thông tin giảng viên/chủ dự án.',
+      },
+    ],
+  },
+  {
+    pagePath: '/giang-vien',
+    title: 'Giảng viên',
+    roles: [],
+    textContent: 'Đội ngũ giảng viên đồng hành trong hệ sinh thái Wi.',
+    steps: [
+      {
+        title: 'Bước 1: Duyệt danh sách giảng viên',
+        body:
+          'Trang hiển thị giảng viên dưới dạng slide (5 thẻ mỗi lượt) và có trang danh sách đầy đủ.\n\n' +
+          'Dùng tìm kiếm hoặc bộ lọc để tìm giảng viên theo chuyên môn.',
+      },
+      {
+        title: 'Bước 2: Xem hồ sơ giảng viên',
+        body:
+          'Bấm vào thẻ giảng viên để xem tiểu sử, chuyên môn và kinh nghiệm.',
+      },
+      {
+        title: 'Bước 3: Xem khóa học của giảng viên',
+        body:
+          'Trong hồ sơ có danh sách khóa học do giảng viên trực tiếp giảng dạy.\n\n' +
+          'Bấm vào khóa học để xem chi tiết và đăng ký.',
+      },
+    ],
+  },
+  {
+    pagePath: '/gioi-thieu',
+    title: 'Giới thiệu',
+    roles: [],
+    textContent: 'Câu chuyện và giá trị cốt lõi của Wi300.',
+    steps: [
+      {
+        title: 'Bước 1: Đọc câu chuyện Wi300',
+        body:
+          'Trang giới thiệu sứ mệnh, tầm nhìn và hành trình hình thành hệ sinh thái Wi.',
+      },
+      {
+        title: 'Bước 2: Tìm hiểu giá trị cốt lõi',
+        body:
+          'Các giá trị như "Kiến tạo tương lai", "Lan tỏa tri thức", "Kết nối con người" ' +
+          'được trình bày cùng minh họa cụ thể.',
+      },
+      {
+        title: 'Bước 3: Kết nối với Wi',
+        body:
+          'Cuối trang có thông tin liên hệ và liên kết tới các dự án, khóa học.\n\n' +
+          'Bấm để bắt đầu hành trình cùng Wi.',
+      },
+    ],
+  },
+  {
+    pagePath: '/kham-pha',
+    title: 'Khám phá',
+    roles: [],
+    textContent: 'Khám phá tri thức và kỹ năng trong hệ sinh thái Wi.',
+    steps: [
+      {
+        title: 'Bước 1: Duyệt nội dung khám phá',
+        body:
+          'Trang tổng hợp nội dung để bạn khám phá: khóa học, bài viết, dự án nổi bật.',
+      },
+      {
+        title: 'Bước 2: Lọc theo nhu cầu',
+        body:
+          'Dùng bộ lọc danh mục để chỉ xem đúng loại nội dung bạn quan tâm.',
+      },
+      {
+        title: 'Bước 3: Mở chi tiết',
+        body:
+          'Bấm vào từng thẻ để xem chi tiết và thực hiện bước tiếp theo (đăng ký, đọc bài, tham gia).',
+      },
+    ],
+  },
+  {
+    pagePath: '/san-pham',
+    title: 'Sản phẩm',
+    roles: [],
+    textContent: 'Danh mục sản phẩm trong hệ sinh thái Wi.',
+    steps: [
+      {
+        title: 'Bước 1: Duyệt danh mục sản phẩm',
+        body:
+          'Trang liệt kê sản phẩm kèm hình ảnh, mô tả ngắn và giá.\n\n' +
+          'Dùng ô tìm kiếm để tìm sản phẩm phù hợp.',
+      },
+      {
+        title: 'Bước 2: Xem chi tiết sản phẩm',
+        body:
+          'Bấm vào sản phẩm để xem mô tả đầy đủ, hình ảnh và thông tin liên quan.',
+      },
+      {
+        title: 'Bước 3: Mua/đăng ký sản phẩm',
+        body:
+          'Bấm nút mua hoặc liên hệ trên trang chi tiết và làm theo hướng dẫn thanh toán.',
+      },
+    ],
+  },
+  {
+    pagePath: '/my-requests',
+    title: 'Yêu cầu hỗ trợ của tôi',
+    roles: [],
+    textContent: 'Theo dõi các yêu cầu hỗ trợ bạn đã gửi.',
+    steps: [
+      {
+        title: 'Bước 1: Xem danh sách yêu cầu',
+        body:
+          'Trang liệt kê mọi yêu cầu hỗ trợ bạn đã gửi kèm trạng thái xử lý mới nhất.',
+      },
+      {
+        title: 'Bước 2: Gửi yêu cầu mới',
+        body:
+          'Bấm nút tạo yêu cầu, chọn loại hỗ trợ và mô tả chi tiết vấn đề bạn gặp.',
+      },
+      {
+        title: 'Bước 3: Theo dõi phản hồi',
+        body:
+          'Mở từng yêu cầu để xem trao đổi với đội ngũ hỗ trợ.\n\n' +
+          'Bạn sẽ nhận thông báo khi có cập nhật mới.',
+      },
+    ],
+  },
+  {
+    pagePath: '/reset-password/[token]',
+    title: 'Đặt lại mật khẩu',
+    roles: [],
+    textContent: 'Tạo mật khẩu mới từ liên kết đặt lại mật khẩu.',
+    steps: [
+      {
+        title: 'Bước 1: Nhập mật khẩu mới',
+        body:
+          'Nhập mật khẩu mới vào ô đầu tiên.\n\n' +
+          'Mật khẩu nên dài, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.',
+      },
+      {
+        title: 'Bước 2: Xác nhận mật khẩu',
+        body:
+          'Nhập lại đúng mật khẩu mới vào ô xác nhận rồi bấm lưu.',
+      },
+      {
+        title: 'Bước 3: Đăng nhập lại',
+        body:
+          'Sau khi đặt lại thành công, bạn được chuyển về trang đăng nhập.\n\n' +
+          'Đăng nhập bằng mật khẩu mới.',
+      },
+    ],
+  },
+  {
+    pagePath: '/page/[slug]',
+    title: 'Trang nội dung',
+    roles: [],
+    textContent: 'Trang nội dung do Wi biên soạn.',
+    steps: [
+      {
+        title: 'Bước 1: Đọc nội dung trang',
+        body:
+          'Trang hiển thị nội dung đã được Wi biên soạn và cập nhật.',
+      },
+      {
+        title: 'Bước 2: Xem mục liên quan',
+        body:
+          'Cuối trang có thể có các mục liên quan: khóa học, bài viết hoặc liên kết hữu ích.',
+      },
+      {
+        title: 'Bước 3: Liên hệ khi cần',
+        body:
+          'Nếu cần thêm thông tin, dùng thông tin liên hệ ở chân trang.',
+      },
+    ],
+  },
+  {
+    pagePath: '/page/[slug]/[pageSlug]',
+    title: 'Trang nội dung chi tiết',
+    roles: [],
+    textContent: 'Trang con thuộc một trang nội dung của Wi.',
+    steps: [
+      {
+        title: 'Bước 1: Đọc nội dung chi tiết',
+        body:
+          'Đây là trang con nằm trong một trang nội dung lớn hơn của Wi.',
+      },
+      {
+        title: 'Bước 2: Điều hướng giữa các mục',
+        body:
+          'Dùng menu hoặc breadcrumb để di chuyển giữa các trang con cùng chủ đề.',
+      },
+    ],
+  },
+  {
+    pagePath: '/land/[slug]',
+    title: 'Trang landing',
+    roles: [],
+    textContent: 'Trang giới thiệu chi tiết một sản phẩm, khóa học hoặc chương trình.',
+    steps: [
+      {
+        title: 'Bước 1: Đọc thông tin trang',
+        body:
+          'Trang landing trình bày đầy đủ: lợi ích, nội dung, giảng viên, học phí và minh chứng.',
+      },
+      {
+        title: 'Bước 2: Điền form đăng ký',
+        body:
+          'Kéo xuống form đăng ký, điền họ tên, số điện thoại, email.\n\n' +
+          'Kiểm tra kỹ thông tin trước khi gửi.',
+      },
+      {
+        title: 'Bước 3: Xác nhận và thanh toán',
+        body:
+          'Sau khi gửi form, làm theo hướng dẫn xác nhận và thanh toán (nếu có) ' +
+          'để hoàn tất đăng ký.',
+      },
+    ],
+  },
+  {
+    pagePath: '/[slug]',
+    title: 'Trang động',
+    roles: [],
+    textContent: 'Trang nội dung động trong hệ thống Wi.',
+    steps: [
+      {
+        title: 'Bước 1: Xem nội dung trang',
+        body:
+          'Trang hiển thị nội dung được cấu hình động trong hệ thống.',
+      },
+      {
+        title: 'Bước 2: Tương tác với các mục',
+        body:
+          'Bấm vào các nút, liên kết trên trang để đi tới nội dung liên quan.',
+      },
+    ],
+  },
+  {
+    pagePath: '/tools/brk',
+    title: 'Điểm BRK',
+    roles: [],
+    textContent: 'Xem cấp độ và tổng điểm BRK của bạn trong hệ thống.',
+    steps: [
+      {
+        title: 'Bước 1: Xem tổng quan điểm BRK',
+        body:
+          'Trang hiển thị hệ thống bạn đang tham gia, cấp độ hiện tại và tổng điểm BRK đã tích lũy.',
+      },
+      {
+        title: 'Bước 2: Xem lịch sử tích điểm',
+        body:
+          'Mở phần lịch sử để xem chi tiết từng lần cộng/trừ điểm và lý do.',
+      },
+      {
+        title: 'Bước 3: Quản lý ví BRK',
+        body:
+          'Bấm sang mục Ví BRK để xem số dư và lịch sử giao dịch ví.',
+      },
+    ],
+  },
+  {
+    pagePath: '/tools/my-site',
+    title: 'Website của tôi',
+    roles: ['ADMIN', 'INSTRUCTOR'],
+    textContent: 'Trung tâm quản trị website cá nhân: trang, giao diện, tên miền, form.',
+    steps: [
+      {
+        title: 'Bước 1: Mở trang Quản lý website',
+        body:
+          'Bấm vào mục Quản lý để vào trung tâm điều khiển website của bạn: ' +
+          'danh sách trang, cài đặt chung.',
+      },
+      {
+        title: 'Bước 2: Soạn trang và chỉnh giao diện',
+        body:
+          'Các mục Trang và Giao diện cho phép soạn nội dung từng trang và tùy chỉnh màu sắc, bố cục.\n\n' +
+          'Mọi thay đổi đều có xem trước trước khi xuất bản.',
+      },
+      {
+        title: 'Bước 3: Quản lý tên miền và form',
+        body:
+          'Mục Tên miền để gắn domain riêng; mục Form để xem dữ liệu khách để lại thông tin.\n\n' +
+          'Kiểm tra kỹ trước khi áp dụng thay đổi ra website thật.',
+      },
+    ],
+  },
+  {
+    pagePath: '/tools/landings',
+    title: 'Landing page',
+    roles: ['ADMIN'],
+    textContent: 'Quản lý các trang landing giới thiệu sản phẩm/khóa học.',
+    steps: [
+      {
+        title: 'Bước 1: Xem danh sách landing page',
+        body:
+          'Trang liệt kê các landing page đã tạo kèm trạng thái và liên kết xem trước.',
+      },
+      {
+        title: 'Bước 2: Tạo landing page mới',
+        body:
+          'Bấm nút tạo mới để vào trình dựng landing: nhập thông tin, chọn mẫu, ' +
+          'duyệt dàn ý, chỉnh nội dung và tải file HTML.',
+      },
+      {
+        title: 'Bước 3: Sửa hoặc xóa landing page',
+        body:
+          'Bấm vào landing page trong danh sách để chỉnh sửa hoặc xóa khi không còn dùng.',
+      },
+    ],
+  },
+  {
+    pagePath: '/tools/site-profiles',
+    title: 'Hồ sơ site',
+    roles: ['ADMIN'],
+    textContent: 'Quản lý hồ sơ website cho các thương hiệu/chi nhánh.',
+    steps: [
+      {
+        title: 'Bước 1: Xem danh sách hồ sơ site',
+        body:
+          'Trang liệt kê các hồ sơ website đã tạo cho từng thương hiệu/chi nhánh.',
+      },
+      {
+        title: 'Bước 2: Tạo hồ sơ site mới',
+        body:
+          'Bấm tạo mới, điền thông tin thương hiệu: tên, logo, màu sắc, nội dung trang chủ.',
+      },
+      {
+        title: 'Bước 3: Chỉnh sửa hồ sơ',
+        body:
+          'Mở hồ sơ trong danh sách để chỉnh sửa nội dung hoặc cấu hình hiển thị.',
+      },
+    ],
+  },
+  {
+    pagePath: '/tools/dev-flow',
+    title: 'Theo dõi luồng phát triển',
+    roles: ['ADMIN'],
+    textContent: 'Theo dõi issue, PR, CI và deployment của dự án.',
+    steps: [
+      {
+        title: 'Bước 1: Xem danh sách công việc',
+        body:
+          'Trang liệt kê các issue/đầu việc kèm nhánh code và trạng thái xử lý.',
+      },
+      {
+        title: 'Bước 2: Kiểm tra PR, CI và deployment',
+        body:
+          'Bấm vào từng đầu việc để xem PR liên quan, kết quả CI và trạng thái deploy trên Vercel ' +
+          'cùng liên kết preview để kiểm thử.',
+      },
+      {
+        title: 'Bước 3: Xem nhật ký',
+        body:
+          'Phần nhật ký ghi lại các hoạt động trong luồng để tiện tra cứu.',
+      },
+    ],
+  },
+  {
+    pagePath: '/tools/tca-sync',
+    title: 'Đồng bộ TCA',
+    roles: ['ADMIN'],
+    textContent: 'Đồng bộ dữ liệu thành viên TCA với hệ thống.',
+    steps: [
+      {
+        title: 'Bước 1: Xem số liệu hiện tại',
+        body:
+          'Trang hiển thị số lượng người dùng, hệ thống, thành viên TCA và các bản ghi đã đồng bộ.',
+      },
+      {
+        title: 'Bước 2: Chạy đồng bộ',
+        body:
+          'Bấm nút đồng bộ để bắt đầu quá trình. Không tắt trang khi đang chạy.',
+      },
+      {
+        title: 'Bước 3: Kiểm tra kết quả',
+        body:
+          'Sau khi xong, đối chiếu số liệu trước/sau để chắc dữ liệu đã đồng bộ đầy đủ.',
+      },
+    ],
+  },
+  {
+    pagePath: '/tools/reserved-ids',
+    title: 'Mã thành viên số đẹp',
+    roles: ['ADMIN'],
+    textContent: 'Quản lý các mã thành viên số đẹp dành riêng.',
+    steps: [
+      {
+        title: 'Bước 1: Xem danh sách mã số đẹp',
+        body:
+          'Trang liệt kê các mã thành viên số đẹp đang được giữ riêng.',
+      },
+      {
+        title: 'Bước 2: Cấp mã cho thành viên',
+        body:
+          'Chọn mã còn trống và gán cho thành viên theo quy định.',
+      },
+    ],
+  },
 ]
 
 async function main() {
