@@ -87,7 +87,7 @@ export function spaceNavigation(role: string, tools: PersonalTool[]): SpaceNavGr
     ] },
     ...(canTeach(role) ? [{ id: 'teaching', label: 'Giảng dạy', href: '/my-space?tab=teaching', icon: 'GraduationCap', items: [] }] : []),
     ...(loggedIn ? [{ id: 'affiliate', label: 'Cộng tác viên', href: '/my-space?tab=affiliate', icon: 'Link2', items: [{ label: 'Link giới thiệu & hoa hồng', href: '/tools/affiliate', icon: 'Link2' }] }] : []),
-    { id: 'business', label: 'Quản lý & kinh doanh', href: '/my-space?tab=business', icon: 'Handshake', items: [] },
+    ...(loggedIn ? [{ id: 'business', label: 'Quản lý & kinh doanh', href: '/my-space?tab=business', icon: 'Handshake', items: [] }] : []),
     { id: 'pages', label: 'Nội dung & website', href: '/my-space?tab=pages', icon: 'Globe', items: [] },
     { id: 'tools', label: 'Công cụ & tiện ích', href: '/my-space?tab=tools', icon: 'LayoutGrid', items: [] },
     { id: 'account', label: 'Tài khoản & tài chính', href: '/my-space?tab=account', icon: 'UserRound', items: [
