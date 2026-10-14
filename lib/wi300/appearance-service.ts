@@ -3,6 +3,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:
 import { z } from 'zod'
 import { appearanceSchema, defaultAppearance } from './appearance'
 import { CrmError } from '@/lib/crm/service'
+import { managedPageSchema, SYSTEM_WEBSITE_PAGES } from './managed-pages'
 
 export function appearanceKey(scope = process.env.SITE_PROFILE_KEY?.trim() || 'default', env: Record<string, string | undefined> = process.env) {
   const base = `wi300:appearance:v1:${encodeURIComponent(scope)}`
@@ -51,7 +52,7 @@ export async function appearanceAdmin(db: PrismaClient, id: number) {
   if (actor.role !== 'ADMIN') throw new CrmError('Chỉ admin được chỉnh giao diện.', 403)
 }
 export async function saveAppearance(db: PrismaClient, id: number, raw: unknown, key = appearanceKey()): Promise<AppearanceState> {
-  const input = z.object({ action: z.enum(['draft', 'publish', 'restore']), revision: z.number().int().min(0), settings: appearanceSchema.optional() }).strict().parse(raw)
+  const input = z.object({ action: z.enum(['draft', 'publish', 'restore']), revision: z.number().int().min(0), settings: appearanceSchema.optional(), page: z.enum(['home', 'courses', 'projects', 'teachers']).optional(), scope: z.literal('website').optional() }).strict().parse(raw)
   if (input.action !== 'restore' && !input.settings) throw new CrmError('Thiếu cài đặt giao diện.')
   return db.$transaction(async tx => {
     // Serialize cả bản nháp và publish, kiểm tra quyền mới nhất trong transaction.
@@ -61,10 +62,50 @@ export async function saveAppearance(db: PrismaClient, id: number, raw: unknown,
     if (input.revision !== current.revision) throw new CrmError('Cài đặt đã được người khác sửa. Tải lại trước khi lưu.', 409)
     if (input.action === 'restore' && !current.previous) throw new CrmError('Chưa có bản trước để khôi phục.')
     const settings = input.action === 'restore' ? current.previous! : input.settings!
-    const value = { revision: current.revision + 1, draft: settings, published: input.action === 'publish' ? settings : current.published, previous: input.action === 'publish' ? current.published : current.previous }
+    function selected(base: AppearanceState['draft']) {
+      if (input.scope === 'website') return { ...structuredClone(base), common: settings.common, seo: settings.seo, footer: settings.footer }
+      if (!input.page) return settings
+      const copy = structuredClone(base)
+      copy[input.page] = settings[input.page] as never
+      copy.pageSeo[input.page] = settings.pageSeo[input.page]
+      return copy
+    }
+    const value = { revision: current.revision + 1, draft: selected(current.draft), published: input.action === 'publish' ? selected(current.published) : current.published, previous: input.action === 'publish' ? current.published : current.previous }
     // Bảng SystemConfig có thể có quyền Data API rộng; không lưu draft bằng plaintext.
     const encrypted = encode(value, key)
     await tx.systemConfig.upsert({ where: { key }, create: { key, value: encrypted }, update: { value: encrypted } })
     return value
+  }, { timeout: 15000 })
+}
+
+/** Áp dụng đúng một trang, giữ các nháp và các trang công khai khác. */
+export async function saveManagedPage(db: PrismaClient, actor: number, raw: unknown, key = appearanceKey()): Promise<AppearanceState> {
+  const input = z.object({ action: z.enum(['draft', 'publish', 'trash', 'restore']), revision: z.number().int().min(0), page: managedPageSchema }).strict().parse(raw)
+  const system = SYSTEM_WEBSITE_PAGES.find(item => item.id === input.page.id)
+  if (system && input.page.slug !== system.url.slice(1)) throw new CrmError('Đường dẫn trang hệ thống được giữ cố định.')
+  return db.$transaction(async tx => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`
+    await appearanceAdmin(tx as PrismaClient, actor)
+    const current = await readAppearance(tx as PrismaClient, key)
+    if (current.revision !== input.revision) throw new CrmError('Cài đặt đã thay đổi. Tải lại trước khi lưu.', 409)
+    const page = { ...input.page, ...(input.action === 'trash' ? { deleted: true, published: false } : input.action === 'restore' ? { deleted: false, published: true } : {}) }
+    function replace(settings: AppearanceState['draft']) {
+      const copy = structuredClone(settings)
+      if (system) {
+        copy.pageContent[page.id] = page
+        copy.hiddenPages = copy.hiddenPages.filter(id => id !== page.id)
+        if (page.deleted || !page.published) copy.hiddenPages.push(page.id)
+      } else {
+        const index = copy.customPages.findIndex(item => item.id === page.id)
+        if (index === -1) copy.customPages.push(page); else copy.customPages[index] = page
+      }
+      return appearanceSchema.parse(copy)
+    }
+    const live = input.action !== 'draft'
+    const state = { revision: current.revision + 1, draft: replace(current.draft), published: live ? replace(current.published) : current.published,
+      previous: live ? current.published : current.previous }
+    const value = encode(state, key)
+    await tx.systemConfig.upsert({ where: { key }, create: { key, value }, update: { value } })
+    return state
   }, { timeout: 15000 })
 }

@@ -7,6 +7,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
+    "prebuild": "node scripts/generate-wi300-page-inventory.cjs",
     "build": "next build --webpack",
     "postinstall": "prisma generate",
     "start": "next start",

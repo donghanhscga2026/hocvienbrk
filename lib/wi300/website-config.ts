@@ -37,7 +37,8 @@ export function pageMetadata(brand: DeploymentBrand, page: WebsitePage): Metadat
   const description = own?.description || brand.description
   const image = own?.imageUrl || brand.ogImageUrl
   return { ...shared, title: { absolute: title }, description, keywords: own?.keywords || shared.keywords,
-    robots: own && !own.inheritRobots ? { index: own.index, follow: own.follow } : shared.robots,
+    alternates: { canonical: fallback.url },
+    robots: brand.appearance?.hiddenPages.includes(page) ? { index: false, follow: false } : own && !own.inheritRobots ? { index: own.index, follow: own.follow } : shared.robots,
     openGraph: { title, description, siteName: brand.name, images: [image] },
     twitter: { card: 'summary_large_image', title, description, images: [image] },
   }

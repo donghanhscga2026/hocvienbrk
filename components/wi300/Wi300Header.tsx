@@ -14,6 +14,7 @@ import NotificationBell from '@/components/notifications/NotificationBell'
 import Wi300SpaceMenu from './Wi300SpaceMenu'
 import { InstallAppButton } from '@/components/pwa/PwaInstallProvider'
 import { useMbwDashboard } from '@/components/mbw/MbwDashboardContext'
+import { websiteLinkVisible } from '@/lib/wi300/managed-pages'
 
 const ShareModal = dynamic(() => import('@/components/share/ShareModal'), { ssr: false })
 const WalletPopup = dynamic(() => import('@/components/mbw/MbwDashboardPopup'), { ssr: false })
@@ -51,7 +52,7 @@ export default function Wi300Header() {
         <Image src={brand.logoUrl} alt={`${brand.name} — Liên minh 300 doanh nghiệp số, WIPA cố vấn`} width={2089} height={753} priority unoptimized className="h-auto w-24 object-contain min-[360px]:w-32 sm:w-44" />
       </Link>
       <nav aria-label="Điều hướng chính" className="col-span-2 row-start-2 flex w-full justify-between gap-1 lg:justify-start py-1 lg:w-auto">
-        {links.map(({ href, label, icon: Icon }) => {
+        {links.filter(item => websiteLinkVisible(item.href, brand.appearance)).map(({ href, label, icon: Icon }) => {
           const selected = path === href || (href === '/khoa-hoc' && path.startsWith(href + '/'))
           return <Link key={href} href={href} aria-current={selected ? 'page' : undefined} className={`inline-flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1.5 text-[11px] font-semibold sm:px-2.5 sm:text-sm lg:flex-none ${selected ? 'bg-brk-background text-brk-primary' : 'text-brk-muted hover:bg-brk-background hover:text-brk-primary'}`}><Icon className="h-4 w-4" aria-hidden="true" />{label}</Link>
         })}
