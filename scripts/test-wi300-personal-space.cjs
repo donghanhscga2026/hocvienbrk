@@ -37,6 +37,7 @@ async function run() {
     { id: 5, slug: 'custom', name: 'Công cụ mới', url: '/tools/new-helper', roles: [], isActive: true },
     { id: 7, slug: 'brk', name: 'BRK (Phước Báu)', url: '/tools/brk', roles: [], isActive: true },
     { id: 6, slug: 'genealogy', name: 'Nhân Mạch', url: '/tools/genealogy', roles: [], isActive: true },
+    { id: 8, slug: 'wi-appearance', name: 'Giao diện website', url: '/tools/wi-appearance', roles: ['ADMIN'], isActive: true },
   ]
   assert.equal(helpers.wi300ToolName(tools[5]), 'Ví Wi')
   assert.equal(tools[5].name, 'BRK (Phước Báu)', 'Nhãn Wi không sửa tên chung trong dữ liệu')
@@ -192,6 +193,10 @@ async function run() {
     role = 'ADMIN'
     await act(async () => render())
     assert.ok(document.querySelector('a[href="/tools/backup"]'))
+    params = new URLSearchParams('tab=website-admin')
+    await act(async () => render())
+    assert.equal(document.querySelector('a[href="/tools/wi-appearance"]').textContent, 'Cấu hình các trang', 'Cards use the same label as sidebar/header even with old API labels')
+    assert.ok(document.querySelector('a[href="/tools/posts"]'))
     params = new URLSearchParams('view=teaching')
     await act(async () => render())
     assert.ok(document.getElementById('overview-tab-teaching'))

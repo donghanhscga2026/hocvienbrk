@@ -124,7 +124,10 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
 
   // Lọc lại theo role hiện tại ngay khi render để tránh hiện danh sách của role cũ.
   const permittedTools = tools.filter(tool => canUseTool(role, tool.roles))
-  const workspaceTools = (workspace: string): Tool[] => (tabs.find(group => group.id === workspace)?.items || []).map((item, index) => permittedTools.find(tool => tool.url === item.href) || { id: -100 - index, name: item.label, url: item.href, icon: item.icon, roles: [], isActive: true })
+  const workspaceTools = (workspace: string): Tool[] => (tabs.find(group => group.id === workspace)?.items || []).map((item, index) => {
+    const tool = permittedTools.find(tool => tool.url === item.href)
+    return tool ? { ...tool, name: item.label } : { id: -100 - index, name: item.label, url: item.href, icon: item.icon, roles: [], isActive: true }
+  })
   const pages = workspaceTools('pages')
   const otherTools = workspaceTools('tools')
   const accountTools = workspaceTools('account')

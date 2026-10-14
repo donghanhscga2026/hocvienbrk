@@ -30,7 +30,7 @@ export async function GET() {
       if (Number.isSafeInteger(id) && id >= 0) {
         const managed = await managedProjects(prisma, id)
         if (managed.admin) tools.push({
-          id: -4, slug: 'wi-appearance', name: 'Giao diện website', description: 'Tùy chỉnh giao diện Wi, bản nháp và xem trước', icon: 'Palette',
+          id: -4, slug: 'wi-appearance', name: 'Cấu hình các trang', description: 'Tùy chỉnh giao diện các trang Wi, bản nháp và xem trước', icon: 'Palette',
           url: '/tools/wi-appearance', roles: ['ADMIN'], order: 103, isActive: true, createdAt: new Date(), updatedAt: new Date(),
         })
         if (managed.admin || managed.projects.length) tools.push({
