@@ -52,10 +52,10 @@ export default function Wi300Header() {
       <Link href="/" aria-label={`${brand.name} — Trang chủ`} className="flex shrink-0 items-center gap-2">
         <Image src={brand.logoUrl} alt={`${brand.name} — Liên minh 300 doanh nghiệp số, WIPA cố vấn`} width={2089} height={753} priority unoptimized className="h-auto w-24 object-contain min-[360px]:w-32 sm:w-44" />
       </Link>
-      <nav aria-label="Điều hướng chính" className="col-span-2 row-start-2 flex w-full justify-between gap-1 lg:justify-start py-1 lg:w-auto">
+      <nav aria-label="Điều hướng chính" className="col-span-2 row-start-2 flex w-full min-w-0 items-center gap-1 overflow-x-auto py-1 lg:w-auto lg:justify-start">
         {links.filter(item => websiteLinkVisible(item.href, brand.appearance)).map(({ href, label, icon: Icon }) => {
           const selected = path === href || (href === '/khoa-hoc' && path.startsWith(href + '/'))
-          return <Link key={href} href={href} target={href.startsWith('https://') ? '_blank' : undefined} rel={href.startsWith('https://') ? 'noopener noreferrer' : undefined} aria-current={selected ? 'page' : undefined} className={`inline-flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1.5 text-[11px] font-semibold sm:px-2.5 sm:text-sm lg:flex-none ${selected ? 'bg-brk-background text-brk-primary' : 'text-brk-muted hover:bg-brk-background hover:text-brk-primary'}`}><Icon className="h-4 w-4" aria-hidden="true" />{label}</Link>
+          return <Link key={href} href={href} target={href.startsWith('https://') ? '_blank' : undefined} rel={href.startsWith('https://') ? 'noopener noreferrer' : undefined} aria-current={selected ? 'page' : undefined} className={`inline-flex min-h-11 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-xl px-2.5 text-[11px] font-semibold sm:px-2.5 sm:text-sm lg:flex-none ${selected ? 'bg-brk-background text-brk-primary' : 'text-brk-muted hover:bg-brk-background hover:text-brk-primary'}`}><Icon className="h-4 w-4" aria-hidden="true" />{label}</Link>
         })}
       </nav>
       <div className="flex shrink-0 items-center justify-end gap-0.5 sm:gap-2">
