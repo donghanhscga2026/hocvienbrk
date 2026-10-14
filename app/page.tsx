@@ -18,6 +18,7 @@ import { FALLBACK_PROFILE } from '@/lib/db-fallback'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import Wi300Home from '@/components/wi300/Wi300Home'
 import { pageMetadata } from '@/lib/wi300/website-config'
+import { notFound } from 'next/navigation'
 
 const getHomepageLanding = cache(async (landingId?: number, landingSlug?: string) => {
   if (!landingId && !landingSlug) return null
@@ -67,6 +68,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function Home() {
   const session = await getSession()
   const brand = await getCurrentDeploymentBrand()
+  if (brand?.appearance?.hiddenPages.includes('home')) notFound()
   if (brand) return <Wi300Home brand={brand} session={session} />
   
   // Resolve Site Profile theo hostname; localhost/host chưa khai báo fallback profile mặc định.

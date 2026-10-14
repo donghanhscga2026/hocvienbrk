@@ -7,18 +7,7 @@ const { JSDOM } = require('jsdom')
 const { createRoot } = require('react-dom/client')
 const { act } = React
 function load(file, overrides = {}) {
-  const module = { exports: {} }
-  const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
-  new Function('require', 'module', 'exports', code)(name => {
-    if (name in overrides) return overrides[name]
-    if (name.startsWith('@/') || name.startsWith('./')) {
-      const base = name.startsWith('@/') ? name.slice(2) : path.posix.join(path.posix.dirname(file), name)
-      const resolved = ['.tsx', '.ts'].map(ext => base + ext).find(candidate => fs.existsSync(path.join(__dirname, '..', candidate)))
-      if (resolved) return load(resolved, overrides)
-    }
-    return require(name)
-  }, module, module.exports)
-  return module.exports
+  return require('./helpers/load-ts.cjs')(file, overrides)
 }
 async function run() {
   const config = load('lib/site-profile/deployment-brand.ts')

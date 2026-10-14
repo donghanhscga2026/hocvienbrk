@@ -10,6 +10,6 @@ export async function generateMetadata() {
 }
 export default async function Page() {
   const brand = await getCurrentDeploymentBrand()
-  if (!brand) notFound()
+  if (!brand || brand.appearance?.hiddenPages.includes('teachers')) notFound()
   return <Wi300Home brand={brand} session={await getSession()} view="teachers" />
 }

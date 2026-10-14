@@ -11,7 +11,7 @@ export async function generateMetadata() {
 }
 export default async function Page() {
   const brand = await getCurrentDeploymentBrand()
-  if (!brand) notFound()
+  if (!brand || brand.appearance?.hiddenPages.includes('projects')) notFound()
   const projects = await readPublicProjects(prisma)
   return <WiProjectDirectory settings={brand.appearance?.projects} projects={projects} />
 }

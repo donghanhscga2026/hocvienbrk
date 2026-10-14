@@ -5,7 +5,7 @@ import { safeProjectUrl } from '@/lib/wi300/projects'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowUp, ArrowDown, Monitor, Tablet, Smartphone } from 'lucide-react'
-import { appearanceSchema, defaultAppearance, homeSectionLabels } from '@/lib/wi300/appearance'
+import { appearanceSchema, defaultAppearance as baselineAppearance, homeSectionLabels } from '@/lib/wi300/appearance'
 import type { AppearanceState } from '@/lib/wi300/appearance-service'
 import type { Wi300HomeClientProps } from './Wi300HomeClient'
 import WiAppearancePreview from './WiAppearancePreview'
@@ -19,6 +19,10 @@ export default function WiAppearanceEditor({ initial, previewData, previewOnly =
   const router = useRouter()
   const [state, setState] = useState(initial)
   const [settings, setSettings] = useState(initial.draft)
+  // Reset mẫu giao diện giữ nguyên các trang đã tạo và dữ liệu CMS.
+  const defaultAppearance = pageOnly ? { ...settings, [pageOnly]: baselineAppearance[pageOnly], pageSeo: { ...settings.pageSeo, [pageOnly]: baselineAppearance.pageSeo[pageOnly] } }
+    : mode === 'website' ? { ...settings, common: baselineAppearance.common, seo: baselineAppearance.seo, footer: baselineAppearance.footer }
+    : { ...baselineAppearance, customPages: settings.customPages, pageContent: settings.pageContent, hiddenPages: settings.hiddenPages }
   const [tab, setTab] = useState<EditorTab>(initialTab)
   const [pagePanel, setPagePanel] = useState<'design' | 'seo'>('design')
   const pageLabel = WEBSITE_PAGES.find(item => item.id === pageOnly)?.label
@@ -79,7 +83,7 @@ export default function WiAppearanceEditor({ initial, previewData, previewOnly =
     }
     setBusy(true); setError(''); setMessage('')
     try {
-      const response = await fetch('/api/wi300/appearance', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, revision: state.revision, ...(action !== 'restore' ? { settings } : {}) }) })
+      const response = await fetch('/api/wi300/appearance', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, revision: state.revision, ...(pageOnly ? { page: pageOnly } : {}), ...(mode === 'website' ? { scope: 'website' } : {}), ...(action !== 'restore' ? { settings } : {}) }) })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Chưa lưu được giao diện.')
       setState(result); setSettings(result.draft)

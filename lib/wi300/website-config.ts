@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import type { DeploymentBrand } from '@/lib/site-profile/deployment-brand'
 import type { WiAppearance } from './appearance'
+import { newManagedPage } from './managed-pages'
 
 export const WEBSITE_PAGES = [
   { id: 'home', label: 'Trang chủ', url: '/' },
@@ -13,7 +14,12 @@ export type WebsitePage = (typeof WEBSITE_PAGES)[number]['id']
 // Cấu hình đã xuất bản ghi đè thương hiệu; ô trống giữ giá trị Vercel hiện tại.
 export function configuredBrand(brand: DeploymentBrand, appearance: WiAppearance): DeploymentBrand {
   const c = appearance.common, seo = appearance.seo
-  return { ...brand, appearance, name: c.name || brand.name, tagline: c.tagline || brand.tagline,
+  // Brand được gửi đến Client Components: không gửi nội dung/SEO của trang ẩn hoặc đã xóa.
+  const publicAppearance = { ...appearance,
+    customPages: appearance.customPages.map(page => page.published && !page.deleted ? page : { ...newManagedPage(page.id, page.slug, 'Trang ẩn'), published: page.published, deleted: page.deleted }),
+    pageContent: Object.fromEntries(Object.entries(appearance.pageContent).map(([id, page]) => [id, appearance.hiddenPages.includes(id) ? { ...newManagedPage(page.id, page.slug, 'Trang ẩn'), published: false, deleted: page.deleted } : page])),
+  }
+  return { ...brand, appearance: publicAppearance, name: c.name || brand.name, tagline: c.tagline || brand.tagline,
     seoTitle: seo.title || brand.seoTitle, description: seo.description || brand.description,
     ogImageUrl: seo.imageUrl || brand.ogImageUrl,
     logoUrl: c.logoUrl || brand.logoUrl, wordmarkUrl: c.logoUrl || brand.wordmarkUrl, iconUrl: c.iconUrl || brand.iconUrl,
@@ -37,7 +43,8 @@ export function pageMetadata(brand: DeploymentBrand, page: WebsitePage): Metadat
   const description = own?.description || brand.description
   const image = own?.imageUrl || brand.ogImageUrl
   return { ...shared, title: { absolute: title }, description, keywords: own?.keywords || shared.keywords,
-    robots: own && !own.inheritRobots ? { index: own.index, follow: own.follow } : shared.robots,
+    alternates: { canonical: fallback.url },
+    robots: brand.appearance?.hiddenPages.includes(page) ? { index: false, follow: false } : own && !own.inheritRobots ? { index: own.index, follow: own.follow } : shared.robots,
     openGraph: { title, description, siteName: brand.name, images: [image] },
     twitter: { card: 'summary_large_image', title, description, images: [image] },
   }

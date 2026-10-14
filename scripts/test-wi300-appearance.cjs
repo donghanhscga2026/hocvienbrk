@@ -3,10 +3,7 @@ const fs = require('node:fs'), path = require('node:path'), assert = require('no
 const React = require('react'), { JSDOM } = require('jsdom')
 process.env.WI300_APPEARANCE_SECRET = 'unit-tests-only-not-a-production-key'
 function load(file, mocks = {}) {
-  const module = { exports: {} }
-  const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name === '@/lib/wi300/website-config' ? load('lib/wi300/website-config.ts') : name === '@/lib/wi300/projects' || name === './projects' ? load('lib/wi300/projects.ts') : name === '@/lib/wi300/appearance' || name === './appearance' ? load('lib/wi300/appearance.ts') : require(name), module, module.exports)
-  return module.exports
+  return require('./helpers/load-ts.cjs')(file, mocks)
 }
 class CrmError extends Error { constructor(message, status = 400) { super(message); this.status = status } }
 async function run() {
@@ -150,7 +147,7 @@ async function run() {
   assert.ok(cardsHTML.includes('<svg')); assert.ok(!cardsHTML.includes('SEO website →'))
   const Pages = load('app/tools/wi-appearance/page.tsx', {
     'next/link': { __esModule: true, default: props => React.createElement('a', props) },
-    'next/navigation': { notFound: () => { throw new Error('404') }, redirect: () => { throw new Error('LOGIN') } },
+    'next/navigation': { useRouter: () => ({ refresh() {} }), notFound: () => { throw new Error('404') }, redirect: () => { throw new Error('LOGIN') } },
     '@/auth': { auth: async () => session }, '@/lib/prisma': { __esModule: true, default: db },
     '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => brand },
     '@/lib/wi300/appearance-service': service, '@/lib/site-profile/deployment-brand': { getDeploymentBrand: () => brandBase },
@@ -158,7 +155,7 @@ async function run() {
     '@/components/wi300/Wi300Home': { __esModule: true, default: async () => ({ props: {} }) },
   }).default
   const listHTML = require('react-dom/server').renderToStaticMarkup(await Pages({ searchParams: Promise.resolve({}) }))
-  assert.equal((listHTML.match(/<article/g) || []).length, 4)
+  assert.equal((listHTML.match(/<article/g) || []).length, 9)
   assert.ok(listHTML.includes('/tools/wi-appearance?page=teachers'))
   assert.equal((await Pages({ searchParams: Promise.resolve({ page: 'teachers' }) })).props.pageOnly, 'teachers')
   await assert.rejects(() => Pages({ searchParams: Promise.resolve({ page: 'invalid' }) }), /404/)

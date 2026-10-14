@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { CSSProperties } from 'react'
 import { safeProjectUrl } from './projects'
+import { managedPageSchema, RESERVED_PAGE_SLUGS } from './managed-pages'
 
 const text = z.string().trim().min(1).max(300)
 const description = z.string().trim().max(1500)
@@ -27,6 +28,9 @@ const pageSeoSchema = z.object({ title: z.string().trim().max(160), description:
 export const HOME_SECTIONS = ['hero', 'discovery', 'projects', 'start'] as const
 export const homeSectionLabels = { hero: 'Hero', discovery: 'Bạn đang tìm gì?', projects: 'Khám phá hệ sinh thái Wi', start: 'Bắt đầu cùng Wi' }
 export const appearanceSchema = z.object({
+  hiddenPages: z.array(z.string().min(1).max(120)).max(100).default([]),
+  pageContent: z.record(z.string().min(1).max(120), managedPageSchema).default({}),
+  customPages: z.array(managedPageSchema).max(50).default([]).refine(pages => pages.every(page => !!page.slug && !RESERVED_PAGE_SLUGS.includes(page.slug)) && new Set(pages.map(page => page.slug)).size === pages.length && new Set(pages.map(page => page.id)).size === pages.length, 'Đường dẫn trang bị trùng hoặc thuộc trang hệ thống.'),
   common: z.object({ name: optionalText.default(''), tagline: optionalText.default(''), logoUrl: url, iconUrl: url, primary: color, accent: color, background: color, foreground: color, width: z.enum(['1120', '1280', '1440']), radius: z.enum(['small', 'medium', 'round']), font: z.enum(['vietnam', 'system']), stickyHeader: z.boolean(), showFooter: z.boolean() }).strict(),
   // Giá trị mặc định giúp đọc nguyên vẹn các bản cấu hình cũ đã mã hóa.
   seo: z.object({ title: z.string().trim().max(160), description: z.string().trim().max(500), imageUrl: url, keywords: optionalText, index: z.boolean(), follow: z.boolean() }).strict().default({ title: '', description: '', imageUrl: '', keywords: '', index: true, follow: true }),
