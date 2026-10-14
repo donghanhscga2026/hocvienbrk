@@ -49,6 +49,9 @@ function CoursesTab() {
     const [loading, setLoading] = useState(true)
     const [loadError, setLoadError] = useState('')
     const courseRequest = useRef(0)
+    const [filtersReady, setFiltersReady] = useState(false)
+    const restoringFilters = useRef(false)
+    const restoredActor = useRef<number | null>(null)
     const [isAdmin, setIsAdmin] = useState(false)
     const [visibilityScope, setVisibilityScope] = useState("shared")
     const [currentUserId, setCurrentUserId] = useState<number | null>(null)
@@ -178,7 +181,34 @@ function CoursesTab() {
     const currentPage = Math.min(page, totalPages)
     const visibleCourses = filteredCourses.slice((currentPage - 1) * 10, currentPage * 10)
     const activityIds = visibleCourses.map(course => course.id).join(',')
-    useEffect(() => { setPage(1); setSelectedIds(new Set()) }, [search, filterStatus, filterCategory, filterProject, filterTeacher])
+    // Nhớ bộ lọc theo tài khoản trong phiên; không lưu dữ liệu hoặc danh sách học viên.
+    useEffect(() => {
+        if (currentUserId == null || restoredActor.current === currentUserId) return
+        restoredActor.current = currentUserId
+        restoringFilters.current = true
+        try {
+            const saved = JSON.parse(window.sessionStorage.getItem('wi300-course-list:' + currentUserId) || 'null')
+            if (saved && typeof saved === 'object') {
+                if (typeof saved.search === 'string') setSearch(saved.search.slice(0, 200))
+                if (['ALL', 'ACTIVE', 'HIDDEN'].includes(saved.status)) setFilterStatus(saved.status)
+                if (typeof saved.category === 'string') setFilterCategory(saved.category)
+                if (typeof saved.project === 'string') setFilterProject(saved.project)
+                if (isAdmin && typeof saved.teacher === 'string' && /^(ALL|SELF|[0-9]+)$/.test(saved.teacher)) setFilterTeacher(saved.teacher)
+                if (Number.isSafeInteger(saved.page) && saved.page > 0) setPage(saved.page)
+                if (['list', 'cards'].includes(saved.display)) setDisplay(saved.display)
+            }
+        } catch {}
+        setFiltersReady(true)
+    }, [currentUserId, isAdmin])
+    useEffect(() => {
+        if (!filtersReady) return
+        if (restoringFilters.current) { restoringFilters.current = false; return }
+        setPage(1); setSelectedIds(new Set())
+    }, [search, filterStatus, filterCategory, filterProject, filterTeacher, filtersReady])
+    useEffect(() => {
+        if (!filtersReady || currentUserId == null) return
+        try { window.sessionStorage.setItem('wi300-course-list:' + currentUserId, JSON.stringify({ search, status: filterStatus, category: filterCategory, project: filterProject, teacher: filterTeacher, page, display })) } catch {}
+    }, [filtersReady, currentUserId, search, filterStatus, filterCategory, filterProject, filterTeacher, page, display])
     useEffect(() => {
         const controller = new AbortController()
         setActivity([]); setActivityError('')

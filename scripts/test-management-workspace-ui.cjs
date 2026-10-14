@@ -86,6 +86,12 @@ async function run() {
     assert.equal(document.querySelectorAll('article').length, 1)
     assert.equal(document.querySelector('[role="alert"]'), null, 'Retry recovers without a stuck spinner')
     await click('Danh mục'); assert.ok(document.body.textContent.includes('Công nghệ'), 'Category management stays available')
+    courseLoad = async () => ({ success: true, courses: Array.from({ length: 12 }, (_, index) => ({ ...course, id: index + 1 })), isAdmin: true, userId: 8 })
+    window.sessionStorage.setItem('wi300-course-list:8', JSON.stringify({ search: '', status: 'ALL', category: 'ALL', project: 'ALL', teacher: 'SELF', page: 2, display: 'cards' }))
+    await click('Khóa học')
+    assert.equal(document.querySelectorAll('article').length, 2, 'Returning to the list restores page two')
+    assert.equal([...document.querySelectorAll('button')].find(node => node.textContent === 'Thẻ').getAttribute('aria-pressed'), 'true', 'Returning restores the display mode')
+    assert.ok(document.body.textContent.includes('Trang 2/2'))
     const Editor = load('app/tools/courses/new/page.tsx').default
     await React.act(async () => root.render(React.createElement(Editor)))
     assert.ok(document.querySelector('input[value="Khóa thực hành AI"]')); snapshot('course-basic')

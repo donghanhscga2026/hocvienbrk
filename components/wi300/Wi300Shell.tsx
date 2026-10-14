@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import Wi300Header from './Wi300Header'
 import Wi300Footer from './Wi300Footer'
 import Link from 'next/link'
+import Wi300ManagementFrame from './Wi300ManagementFrame'
+import { isManagementRoute } from '@/lib/wi300/management-navigation'
 import { defaultPageTitle } from '@/lib/wi300/default-pages'
 
 /** Trang khóa học sở hữu menu; các trang khác dùng menu chung của WI300. */
@@ -29,6 +31,7 @@ export default function Wi300Shell({ children }: { children: React.ReactNode }) 
   }, [pathname])
   const courseOwnsShell = /^\/khoa-hoc\/[^/]+\/?$/.test(pathname) || /^\/courses\/[^/]+\/learn\/?$/.test(pathname)
   if (pathname === '/tools/courses/templates/preview') return <>{children}</>
+  if (isManagementRoute(pathname)) return <div data-wi300-shell className="flex min-h-dvh flex-col"><Wi300Header /><Suspense fallback={<p className="p-5 text-sm">Đang mở không gian quản lý…</p>}><Wi300ManagementFrame>{children}</Wi300ManagementFrame></Suspense><Wi300Footer /></div>
   const managementOwnsLayout = ['/tools/courses', '/tools/courses/new', '/tools/courses/templates', '/tools/courses/templates/legacy', '/du-an/quan-ly'].includes(pathname)
   const title = managementOwnsLayout ? null : defaultPageTitle(pathname)
   // Chỉ căn khung trang hệ thống mặc định; trang khóa học/template sở hữu bố cục riêng.

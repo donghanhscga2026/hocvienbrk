@@ -3,7 +3,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
 import { BookOpen, ChevronDown, ChevronRight, ContactRound, CreditCard, FileText, Globe, GraduationCap, Handshake, LayoutGrid, LifeBuoy, Link2, Mail, Network, Settings, ShieldCheck, UserRound, Users, Wallet, Youtube, type LucideIcon } from 'lucide-react'
-import { spaceNavigation, type PersonalTool, type SpaceNavGroup, type SpaceShortcut } from '@/lib/wi300/personal-space'
+import { managementNavigation } from '@/lib/wi300/management-navigation'
+import { type PersonalTool, type SpaceNavGroup, type SpaceShortcut } from '@/lib/wi300/personal-space'
 
 const icons: Record<string, LucideIcon> = { BookOpen, ContactRound, CreditCard, FileText, Globe, GraduationCap, Handshake, LayoutGrid, LifeBuoy, Link2, Mail, Network, Settings, ShieldCheck, UserRound, Users, Wallet, Youtube }
 function ShortcutIcon({ name }: { name?: string | null }) {
@@ -33,7 +34,7 @@ export default function Wi300SpaceMenu({ role, actorKey, route, onOpen }: { role
   const [result, setResult] = useState<{ actorKey: string | null; tools: PersonalTool[] } | null>(null)
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
-  const groups = spaceNavigation(role, result?.actorKey === actorKey ? result.tools : [])
+  const groups = managementNavigation(role, result?.actorKey === actorKey ? result.tools : [])
   const current = groups.find(g => g.id === active) || groups[0]
   const cancelClose = () => { if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null } }
   const close = () => { cancelClose(); setOpen(false) }

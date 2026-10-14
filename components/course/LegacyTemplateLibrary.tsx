@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import {
   ArrowDown,
   ArrowLeft,
@@ -68,6 +69,10 @@ const SECTION_NAMES: Record<string, string> = {
 }
 
 export default function CourseTemplateLibraryPage() {
+  const params = useSearchParams()
+  const context = new URLSearchParams()
+  for (const key of ['course', 'courseId', 'name']) { const value = params.get(key); if (value) context.set(key, value) }
+  const libraryHref = '/tools/courses/templates' + (context.size ? '?' + context.toString() : '')
   const [storedTemplates, setStoredTemplates] = useState<StoredTemplate[]>([])
   const [loadingLibrary, setLoadingLibrary] = useState(true)
   const [showImporter, setShowImporter] = useState(false)
@@ -346,8 +351,8 @@ export default function CourseTemplateLibraryPage() {
       <main className="mx-auto max-w-7xl space-y-6 p-4 pb-20 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <Link href="/tools/courses" className="inline-flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-purple-700">
-              <ArrowLeft className="h-4 w-4" /> Quản lý khóa học
+            <Link href={libraryHref} className="inline-flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-purple-700">
+              <ArrowLeft className="h-4 w-4" /> Về thư viện mẫu
             </Link>
             <h1 className="mt-3 text-2xl font-black text-gray-900">Thư viện mẫu Salespage</h1>
             <p className="mt-1 max-w-3xl text-sm text-gray-500">
