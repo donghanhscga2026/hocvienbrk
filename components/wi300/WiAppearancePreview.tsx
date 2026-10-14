@@ -6,6 +6,8 @@ import { createPortal } from 'react-dom'
 import Wi300HomeClient, { type Wi300HomeClientProps } from './Wi300HomeClient'
 import WiProjectDirectory from './WiProjectDirectory'
 import { appearanceStyle, type WiAppearance } from '@/lib/wi300/appearance'
+import { configuredBrand } from '@/lib/wi300/website-config'
+import Wi300Footer from './Wi300Footer'
 
 const documentHTML = '<!doctype html><html lang="vi" data-website-theme="light" data-site-variant="wi300"><head></head><body><div id="preview"></div></body></html>'
 
@@ -30,7 +32,7 @@ export default function WiAppearancePreview({ settings, tab, data, width }: { se
     for (const [key, value] of Object.entries(appearanceStyle(settings))) doc.documentElement.style.setProperty(key, String(value))
   }, [settings, target])
   const scale = Math.min(1, available / width)
-  const brand = { ...data.brand, logoUrl: settings.common.logoUrl || data.brand.logoUrl, iconUrl: settings.common.iconUrl || data.brand.iconUrl, appearance: settings }
+  const brand = configuredBrand(data.brand, settings)
   return <div ref={container} className="min-w-0 overflow-hidden rounded-2xl border border-brk-outline bg-brk-background">
     <div style={{ width: width * scale, height: 900 * scale }} className="mx-auto">
       <iframe ref={frame} title="Xem trước giao diện website" sandbox="allow-same-origin" srcDoc={documentHTML} onLoad={() => {
@@ -43,8 +45,8 @@ export default function WiAppearancePreview({ settings, tab, data, width }: { se
     </div>
     {target && createPortal(<div inert>
       <header className={`${settings.common.stickyHeader ? "sticky top-0 z-20" : ""} border-b border-brk-outline bg-white px-6 py-4`}><div className="mx-auto flex max-w-7xl items-center justify-between gap-6"><Image unoptimized width={160} height={48} src={brand.logoUrl} alt={brand.name} className="h-12 w-40 object-contain" /><span className="hidden text-sm text-brk-muted sm:block">Trang chủ · Khóa học · Sản phẩm · Dịch vụ</span></div></header>
-      {tab === 'projects' ? <WiProjectDirectory projects={data.projects || []} settings={settings.projects} /> : <Wi300HomeClient {...data} brand={brand} appearance={settings} view={tab === 'courses' ? 'catalog' : tab === 'teachers' ? 'teachers' : 'home'} />}
-      {settings.common.showFooter && <footer className="border-t border-brk-outline bg-white px-6 py-8 text-center text-sm text-brk-muted">{brand.name} · Kết nối con người. Lan tỏa giá trị.</footer>}
+      {tab !== 'footer' && (tab === 'projects' ? <WiProjectDirectory projects={data.projects || []} settings={settings.projects} /> : <Wi300HomeClient {...data} brand={brand} appearance={settings} view={tab === 'courses' ? 'catalog' : tab === 'teachers' ? 'teachers' : 'home'} />)}
+      <Wi300Footer previewBrand={brand} />
     </div>, target)}
   </div>
 }

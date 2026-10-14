@@ -16,7 +16,10 @@ export function managementLocation(path: string, params: URLSearchParams, groups
   const courseList = { label: 'Quản lý khóa học', href: '/tools/courses' }
   const courseId = params.get('courseId')
   const courseReturn = courseId && /^\d+$/.test(courseId) && Number.isSafeInteger(Number(courseId)) && Number(courseId) > 0 ? `/tools/courses/new?id=${courseId}&tab=sales` : null
-  const exactTool = groups.flatMap(group => group.items.map(item => ({ ...item, groupId: group.id }))).filter(item => item.href.startsWith('/')).sort((a, b) => b.href.split('?')[0].length - a.href.split('?')[0].length).find(item => path === item.href.split('?')[0] || path.startsWith(item.href.split('?')[0] + '/'))
+  const exactTool = groups.flatMap(group => group.items.map(item => ({ ...item, groupId: group.id }))).filter(item => item.href.startsWith('/')).sort((a, b) => b.href.split('?')[0].length - a.href.split('?')[0].length).find(item => {
+    const target = new URL(item.href, 'https://wi300.invalid')
+    return (path === target.pathname || path.startsWith(target.pathname + '/')) && [...target.searchParams].every(([key, value]) => params.get(key) === value)
+  })
   let groupId = exactTool?.groupId || 'tools'
   let title = exactTool?.label || defaultPageTitle(path) || 'Không gian quản lý'
   let crumbs: NavigationLocation['crumbs'] = [root]
@@ -49,10 +52,12 @@ export function managementLocation(path: string, params: URLSearchParams, groups
     if (params.get('project')) { crumbs.push({ label: 'Dự án đang chỉnh sửa' }); back = { label: 'Về danh sách dự án', href: '/du-an/quan-ly' } }
     if (path.endsWith('/noi-dung') && params.get('project')) back = { label: 'Về dự án này', href: `/du-an/quan-ly?project=${encodeURIComponent(params.get('project')!)}` }
   } else {
+    if (path === '/tools/wi-website') { groupId = 'website-admin'; title = exactTool?.label || 'Quản trị website' }
     if (path === '/account-settings') { groupId = 'account'; title = 'Cài đặt tài khoản' }
     if (path === '/my-requests') { groupId = 'learning'; title = 'Yêu cầu của tôi' }
     const group = groups.find(item => item.id === groupId)
     if (group) back = { label: `Về ${group.label.toLowerCase()}`, href: group.href }
+    if (path === '/tools/wi-website' && !params.get('section')) back = { label: 'Về Không gian của tôi', href: root.href }
     const parent = exactTool?.href.split('?')[0]
     if (parent && path !== parent) { crumbs.push({ label: exactTool!.label, href: parent }); back = { label: `Về ${exactTool!.label.toLowerCase()}`, href: parent } }
     crumbs.push({ label: title })
