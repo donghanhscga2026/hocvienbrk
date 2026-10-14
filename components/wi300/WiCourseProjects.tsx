@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import ProjectMultiSelect from './ProjectMultiSelect'
 
 type Option = { slug: string; name: string; revision: number; selected: boolean }
 
@@ -86,12 +87,7 @@ export default function WiCourseProjects({ courseId, compact = false }: { course
     </div>
     {!editing && <div className="flex flex-wrap gap-2">{projects?.filter(project => project.selected).map(project => <span key={project.slug} className="rounded-lg bg-brk-background px-3 py-2 text-sm text-brk-primary">{project.name}</span>)}{!selectedCount && <p className="text-sm text-gray-500">Chưa liên kết dự án.</p>}</div>}
     {editing && <p className="text-sm text-gray-600">Chọn dự án để liên kết khóa học này.</p>}
-    {projects && editing && <div className={compact ? "grid grid-cols-1 gap-2" : "grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 sm:grid-cols-3"}>
-      {projects.map(project => <label key={project.slug} className={`flex min-h-11 min-w-0 cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${project.selected ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'} ${busy || needsReload ? 'cursor-default opacity-60' : ''}`}>
-        <input type="checkbox" checked={project.selected} disabled={busy || needsReload} className="h-4 w-4 shrink-0 accent-green-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700" onChange={event => setProjects(current => current?.map(item => item.slug === project.slug ? { ...item, selected: event.target.checked } : item) || null)} />
-        <span className="min-w-0 break-words">{project.name}</span>
-      </label>)}
-    </div>}
+    {projects && editing && <ProjectMultiSelect options={projects} disabled={busy || needsReload} onChange={(slug, checked) => setProjects(current => current?.map(item => item.slug === slug ? { ...item, selected: checked } : item) || null)} />}
     {error && <p role="alert" className="text-sm text-red-700">{error}{needsReload && ' Vui lòng tải lại trước khi sửa tiếp.'}</p>}
     {message && <p role="status" className="text-sm text-green-700">{message}</p>}
     <div className="flex flex-wrap items-center gap-2">

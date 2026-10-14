@@ -105,7 +105,7 @@ async function run() {
     await React.act(async () => root.render(React.createElement(Team, { key: 'readonly', members: [{ userId: 9, title: 'Helper', visible: true, canManage: true }], names: {}, editable: false })))
     assert.equal(document.querySelector('[name="members"]'), null, 'Helpers cannot submit team changes')
     assert.ok([...document.querySelectorAll('input')].every(input => input.disabled))
-    const CourseProjects = load('components/wi300/WiCourseProjects.tsx').default
+    const CourseProjects = load('components/wi300/WiCourseProjects.tsx', { './ProjectMultiSelect': load('components/wi300/ProjectMultiSelect.tsx') }).default
     for (const [key, status, projects] of [['no-projects', 200, []], ['forbidden', 403, undefined], ['guest', 401, undefined]]) {
       global.fetch = async () => ({ status, ok: status === 200, json: async () => ({ projects }) })
       await React.act(async () => root.render(React.createElement(CourseProjects, { key, courseId: '1' })))

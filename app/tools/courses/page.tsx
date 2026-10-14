@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { getAdminCoursesAction, bulkToggleCourseStatusAction, bulkUpdateCoursesOptionsAction } from '@/app/actions/admin-actions'
 import { getTeachersAction } from '@/app/actions/course-actions'
-import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Eye, EyeOff, CheckSquare, X, Search, Tag, Trash2, Save, Edit2, Palette } from 'lucide-react'
+import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Eye, EyeOff, X, Search, Tag, Trash2, Save, Edit2, Palette } from 'lucide-react'
 import Link from 'next/link'
 import CourseActionsMenu from '@/components/course/CourseActionsMenu'
 import CourseExportButton from '@/components/course/CourseExportButton'
@@ -191,7 +191,7 @@ function CoursesTab() {
     }
 
     const toggleSelectAll = () => {
-        if (selectedIds.size === filteredCourses.length) {
+        if (filteredCourses.length > 0 && filteredCourses.every(course => selectedIds.has(course.id))) {
             setSelectedIds(new Set())
         } else {
             setSelectedIds(new Set(filteredCourses.map(c => c.id)))
@@ -313,10 +313,9 @@ function CoursesTab() {
             </div>
 
             {selectedIds.size > 0 && (
-                <div className="flex items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm">
-                    <CheckSquare className="w-4 h-4 text-gray-500 shrink-0" />
-                    <span className="text-sm font-bold text-gray-700">Đã chọn {selectedIds.size} khóa học</span>
-                    <div className="ml-auto flex gap-2">
+                <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm">
+                    <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-bold text-gray-700"><input type="checkbox" aria-label="Chọn tất cả khóa học" checked={filteredCourses.length > 0 && filteredCourses.every(course => selectedIds.has(course.id))} ref={element => { if (element) element.indeterminate = filteredCourses.some(course => selectedIds.has(course.id)) && !filteredCourses.every(course => selectedIds.has(course.id)) }} disabled={batchLoading || bulkOptionsLoading} onChange={toggleSelectAll} className="h-4 w-4 accent-green-700" />Đã chọn {selectedIds.size} khóa học</label>
+                    <div className="ml-auto flex flex-wrap gap-2">
                         <button
                             onClick={() => handleBulkAction(true)}
                             disabled={batchLoading}
@@ -355,7 +354,8 @@ function CoursesTab() {
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input
                             type="checkbox"
-                            checked={filteredCourses.length > 0 && selectedIds.size === filteredCourses.length}
+                            aria-label="Chọn tất cả khóa học"
+                            checked={filteredCourses.length > 0 && filteredCourses.every(course => selectedIds.has(course.id))}
                             onChange={toggleSelectAll}
                             className="rounded border-gray-300 accent-yellow-500 cursor-pointer"
                         />

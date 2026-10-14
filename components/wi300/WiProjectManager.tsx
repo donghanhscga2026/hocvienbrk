@@ -8,10 +8,15 @@ import { PROJECT_CATEGORIES, projectCategoryLabels, type WiProject } from '@/lib
 import WiProjectTeamEditor from './WiProjectTeamEditor'
 import WiProjectOverview, { type ProjectCourseOption } from './WiProjectOverview'
 
+const bulkActions = [{ value: 'publish', label: 'Công khai' }, { value: 'hide', label: 'Ẩn' }, { value: 'feature', label: 'Đặt tiêu biểu' }, { value: 'unfeature', label: 'Bỏ tiêu biểu' }, { value: 'homepage', label: 'Hiển thị trang chủ' }, { value: 'unhomepage', label: 'Bỏ khỏi trang chủ' }, { value: 'delete', label: 'Xóa dự án' }] as const
+type BulkAction = typeof bulkActions[number]['value']
 const field = 'mt-1 min-h-11 w-full rounded-xl border border-brk-outline bg-white px-3 py-2 text-sm'
 type CourseOption = ProjectCourseOption
 export default function WiProjectManager({ courses, initial, initialSlug }: { courses: CourseOption[]; initial: { admin: boolean; actorId?: number; projects: WiProject[]; ownerNames?: Record<string, string> }; initialSlug?: string }) {
   const router = useRouter()
+  const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set())
+  const [bulkAction, setBulkAction] = useState<BulkAction>('publish')
+  const [bulkNeedsReload, setBulkNeedsReload] = useState(false)
   const [view, setView] = useState<'list' | 'cards'>('list')
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
@@ -37,6 +42,30 @@ export default function WiProjectManager({ courses, initial, initialSlug }: { co
   const totalPages = Math.max(1, Math.ceil(filtered.length / 10))
   const currentPage = Math.min(page, totalPages)
   const visible = filtered.slice((currentPage - 1) * 10, currentPage * 10)
+  const allSelected = filtered.length > 0 && filtered.every(item => selectedSlugs.has(item.slug))
+  function selectAll() { setSelectedSlugs(allSelected ? new Set() : new Set(filtered.map(item => item.slug))) }
+  function selectProject(slug: string, checked: boolean) { setSelectedSlugs(current => { const next = new Set(current); if (checked) next.add(slug); else next.delete(slug); return next }) }
+  async function applyBulk() {
+    if (!admin || busy || loading || bulkNeedsReload || !selectedSlugs.size) return
+    const chosen = projects.filter(item => selectedSlugs.has(item.slug))
+    if (!chosen.length || chosen.length > 100) { setError('Chọn từ 1 đến 100 dự án mỗi lần thao tác.'); return }
+    const actionName = bulkActions.find(item => item.value === bulkAction)!.label
+    if (!window.confirm(`${actionName} cho ${chosen.length} dự án: ${chosen.map(item => item.name).join(', ')}?${bulkAction === 'delete' ? '\nChỉ xóa hồ sơ dự án; khóa học, sản phẩm/dịch vụ và tài khoản liên quan được giữ nguyên.' : ''}`)) return
+    setBusy(true); setError(''); setMessage(''); setBulkNeedsReload(true)
+    const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 30000)
+    try {
+      const response = await fetch('/api/wi300/projects/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal, body: JSON.stringify({ action: bulkAction, projects: chosen.map(({ slug, revision }) => ({ slug, revision })) }) })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Không thực hiện được thao tác.')
+      if (!Array.isArray(result.projects) || result.count !== chosen.length) throw new Error('Chưa nhận được kết quả đầy đủ. Hãy tải lại dữ liệu.')
+      const changed = new Map<string, WiProject>(result.projects.map((item: WiProject) => [item.slug, item]))
+      setProjects(current => current.flatMap(item => { const next = changed.get(item.slug); return next?.deleted ? [] : [next || item] }))
+      setSelectedSlugs(new Set()); setBulkNeedsReload(false)
+      setMessage(`Đã áp dụng “${actionName}” cho ${result.count} dự án.${bulkAction === 'homepage' ? ' Trang chủ chỉ hiển thị dự án công khai, tối đa 8 dự án.' : ''}`)
+      router.refresh()
+    } catch (error) { setError(controller.signal.aborted ? 'Chưa nhận được kết quả. Tải lại dữ liệu để kiểm tra trước khi thử tiếp.' : error instanceof Error ? error.message : 'Không thực hiện được thao tác.') }
+    finally { clearTimeout(timer); setBusy(false) }
+  }
   // Lưu qua API hiện có: quyền admin và revision vẫn được kiểm tra ở server.
   async function toggleHomepage(item: WiProject, checked: boolean) {
     if (!admin || busy) return
@@ -93,7 +122,7 @@ export default function WiProjectManager({ courses, initial, initialSlug }: { co
       const response = await fetch('/api/wi300/projects', { cache: 'no-store' })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Không tải được dự án.')
-      setProjects(data.projects); setAdmin(data.admin); setOwnerNames(data.ownerNames || {})
+      setProjects(data.projects); setAdmin(data.admin); setOwnerNames(data.ownerNames || {}); setSelectedSlugs(new Set()); setBulkNeedsReload(false)
       const next = data.projects.find((item: WiProject) => item.slug === selected)
       setSelected(next?.slug || ''); setFormVersion(value => value + 1)
     } catch (error) { setError(error instanceof Error ? error.message : 'Không tải được dự án.') }
@@ -151,8 +180,8 @@ export default function WiProjectManager({ courses, initial, initialSlug }: { co
       </fieldset></form>}
     </div>}
     {loading ? <p role="status">Đang tải dự án…</p> : !projects.length ? <p className="rounded-2xl border border-brk-outline bg-white p-6">{admin ? 'Chưa có dự án. Bấm Thêm dự án để tạo mới.' : 'Bạn chưa được giao quản lý dự án. Vui lòng liên hệ ban điều phối để gắn tài khoản với dự án của bạn.'}</p> : <>
-      {!selected && <><div className="flex flex-wrap items-center gap-3 rounded-2xl border border-brk-outline bg-white p-3"><input aria-label="Tìm dự án hoặc chủ dự án" value={search} onChange={event => { setSearch(event.target.value); setPage(1) }} placeholder="Tìm dự án, chủ dự án…" className="min-h-11 min-w-0 flex-1 rounded-xl border px-3 text-sm" /><select aria-label="Trạng thái dự án" value={status} onChange={event => { setStatus(event.target.value); setPage(1) }} className="min-h-11 rounded-xl border px-3 text-sm"><option value="all">Tất cả trạng thái</option><option value="public">Công khai</option><option value="hidden">Đang ẩn</option></select>{(['list', 'cards'] as const).map(value => <button key={value} type="button" aria-pressed={view === value} onClick={() => setView(value)} className={`min-h-11 rounded-xl px-3 text-sm font-semibold ${view === value ? 'bg-brk-primary text-white' : 'border border-brk-outline'}`}>{value === 'list' ? 'Danh sách' : 'Dạng thẻ'}</button>)}</div><div className={view === 'cards' ? 'grid gap-5 sm:grid-cols-2 lg:grid-cols-3' : 'space-y-3'}>{visible.map(item => <article key={item.slug} className={`min-w-0 gap-3 rounded-2xl border border-brk-outline bg-white p-4 shadow-sm ${view === 'cards' ? 'flex flex-col' : 'grid md:grid-cols-[minmax(160px,1.2fr)_minmax(120px,1fr)_minmax(160px,1fr)_auto] md:items-center'}`}>
-        <div className="flex items-center gap-4">{item.logo ? <Image src={item.logo} alt={`Logo ${item.name}`} width={72} height={72} className="h-18 w-18 shrink-0 rounded-full border border-brk-outline bg-white object-contain p-1" /> : <span className="flex h-18 w-18 shrink-0 items-center justify-center rounded-full bg-brk-background text-2xl font-bold text-brk-primary" aria-hidden="true">{item.name.slice(0, 2)}</span>}<h2 className="min-w-0 break-words text-xl font-bold">{item.name}</h2></div>
+      {!selected && <><div className="flex flex-wrap items-center gap-3 rounded-2xl border border-brk-outline bg-white p-3"><input aria-label="Tìm dự án hoặc chủ dự án" value={search} onChange={event => { setSearch(event.target.value); setPage(1); setSelectedSlugs(new Set()) }} placeholder="Tìm dự án, chủ dự án…" className="min-h-11 min-w-0 flex-1 rounded-xl border px-3 text-sm" /><select aria-label="Trạng thái dự án" value={status} onChange={event => { setStatus(event.target.value); setPage(1); setSelectedSlugs(new Set()) }} className="min-h-11 rounded-xl border px-3 text-sm"><option value="all">Tất cả trạng thái</option><option value="public">Công khai</option><option value="hidden">Đang ẩn</option></select>{(['list', 'cards'] as const).map(value => <button key={value} type="button" aria-pressed={view === value} onClick={() => setView(value)} className={`min-h-11 rounded-xl px-3 text-sm font-semibold ${view === value ? 'bg-brk-primary text-white' : 'border border-brk-outline'}`}>{value === 'list' ? 'Danh sách' : 'Dạng thẻ'}</button>)}</div>{admin && <div className="sticky top-20 z-20 flex flex-wrap items-center gap-3 rounded-xl border border-brk-outline bg-white p-3 shadow-sm"><label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-semibold"><input type="checkbox" aria-label="Chọn tất cả dự án đang lọc" checked={allSelected} ref={element => { if (element) element.indeterminate = selectedSlugs.size > 0 && !allSelected }} disabled={busy || loading || bulkNeedsReload || !filtered.length} onChange={selectAll} className="h-4 w-4 accent-green-700" />{selectedSlugs.size ? `Đã chọn ${selectedSlugs.size} dự án` : `Chọn tất cả (${filtered.length})`}</label>{selectedSlugs.size > 0 && <><select aria-label="Thao tác với dự án đã chọn" value={bulkAction} disabled={busy || bulkNeedsReload} onChange={event => setBulkAction(event.target.value as BulkAction)} className="min-h-11 max-w-full rounded-lg border border-brk-outline px-3 text-sm">{bulkActions.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select><button type="button" disabled={busy || bulkNeedsReload || selectedSlugs.size > 100} onClick={() => void applyBulk()} className={`min-h-11 rounded-lg px-4 text-sm font-semibold text-white disabled:opacity-50 ${bulkAction === 'delete' ? 'bg-red-700' : 'bg-brk-primary'}`}>{busy ? 'Đang xử lý…' : 'Áp dụng'}</button><button type="button" disabled={busy} onClick={() => setSelectedSlugs(new Set())} className="min-h-11 px-2 text-sm text-brk-muted">Bỏ chọn</button></>}{bulkNeedsReload && <p className="w-full text-xs text-amber-800">Tải lại dữ liệu trước khi thao tác tiếp.</p>}<p className="w-full text-xs text-brk-muted">Chọn tất cả áp dụng cho các dự án đang lọc, kể cả ở trang kế tiếp.</p></div>}<div className={view === 'cards' ? 'grid gap-5 sm:grid-cols-2 lg:grid-cols-3' : 'space-y-3'}>{visible.map(item => <article key={item.slug} className={`min-w-0 gap-3 rounded-2xl border border-brk-outline bg-white p-4 shadow-sm ${view === 'cards' ? 'flex flex-col' : 'grid md:grid-cols-[minmax(160px,1.2fr)_minmax(120px,1fr)_minmax(160px,1fr)_auto] md:items-center'}`}>
+        <div className="flex items-center gap-4">{admin && <input type="checkbox" aria-label={`Chọn dự án ${item.name}`} checked={selectedSlugs.has(item.slug)} disabled={busy || loading || bulkNeedsReload} onChange={event => selectProject(item.slug, event.target.checked)} className="h-4 w-4 shrink-0 accent-green-700" />}{item.logo ? <Image src={item.logo} alt={`Logo ${item.name}`} width={72} height={72} className="h-18 w-18 shrink-0 rounded-full border border-brk-outline bg-white object-contain p-1" /> : <span className="flex h-18 w-18 shrink-0 items-center justify-center rounded-full bg-brk-background text-2xl font-bold text-brk-primary" aria-hidden="true">{item.name.slice(0, 2)}</span>}<h2 className="min-w-0 break-words text-xl font-bold">{item.name}</h2></div>
         {view === 'cards' && <p className="line-clamp-3 text-sm leading-6 text-brk-muted">{item.description}</p>}
         <p className="text-sm">Chủ dự án: <span className="font-semibold">{item.ownerId == null ? 'Chưa được giao' : ownerNames[String(item.ownerId)] || `Thành viên #${item.ownerId}`}</span></p>
         <div className="space-y-2"><div className="flex flex-wrap gap-2 text-xs font-semibold"><span className={`rounded-full px-3 py-1 ${item.published ? 'bg-green-50 text-green-800' : 'bg-slate-100 text-slate-700'}`}>{item.published ? 'Công khai' : 'Bản nháp / đang ẩn'}</span><span className="rounded-full bg-brk-background px-3 py-1 text-brk-primary">{item.featured ? 'Tiêu biểu' : 'Không tiêu biểu'}</span></div>
