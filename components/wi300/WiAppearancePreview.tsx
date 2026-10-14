@@ -8,6 +8,7 @@ import WiProjectDirectory from './WiProjectDirectory'
 import { appearanceStyle, type WiAppearance } from '@/lib/wi300/appearance'
 import { configuredBrand } from '@/lib/wi300/website-config'
 import Wi300Footer from './Wi300Footer'
+import { websiteLinkVisible } from '@/lib/wi300/managed-pages'
 
 const documentHTML = '<!doctype html><html lang="vi" data-website-theme="light" data-site-variant="wi300"><head></head><body><div id="preview"></div></body></html>'
 
@@ -44,7 +45,7 @@ export default function WiAppearancePreview({ settings, tab, data, width }: { se
       }} style={{ width, height: 900, transform: `scale(${scale})`, transformOrigin: 'top left', border: 0 }} />
     </div>
     {target && createPortal(<div inert>
-      <header className={`${settings.common.stickyHeader ? "sticky top-0 z-20" : ""} border-b border-brk-outline bg-white px-6 py-4`}><div className="mx-auto flex max-w-7xl items-center justify-between gap-6"><Image unoptimized width={160} height={48} src={brand.logoUrl} alt={brand.name} className="h-12 w-40 object-contain" /><span className="hidden text-sm text-brk-muted sm:block">Trang chủ · Khóa học · Sản phẩm · Dịch vụ</span></div></header>
+      <header className={`${settings.common.stickyHeader ? "sticky top-0 z-20" : ""} border-b border-brk-outline bg-white px-4 py-4`}><div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4"><Image unoptimized width={160} height={48} src={brand.logoUrl} alt={brand.name} className="h-12 w-40 object-contain" /><nav aria-label="Menu xem trước" className="flex min-w-0 max-w-full gap-2 overflow-x-auto">{settings.headerMenu.filter(item => item.visible && websiteLinkVisible(item.url, settings)).map(item => <span key={item.url} className="inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-xl px-2.5 text-sm font-semibold text-brk-muted">{item.label}</span>)}</nav></div></header>
       {tab !== 'footer' && (tab === 'projects' ? <WiProjectDirectory projects={data.projects || []} settings={settings.projects} /> : <Wi300HomeClient {...data} brand={brand} appearance={settings} view={tab === 'courses' ? 'catalog' : tab === 'teachers' ? 'teachers' : 'home'} />)}
       <Wi300Footer previewBrand={brand} />
     </div>, target)}

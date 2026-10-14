@@ -9,13 +9,14 @@ class CrmError extends Error { constructor(message, status = 400) { super(messag
 async function run() {
   const shared = load('lib/wi300/appearance.ts')
   const legacy = structuredClone(shared.defaultAppearance)
-  delete legacy.pageSeo; delete legacy.seo; delete legacy.footer; delete legacy.common.name; delete legacy.common.tagline
+  delete legacy.pageSeo; delete legacy.seo; delete legacy.footer; delete legacy.headerMenu; delete legacy.common.name; delete legacy.common.tagline
   const upgraded = shared.appearanceSchema.parse(legacy)
   const separateDefaults = structuredClone(upgraded)
   separateDefaults.pageSeo.courses.title = 'Chỉ khóa học'
   assert.equal(separateDefaults.pageSeo.home.title, '', 'Default SEO objects must be independent before first save')
   assert.deepEqual(upgraded.home, legacy.home, 'Old page settings preserved')
   assert.deepEqual(upgraded.footer, shared.defaultFooter)
+  assert.deepEqual(upgraded.headerMenu, shared.defaultHeaderMenu, 'Legacy settings receive the default menu')
   assert.equal(upgraded.common.name, '')
   const website = load('lib/wi300/website-config.ts')
   const brandBase = load('lib/site-profile/deployment-brand.ts').getDeploymentBrand({ SITE_VARIANT: 'wi300' })
@@ -96,6 +97,8 @@ async function run() {
   for (const url of ['javascript:alert(1)', '//evil.example', 'https://name:secret@example.com', '/\\evil', 'data:image/svg+xml,bad']) {
     const unsafe = structuredClone(settings); unsafe.common.logoUrl = url
     assert.equal(shared.appearanceSchema.safeParse(unsafe).success, false)
+    const unsafeMenu = structuredClone(settings); unsafeMenu.headerMenu[0].url = url
+    assert.equal(shared.appearanceSchema.safeParse(unsafeMenu).success, false, 'Unsafe menu URLs rejected')
   }
   const duplicate = structuredClone(settings); duplicate.home.order = ['hero', 'hero', 'projects', 'start']
   assert.equal(shared.appearanceSchema.safeParse(duplicate).success, false)
@@ -141,6 +144,7 @@ async function run() {
   session = { user: { id: '0' } }
   assert.equal((await WebsitePage(pageArgs('footer'))).props.initialTab, 'footer')
   assert.equal((await WebsitePage(pageArgs('seo'))).props.mode, 'website')
+  assert.equal((await WebsitePage(pageArgs('menu'))).props.initialTab, 'menu')
   await assert.rejects(() => WebsitePage(pageArgs('unknown')), /404/)
   const cardsHTML = require('react-dom/server').renderToStaticMarkup(await WebsitePage(pageArgs()))
   assert.equal((cardsHTML.match(/<h2/g) || []).length, 3)
@@ -184,7 +188,25 @@ async function run() {
   try {
     const initial = await service.readAppearance(db, service.appearanceKey('editor'))
     await React.act(async () => root.render(React.createElement(Editor, { initial, previewData: {} })))
-    assert.equal(document.querySelectorAll('[role="tab"]').length, 7)
+    assert.equal(document.querySelectorAll('[role="tab"]').length, 8)
+    await React.act(async () => button('Menu website').click())
+    await React.act(async () => button('+ Thêm mục menu').click())
+    assert.equal(document.querySelectorAll('input[type="checkbox"]').length, 5)
+    await React.act(async () => document.querySelectorAll('input[type="checkbox"]')[4].click())
+    await React.act(async () => [...document.querySelectorAll('button[aria-label="Di chuyển lên"]')][4].click())
+    fail = false
+    await React.act(async () => button('Lưu bản nháp').click())
+    let menuState = await service.readAppearance(db, service.appearanceKey('editor'))
+    assert.equal(menuState.draft.headerMenu[3].visible, false)
+    assert.equal(menuState.published.headerMenu.length, 4, 'Draft menu stays private')
+    await React.act(async () => button('Áp dụng lên website').click())
+    menuState = await service.readAppearance(db, service.appearanceKey('editor'))
+    assert.equal(menuState.published.headerMenu[3].label, 'Menu mới')
+    await React.act(async () => button('Khôi phục bản trước').click())
+    assert.equal(document.querySelectorAll('input[type="checkbox"]').length, 4)
+    await React.act(async () => button('Áp dụng lên website').click())
+    assert.deepEqual((await service.readAppearance(db, service.appearanceKey('editor'))).published.headerMenu, shared.defaultHeaderMenu)
+    fail = true; refreshes = 0
     await React.act(async () => button('Trang chủ').click())
     const title = [...document.querySelectorAll('label')].find(item => item.textContent.startsWith('Tiêu đề')).querySelector('textarea')
     await React.act(async () => {
