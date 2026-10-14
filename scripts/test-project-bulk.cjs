@@ -39,7 +39,7 @@ async function run() {
   assert.equal((await api.POST(request('https://other.invalid'))).status, 403); assert.equal((await api.POST(request())).status, 200)
   session = null; assert.equal((await api.POST(request())).status, 401); session = { user: { id: '0' } }; brand = null; assert.equal((await api.POST(request())).status, 404)
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://test.invalid/du-an/quan-ly' })
-  global.window = dom.window; global.document = dom.window.document; global.Node = dom.window.Node; global.IS_REACT_ACT_ENVIRONMENT = true
+  global.window = dom.window; global.document = dom.window.document; global.Node = dom.window.Node; global.FormData = dom.window.FormData; global.IS_REACT_ACT_ENVIRONMENT = true
   Object.defineProperty(global, 'navigator', { configurable: true, value: dom.window.navigator })
   const uiProjects = Array.from({ length: 12 }, (_, i) => ({ ...shared.projectDefaults[0], slug: 'test-' + i, name: 'Project ' + i }))
   let sent, deny = false
@@ -47,14 +47,20 @@ async function run() {
   global.fetch = async (url, init = {}) => {
     if (!init.method) return Response.json({ admin: true, projects: uiProjects })
     sent = JSON.parse(init.body)
+    if (init.method === 'PUT') return Response.json({ project: { ...uiProjects[0], ...sent.content, ...sent.controls, revision: 1 } })
     if (deny) return Response.json({ error: 'Stale project' }, { status: 409 })
     return Response.json({ count: sent.projects.length, projects: sent.projects.map(item => ({ ...uiProjects.find(project => project.slug === item.slug), published: false, revision: 1 })) })
   }
-  const ui = load('components/wi300/WiProjectManager.tsx', { 'next/link': { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }, 'next/image': { __esModule: true, default: () => null }, 'next/navigation': { useRouter: () => ({ refresh: () => {}, replace: () => {} }) }, './WiProjectTeamEditor': { __esModule: true, default: () => null }, './WiProjectOverview': { __esModule: true, default: () => null } }).default
+  const ui = load('components/wi300/WiProjectManager.tsx', { 'next/link': { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }, 'next/image': { __esModule: true, default: ({ children, ...props }) => React.createElement('img', props, children) }, 'next/navigation': { useRouter: () => ({ refresh: () => {}, replace: () => {} }) }, './WiProjectTeamEditor': { __esModule: true, default: () => null } }).default
   const root = require('react-dom/client').createRoot(document.getElementById('root'))
   const click = async label => React.act(async () => { const node = document.querySelector(`[aria-label="${label}"]`) || [...document.querySelectorAll('button')].find(node => node.textContent === label); assert.ok(node, label); node.click() })
   try {
     await React.act(async () => root.render(React.createElement(ui, { courses: [], initial: { admin: true, projects: uiProjects } })))
+    assert.ok(document.body.textContent.includes('Trạng thái'));
+    assert.ok(document.body.textContent.includes('Tiêu biểu'));
+    assert.ok(document.body.textContent.includes('Trang chủ'));
+    function snapshot(name) { if (process.env.PROJECT_UI_SNAPSHOT_DIR) { fs.mkdirSync(process.env.PROJECT_UI_SNAPSHOT_DIR, { recursive: true }); fs.writeFileSync(path.join(process.env.PROJECT_UI_SNAPSHOT_DIR, name + '.html'), document.getElementById('root').innerHTML) } }
+    snapshot('projects-list');
     await click('Chọn tất cả dự án đang lọc'); assert.match(document.body.textContent, /Đã chọn 12 dự án/)
     await click('Sau'); assert.equal(document.querySelectorAll('article').length, 2); assert.ok(document.querySelector('[aria-label="Chọn dự án Project 11"]').checked)
     await click('Chọn tất cả dự án đang lọc'); assert.ok(!document.body.textContent.includes('Đã chọn 12 dự án'))
@@ -64,6 +70,25 @@ async function run() {
     await click('Tải lại dữ liệu'); deny = false; await click('Chọn dự án Project 11')
     const select = document.querySelector('[aria-label="Thao tác với dự án đã chọn"]'); await React.act(async () => { select.value = 'hide'; select.dispatchEvent(new window.Event('change', { bubbles: true })) }); await click('Áp dụng')
     assert.deepEqual(sent, { action: 'hide', projects: [{ slug: 'test-11', revision: 0 }] }); assert.match(document.body.textContent, /Đã áp dụng/)
+    const courses = Array.from({ length: 6 }, (_, i) => ({ id: i + 1, name_lop: 'Khóa học kiểm thử ' + (i + 1), id_khoa: 'TEST-' + (i + 1), teacherName: 'Giảng viên kiểm thử', status: true }))
+    const detail = { ...uiProjects[0], name: 'Dự án kiểm thử', ownerId: 8, category: 'OTHER', courseIds: courses.map(course => course.id), members: [] }
+    await React.act(async () => root.render(React.createElement(ui, { key: 'detail', courses, initialSlug: detail.slug, initial: { admin: true, projects: [detail], ownerNames: { 8: 'Chủ dự án kiểm thử' } } })))
+    assert.ok(document.querySelector('a[href="/du-an/' + detail.slug + '"]'), 'Overview links to the actual public project')
+    assert.equal(document.querySelectorAll('input[role="switch"]').length, 3, 'Independent display switches')
+    assert.ok(document.body.textContent.includes('Thay đổi chủ dự án'))
+    assert.ok(document.body.textContent.includes('Lĩnh vực'))
+    snapshot('projects-overview')
+    await click('Xem tất cả 6 khóa học →')
+    assert.ok(document.body.textContent.includes('Khóa học kiểm thử 6'))
+    const checkbox = document.querySelector('input[name="featured"]')
+    await React.act(async () => checkbox.click())
+    await React.act(async () => document.querySelector('form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true })))
+    assert.equal(sent.controls.featured, !detail.featured, 'Overview switch is included in save')
+    assert.equal(sent.controls.published, detail.published)
+    assert.equal(sent.controls.showOnHomepage, detail.showOnHomepage)
+    assert.equal(sent.controls.ownerId, 8, 'Hidden owner field remains in the form')
+    assert.deepEqual(sent.content.courseIds, courses.map(course => course.id), 'Saving overview retains all linked courses')
+    assert.equal(sent.content.name, detail.name)
   } finally { await React.act(async () => root.unmount()); dom.window.close(); global.fetch = originalFetch }
   console.log('PASS bulk projects: fresh admin permissions, complete revision checks, atomic rollback/concurrency, independent flags, soft deletion, API guards, cross-page selection, confirmation and stale-data recovery')
 }

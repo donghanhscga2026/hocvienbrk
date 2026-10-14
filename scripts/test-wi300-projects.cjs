@@ -175,7 +175,7 @@ async function run() {
       togglePayload = JSON.parse(options.body)
       return { ok: false, json: async () => ({ error: 'Dữ liệu đã thay đổi. Tải lại.' }) }
     }
-    const homeToggle = [...document.querySelectorAll('article label')].find(label => label.textContent.includes('Hiển thị trên trang chủ')).querySelector('input')
+    const homeToggle = document.querySelector('input[aria-label="Hiển thị Wi.Grow trên trang chủ"]')
     await React.act(async () => homeToggle.click())
     assert.equal(togglePayload.controls.showOnHomepage, false)
     assert.equal(togglePayload.controls.featured, initial.featured, 'Homepage toggle preserves featuring')
@@ -185,7 +185,7 @@ async function run() {
       return { ok: true, json: async () => ({ project: { ...initial, ...togglePayload.controls, revision: initial.revision + 1 } }) }
     }
     await React.act(async () => homeToggle.click())
-    assert.equal([...document.querySelectorAll('article label')].find(label => label.textContent.includes('Hiển thị trên trang chủ')).querySelector('input').checked, false)
+    assert.equal(document.querySelector('input[aria-label="Hiển thị Wi.Grow trên trang chủ"]').checked, false)
     global.fetch = createFetch
     await React.act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === '+ Thêm dự án').click())
     const createForm = document.querySelector('form')
