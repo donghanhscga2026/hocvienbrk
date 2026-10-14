@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 720" role="img" aria-label="Hộp quà màu kem với nơ xanh">
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#f9f5e9"/><stop offset="1" stop-color="#e5dfd0"/></linearGradient><linearGradient id="box" x2="1" y2="1"><stop stop-color="#fffcf0"/><stop offset="1" stop-color="#d1c3a5"/></linearGradient><linearGradient id="ribbon"><stop stop-color="#367563"/><stop offset="1" stop-color="#124c3c"/></linearGradient><filter id="shadow"><feGaussianBlur stdDeviation="18"/></filter></defs>
+  <rect width="800" height="720" rx="32" fill="url(#bg)"/>
+  <circle cx="650" cy="130" r="180" fill="#fffdf4" opacity=".5"/>
+  <ellipse cx="410" cy="594" rx="215" ry="32" fill="#7d7054" opacity=".2" filter="url(#shadow)"/>
+  <g fill="none" stroke="#80967d" stroke-width="6" opacity=".6"><path d="M653 582q-38-167 60-296M680 458q-85-7-91-90M695 386q58-1 64-59"/></g>
+  <g fill="#edf0df"><ellipse cx="591" cy="369" rx="20" ry="45" transform="rotate(-35 591 369)"/><ellipse cx="748" cy="332" rx="19" ry="42" transform="rotate(42 748 332)"/></g>
+  <path d="M186 292h351v270H186z" fill="url(#box)"/><path d="m537 292 94-53v270l-94 53z" fill="#c2b390"/><path d="m186 292 94-53h351l-94 53z" fill="#faf5e7"/>
+  <path d="M173 268h370v67H173z" fill="#f8f1df"/><path d="m543 268 104-58v67l-104 58z" fill="#d6c8ab"/><path d="m173 268 104-58h370l-104 58z" fill="#fffaf0"/>
+  <path d="M330 268h65v294h-65z" fill="url(#ribbon)"/><path d="m330 268 104-58h64l-103 58z" fill="#29604c"/>
+  <path d="M361 243c-147-16-150-113-91-127 52-12 101 58 99 115-30-69-44-89-66-83-32 9 7 63 58 95z" fill="url(#ribbon)"/>
+  <path d="M366 244c137-31 169-113 111-139-57-25-119 64-111 127 28-71 62-108 83-94 28 20-32 74-83 106z" fill="url(#ribbon)"/>
+  <path d="m355 237-64 122 46-11 16 38 28-140zM382 238l85 110-44-10-8 44-50-139z" fill="#285f4b"/>
+  <ellipse cx="369" cy="239" rx="34" ry="23" fill="#1a503f"/>
+  <g transform="rotate(-12 495 390)"><rect x="450" y="347" width="95" height="122" rx="8" fill="#fffaf0"/><circle cx="497" cy="361" r="4" fill="#af9c79"/><path d="M474 397h49M474 410h39M474 424h46" stroke="#b0baaa" stroke-width="4" stroke-linecap="round"/></g>
+</svg>

@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { getCoursePage } from '@/app/actions/course-page-actions'
 import EditCoursePageForm from './EditCoursePageForm'
+import ManagementWorkspace from '@/components/layout/ManagementWorkspace'
 import MainHeader from '@/components/layout/MainHeader'
 
 interface EditPageProps {
@@ -29,13 +30,13 @@ export default async function EditCoursePageLanding({ params }: EditPageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <MainHeader title="CHỈNH SỬA TRANG KHÓA HỌC" toolSlug="pages" />
+      <MainHeader title="Trang bán khóa học" toolSlug="pages" />
 
-      <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
+      <ManagementWorkspace active="courses" appearance="forest">
         <div className="mb-6">
           <Link
             href="/tools/courses"
-            className="inline-flex items-center gap-2 text-xs font-black text-gray-400 uppercase hover:text-purple-600 transition-colors"
+            className="inline-flex items-center gap-2 text-xs font-black text-gray-400 uppercase hover:text-brk-primary transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             Quay lại quản lý khóa học
@@ -43,16 +44,16 @@ export default async function EditCoursePageLanding({ params }: EditPageProps) {
         </div>
 
         <div className="mb-8">
-          <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Cấu hình Trang Khóa Học</h1>
-          <p className="text-sm text-gray-500 mt-1 font-mono font-bold text-purple-600">
+          <h1 className="text-2xl font-bold text-brk-primary tracking-tight">Trang bán khóa học</h1>
+          <p className="mt-1 break-all font-mono text-sm font-semibold text-brk-primary">
             URL: /khoa-hoc/{page.slug}
           </p>
         </div>
 
-        <div className="bg-white rounded-3xl p-6 lg:p-10 shadow-xl border border-gray-100">
+        <div className="min-w-0">
           <EditCoursePageForm initialPage={page as any} />
         </div>
-      </div>
+      </ManagementWorkspace>
     </div>
   )
 }

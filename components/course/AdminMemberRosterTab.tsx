@@ -1,12 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Loader2, Plus, Minus, AlertTriangle, Save, FileSpreadsheet, ImageDown } from 'lucide-react'
+import { useMemo, useState, useEffect } from 'react'
+import { Loader2, Plus, Minus, AlertTriangle, Save } from 'lucide-react'
 import {
     updateCourseMemberAssignmentsAction,
     updateCourseMemberLabelAction,
-    exportCourseMembersAction,
 } from '@/app/actions/admin-actions'
+import CourseExportButton from './CourseExportButton'
 import MemberDayChips from './MemberDayChips'
 import MemberDetailPanel from './MemberDetailPanel'
 import { teamLabel, groupLabel, CourseMemberLabels, RosterMember, formatStartDate, recentDayWindow } from './MemberRosterPanel'
@@ -161,19 +161,22 @@ function ToggleCheckbox({ checked, onChange, label }: { checked: boolean; onChan
     )
 }
 
-export default function AdminMemberRosterTab({ courseId, courseName, members, labels, reload }: {
+export default function AdminMemberRosterTab({ courseId, courseName, members, labels, reload, initialStudentId }: {
     courseId: number
     courseName: string
     members: RosterMember[]
     labels: CourseMemberLabels
     reload: () => void
+    initialStudentId?: number
 }) {
     const [editedMembers, setEditedMembers] = useState<Record<number, EditPatch>>({})
     const [savingAssignments, setSavingAssignments] = useState(false)
     const [ssMode, setSsMode] = useState(false)
     const [cardDisplay, setCardDisplay] = useState<CardDisplayToggles>({ role: true, code: true, phone: true })
     const [selectedMember, setSelectedMember] = useState<RosterMember | null>(null)
-    const [exportingStudents, setExportingStudents] = useState(false)
+    useEffect(() => {
+        if (initialStudentId != null) setSelectedMember(members.find(member => member.user.id === initialStudentId) || null)
+    }, [initialStudentId, members])
     const [exportingImage, setExportingImage] = useState(false)
 
     const hasCustomAssignment = useMemo(() => {
@@ -239,35 +242,11 @@ export default function AdminMemberRosterTab({ courseId, courseName, members, la
         else alert(res.error || 'Có lỗi xảy ra khi đổi tên')
     }
 
-    const handleExportStudents = async () => {
-        setExportingStudents(true)
-        try {
-            const res = await exportCourseMembersAction(courseId, courseName)
-            if (res.success && res.sheetUrl) {
-                window.open(res.sheetUrl, '_blank')
-            } else if (res.success && res.csvContent) {
-                const blob = new Blob([res.csvContent], { type: 'text/csv;charset=utf-8;' })
-                const url = URL.createObjectURL(blob)
-                const a = document.createElement('a')
-                a.href = url
-                a.download = `${res.fileName || 'thanh-vien'}.csv`
-                a.click()
-                URL.revokeObjectURL(url)
-                alert('Không tạo được Google Sheet, đã tải file CSV thay thế.')
-            } else {
-                alert(res.error || 'Lỗi xuất danh sách')
-            }
-        } catch {
-            alert('Lỗi xuất danh sách')
-        }
-        setExportingStudents(false)
-    }
-
-    const handleExportImage = () => {
+    const handleExportImage = async (options: import('./CourseExportButton').ImageExportOptions = {}) => {
         if (members.length === 0) return
         setExportingImage(true)
         try {
-            const sorted = [...members].sort((a, b) => {
+            const sorted = members.filter(member => !options.userIds || options.userIds.includes(member.user.id)).sort((a, b) => {
                 if (a.team !== b.team) return a.team - b.team
                 if (a.memberRole !== b.memberRole) return a.memberRole === 'PS' ? -1 : 1
                 if (a.group !== b.group) return a.group - b.group
@@ -283,7 +262,7 @@ export default function AdminMemberRosterTab({ courseId, courseName, members, la
                 startDate: m.startDate,
                 days: m.days || [],
             }))
-            downloadRosterAsImage(courseName, rows)
+            await downloadRosterAsImage(courseName, rows, 'png', options)
         } finally {
             setExportingImage(false)
         }
@@ -374,7 +353,7 @@ export default function AdminMemberRosterTab({ courseId, courseName, members, la
                             onChange={e => setSsMode(e.target.checked)}
                             className="rounded border-gray-300 accent-yellow-500 cursor-pointer"
                         />
-                        <span className="text-xs font-bold text-gray-500" title="Sắp xếp Team / Group">SS</span>
+                        <span className="text-xs font-bold text-gray-500" title="Chỉnh vai trò, đội và nhóm của học viên">Sửa đội/nhóm</span>
                     </label>
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0 ml-2">Hiển thị:</span>
                     <ToggleCheckbox checked={cardDisplay.role} onChange={v => setCardDisplay(d => ({ ...d, role: v }))} label="Vai trò" />
@@ -393,23 +372,7 @@ export default function AdminMemberRosterTab({ courseId, courseName, members, la
                             Cập nhật{pendingCount > 0 ? ` (${pendingCount})` : ''}
                         </button>
                     )}
-                    <button
-                        onClick={handleExportImage}
-                        disabled={exportingImage || members.length === 0}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Xuất bảng tổng hợp nộp bài ra file ảnh PNG"
-                    >
-                        {exportingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageDown className="w-3.5 h-3.5" />}
-                        Xuất ảnh
-                    </button>
-                    <button
-                        onClick={handleExportStudents}
-                        disabled={exportingStudents || members.length === 0}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {exportingStudents ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
-                        Xuất Google Sheet
-                    </button>
+                    <CourseExportButton courseIds={[courseId]} courseName={courseName} onImageExport={handleExportImage} imageBusy={exportingImage} imageCount={members.length} />
                 </div>
             </div>
 

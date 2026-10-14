@@ -1,3 +1,4 @@
+import { createWi300GiftCoursePage } from './wi300-gift'
 import { createWiGrowCoursePage } from './wigrow'
 import { createClassicCoursePage } from './mfc-classic'
 
@@ -14,10 +15,13 @@ export const COURSE_TEMPLATE_LIBRARY = [
   },
 ] as const
 
-export type CourseTemplateKey = typeof COURSE_TEMPLATE_LIBRARY[number]['key']
+// Giữ renderer tương thích cho trang đã lưu, nhưng không cho chọn mẫu Quà tặng mới.
+export type CourseTemplateKey = typeof COURSE_TEMPLATE_LIBRARY[number]['key'] | 'wi300-gift'
 
 export function createCoursePageFromTemplate(key: CourseTemplateKey, slug: string) {
   switch (key) {
+    case 'wi300-gift':
+      return createWi300GiftCoursePage(slug)
     case 'mfc-classic':
       return createClassicCoursePage(slug)
     case 'wigrow':

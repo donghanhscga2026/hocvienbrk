@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { CourseSection, CourseSectionType } from '@/lib/course-page/types'
+import GiftTemplateSection from './sections/GiftTemplateSection'
 import HeroSection from './sections/HeroSection'
 import QuoteSection from './sections/QuoteSection'
 import PainPointsSection from './sections/PainPointsSection'
@@ -79,6 +80,7 @@ export default function SectionRenderer({
     <>
       {visibleSections.map((section) => {
         const type = (section as any).sectionType || (section as any).type
+        if (section.variant?.startsWith('wi300-gift')) return <GiftTemplateSection key={section.id || section.sectionKey} section={section} onAction={onAction} testimonials={testimonials} isEnrolled={isEnrolled} />
         if (section.variant === 'zip-source-v1') {
           return (
             <ZipSourceSection

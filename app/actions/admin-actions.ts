@@ -803,11 +803,15 @@ function computeDayStatus(
  */
 async function checkCourseRosterAccess(courseId: number) {
     const session = await auth()
-    if (!session?.user?.id) return { error: "Unauthorized" as const }
+    if (session?.user?.id == null) return { error: "Unauthorized" as const }
 
-    const userId = parseInt(session.user.id)
-    const isAdmin = session.user.role === Role.ADMIN
-    const isTeacher = session.user.role === Role.TEACHER || session.user.role === Role.INSTRUCTOR
+    const userId = Number(session.user.id)
+    if (!Number.isInteger(userId) || userId < 0) return { error: "Unauthorized" as const }
+    // Quyền liên hệ dùng vai trò hiện tại trong DB, không dùng vai trò đã lưu trong phiên.
+    const actor = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
+    if (!actor) return { error: "Unauthorized" as const }
+    const isAdmin = actor.role === Role.ADMIN
+    const isTeacher = actor.role === Role.TEACHER || actor.role === Role.INSTRUCTOR
 
     const course = await prisma.course.findUnique({ where: { id: courseId }, select: { teacherId: true } })
     if (!course) return { error: "Không tìm thấy khóa học" as const }
@@ -831,21 +835,22 @@ async function checkCourseRosterAccess(courseId: number) {
  * Truy vấn dữ liệu roster dùng chung: danh sách bài học (theo `order` = ngày),
  * thành viên ACTIVE + trạng thái nộp bài từng ngày (missing/late/onTime).
  */
-async function buildCourseRoster(courseId: number) {
+async function buildCourseRoster(courseId: number, includePending = false) {
     const [course, lessons, enrollments] = await Promise.all([
         prisma.course.findUnique({ where: { id: courseId }, select: { id: true, name_lop: true, id_khoa: true, memberLabels: true } }),
         prisma.lesson.findMany({ where: { courseId }, orderBy: { order: 'asc' }, select: { id: true, order: true, title: true } }),
         prisma.enrollment.findMany({
-            where: { courseId, status: 'ACTIVE' },
+            where: { courseId, status: includePending ? { in: ['ACTIVE', 'PENDING'] } : 'ACTIVE' },
             select: {
                 id: true,
+                status: true,
                 memberRole: true,
                 team: true,
                 group: true,
                 startedAt: true,
                 activatedAt: true,
                 createdAt: true,
-                user: { select: { id: true, name: true, phone: true } },
+                user: { select: { id: true, name: true, phone: true, email: true, image: true } },
                 // status: loại RESET vì đó là bài của lộ trình CŨ trước khi
                 // thành viên "Đặt lại lộ trình" (confirmStartDateAction) — vẫn
                 // còn submittedAt/scores trong DB nhưng không thuộc chu kỳ hiện
@@ -864,11 +869,11 @@ async function buildCourseRoster(courseId: number) {
         )
         const base = e.startedAt || e.activatedAt || e.createdAt
 
-        const days = lessons.map(l => {
+        const days = (e.status === 'ACTIVE' ? lessons : []).map(l => {
             const p = progressByLesson.get(l.id)
             const deadlineUTC = computeLessonDeadlineUTC(base, l.order)
             const status = computeDayStatus(p, deadlineUTC, nowUTC)
-            return { order: l.order, status }
+            return { order: l.order, status, submittedAt: p?.submittedAt ?? null, submitted: !!p?.submittedAt }
         })
 
         // "Hôm nay là Ngày mấy" theo lịch riêng của thành viên — mỗi người bắt
@@ -876,7 +881,7 @@ async function buildCourseRoster(courseId: number) {
         // của mỗi người sẽ khác nhau. Dùng để: (a) cắt cửa sổ hiển thị ở thẻ rút
         // gọn theo đúng lịch cá nhân thay vì cắt cứng theo cuối danh sách bài
         // học chung, (b) tô sáng ô "bài hôm nay" ở giao diện.
-        const dayIndexToday = computeCurrentDayOrder(base)
+        const dayIndexToday = e.status === 'ACTIVE' ? computeCurrentDayOrder(base) : 0
 
         // % nộp ĐÚNG HẠN tính đến hết ngày hôm qua (không tính nộp muộn), theo mốc
         // bắt đầu học riêng của từng thành viên (giống cách tính hạn nộp trong
@@ -888,12 +893,15 @@ async function buildCourseRoster(courseId: number) {
 
         return {
             id: e.id,
+            enrollmentStatus: e.status,
             memberRole: e.memberRole,
             team: e.team,
             group: e.group,
             user: e.user,
             days,
             completionPercent,
+            submittedCount: days.filter(day => day.submitted).length,
+            lastSubmittedAt: days.reduce<Date | null>((latest, day) => day.submittedAt && (!latest || day.submittedAt > latest) ? day.submittedAt : latest, null),
             todayOrder: dayIndexToday,
             startDate: base,
         }
@@ -915,17 +923,17 @@ async function buildCourseRoster(courseId: number) {
  * trang khóa học công khai (icon "học viên"). Học viên ACTIVE của khóa được
  * xem nhưng không thấy SĐT; chỉ ADMIN/giáo viên sở hữu khóa mới thấy SĐT.
  */
-export async function getCourseMemberRosterAction(courseId: number) {
+export async function getCourseMemberRosterAction(courseId: number, includePending = false) {
     try {
         const access = await checkCourseRosterAccess(courseId)
         if (access.error) return { success: false, error: access.error }
 
-        const { course, lessons, members } = await buildCourseRoster(courseId)
+        const { course, lessons, members } = await buildCourseRoster(courseId, includePending && !!access.canViewPhone)
         if (!course) return { success: false, error: "Không tìm thấy khóa học" }
 
         const sanitizedMembers = members.map(m => ({
             ...m,
-            user: access.canViewPhone ? m.user : { id: m.user.id, name: m.user.name, phone: null }
+            user: access.canViewPhone ? m.user : { id: m.user.id, name: m.user.name, phone: null, email: null, image: m.user.image }
         }))
 
         return {
@@ -1188,47 +1196,24 @@ export async function updateCourseMemberAssignmentsAction(
  * Xuất danh sách thành viên ACTIVE của 1 khóa học ra Google Sheet (ID, họ tên,
  * vai trò, Team, Group) — dùng cho modal "Xem thành viên" ở trang quản lý khóa học.
  */
-export async function exportCourseMembersAction(courseId: number, courseName: string) {
+export async function exportCourseMembersAction(courseId: number, _courseName: string) {
     try {
-        const access = await checkCourseMemberAccess(courseId)
-        if (access.error) return { success: false, error: access.error }
-
-        const [enrollments, course] = await Promise.all([
-            prisma.enrollment.findMany({
-                where: { courseId, status: 'ACTIVE' },
-                select: { memberRole: true, team: true, group: true, user: { select: { id: true, name: true } } },
-                orderBy: [{ team: 'asc' }, { memberRole: 'asc' }, { group: 'asc' }, { activatedAt: 'asc' }]
-            }),
-            prisma.course.findUnique({ where: { id: courseId }, select: { memberLabels: true } })
-        ])
-
-        if (enrollments.length === 0) return { success: false, error: "Chưa có thành viên nào" }
-
-        const labels = (course?.memberLabels as CourseMemberLabels) || {}
-        const headers = ["STT", "ID", "Họ tên", "Vai trò", "Team", "Group"]
-        const rows = enrollments.map((e, index) => [
-            (index + 1).toString(),
-            e.user.id.toString(),
-            e.user.name || "Chưa có tên",
-            e.memberRole === 'PS' ? "Phụng sự (PS)" : "Thành viên (TV)",
-            teamLabel(e.team, labels),
-            e.memberRole === 'PS' ? "" : groupLabel(e.team, e.group, labels),
-        ])
-
-        const safeTitle = courseName.replace(/[<>:"/\\|?*]/g, "").substring(0, 90)
-        const dateStr = new Date().toLocaleDateString("vi-VN").replace(/\//g, "-")
-        const fileName = `ThanhVien_${safeTitle}_${dateStr}`
-
-        const csvHeader = headers.join(",")
-        const csvRows = rows.map(r => r.map(v => (v.includes(",") || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v)).join(","))
-        const csvContent = [csvHeader, ...csvRows].join("\n")
-
-        const { tryCreateSheet } = await import("@/lib/email-campaign-export")
-        const fullSheetTitle = `[Thành viên] ${safeTitle} - ${new Date().toLocaleDateString("vi-VN")}`
-        const { sheetUrl, error } = await tryCreateSheet(rows, headers, fullSheetTitle)
-
-        return { success: true, sheetUrl, csvContent, fileName, totalRows: rows.length, sheetError: error }
-    } catch (error: any) { return { success: false, error: error.message } }
+        if (await domainContext()) return { success: false, error: 'Xuất dữ liệu tại hệ thống chính.' }
+        const session = await auth()
+        const id = session?.user?.id == null ? NaN : Number(session.user.id)
+        if (!Number.isSafeInteger(id) || id < 0) return { success: false, error: 'Vui lòng đăng nhập.' }
+        const actor = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true, email: true, emailVerified: true } })
+        if (!actor) return { success: false, error: 'Vui lòng đăng nhập lại.' }
+        if (!actor.emailVerified) return { success: false, error: 'Xác minh email tài khoản để nhận Google Sheet. Bạn vẫn có thể dùng Xuất Excel.' }
+        const { memberExportSheets } = await import('@/lib/course/member-export')
+        const { createCourseGoogleSheet } = await import('@/lib/course/google-export')
+        const report = await memberExportSheets(prisma, actor, { courseIds: [courseId] })
+        const sheetUrl = await createCourseGoogleSheet(report.sheets, `Học viên - ${report.title} - ${new Date().toLocaleDateString('vi-VN')}`, actor.email)
+        return { success: true, sheetUrl, totalRows: report.total }
+    } catch (error) {
+        const { CrmError } = await import('@/lib/crm/service')
+        return { success: false, error: error instanceof CrmError ? error.message : 'Không tạo được Google Sheet. Hãy thử lại hoặc tải Excel.' }
+    }
 }
 
 // ==========================================
