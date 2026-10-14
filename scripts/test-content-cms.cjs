@@ -10,6 +10,7 @@ async function run() {
   const db = {
     user: { findUnique: async ({ where }) => roles.has(where.id) ? { role: roles.get(where.id) } : null },
     systemConfig: {
+      findMany: async ({ where }) => [...configs].filter(([key]) => where.key.in.includes(key)).map(([key, value]) => ({ key, value: structuredClone(value) })),
       findUnique: async ({ where }) => configs.has(where.key) ? { value: structuredClone(configs.get(where.key)) } : null,
       upsert: async ({ where, create, update }) => configs.set(where.key, structuredClone(configs.has(where.key) ? update.value : create.value)),
       deleteMany: async ({ where }) => configs.delete(where.key),
@@ -41,6 +42,9 @@ async function run() {
   const category = await service.saveManagedCategory(db, 0, { name: 'Kiến thức', description: 'Mô tả', order: 3, seo: { ...seo.emptyContentSeo, slug: 'kien-thuc', title: 'SEO danh mục' } })
   let post = await service.saveManagedPost(db, 0, { ...input, categoryId: category.id })
   assert.equal(post.authorId, 0); assert.equal(post.published, false)
+  assert.equal(posts.get(post.id).title, 'Bản nháp'); assert.equal(posts.get(post.id).content, '', 'Private draft content is not stored in the publicly readable Post table')
+  assert.equal((await service.readManagedPost(db, post.id)).content, input.content)
+  assert.equal((await service.listManagedPosts(db, 0, 0, 'Bài thử', undefined, false)).total, 1, 'Search uses decrypted draft title')
   assert.equal((await service.listManagedPosts(db, 0, 0, '', undefined, false)).total, 1)
   assert.equal((await service.listManagedPosts(db, 0, 0, '', undefined, true)).total, 0)
   assert.ok(!JSON.stringify([...configs]).includes('SEO bài thử'), 'SEO drafts are encrypted')
@@ -92,12 +96,23 @@ async function run() {
   await appearance.saveManagedPage(db, 0, { action: 'trash', revision: 0, page }, preview)
   assert.equal((await appearance.readAppearance(db, key)).published.customPages[0].deleted, false, 'Preview isolates custom-page changes')
   const draftKey = appearance.appearanceKey('draft-restoration')
-  const draftPage = managed.newManagedPage('unreviewed', 'chua-duyet', 'Trang chưa duyệt')
+  const draftPage = { ...managed.newManagedPage('unreviewed', 'chua-duyet', 'Trang chưa duyệt'), body: 'Nội dung mật chưa duyệt' }
   let draftState = await appearance.saveManagedPage(db, 0, { action: 'draft', revision: 0, page: draftPage }, draftKey)
   draftState = await appearance.saveManagedPage(db, 0, { action: 'trash', revision: draftState.revision, page: draftState.draft.customPages[0] }, draftKey)
   draftState = await appearance.saveManagedPage(db, 0, { action: 'restore', revision: draftState.revision, page: draftState.draft.customPages[0] }, draftKey)
   assert.equal(draftState.published.customPages[0].published, false, 'Restoring an unpublished draft must not publish it')
   assert.equal(draftState.draft.customPages[0].deleted, false)
+  const website = load('lib/wi300/website-config.ts')
+  const publicDraftBrand = website.configuredBrand({ name: 'Wi', description: 'Mô tả', ogImageUrl: '/logo.png' }, draftState.published)
+  assert.ok(!JSON.stringify(publicDraftBrand.appearance).includes('Nội dung mật'), 'Hidden content must never be serialized into public brand props')
+  const versionsKey = appearance.appearanceKey('restore-versions')
+  const reviewed = { ...managed.newManagedPage('reviewed', 'da-duyet', 'Trang đã duyệt'), body: 'Nội dung đã duyệt' }
+  let versions = await appearance.saveManagedPage(db, 0, { action: 'publish', revision: 0, page: reviewed }, versionsKey)
+  versions = await appearance.saveManagedPage(db, 0, { action: 'draft', revision: versions.revision, page: { ...reviewed, body: 'Nháp chưa duyệt' } }, versionsKey)
+  versions = await appearance.saveManagedPage(db, 0, { action: 'trash', revision: versions.revision, page: versions.draft.customPages[0] }, versionsKey)
+  versions = await appearance.saveManagedPage(db, 0, { action: 'restore', revision: versions.revision, page: versions.draft.customPages[0] }, versionsKey)
+  assert.equal(versions.published.customPages[0].body, 'Nội dung đã duyệt')
+  assert.equal(versions.draft.customPages[0].body, 'Nháp chưa duyệt', 'Restore retains unreviewed edits as draft')
 
   const brand = { name: 'Wi300', description: 'Mô tả website', ogImageUrl: '/global.png', appearance: state.published }
   const routeMocks = { ...mocks, react: { ...React, cache: fn => fn }, 'next/navigation': { notFound: () => { throw Error('404') }, permanentRedirect: url => { throw Error('REDIRECT:' + url) } }, '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => brand } }

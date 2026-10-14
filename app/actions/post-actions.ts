@@ -140,6 +140,7 @@ export async function updatePostAction(postId: string, data: { title: string; co
         await appearanceAdmin(prisma, Number(session.user.id))
         const existing = await prisma.post.findUnique({ where: { id: postId } })
         if (!existing) return { success: false, error: "Không tìm thấy bài viết." }
+        if (existing.published === false) return { success: false, error: 'Vui lòng sửa bản nháp trong công cụ Bài viết.' }
         // Không tải/lưu lại ảnh khi chỉ sửa chữ; bỏ trống ảnh nghĩa là gỡ ảnh.
         let finalImage = existing.image
         if (image !== undefined && image !== (existing.image || '')) {

@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { appearanceAdmin } from '@/lib/wi300/appearance-service'
 import { CrmError } from '@/lib/crm/service'
 import { contentSeoSchema } from './seo'
-import { contentSeoKey, readContentSeo, writeContentSeo } from './seo-storage'
+import { contentSeoKey, readContentRecord, readContentRecords, writeContentSeo } from './seo-storage'
 
 const name = z.string().trim().min(1).max(300)
 const postInput = z.object({ id: z.string().min(1).optional(), title: name, content: z.string().trim().min(1).max(100000),
@@ -17,16 +17,44 @@ const categoryInput = z.object({ id: z.number().int().min(0).optional(), name, d
 
 export async function listManagedPosts(db: PrismaClient, actor: number, page: number, query = '', categoryId?: number, published?: boolean) {
   await appearanceAdmin(db, actor)
+  const include = { category: true, _count: { select: { comments: true } } } as const
+  const orderBy = [{ pin: 'desc' }, { createdAt: 'desc' }] as const
+  const hydrate = async (rows: Awaited<ReturnType<typeof db.post.findMany>>) => {
+    const records = await readContentRecords(db, 'post', rows.map(row => row.id))
+    return rows.map(row => { const record = records.get(row.id)!; return { ...row, ...(!row.published && record.draft ? record.draft : {}), seo: record.seo } })
+  }
+  // Tìm nội dung nháp sau giải mã, vì bảng Post chỉ chứa placeholder an toàn.
+  if (query.trim() && published !== true) {
+    const categoryWhere = categoryId === undefined ? {} : { categoryId }
+    const publicWhere = { ...categoryWhere, published: true, title: { contains: query.slice(0, 300), mode: 'insensitive' as const } }
+    const [visible, count] = published === false ? [[], 0] : await Promise.all([db.post.findMany({ where: publicWhere, include, orderBy: [...orderBy], take: (page + 1) * 10 }), db.post.count({ where: publicWhere })])
+    const drafts: Awaited<ReturnType<typeof hydrate>> = []
+    for (let offset = 0;; offset += 200) {
+      const rows = await db.post.findMany({ where: { ...categoryWhere, published: false }, include, orderBy: [...orderBy], take: 200, skip: offset })
+      drafts.push(...(await hydrate(rows)).filter(row => row.title.toLocaleLowerCase('vi').includes(query.trim().toLocaleLowerCase('vi'))))
+      if (rows.length < 200) break
+    }
+    const combined = [...await hydrate(visible), ...drafts].sort((a, b) => Number(b.pin) - Number(a.pin) || b.createdAt.getTime() - a.createdAt.getTime())
+    const total = count + drafts.length
+    return { posts: combined.slice(page * 10, (page + 1) * 10), total, totalPages: Math.max(1, Math.ceil(total / 10)) }
+  }
   const where = { ...(query ? { title: { contains: query.slice(0, 300), mode: 'insensitive' as const } } : {}),
     ...(categoryId === undefined ? {} : { categoryId }), ...(published === undefined ? {} : { published }) }
-  const [posts, total] = await Promise.all([db.post.findMany({ where, include: { category: true, _count: { select: { comments: true } } },
-    orderBy: [{ pin: 'desc' }, { createdAt: 'desc' }], skip: page * 10, take: 10 }), db.post.count({ where })])
-  return { posts: await Promise.all(posts.map(async post => ({ ...post, seo: await readContentSeo(db, 'post', post.id) }))), total, totalPages: Math.max(1, Math.ceil(total / 10)) }
+  const [posts, total] = await Promise.all([db.post.findMany({ where, include, orderBy: [...orderBy], skip: page * 10, take: 10 }), db.post.count({ where })])
+  return { posts: await hydrate(posts), total, totalPages: Math.max(1, Math.ceil(total / 10)) }
+}
+/** Chỉ gọi sau kiểm tra admin; không dùng để phục vụ bài viết công khai. */
+export async function readManagedPost(db: PrismaClient, id: string) {
+  const post = await db.post.findUnique({ where: { id } })
+  if (!post) return null
+  const record = await readContentRecord(db, 'post', id)
+  return { ...post, ...(!post.published && record.draft ? record.draft : {}), seo: record.seo }
 }
 export async function listManagedCategories(db: PrismaClient, actor: number) {
   await appearanceAdmin(db, actor)
   const rows = await db.postCategory.findMany({ orderBy: [{ order: 'asc' }, { name: 'asc' }], include: { _count: { select: { posts: true } } } })
-  return Promise.all(rows.map(async row => ({ ...row, seo: await readContentSeo(db, 'category', row.id) })))
+  const records = await readContentRecords(db, 'category', rows.map(row => row.id))
+  return rows.map(row => ({ ...row, seo: records.get(String(row.id))!.seo }))
 }
 export async function saveManagedPost(db: PrismaClient, actor: number, raw: unknown) {
   const input = postInput.parse(raw)
@@ -40,11 +68,14 @@ export async function saveManagedPost(db: PrismaClient, actor: number, raw: unkn
     const old = input.id ? await tx.post.findUnique({ where: { id: input.id } }) : null
     if (input.id && !old) throw new CrmError('Không tìm thấy bài viết.', 404)
     if (old && (!input.version || old.updatedAt.toISOString() !== input.version)) throw new CrmError('Bài viết đã thay đổi. Tải lại trước khi sửa.', 409)
+    if (old && !old.published && !old.content && !(await readContentRecord(tx as PrismaClient, 'post', old.id)).draft) throw new CrmError('Bản nháp thuộc website hoặc nhánh khác.', 409)
     if (input.categoryId !== null && !await tx.postCategory.findUnique({ where: { id: input.categoryId } })) throw new CrmError('Danh mục không còn tồn tại.', 409)
-    const data = { title: input.title, content: input.content, image: input.image || null, categoryId: input.categoryId, published: input.published }
+    const privateContent = { title: input.title, content: input.content, image: input.image || null }
+    // Post có thể đọc qua Data API cũ: bản nháp chỉ lưu placeholder, chữ/ảnh thật được mã hóa.
+    const data = { ...(input.published ? privateContent : { title: 'Bản nháp', content: '', image: null }), categoryId: input.categoryId, published: input.published }
     const post = old ? await tx.post.update({ where: { id: old.id }, data }) : await tx.post.create({ data: { ...data, authorId: actor } })
-    await writeContentSeo(tx as PrismaClient, 'post', post.id, input.seo)
-    return { ...post, seo: input.seo }
+    await writeContentSeo(tx as PrismaClient, 'post', post.id, input.seo, input.published ? null : privateContent)
+    return { ...post, ...privateContent, seo: input.seo }
   })
 }
 export async function saveManagedCategory(db: PrismaClient, actor: number, raw: unknown) {

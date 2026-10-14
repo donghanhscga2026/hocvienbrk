@@ -1,9 +1,8 @@
 import prisma from '@/lib/prisma'
 import { crmBody, crmResponse } from '@/lib/crm/http'
 import { contentActor, contentFailure } from '@/lib/content/admin-http'
-import { listManagedPosts, saveManagedPost, deleteManagedContent } from '@/lib/content/admin-service'
+import { listManagedPosts, saveManagedPost, deleteManagedContent, readManagedPost } from '@/lib/content/admin-service'
 import { appearanceAdmin } from '@/lib/wi300/appearance-service'
-import { readContentSeo } from '@/lib/content/seo-storage'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 function invalidate() { revalidatePath('/', 'layout'); revalidatePath('/tools/posts') }
@@ -12,8 +11,7 @@ export async function GET(request: Request) {
     const actor = await contentActor(), params = new URL(request.url).searchParams
     await appearanceAdmin(prisma, actor)
     if (params.has('id')) {
-      const post = await prisma.post.findUnique({ where: { id: z.string().min(1).max(200).parse(params.get('id')) } })
-      return crmResponse({ post: post ? { ...post, seo: await readContentSeo(prisma, 'post', post.id) } : null })
+      return crmResponse({ post: await readManagedPost(prisma, z.string().min(1).max(200).parse(params.get('id'))) })
     }
     const page = z.coerce.number().int().min(0).max(100000).parse(params.get('page') || 0)
     const category = params.get('category'), status = params.get('status')

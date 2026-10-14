@@ -16,17 +16,35 @@ function secret() {
   return createHash('sha256').update('content-seo-v1:' + value).digest()
 }
 const envelope = z.object({ iv: z.string(), tag: z.string(), payload: z.string() }).strict()
-export async function readContentSeo(db: PrismaClient, kind: 'post' | 'category', id: string | number): Promise<ContentSeo> {
-  const key = contentSeoKey(kind, id), row = await db.systemConfig.findUnique({ where: { key }, select: { value: true } })
-  if (!row) return { ...emptyContentSeo }
-  const record = envelope.parse(row.value), cipher = createDecipheriv('aes-256-gcm', secret(), Buffer.from(record.iv, 'base64'))
+const privatePostSchema = z.object({ title: z.string().max(300), content: z.string().max(100000), image: z.string().max(1000).nullable() }).strict()
+export type PrivatePost = z.infer<typeof privatePostSchema>
+const contentRecordSchema = z.object({ seo: contentSeoSchema, draft: privatePostSchema.nullable().default(null) }).strict()
+type ContentRecord = z.infer<typeof contentRecordSchema>
+function decode(value: unknown, key: string): ContentRecord {
+  const record = envelope.parse(value), cipher = createDecipheriv('aes-256-gcm', secret(), Buffer.from(record.iv, 'base64'))
   cipher.setAAD(Buffer.from(key)); cipher.setAuthTag(Buffer.from(record.tag, 'base64'))
-  return contentSeoSchema.parse(JSON.parse(Buffer.concat([cipher.update(Buffer.from(record.payload, 'base64')), cipher.final()]).toString('utf8')))
+  const raw = JSON.parse(Buffer.concat([cipher.update(Buffer.from(record.payload, 'base64')), cipher.final()]).toString('utf8'))
+  // Đọc được bản SEO cũ chỉ chứa các trường SEO, trước khi có nội dung nháp.
+  return raw && 'seo' in raw ? contentRecordSchema.parse(raw) : { seo: contentSeoSchema.parse(raw), draft: null }
 }
-export async function writeContentSeo(db: PrismaClient, kind: 'post' | 'category', id: string | number, seo: ContentSeo) {
+export async function readContentRecord(db: PrismaClient, kind: 'post' | 'category', id: string | number): Promise<ContentRecord> {
+  const key = contentSeoKey(kind, id), row = await db.systemConfig.findUnique({ where: { key }, select: { value: true } })
+  return row ? decode(row.value, key) : { seo: { ...emptyContentSeo }, draft: null }
+}
+export async function readContentRecords(db: PrismaClient, kind: 'post' | 'category', ids: (string | number)[]) {
+  if (!ids.length) return new Map<string, ContentRecord>()
+  const keys = ids.map(id => contentSeoKey(kind, id))
+  const rows = await db.systemConfig.findMany({ where: { key: { in: keys } }, select: { key: true, value: true } })
+  const records = new Map(rows.map(row => [row.key, decode(row.value, row.key)]))
+  return new Map(ids.map(id => [String(id), records.get(contentSeoKey(kind, id)) || { seo: { ...emptyContentSeo }, draft: null }]))
+}
+export async function readContentSeo(db: PrismaClient, kind: 'post' | 'category', id: string | number): Promise<ContentSeo> {
+  return (await readContentRecord(db, kind, id)).seo
+}
+export async function writeContentSeo(db: PrismaClient, kind: 'post' | 'category', id: string | number, seo: ContentSeo, draft: PrivatePost | null = null) {
   const key = contentSeoKey(kind, id), iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', secret(), iv)
   cipher.setAAD(Buffer.from(key))
-  const payload = Buffer.concat([cipher.update(JSON.stringify(contentSeoSchema.parse(seo)), 'utf8'), cipher.final()])
+  const payload = Buffer.concat([cipher.update(JSON.stringify(contentRecordSchema.parse({ seo, draft })), 'utf8'), cipher.final()])
   const value = { iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), payload: payload.toString('base64') }
   await db.systemConfig.upsert({ where: { key }, create: { key, value }, update: { value } })
 }

@@ -3,7 +3,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:
 import { z } from 'zod'
 import { appearanceSchema, defaultAppearance } from './appearance'
 import { CrmError } from '@/lib/crm/service'
-import { managedPageSchema, SYSTEM_WEBSITE_PAGES } from './managed-pages'
+import { managedPageSchema, SYSTEM_WEBSITE_PAGES, newManagedPage } from './managed-pages'
 
 export function appearanceKey(scope = process.env.SITE_PROFILE_KEY?.trim() || 'default', env: Record<string, string | undefined> = process.env) {
   const base = `wi300:appearance:v1:${encodeURIComponent(scope)}`
@@ -88,26 +88,28 @@ export async function saveManagedPage(db: PrismaClient, actor: number, raw: unkn
     await appearanceAdmin(tx as PrismaClient, actor)
     const current = await readAppearance(tx as PrismaClient, key)
     if (current.revision !== input.revision) throw new CrmError('Cài đặt đã thay đổi. Tải lại trước khi lưu.', 409)
-    const currentPage = current.published.customPages.find(page => page.id === input.page.id)
+    const currentPage = system ? current.published.pageContent[input.page.id] || newManagedPage(system.id, system.url.slice(1), system.label) : current.published.customPages.find(page => page.id === input.page.id)
     const stagedPage = system ? current.draft.pageContent[input.page.id] : current.draft.customPages.find(page => page.id === input.page.id)
     if (input.action === 'restore' && !stagedPage?.deleted) throw new CrmError('Trang chưa được xóa.', 409)
     const wasPublished = system ? !current.published.hiddenPages.includes(input.page.id) : !!currentPage?.published && !currentPage.deleted
     // Khôi phục trạng thái công khai trước khi xóa; trang chưa áp dụng vẫn giữ ẩn.
     const page = { ...input.page, ...(input.action === 'trash' ? { deleted: true, published: false, restorePublished: wasPublished } : input.action === 'restore' ? { deleted: false, published: stagedPage!.restorePublished } : {}) }
-    function replace(settings: AppearanceState['draft']) {
+    function replace(settings: AppearanceState['draft'], publicView = false) {
       const copy = structuredClone(settings)
+      // Xóa/khôi phục giữ nội dung đã duyệt trong bản công khai; các sửa nháp vẫn là nháp.
+      const content = publicView && currentPage && ['trash', 'restore'].includes(input.action) ? { ...currentPage, deleted: page.deleted, published: page.published, restorePublished: page.restorePublished } : page
       if (system) {
-        copy.pageContent[page.id] = page
+        copy.pageContent[page.id] = content
         copy.hiddenPages = copy.hiddenPages.filter(id => id !== page.id)
         if (page.deleted || !page.published) copy.hiddenPages.push(page.id)
       } else {
         const index = copy.customPages.findIndex(item => item.id === page.id)
-        if (index === -1) copy.customPages.push(page); else copy.customPages[index] = page
+        if (index === -1) copy.customPages.push(content); else copy.customPages[index] = content
       }
       return appearanceSchema.parse(copy)
     }
     const live = input.action !== 'draft'
-    const state = { revision: current.revision + 1, draft: replace(current.draft), published: live ? replace(current.published) : current.published,
+    const state = { revision: current.revision + 1, draft: replace(current.draft), published: live ? replace(current.published, true) : current.published,
       previous: live ? current.published : current.previous }
     const value = encode(state, key)
     await tx.systemConfig.upsert({ where: { key }, create: { key, value }, update: { value } })
