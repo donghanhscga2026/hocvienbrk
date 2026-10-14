@@ -25,6 +25,7 @@ import { getCurrentSiteProfile, getSiteRuntimeConfig } from "@/lib/site-profile/
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import { Wi300BrandProvider } from '@/components/wi300/Wi300BrandContext'
 import Wi300Shell from '@/components/wi300/Wi300Shell'
+import { websiteMetadata } from '@/lib/wi300/website-config'
 
 // [OPTIMIZE] font-thin/extralight/light (100/200/300) không có class Tailwind
 // nào trong toàn bộ codebase dùng tới (đã kiểm bằng grep) — bỏ để giảm số file
@@ -63,6 +64,7 @@ export async function generateMetadata(): Promise<Metadata> {
   }
   const brand = await getCurrentDeploymentBrand()
   if (brand) return {
+    ...websiteMetadata(brand),
     metadataBase: new URL(`https://${(await headers()).get('host') || 'wi300.vn'}`),
     title: { default: brand.seoTitle, template: `%s | ${brand.name}` },
     description: brand.description, applicationName: brand.name,

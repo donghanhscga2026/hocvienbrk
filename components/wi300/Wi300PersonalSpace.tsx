@@ -124,7 +124,10 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
 
   // Lọc lại theo role hiện tại ngay khi render để tránh hiện danh sách của role cũ.
   const permittedTools = tools.filter(tool => canUseTool(role, tool.roles))
-  const workspaceTools = (workspace: string): Tool[] => (tabs.find(group => group.id === workspace)?.items || []).map((item, index) => permittedTools.find(tool => tool.url === item.href) || { id: -100 - index, name: item.label, url: item.href, icon: item.icon, roles: [], isActive: true })
+  const workspaceTools = (workspace: string): Tool[] => (tabs.find(group => group.id === workspace)?.items || []).map((item, index) => {
+    const tool = permittedTools.find(tool => tool.url === item.href)
+    return tool ? { ...tool, name: item.label } : { id: -100 - index, name: item.label, url: item.href, icon: item.icon, roles: [], isActive: true }
+  })
   const pages = workspaceTools('pages')
   const otherTools = workspaceTools('tools')
   const accountTools = workspaceTools('account')
@@ -163,6 +166,7 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
     {!shared && <aside className="relative z-30 min-w-0 lg:sticky lg:top-24 lg:self-start"><SpaceSidebar groups={spaceNavigation(role, permittedTools)} active={tab} route={params.toString()} onNavigate={() => titleRef.current?.scrollIntoView({ block: 'start' })} loading={toolsLoading} failed={toolsError} /></aside>}
     <div className="relative z-0 min-w-0 space-y-5"><h1 ref={titleRef} className="scroll-mt-44 break-words text-2xl font-bold sm:text-3xl lg:scroll-mt-24">{tab === 'home' ? 'Tổng quan' : tab === 'pages' ? 'Nội dung & website' : tabs.find(item => item.id === tab)?.label}</h1>
       {tab === 'business' && toolList(workspaceTools('business'))}
+      {tab === 'website-admin' && role === 'ADMIN' && toolList(workspaceTools('website-admin'))}
       {accountError && <p role="alert" className="rounded-xl bg-amber-50 p-4 text-amber-900">Chưa tải được dữ liệu học tập. Vui lòng thử tải lại trang.</p>}
       {tab === 'home' && <>
         <p className="text-sm leading-6 text-brk-muted">Chào {session?.user?.name || 'bạn'}! Theo dõi khóa học và công việc của bạn tại đây.</p>
@@ -200,7 +204,7 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
         })}
       </>}
       </div>
-      {tab === 'home' && <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">{tabs.filter(item => item.id !== 'home').map(item => <Link key={item.id} href={`/my-space?tab=${item.id}`} className={toolTile}><ToolBadge tool={{ slug: item.id, url: `/my-space?tab=${item.id}` }} /><h2 className="text-sm font-semibold leading-5">{item.label}</h2></Link>)}</div>}
+      {tab === 'home' && <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">{tabs.filter(item => item.id !== 'home').map(item => <Link key={item.id} href={item.href} className={toolTile}><ToolBadge tool={{ slug: item.id, url: item.href }} /><h2 className="text-sm font-semibold leading-5">{item.label}</h2></Link>)}</div>}
       {tab === 'home' && !teachingAllowed && <section className={box}><h2 className="text-lg font-bold">Bạn muốn chia sẻ chuyên môn?</h2><p className="mt-2 text-sm leading-6 text-brk-muted">Gửi hồ sơ đăng ký giảng viên. Khu quản lý giảng dạy sẽ xuất hiện khi tài khoản được cấp quyền.</p><Link href="/doi-tac" className="mt-3 inline-flex min-h-11 items-center font-semibold text-brk-primary">Đăng ký làm giảng viên →</Link></section>}
       {tab === 'account' && <section className="space-y-3"><h2 className="text-xl font-bold">Tài khoản & tài chính</h2>{toolList(accountTools)}</section>}
       {tab === 'pages' && <><p className="text-brk-muted">Quản lý website, trang giới thiệu, landing page và bài viết.</p>{toolList(pages)}</>}

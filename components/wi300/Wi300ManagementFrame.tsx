@@ -51,7 +51,7 @@ export default function Wi300ManagementFrame({ children }: { children: ReactNode
       <div className="min-w-0 px-3 py-4 sm:px-5 sm:py-6 xl:px-7">
         <nav aria-label="Đường dẫn quản lý" className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-brk-muted">{location.crumbs.map((crumb, index) => <span key={index} className="inline-flex min-w-0 items-center gap-2">{index > 0 && <span aria-hidden="true">/</span>}{crumb.href ? <Link href={crumb.href} className="inline-flex min-h-11 items-center break-words font-medium text-brk-primary">{crumb.label}</Link> : <span aria-current="page" className="break-words">{crumb.label}</span>}</span>)}</nav>
         {location.back && <Link href={location.back.href} className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-brk-outline bg-white px-4 text-sm font-semibold text-brk-primary"><ArrowLeft size={16} />{location.back.label}</Link>}
-        {path.startsWith('/tools/') && !path.startsWith('/tools/courses') && path !== '/tools/crm' && <h1 data-navigation-title className="mb-5 text-2xl font-bold">{location.title}</h1>}
+        {path.startsWith('/tools/') && !path.startsWith('/tools/courses') && !['/tools/crm', '/tools/wi-website', '/tools/wi-appearance'].includes(path) && <h1 data-navigation-title className="mb-5 text-2xl font-bold">{location.title}</h1>}
         <ManagementToolsContext value={{ tools: currentTools, loading: status === 'loading' || status === 'authenticated' && (!result || result.actor !== actor || result.role !== role) && !failed, failed }}><div className="min-w-0">{children}</div></ManagementToolsContext>
       </div>
     </div>

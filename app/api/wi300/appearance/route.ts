@@ -26,10 +26,11 @@ export async function PUT(request: Request) {
   try {
     const id = await actor()
     await appearanceAdmin(prisma, id)
-    const body = await crmBody(request, 40000)
+    const body = await crmBody(request, 100000)
     const state = await saveAppearance(prisma, id, body)
     // Draft/restore không thay đổi nội dung công khai hoặc cache website.
     revalidatePath('/tools/wi-appearance')
+    revalidatePath('/tools/wi-website')
     if ((body as { action: string }).action === 'publish') revalidatePath('/', 'layout')
     return crmResponse(state)
   } catch (error) { return failure(error) }
