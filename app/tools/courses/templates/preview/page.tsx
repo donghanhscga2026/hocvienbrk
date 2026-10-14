@@ -24,5 +24,5 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
     const snapshot = template.snapshot as any
     page = { ...snapshot, id: 'preview', slug: 'template-preview', status: 'draft', sections: (snapshot.sections || []).map((section: any, index: number) => ({ ...section, id: `preview-${index}`, type: section.sectionType })) }
   } else notFound()
-  return <TemplateRenderedPreview page={page} exportable={Boolean(system && params.token)} token={params.token || ''} />
+  return <TemplateRenderedPreview page={page} exportable={Boolean((system || params.page && !page.sections.some(section => section.variant === 'zip-source-v1')) && params.token)} token={params.token || ''} />
 }

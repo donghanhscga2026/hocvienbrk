@@ -242,11 +242,11 @@ export default function AdminMemberRosterTab({ courseId, courseName, members, la
         else alert(res.error || 'Có lỗi xảy ra khi đổi tên')
     }
 
-    const handleExportImage = () => {
+    const handleExportImage = async (options: import('./CourseExportButton').ImageExportOptions = {}) => {
         if (members.length === 0) return
         setExportingImage(true)
         try {
-            const sorted = [...members].sort((a, b) => {
+            const sorted = members.filter(member => !options.userIds || options.userIds.includes(member.user.id)).sort((a, b) => {
                 if (a.team !== b.team) return a.team - b.team
                 if (a.memberRole !== b.memberRole) return a.memberRole === 'PS' ? -1 : 1
                 if (a.group !== b.group) return a.group - b.group
@@ -262,7 +262,7 @@ export default function AdminMemberRosterTab({ courseId, courseName, members, la
                 startDate: m.startDate,
                 days: m.days || [],
             }))
-            downloadRosterAsImage(courseName, rows)
+            await downloadRosterAsImage(courseName, rows, 'png', options)
         } finally {
             setExportingImage(false)
         }

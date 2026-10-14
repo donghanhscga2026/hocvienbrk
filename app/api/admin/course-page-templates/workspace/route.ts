@@ -49,6 +49,19 @@ async function readSource(url: string, extension: 'json' | 'html') {
 export async function GET(request: Request) {
   try {
     await admin()
+    const pageId = new URL(request.url).searchParams.get('page')
+    if (pageId) {
+      const page = await prisma.coursePage.findUnique({ where: { id: pageId }, include: { sections: { orderBy: { sortOrder: 'asc' } } } })
+      if (!page) throw new CrmError('Không tìm thấy trang khóa học.', 404)
+      const exact = page.sections.find(section => section.variant === 'zip-source-v1')
+      const content = exact?.content as { exactSource?: { url?: string }; selectedBlockKeys?: unknown } | undefined
+      // Đọc bản HTML bất biến đã áp dụng cho khóa, không lấy mẫu thư viện có thể đã đổi.
+      if (content?.exactSource?.url) {
+        const source = sourceFromHtml(await readSource(content.exactSource.url, 'html'), zipSelectedBlockKeys(content.selectedBlockKeys))
+        return crmResponse({ template: { name: page.name + ' – Bản sao', description: 'Mã trang hiện tại của khóa học', sourceType: 'html' }, source })
+      }
+      return crmResponse({ renderPage: true, name: page.name })
+    }
     const id = new URL(request.url).searchParams.get('id')
     if (!id) {
       const templates = await prisma.coursePageTemplate.findMany({ orderBy: { updatedAt: 'desc' }, take: 100, select: { id: true, key: true, name: true, description: true, sourceType: true, updatedAt: true } })

@@ -12,6 +12,7 @@ const mocks = {
   'next/dynamic': { __esModule: true, default: () => ({ value, disabled, onChange }) => React.createElement('textarea', { 'aria-label': 'Code', value, disabled, onInput: event => onChange(event.target.value) }) },
   '@/lib/course-page/templates': { COURSE_TEMPLATE_LIBRARY: [{ key: 'system', name: 'Built-in', description: 'True template preview' }] },
   '@/lib/course-page/template-workspace-client': { templateWorkspaceRequest: async (url, input) => {
+    if (!input && url.includes('?page=')) return { template: { name: 'Current page copy', description: '', sourceType: 'html' }, source: { entryPath: 'index.html', files: [{ path: 'index.html', kind: 'html', content: '<section id="current"><h1>Applied page source</h1></section>' }] } }
     if (!input) return { templates: [] }
     if (failSave) throw new Error('Storage failed; code retained')
     saved.push(input); return { template: { id: 'saved', name: input.name, description: input.description, sourceType: input.sourceType, updatedAt: '2026-10-14T00:00:00.000Z' } }
@@ -60,6 +61,12 @@ async function run() {
     await code('<section><img src="ftp://invalid.test/missing.png"></section>'); await tick()
     assert.match(document.body.textContent, /Đường dẫn chưa được hỗ trợ/); assert.equal(document.querySelector('iframe[srcdoc]').srcdoc, previewBefore, 'Invalid changes keep the last valid preview and the editable draft')
     const event = new window.Event('beforeunload', { cancelable: true }); window.dispatchEvent(event); assert.equal(event.defaultPrevented, true)
+    await React.act(async () => root.render(React.createElement(load('components/course/CourseTemplateWorkspace.tsx').default, { key: 'inline', embedded: true, context: { slug: 'AI', name: 'Inline course', courseId: 1 }, startPageId: 'current' })))
+    assert.equal(document.querySelector('[data-management-workspace]'), null, 'Embedded editor does not repeat the application navigation')
+    assert.match(document.querySelector('textarea[aria-label="Code"]').value, /Applied page source/)
+    await code('<section id="current"><h1>Inline edited source</h1></section>'); await tick()
+    assert.match(document.querySelector('iframe[srcdoc]').srcdoc, /Inline edited source/)
+    snapshot('course-inline-code')
     console.log('PASS template workspace UI: true previews, course context, confirmed apply, trusted HTML copies, live preview, source-only saves and retained drafts on failure')
   } finally { await React.act(async () => root.unmount()); dom.window.close() }
 }

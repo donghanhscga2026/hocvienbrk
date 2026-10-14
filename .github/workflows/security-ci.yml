@@ -92,6 +92,8 @@ jobs:
           node scripts/test-course-management-activity.cjs
           node scripts/test-management-workspace-ui.cjs
           node scripts/test-course-member-export.cjs
+          node scripts/test-course-roster-workspace.cjs
+          node scripts/test-course-student-ui.cjs
           node scripts/test-template-workspace.cjs
           node scripts/test-template-workspace-ui.cjs
           node scripts/test-course-builder-ui.cjs

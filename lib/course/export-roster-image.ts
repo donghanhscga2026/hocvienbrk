@@ -53,7 +53,7 @@ function chunk<T>(arr: T[], size: number): T[][] {
 }
 
 function formatDDMM(mid: number) {
-    return new Date(mid).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+    return new Date(mid).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', timeZone: 'UTC' })
 }
 
 /**
@@ -201,7 +201,7 @@ function renderChunk(
     ctx.font = '600 11px Arial, sans-serif'
     let lx = PAD
     const ly = y + LEGEND_H / 2
-    const legend: [DayStatus, string][] = [['onTime', 'Đúng hạn'], ['late', 'Nộp muộn'], ['missing', 'Chưa nộp']]
+    const legend: [DayStatus, string][] = [['onTime', 'Đúng hạn'], ['late', 'Quá hạn / Nộp muộn'], ['missing', 'Chưa nộp']]
     for (const [status, label] of legend) {
         ctx.fillStyle = STATUS_COLOR[status]
         roundedRect(ctx, lx, ly - 7, 14, 14, 3)
@@ -215,15 +215,16 @@ function renderChunk(
     ctx.fillText('Ô trống = chưa bắt đầu học hoặc chưa tới ngày này', lx + 10, ly)
 
     const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png'
-    canvas.toBlob(blob => {
-        if (!blob) return
+    return new Promise<void>((resolve, reject) => canvas.toBlob(blob => {
+        if (!blob) { reject(new Error('Không tạo được ảnh. Hãy chọn ít học viên hơn.')); return }
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
         a.download = `nop-bai-${slugify(courseName)}${fileSuffix}-${exportedAt.toISOString().slice(0, 10)}.${format === 'jpeg' ? 'jpg' : 'png'}`
         a.click()
-        URL.revokeObjectURL(url)
-    }, mime, format === 'jpeg' ? 0.95 : undefined)
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+        resolve()
+    }, mime, format === 'jpeg' ? 0.95 : undefined))
 }
 
 /**
@@ -233,10 +234,11 @@ function renderChunk(
  * nhau. Nếu khoảng ngày dài hơn MAX_COLS_PER_IMAGE thì tự tách thành nhiều
  * ảnh (mỗi ảnh 1 khoảng ngày liên tiếp) để bảng không quá rộng khó xem.
  */
-export function downloadRosterAsImage(
+export async function downloadRosterAsImage(
     courseName: string,
     rows: RosterExportRow[],
-    format: 'png' | 'jpeg' = 'png'
+    format: 'png' | 'jpeg' = 'png',
+    range: { fromDate?: string; toDate?: string } = {}
 ) {
     if (rows.length === 0) return
 
@@ -244,15 +246,20 @@ export function downloadRosterAsImage(
     const startMids = rows.map(r => toVnMidnightUTC(r.startDate))
     const earliestStartMid = Math.min(...startMids)
     const todayMid = toVnMidnightUTC(exportedAt)
-    const totalDays = Math.max(1, Math.floor((todayMid - earliestStartMid) / DAY_MS) + 1)
-    const allDateMids = Array.from({ length: totalDays }, (_, i) => earliestStartMid + i * DAY_MS)
+    // Ngày chọn là nhãn lịch YYYY-MM-DD, cùng trục lịch hiện có; không đổi công thức hạn nộp.
+    const start = range.fromDate ? Date.parse(range.fromDate + 'T00:00:00Z') : earliestStartMid
+    const end = range.toDate ? Date.parse(range.toDate + 'T00:00:00Z') : todayMid
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) throw new Error('Khoảng ngày xuất ảnh không hợp lệ.')
+    const totalDays = Math.floor((end - start) / DAY_MS) + 1
+    if ((range.fromDate || range.toDate) && totalDays > 366) throw new Error('Chọn khoảng tối đa 366 ngày cho một lần xuất ảnh.')
+    const allDateMids = Array.from({ length: totalDays }, (_, i) => start + i * DAY_MS)
 
     const chunks = chunk(allDateMids, MAX_COLS_PER_IMAGE)
 
-    chunks.forEach((dateMids, i) => {
+    for (const [i, dateMids] of chunks.entries()) {
         const titleSuffix = chunks.length > 1 ? ` — Phần ${i + 1}/${chunks.length}` : ''
         const fileSuffix = chunks.length > 1 ? `-phan-${i + 1}` : ''
-        // Giãn nhẹ giữa các lần tải để trình duyệt không chặn tải nhiều file liên tiếp.
-        setTimeout(() => renderChunk(courseName, rows, dateMids, titleSuffix, fileSuffix, exportedAt, format), i * 350)
-    })
+        if (i > 0) await new Promise(resolve => setTimeout(resolve, 350))
+        await renderChunk(courseName, rows, dateMids, titleSuffix, fileSuffix, exportedAt, format)
+    }
 }

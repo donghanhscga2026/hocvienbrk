@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getCourseMemberRosterAction } from "@/app/actions/admin-actions";
 import AdminMemberRosterTab from "./AdminMemberRosterTab";
+import CourseStudentTable from "./CourseStudentTable";
 import CourseStatsTab from "./CourseStatsTab";
 import type { RosterMember, CourseMemberLabels } from "./MemberRosterPanel";
 
@@ -10,12 +11,16 @@ export default function CourseRosterWorkspace({
     courseName,
     tab,
     initialStudentId,
+    onActivity,
 }: {
     courseId: number;
     courseName: string;
     tab: "members" | "stats";
     initialStudentId?: number;
+    onActivity?: () => void;
 }) {
+    const [canManage, setCanManage] = useState(false);
+    const [editAssignments, setEditAssignments] = useState(false);
     const [members, setMembers] = useState<RosterMember[]>([]);
     const [lessons, setLessons] = useState<
         { id: string; order: number; title: string }[]
@@ -25,10 +30,11 @@ export default function CourseRosterWorkspace({
     const [error, setError] = useState("");
     const reload = useCallback(async () => {
         try {
-            const result = await getCourseMemberRosterAction(courseId);
+            const result = await getCourseMemberRosterAction(courseId, true);
             if (!result.success)
                 throw new Error(result.error || "Không tải được học viên.");
             setError("");
+            setCanManage(!!result.canViewPhone);
             setMembers((result.members || []) as RosterMember[]);
             setLessons(result.lessons || []);
             setLabels((result.labels || {}) as CourseMemberLabels);
@@ -44,10 +50,11 @@ export default function CourseRosterWorkspace({
     }, [courseId]);
     useEffect(() => {
         let cancelled = false;
-        getCourseMemberRosterAction(courseId)
+        getCourseMemberRosterAction(courseId, true)
             .then((result) => {
                 if (cancelled) return;
                 if (result.success) {
+                    setCanManage(!!result.canViewPhone);
                     setMembers((result.members || []) as RosterMember[]);
                     setLessons(result.lessons || []);
                     setLabels((result.labels || {}) as CourseMemberLabels);
@@ -89,21 +96,14 @@ export default function CourseRosterWorkspace({
             ) : (
                 <>
                     <div hidden={tab !== "members"}>
-                        <AdminMemberRosterTab
-                            courseId={courseId}
-                            courseName={courseName}
-                            members={members}
-                            labels={labels}
-                            reload={() => {
-                                setLoading(true);
-                                void reload();
-                            }}
-                            initialStudentId={initialStudentId}
-                        />
+                        <div hidden={editAssignments}>
+                            <CourseStudentTable courseId={courseId} courseName={courseName} members={members} labels={labels} totalLessons={lessons.length} canManage={canManage} reload={() => { void reload() }} initialStudentId={initialStudentId} onActivity={onActivity} onEditAssignments={() => setEditAssignments(true)} />
+                        </div>
+                        {canManage && editAssignments && <div className="p-4"><button type="button" onClick={() => setEditAssignments(false)} className="mb-3 min-h-11 rounded-lg border border-brk-outline px-3 text-sm text-brk-primary">← Bảng học viên</button><AdminMemberRosterTab courseId={courseId} courseName={courseName} members={members.filter(member => member.enrollmentStatus !== 'PENDING')} labels={labels} reload={() => { void reload() }} initialStudentId={initialStudentId} /></div>}
                     </div>
                     <div hidden={tab !== "stats"}>
                         <CourseStatsTab
-                            members={members}
+                            members={members.filter(member => member.enrollmentStatus !== 'PENDING')}
                             lessons={lessons}
                             labels={labels}
                         />

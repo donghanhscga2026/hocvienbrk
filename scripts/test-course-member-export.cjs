@@ -43,6 +43,17 @@ async function run() {
   assert.deepEqual(summary[2].slice(6, 11), [1, 1, 1, 0, 1])
   assert.equal(report.sheets[2].rows[0][13], 2); assert.equal(report.sheets[2].rows[1][9], null, 'RESET submission is not exported')
   assert.match(exportService.exportedProgressState({ status: 'IN_PROGRESS', submittedAt: now }, now.getTime() + 1000, now.getTime()), /Đã nộp, chưa hoàn thành/)
+  const ranged = await exportService.memberExportSheets(db, admin, { courseIds: [1, 2], reports: true, fromDate: '2026-10-12', toDate: '2026-10-12' }, now)
+  assert.equal(ranged.sheets[0].rows.length, 3, 'Date range does not remove registered students')
+  assert.equal(ranged.sheets[2].rows.length, 1, 'Only actual submissions inside the selected VN date')
+  const originalTime = entries[0].lessonProgress[0].submittedAt
+  entries[0].lessonProgress[0].submittedAt = new Date('2026-10-12T16:59:59.999Z')
+  assert.equal((await exportService.memberExportSheets(db, teacher, { courseIds: [1], reports: true, fromDate: '2026-10-12', toDate: '2026-10-12' }, now)).sheets[2].rows.length, 1, '23:59:59.999 VN is included')
+  entries[0].lessonProgress[0].submittedAt = new Date('2026-10-12T17:00:00Z')
+  assert.equal((await exportService.memberExportSheets(db, teacher, { courseIds: [1], reports: true, fromDate: '2026-10-12', toDate: '2026-10-12' }, now)).sheets[2].rows.length, 0, '00:00 VN next day is excluded')
+  entries[0].lessonProgress[0].submittedAt = originalTime
+  assert.throws(() => exportService.memberExportInput.parse({ courseIds: [1], fromDate: '2026-02-30' }))
+  assert.throws(() => exportService.memberExportInput.parse({ courseIds: [1], fromDate: '2026-10-14', toDate: '2026-10-12' }))
   const bytes = workbook.courseWorkbook(report.sheets), xml = unzip(bytes)
   assert.match(xml['xl/worksheets/sheet1.xml'], /t="inlineStr"[^>]*><is><t xml:space="preserve">=1\+1/); assert.ok(!xml['xl/worksheets/sheet1.xml'].includes('<f>'))
   assert.match(xml['xl/worksheets/sheet1.xml'], /0901234567/); assert.match(xml['xl/worksheets/sheet1.xml'], /one@example.invalid/); assert.match(xml['xl/worksheets/sheet1.xml'], /state="frozen"/); assert.match(xml['xl/worksheets/sheet1.xml'], /autoFilter/)

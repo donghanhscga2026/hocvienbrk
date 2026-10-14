@@ -10,6 +10,10 @@ import { Save, Plus, Trash2, ArrowUp, ArrowDown, Settings, FileText, Palette, Co
 import { updateCoursePage, saveCourseSections, publishCoursePage, getCoursePageVersions, restoreCoursePageVersion, createCoursePageCheckpoint } from '@/app/actions/course-page-actions'
 
 interface EditCoursePageFormProps {
+  embedded?: boolean
+  onDirtyChange?: (dirty: boolean) => void
+  onEditCode?: () => void
+  onSaved?: () => void
   initialPage: {
     id: string
     slug: string
@@ -24,7 +28,7 @@ interface EditCoursePageFormProps {
   }
 }
 
-export default function EditCoursePageForm({ initialPage }: EditCoursePageFormProps) {
+export default function EditCoursePageForm({ initialPage, embedded = false, onDirtyChange, onEditCode, onSaved }: EditCoursePageFormProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'info' | 'theme' | 'sections'>('sections')
   const [expandedSection, setExpandedSection] = useState<number | null>(0)
@@ -57,6 +61,8 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
   const [showVersions, setShowVersions] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
+
   useEffect(() => {
     if (!dirty) return
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
@@ -87,6 +93,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
           setDirty(false)
           setPreviewKey(k => k + 1)
           router.refresh()
+          onSaved?.()
         } else {
           setMessage({ type: 'error', text: secRes.error || 'Lỗi khi lưu các phần giao diện' })
         }
@@ -465,7 +472,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
         <button type="button" onClick={handleSavePage} disabled={saving || !dirty} className="inline-flex items-center gap-2 rounded-xl border border-gray-900 px-4 py-2.5 text-xs font-black text-gray-900 disabled:opacity-40">
           <Save className="w-4 h-4"/>{saving?'Đang lưu...':'Lưu bản nháp'}
         </button>
-        <button type="button" onClick={handlePublish} disabled={publishing || saving || dirty} className="rounded-xl bg-black px-4 py-2.5 text-xs font-black text-yellow-400 disabled:opacity-40">
+        <button type="button" onClick={handlePublish} disabled={publishing || saving || dirty} className="rounded-xl bg-brk-primary px-4 py-2.5 text-xs font-black text-white disabled:opacity-40">
           {publishing?'Đang xuất bản...':'Xuất bản'}
         </button>
       </div>
@@ -659,7 +666,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
       {activeTab === 'sections' && <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brk-outline bg-white p-3">
           <div className="text-sm"><span className="text-brk-muted">Mẫu hiện tại:</span> <strong>{templateName}</strong></div>
-          <div className="flex flex-wrap gap-2"><Link href={`/tools/courses/templates?course=${encodeURIComponent(initialPage.slug)}&name=${encodeURIComponent(name)}`} onClick={event => { if (dirty && !confirm('Bạn có thay đổi chưa lưu. Rời trang để đổi mẫu?')) event.preventDefault() }} className="inline-flex min-h-11 items-center rounded-lg border border-brk-outline px-3 text-sm font-semibold text-brk-primary">Đổi mẫu / Sửa code</Link><a href={`/khoa-hoc/${initialPage.slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-brk-outline px-3 text-sm">Xem trang công khai <ExternalLink size={15} /></a></div>
+          <div className="flex flex-wrap gap-2">{embedded ? <button type="button" onClick={onEditCode} className="min-h-11 rounded-lg border border-brk-outline px-3 text-sm text-brk-primary">Sửa code</button> : <Link href={`/tools/courses/templates?course=${encodeURIComponent(initialPage.slug)}&name=${encodeURIComponent(name)}`} onClick={event => { if (dirty && !confirm('Bạn có thay đổi chưa lưu. Rời trang để đổi mẫu?')) event.preventDefault() }} className="inline-flex min-h-11 items-center rounded-lg border border-brk-outline px-3 text-sm font-semibold text-brk-primary">Đổi mẫu / Sửa code</Link>}<a href={`/khoa-hoc/${initialPage.slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-brk-outline px-3 text-sm">Xem trang công khai <ExternalLink size={15} /></a></div>
         </div>
         <div className="flex gap-2 xl:hidden">{(['edit', 'preview'] as const).map(pane => <button type="button" key={pane} aria-pressed={mobilePane === pane} onClick={() => setMobilePane(pane)} className={`min-h-11 flex-1 rounded-lg border border-brk-outline px-3 text-sm ${mobilePane === pane ? 'bg-brk-primary text-white' : 'bg-white'}`}>{pane === 'edit' ? 'Chỉnh sửa' : 'Xem trước'}</button>)}</div>
         <div className="grid min-w-0 gap-4 xl:grid-cols-[200px_minmax(0,1fr)_290px]">
@@ -695,7 +702,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
       </div>}
 
       {/* Save Trigger */}
-      <div className="pt-6 border-t border-gray-100 flex justify-end gap-3">
+      <div hidden={embedded} className="pt-6 border-t border-gray-100 flex justify-end gap-3">
         <Link
           href="/tools/courses"
           className="px-5 py-3 border border-gray-200 rounded-xl text-xs font-bold uppercase text-gray-500 hover:bg-gray-50 transition-all"

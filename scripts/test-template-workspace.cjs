@@ -42,7 +42,7 @@ async function run() {
     create: async ({ data }) => { saved = { ...data, id: 'new-template', updatedAt: now }; records.set(saved.id, saved); return saved },
     updateMany: async ({ data }) => { if (conflict) return { count: 0 }; saved = { ...records.get('new-template'), ...data, updatedAt: now }; records.set(saved.id, saved); return { count: 1 } },
     findUniqueOrThrow: async ({ where }) => records.get(where.id),
-  }, $transaction: async fn => fn(db) }
+  }, coursePage: { findUnique: async ({ where }) => where.id === 'current' ? { name: 'Current page', sections: saved.snapshot.sections } : where.id === 'native' ? { name: 'Native page', sections: [] } : null }, $transaction: async fn => fn(db) }
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://project.supabase.co'
   const storage = { upload: async (name, bytes, options) => { assert.equal(options.upsert, false); uploads.push({ name, text: bytes.toString() }); return { error: null } }, getPublicUrl: name => ({ data: { publicUrl: 'https://project.supabase.co/storage/v1/object/public/uploads/' + name } }) }
   const mocks = { './service': { CrmError }, '@/auth': { auth: async () => session }, '@/lib/prisma': { __esModule: true, default: db }, '@/lib/supabase': { supabase: { storage: { from: () => storage } } }, '@/lib/website/domain-context': { domainContext: async () => domain }, '@/lib/api-auth': { requireAdminAction: async () => null }, 'next/cache': { revalidatePath: () => {} }, '@/lib/course-page/importer/image-mirror': { mirrorAnalysisImages: async value => value }, '@/lib/course-page/importer/fetch-html': { fetchRemoteHtml: async () => { throw new Error('not called') } } }
@@ -66,6 +66,13 @@ async function run() {
     global.fetch = async url => { const name = new URL(url).pathname.split('/').at(-1); return new Response(uploads.find(file => file.name.endsWith(name)).text) }
     const opened = await (await api.GET(new Request('https://test.invalid/api/admin/course-page-templates/workspace?id=new-template'))).json()
     assert.deepEqual(opened.source, source, 'Raw file tree round trips unchanged')
+    const current = await (await api.GET(new Request('https://test.invalid/api/admin/course-page-templates/workspace?page=current'))).json()
+    assert.ok(current.source.files.some(file => file.kind === 'js'), 'Current applied HTML restores its packaged files')
+    assert.equal(current.template.id, undefined, 'Editing an applied snapshot makes a new template, never overwrites a library version')
+    const native = await (await api.GET(new Request('https://test.invalid/api/admin/course-page-templates/workspace?page=native'))).json()
+    assert.equal(native.renderPage, true, 'Native pages are copied from their actual renderer')
+    role = 'TEACHER'; assert.equal((await api.GET(new Request('https://test.invalid/api/admin/course-page-templates/workspace?page=current'))).status, 403); role = 'ADMIN'
+    assert.equal((await api.GET(new Request('https://test.invalid/api/admin/course-page-templates/workspace?page=missing'))).status, 404)
     records.set('bad', { ...saved, analysis: { editorSourceUrl: 'https://evil.invalid/source.json' } })
     assert.equal((await api.GET(new Request('https://test.invalid/api/admin/course-page-templates/workspace?id=bad'))).status, 400)
   } finally { global.fetch = originalFetch }

@@ -19,6 +19,8 @@ const mocks = {
   '@/components/layout/MainHeader': { __esModule: true, default: props => React.createElement('header', { className: 'bg-white p-4 text-xl font-bold' }, props.title) },
   '@/components/course/CourseManagementActivity': stub('Hoạt động'),
   '@/components/course/CourseRosterWorkspace': stub('Học viên'),
+  '@/app/tools/courses/pages/[id]/EditCoursePageForm': stub('Trình chỉnh nội dung'),
+  './CourseTemplateWorkspace': stub('Trình chỉnh code'),
   '@/components/course/CourseActivityFeedTab': stub('Nhật ký'),
   '@/components/course/CourseDashboardModal': stub('Dashboard'),
   '@/components/course/AdminMemberRosterTab': stub('Roster'),
@@ -28,7 +30,7 @@ const mocks = {
   '@/components/admin/courses/LessonAnnouncementModal': { LessonAnnouncementModal: () => null },
   '@/app/actions/course-actions': { getTeachersAction: async () => ({ success: true, teachers: [{ id: 8, name: 'Hương Lucy' }] }) },
   '@/app/actions/admin-actions': { getAdminCoursesAction: async () => ({ success: true, courses: Array.from({ length: 12 }, (_, index) => ({ ...course, id: index + 1, name_lop: course.name_lop + ' ' + (index + 1) })), isAdmin: true, userId: 8 }) },
-  '@/app/actions/course-page-actions': { getCoursePages: async () => [{ id: 'page-1', slug: 'AI', useTemplate: true, status: 'draft' }], applyCoursePageTemplate: async (...args) => { applied.push(args); return { success: true } } },
+  '@/app/actions/course-page-actions': { getCoursePages: async () => [{ id: 'page-1', slug: 'AI', useTemplate: true, status: 'draft' }], getCoursePage: async () => ({ id: 'page-1', slug: 'AI', useTemplate: true, status: 'draft', name: 'AI', sections: [] }), applyCoursePageTemplate: async (...args) => { applied.push(args); return { success: true } } },
   '@/app/actions/course-page-template-actions': { getStoredCoursePageTemplateOptions: async () => ({ success: true, templates }), applyStoredCoursePageTemplate: async (...args) => { applied.push(args); return { success: true } } },
   '@/lib/course-page/templates': { COURSE_TEMPLATE_LIBRARY: [{ key: 'test', name: 'Mẫu hệ thống', description: 'Mẫu có sẵn' }] },
 }
@@ -56,12 +58,12 @@ async function run() {
     await React.act(async () => document.querySelector('[aria-label="Chọn tất cả khóa học"]').click())
     assert.equal(document.querySelector('[aria-label="Chọn tất cả khóa học"]').checked, false); assert.ok(!document.body.textContent.includes('Đã chọn 12 khóa học'), 'Select-all can clear selection at the same location')
     await click('Thẻ'); assert.equal(document.querySelectorAll('article').length, 10); snapshot('course-cards'); await click('Danh sách')
-    await click('Xuất học viên các khóa đang lọc'); assert.ok(document.querySelector('dialog[open]')); assert.equal(document.querySelector('dialog select').value, 'students'); assert.ok(document.querySelector('option[value="GOOGLE"]')); snapshot('course-export'); await click('Đóng lựa chọn xuất')
+    await click('Xuất học viên các khóa đang lọc'); assert.ok(document.querySelector('dialog[open]')); assert.equal(document.querySelector('dialog input[value="students"]').checked, true); assert.ok(document.querySelector('option[value="GOOGLE"]')); snapshot('course-export'); await click('Đóng lựa chọn xuất')
     await click('Sau'); assert.equal(document.querySelectorAll('article').length, 2)
     await click('Danh mục'); assert.ok(document.body.textContent.includes('Công nghệ'), 'Category management stays available')
     const Editor = load('app/tools/courses/new/page.tsx').default
     await React.act(async () => root.render(React.createElement(Editor)))
-    assert.ok(document.querySelector('input[value="Khóa thực hành AI"]'))
+    assert.ok(document.querySelector('input[value="Khóa thực hành AI"]')); snapshot('course-basic')
     assert.equal(document.querySelector('[data-info-group="description"]').hidden, true, 'Basic information excludes description/image fields')
     await click('Mô tả & hình ảnh')
     const shortDescription = [...document.querySelectorAll('textarea')].find(item => item.value === 'Mô tả ngắn')
@@ -72,14 +74,13 @@ async function run() {
     await click('Thông tin'); assert.equal([...document.querySelectorAll('textarea')].find(item => item === shortDescription).value, 'Nội dung đang sửa chưa lưu', 'Switching tabs preserves form edits')
     await click('Thanh toán & kích hoạt'); assert.ok([...document.querySelectorAll('input')].some(item => item.value === '1000000')); snapshot('course-settings')
     await click('Email & Zalo'); assert.ok(document.body.textContent.includes('Nội dung email kích hoạt'))
-    await click('Thành viên'); assert.ok(document.querySelector('[data-panel="Học viên"]'))
+    await click('Học viên'); assert.ok(document.querySelector('[data-panel="Học viên"]'))
     await click('Thống kê'); assert.ok(document.querySelector('[data-panel="Học viên"]'))
     await click('Nhật ký'); assert.ok(document.querySelector('[data-panel="Nhật ký"]'))
     await click('Trang bán khóa học'); snapshot('course-sales')
-    const libraryLink = [...document.querySelectorAll('a')].find(item => item.textContent.includes('Đổi mẫu'))
-    const query = new URL(libraryLink.href).searchParams
-    assert.equal(query.get('course'), 'AI'); assert.equal(query.get('courseId'), '1'); assert.equal(query.get('name'), 'Khóa thực hành AI')
-    assert.ok(document.querySelector('iframe[src*="preview?page=page-1"]'), 'Current template uses actual saved course preview')
+    assert.ok(document.querySelector('[data-panel="Trình chỉnh nội dung"]'), 'Sales editor is rendered inside the course tab');
+    await click('Sửa code'); assert.ok(document.querySelector('[data-panel="Trình chỉnh code"]'));
+    assert.ok(document.querySelector('iframe[src*="preview?page=page-1"]'), 'Information sidebar shows actual saved page preview');
     assert.ok(!document.querySelector('iframe[src="/tools/courses/templates"]'), 'No nested management page')
     console.log('PASS management UI: course pagination, category tab, exclusive descriptions, retained edits, teaching tools and dedicated template context')
   } finally { await React.act(async () => root.unmount()); dom.window.close(); global.fetch = savedFetch }

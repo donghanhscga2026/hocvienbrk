@@ -4,13 +4,16 @@ import { CrmError } from '@/lib/crm/service'
 import { computeLessonDeadlineUTC } from './deadline'
 import { exportDate, type ExportSheet, type ExportCell } from './export-workbook'
 
+const calendarDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => { const date = new Date(value + 'T00:00:00Z'); return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value }, 'Ngày không hợp lệ.')
 export const memberExportInput = z.object({
   courseIds: z.array(z.number().int().positive()).min(1).max(50).refine(ids => new Set(ids).size === ids.length),
   status: z.enum(['ALL', 'ACTIVE', 'PENDING']).default('ALL'),
   reports: z.boolean().default(false),
   format: z.enum(['EXCEL', 'GOOGLE']).default('EXCEL'),
+  fromDate: calendarDate.optional(),
+  toDate: calendarDate.optional(),
   userIds: z.array(z.number().int().nonnegative()).min(1).max(10000).optional(),
-}).strict()
+}).strict().refine(input => !input.fromDate || !input.toDate || input.fromDate <= input.toDate, 'Ngày bắt đầu phải trước ngày kết thúc.')
 export type MemberExportInput = z.infer<typeof memberExportInput>
 type Actor = { id: number; role: string }
 
@@ -22,6 +25,9 @@ export function exportedProgressState(progress: { status: string; scores: unknow
 }
 export async function memberExportSheets(db: PrismaClient, actor: Actor, raw: unknown, now = new Date()) {
   const input = memberExportInput.parse(raw)
+  const from = input.fromDate ? Date.parse(input.fromDate + 'T00:00:00+07:00') : -Infinity
+  const to = input.toDate ? Date.parse(input.toDate + 'T23:59:59.999+07:00') : Infinity
+  const inRange = (date: Date | null | undefined) => !input.fromDate && !input.toDate || !!date && date.getTime() >= from && date.getTime() <= to
   if (!['ADMIN', 'TEACHER', 'INSTRUCTOR'].includes(actor.role)) throw new CrmError('Bạn không có quyền xuất thông tin học viên.', 403)
   const courses = await db.course.findMany({ where: { id: { in: input.courseIds }, ...(actor.role === 'ADMIN' ? {} : { teacherId: actor.id }) }, select: { id: true, id_khoa: true, name_lop: true }, orderBy: { id: 'asc' } })
   if (courses.length !== input.courseIds.length) throw new CrmError('Bạn không có quyền xuất một số khóa học đã chọn.', 403)
@@ -31,7 +37,7 @@ export async function memberExportSheets(db: PrismaClient, actor: Actor, raw: un
   if (count > 10000) throw new CrmError('Báo cáo vượt 10.000 lượt đăng ký. Chọn ít khóa hoặc lọc học viên để xuất.')
   const lessons = input.reports ? await db.lesson.findMany({ where: { courseId: { in: input.courseIds } }, select: { id: true, courseId: true, order: true, title: true }, orderBy: [{ courseId: 'asc' }, { order: 'asc' }, { id: 'asc' }] }) : []
   if (input.reports && count * Math.max(1, lessons.length) > 200000) throw new CrmError('Báo cáo quá lớn. Xuất từng khóa hoặc chỉ xuất danh sách học viên.')
-  const enrollments = await db.enrollment.findMany({ where, take: 10001, orderBy: [{ courseId: 'asc' }, { userId: 'asc' }], select: { id: true, courseId: true, status: true, createdAt: true, activatedAt: true, startedAt: true, memberRole: true, team: true, group: true, user: { select: { id: true, name: true, phone: true, email: true } }, ...(input.reports ? { lessonProgress: { where: { status: { not: 'RESET' }, lesson: { courseId: { in: input.courseIds } } }, select: { lessonId: true, status: true, scores: true, totalScore: true, submittedAt: true, assignment: true } } } : {}) } })
+  const enrollments = await db.enrollment.findMany({ where, take: 10001, orderBy: [{ courseId: 'asc' }, { userId: 'asc' }], select: { id: true, courseId: true, status: true, createdAt: true, activatedAt: true, startedAt: true, memberRole: true, team: true, group: true, user: { select: { id: true, name: true, phone: true, email: true } }, ...(input.reports ? { lessonProgress: { where: { status: { not: 'RESET' }, ...(input.fromDate || input.toDate ? { submittedAt: { ...(input.fromDate ? { gte: new Date(from) } : {}), ...(input.toDate ? { lte: new Date(to) } : {}) } } : {}), lesson: { courseId: { in: input.courseIds } } }, select: { lessonId: true, status: true, scores: true, totalScore: true, submittedAt: true, assignment: true } } } : {}) } })
   if (enrollments.length > 10000) throw new CrmError('Có thêm đăng ký trong lúc xuất. Hãy thu hẹp phạm vi xuất.')
   const courseMap = new Map(courses.map(course => [course.id, course]))
   const identity = (entry: typeof enrollments[number]): ExportCell[] => [String(entry.user.id), entry.user.name || '', entry.user.phone?.startsWith('+84') ? '0' + entry.user.phone.slice(3) : entry.user.phone || '', entry.user.email || '', courseMap.get(entry.courseId)!.id_khoa, courseMap.get(entry.courseId)!.name_lop]
@@ -46,17 +52,18 @@ export async function memberExportSheets(db: PrismaClient, actor: Actor, raw: un
       let submitted = 0, completed = 0, onTime = 0
       for (const lesson of ownLessons) {
         const p = progress.get(lesson.id)
+        if ((input.fromDate || input.toDate) && !inRange(p?.submittedAt)) continue
         const deadline = computeLessonDeadlineUTC(entry.startedAt || entry.activatedAt || entry.createdAt, lesson.order)
         if (p?.submittedAt) submitted++
         if (p?.status === 'COMPLETED') { completed++; if ((p.scores as { timing?: number } | null)?.timing !== -1) onTime++ }
         const assignment = p?.assignment as { reflection?: string; links?: unknown[]; supports?: boolean[] } | null
         reportRows.push([...identity(entry), lesson.order, lesson.title, exportedProgressState(p, deadline, now.getTime()), exportDate(p?.submittedAt), p?.submittedAt ? p.totalScore : null, typeof assignment?.reflection === 'string' ? assignment.reflection : '', Array.isArray(assignment?.links) ? assignment.links.filter(item => typeof item === 'string').join('\n') : '', Array.isArray(assignment?.supports) ? assignment.supports.filter(Boolean).length : null])
       }
-      summaryRows.push([...identity(entry), ownLessons.length, submitted, completed, onTime, completed - onTime, ...lessons.map(lesson => lesson.courseId !== entry.courseId ? '' : exportedProgressState(progress.get(lesson.id), computeLessonDeadlineUTC(entry.startedAt || entry.activatedAt || entry.createdAt, lesson.order), now.getTime()))])
+      summaryRows.push([...identity(entry), ownLessons.length, submitted, completed, onTime, completed - onTime, ...lessons.map(lesson => lesson.courseId !== entry.courseId || (input.fromDate || input.toDate) && !inRange(progress.get(lesson.id)?.submittedAt) ? '' : exportedProgressState(progress.get(lesson.id), computeLessonDeadlineUTC(entry.startedAt || entry.activatedAt || entry.createdAt, lesson.order), now.getTime()))])
     }
     sheets.push({ name: 'Tổng hợp nộp bài', headers: [...headers, 'Tổng bài', 'Số bài đã nộp', 'Số bài hoàn thành', 'Hoàn thành đúng hạn', 'Hoàn thành nộp muộn', ...lessons.map(lesson => `${courseMap.get(lesson.courseId)!.id_khoa} · Bài ${lesson.order}: ${lesson.title}`)], rows: summaryRows })
     sheets.push({ name: 'Chi tiết bài nộp', headers: [...headers, 'Thứ tự bài', 'Tên bài học', 'Tình trạng bài', 'Thời gian nộp (giờ VN)', 'Điểm hiện tại', 'Nội dung báo cáo', 'Link minh chứng', 'Số minh chứng hỗ trợ'], rows: reportRows, widths: [18, 28, 20, 32, 18, 35, 12, 35, 38, 25, 18, 65, 60, 20] })
   }
-  sheets.push({ name: 'Thông tin báo cáo', headers: ['Thông tin', 'Giá trị'], rows: [['Xuất lúc (giờ Việt Nam)', exportDate(now)], ['Phạm vi khóa học', courses.map(course => `${course.id_khoa}: ${course.name_lop}`).join('\n')], ['Trạng thái đăng ký', input.status === 'ALL' ? 'Tất cả trạng thái' : statusLabels[input.status]], ['Số lượt đăng ký', enrollments.length], ['Phạm vi học viên', input.userIds ? 'Theo danh sách học viên đang lọc' : 'Tất cả học viên thuộc khóa đã chọn'], ['Quy tắc báo cáo', 'Điểm và trạng thái hoàn thành dùng dữ liệu đang lưu. Đã nộp không đồng nghĩa đã hoàn thành. Bài RESET thuộc lộ trình cũ không được tính.'], ['Tỷ lệ/nhóm', 'Báo cáo xuất toàn bộ người phù hợp bộ lọc, không loại Team chưa có Phụng sự hoặc nhóm tạm dừng như một số thống kê dashboard.'], ['Ô trống', 'Số điện thoại/email chưa có để trống; điểm chỉ có khi tồn tại bài nộp hiện tại.']] })
+  sheets.push({ name: 'Thông tin báo cáo', headers: ['Thông tin', 'Giá trị'], rows: [['Xuất lúc (giờ Việt Nam)', exportDate(now)], ['Phạm vi khóa học', courses.map(course => `${course.id_khoa}: ${course.name_lop}`).join('\n')], ['Trạng thái đăng ký', input.status === 'ALL' ? 'Tất cả trạng thái' : statusLabels[input.status]], ['Khoảng thời gian bài nộp (giờ VN)', input.fromDate || input.toDate ? `${input.fromDate || 'Không giới hạn'} → ${input.toDate || 'Không giới hạn'}; lọc theo thời gian nộp, danh sách học viên giữ nguyên` : 'Toàn bộ thời gian'], ['Số lượt đăng ký', enrollments.length], ['Phạm vi học viên', input.userIds ? 'Theo danh sách học viên được chọn để xuất' : 'Tất cả học viên thuộc khóa đã chọn'], ['Quy tắc báo cáo', 'Điểm và trạng thái hoàn thành dùng dữ liệu đang lưu. Đã nộp không đồng nghĩa đã hoàn thành. Bài RESET thuộc lộ trình cũ không được tính.'], ['Tỷ lệ/nhóm', 'Báo cáo xuất toàn bộ người phù hợp bộ lọc, không loại Team chưa có Phụng sự hoặc nhóm tạm dừng như một số thống kê dashboard.'], ['Ô trống', 'Số điện thoại/email chưa có để trống; điểm chỉ có khi tồn tại bài nộp hiện tại.']] })
   return { sheets, input, total: enrollments.length, title: courses.length === 1 ? courses[0].name_lop : `${courses.length} khóa học` }
 }

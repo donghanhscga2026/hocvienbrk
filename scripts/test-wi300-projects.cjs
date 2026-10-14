@@ -186,6 +186,14 @@ async function run() {
     }
     await React.act(async () => homeToggle.click())
     assert.equal(document.querySelector('input[aria-label="Hiển thị Wi.Grow trên trang chủ"]').checked, false)
+    const publicToggle = document.querySelector('input[aria-label="Công khai Wi.Grow"]')
+    await React.act(async () => publicToggle.click())
+    assert.equal(togglePayload.controls.published, false)
+    assert.equal(togglePayload.controls.showOnHomepage, false, 'Public toggle preserves homepage choice')
+    const featureToggle = document.querySelector('input[aria-label="Tiêu biểu Wi.Grow"]')
+    await React.act(async () => featureToggle.click())
+    assert.equal(togglePayload.controls.featured, false)
+    assert.equal(togglePayload.controls.published, false, 'Featured toggle preserves public choice')
     global.fetch = createFetch
     await React.act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === '+ Thêm dự án').click())
     const createForm = document.querySelector('form')
