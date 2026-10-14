@@ -88,7 +88,12 @@ export async function saveManagedPage(db: PrismaClient, actor: number, raw: unkn
     await appearanceAdmin(tx as PrismaClient, actor)
     const current = await readAppearance(tx as PrismaClient, key)
     if (current.revision !== input.revision) throw new CrmError('Cài đặt đã thay đổi. Tải lại trước khi lưu.', 409)
-    const page = { ...input.page, ...(input.action === 'trash' ? { deleted: true, published: false } : input.action === 'restore' ? { deleted: false, published: true } : {}) }
+    const currentPage = current.published.customPages.find(page => page.id === input.page.id)
+    const stagedPage = system ? current.draft.pageContent[input.page.id] : current.draft.customPages.find(page => page.id === input.page.id)
+    if (input.action === 'restore' && !stagedPage?.deleted) throw new CrmError('Trang chưa được xóa.', 409)
+    const wasPublished = system ? !current.published.hiddenPages.includes(input.page.id) : !!currentPage?.published && !currentPage.deleted
+    // Khôi phục trạng thái công khai trước khi xóa; trang chưa áp dụng vẫn giữ ẩn.
+    const page = { ...input.page, ...(input.action === 'trash' ? { deleted: true, published: false, restorePublished: wasPublished } : input.action === 'restore' ? { deleted: false, published: stagedPage!.restorePublished } : {}) }
     function replace(settings: AppearanceState['draft']) {
       const copy = structuredClone(settings)
       if (system) {

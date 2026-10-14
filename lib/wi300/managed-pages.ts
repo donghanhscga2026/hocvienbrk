@@ -8,7 +8,7 @@ export const managedPageSchema = z.object({
   name: z.string().trim().min(1).max(300), title: z.string().trim().max(300), description: z.string().trim().max(1500),
   body: z.string().trim().max(30000), imageUrl: safeUrl, layout: z.enum(['stack', 'split']), columns: z.number().int().min(2).max(4),
   showHero: z.boolean(), showContent: z.boolean(), showCTA: z.boolean(), showList: z.boolean().default(true), showForm: z.boolean().default(true), ctaLabel: z.string().trim().max(300), ctaUrl: safeUrl,
-  published: z.boolean(), deleted: z.boolean(), inheritRobots: z.boolean(), seo: contentSeoSchema,
+  published: z.boolean(), deleted: z.boolean(), restorePublished: z.boolean().default(false), inheritRobots: z.boolean(), seo: contentSeoSchema,
 }).strict().refine(page => !page.showCTA || !page.ctaLabel || !!page.ctaUrl, 'Nhập đường dẫn cho nút liên kết.')
 export type ManagedPage = z.infer<typeof managedPageSchema>
 export const SYSTEM_WEBSITE_PAGES = inventory.pages

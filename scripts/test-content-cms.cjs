@@ -91,6 +91,13 @@ async function run() {
   const preview = appearance.appearanceKey('cms-tests', { VERCEL_ENV: 'preview', VERCEL_GIT_COMMIT_REF: 'feature' })
   await appearance.saveManagedPage(db, 0, { action: 'trash', revision: 0, page }, preview)
   assert.equal((await appearance.readAppearance(db, key)).published.customPages[0].deleted, false, 'Preview isolates custom-page changes')
+  const draftKey = appearance.appearanceKey('draft-restoration')
+  const draftPage = managed.newManagedPage('unreviewed', 'chua-duyet', 'Trang chưa duyệt')
+  let draftState = await appearance.saveManagedPage(db, 0, { action: 'draft', revision: 0, page: draftPage }, draftKey)
+  draftState = await appearance.saveManagedPage(db, 0, { action: 'trash', revision: draftState.revision, page: draftState.draft.customPages[0] }, draftKey)
+  draftState = await appearance.saveManagedPage(db, 0, { action: 'restore', revision: draftState.revision, page: draftState.draft.customPages[0] }, draftKey)
+  assert.equal(draftState.published.customPages[0].published, false, 'Restoring an unpublished draft must not publish it')
+  assert.equal(draftState.draft.customPages[0].deleted, false)
 
   const brand = { name: 'Wi300', description: 'Mô tả website', ogImageUrl: '/global.png', appearance: state.published }
   const routeMocks = { ...mocks, react: { ...React, cache: fn => fn }, 'next/navigation': { notFound: () => { throw Error('404') }, permanentRedirect: url => { throw Error('REDIRECT:' + url) } }, '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => brand } }
