@@ -20,16 +20,16 @@ export default function ToolsCoursesPage() {
     const [activeTab, setActiveTab] = useState<'courses' | 'categories'>('courses')
 
     return (
-        <div className="min-h-screen bg-[#F8FAFC]">
+        <div className="min-h-screen bg-[#F7F9F5] text-[#24352A]">
             <MainHeader title="Quản lý khóa học" toolSlug="courses" />
 
             <ManagementWorkspace active="courses">
-                <div><h1 className="text-2xl font-bold text-brk-primary">Quản lý khóa học</h1><p className="mt-2 text-sm text-gray-600">Quản lý nội dung, học viên và hoạt động của từng khóa. Chọn mẫu Sales Page trong mục Trang bán khóa học.</p></div>
+                <div><h1 className="text-2xl font-bold text-brk-primary">Quản lý khóa học</h1><p className="mt-2 text-sm text-[#617066]">Quản lý nội dung, học viên và hoạt động của từng khóa. Chọn mẫu Sales Page trong mục Trang bán khóa học.</p></div>
 
-                <div className="mt-4 flex gap-2 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
+                <div className="mt-4 flex gap-2 rounded-2xl border border-[#E2E8DC] bg-white p-1.5 shadow-sm">
                     <button
                         onClick={() => setActiveTab('courses')}
-                        className={`flex-1 rounded-xl px-3 py-3 text-xs font-semibold tracking-wide transition-colors ${activeTab === 'courses' ? 'bg-brk-background text-brk-primary shadow-sm ring-1 ring-brk-primary/10' : 'text-slate-600 hover:bg-slate-50 hover:text-brk-primary'}`}
+                        className={`flex-1 rounded-xl px-3 py-3 text-xs font-semibold tracking-wide transition-colors ${activeTab === 'courses' ? 'bg-[#EAF3E7] text-[#206B25] shadow-sm ring-1 ring-[#CFE2CB]' : 'text-[#506153] hover:bg-[#F7F9F5] hover:text-[#206B25]'}`}
                     >
                         <BookOpen className="w-4 h-4 inline mr-2" /> Khóa học
                     </button>
