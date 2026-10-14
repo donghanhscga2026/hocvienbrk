@@ -39,12 +39,13 @@ export default function Wi300Header() {
     return () => document.removeEventListener('pointerdown', closeOutside)
   }, [])
   if (!brand) return null
-  const links = [
-    { href: '/', label: 'Trang chủ', icon: Home },
-    { href: '/khoa-hoc', label: 'Khóa học', icon: BookOpen },
-    { href: '/san-pham', label: 'Sản phẩm', icon: Package },
-    { href: '/dich-vu', label: 'Dịch vụ', icon: BriefcaseBusiness },
-  ]
+  const menuIcons: Record<string, typeof Home> = { '/': Home, '/khoa-hoc': BookOpen, '/san-pham': Package, '/dich-vu': BriefcaseBusiness }
+  const links = (brand.appearance?.headerMenu || [
+    { label: 'Trang chủ', url: '/', visible: true },
+    { label: 'Khóa học', url: '/khoa-hoc', visible: true },
+    { label: 'Sản phẩm', url: '/san-pham', visible: true },
+    { label: 'Dịch vụ', url: '/dich-vu', visible: true },
+  ]).filter(item => item.visible).map(item => ({ href: item.url, label: item.label, icon: menuIcons[item.url.split('?')[0]] || LayoutGrid }))
   const accountLink = 'flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-brk-background focus-visible:outline-brk-primary'
   return <><header className={`${brand.appearance?.common.stickyHeader !== false ? "sticky top-0" : "relative"} z-50 shrink-0 border-b border-brk-outline bg-white/95 backdrop-blur-xl`}>
     <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-2 sm:px-4 lg:flex lg:justify-between lg:px-6">
@@ -54,7 +55,7 @@ export default function Wi300Header() {
       <nav aria-label="Điều hướng chính" className="col-span-2 row-start-2 flex w-full justify-between gap-1 lg:justify-start py-1 lg:w-auto">
         {links.filter(item => websiteLinkVisible(item.href, brand.appearance)).map(({ href, label, icon: Icon }) => {
           const selected = path === href || (href === '/khoa-hoc' && path.startsWith(href + '/'))
-          return <Link key={href} href={href} aria-current={selected ? 'page' : undefined} className={`inline-flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1.5 text-[11px] font-semibold sm:px-2.5 sm:text-sm lg:flex-none ${selected ? 'bg-brk-background text-brk-primary' : 'text-brk-muted hover:bg-brk-background hover:text-brk-primary'}`}><Icon className="h-4 w-4" aria-hidden="true" />{label}</Link>
+          return <Link key={href} href={href} target={href.startsWith('https://') ? '_blank' : undefined} rel={href.startsWith('https://') ? 'noopener noreferrer' : undefined} aria-current={selected ? 'page' : undefined} className={`inline-flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1.5 text-[11px] font-semibold sm:px-2.5 sm:text-sm lg:flex-none ${selected ? 'bg-brk-background text-brk-primary' : 'text-brk-muted hover:bg-brk-background hover:text-brk-primary'}`}><Icon className="h-4 w-4" aria-hidden="true" />{label}</Link>
         })}
       </nav>
       <div className="flex shrink-0 items-center justify-end gap-0.5 sm:gap-2">
