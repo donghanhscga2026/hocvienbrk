@@ -3,15 +3,18 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { getAdminCoursesAction, bulkToggleCourseStatusAction, bulkUpdateCoursesOptionsAction } from '@/app/actions/admin-actions'
 import { getTeachersAction } from '@/app/actions/course-actions'
-import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Eye, EyeOff, X, Search, Tag, Trash2, Save, Edit2, Palette } from 'lucide-react'
+import { BookOpen, Users, Loader2, Plus, Eye, X, Search, Tag, Trash2, Save, Edit2 } from 'lucide-react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import CourseActionsMenu from '@/components/course/CourseActionsMenu'
 import CourseExportButton from '@/components/course/CourseExportButton'
 import ManagementWorkspace from '@/components/layout/ManagementWorkspace'
 import MainHeader from '@/components/layout/MainHeader'
-import CourseDashboardModal from '@/components/course/CourseDashboardModal'
-import AdminMemberRosterTab from '@/components/course/AdminMemberRosterTab'
 import type { ActivitySummary } from '@/components/course/CourseManagementActivity'
+
+// Chỉ tải màn thống kê/học viên khi người dùng mở, giảm mã tải ban đầu.
+const CourseDashboardModal = dynamic(() => import('@/components/course/CourseDashboardModal'), { ssr: false })
+const AdminMemberRosterTab = dynamic(() => import('@/components/course/AdminMemberRosterTab'), { ssr: false })
 
 export default function ToolsCoursesPage() {
     const [activeTab, setActiveTab] = useState<'courses' | 'categories'>('courses')
@@ -90,6 +93,7 @@ function CoursesTab() {
         applyVouchers: false, acceptedVoucherIds: [] as number[],
     }
     const [bulkOpts, setBulkOpts] = useState(defaultBulkOpts)
+    const [quickBulk, setQuickBulk] = useState({ status: '', categoryId: '', feeType: '' })
 
     // ✅ Tải danh sách khoá học theo đúng phạm vi đang chọn (server-side filter) —
     // thay vì tải hết rồi lọc ở client, giúp ADMIN mặc định chỉ tải khoá học của
@@ -124,7 +128,6 @@ function CoursesTab() {
         fetch('/api/wi300/projects', { cache: 'no-store' }).then(async response => {
             if (response.ok) { const data = await response.json(); setProjects(data.projects || []) }
         }).catch(() => {})
-        fetch('/api/vouchers').then(r => r.json()).then(data => setAllVouchers(data.vouchers || [])).catch(() => {})
         // ✅ Danh sách GV cho dropdown lọc — tải riêng, độc lập với phạm vi khoá học
         // đang xem, để ADMIN luôn chọn được bất kỳ GV nào (kể cả khi đang chỉ xem
         // khoá học của chính mình).
@@ -139,6 +142,13 @@ function CoursesTab() {
             setAllCategories((data.categories || []).map((c: any) => ({ id: c.id, name: c.name })))
         }).catch(() => {})
     }, [])
+
+    useEffect(() => {
+        if (!showBulkOptions) return
+        const controller = new AbortController()
+        fetch('/api/vouchers', { signal: controller.signal }).then(r => r.json()).then(data => { if (!controller.signal.aborted) setAllVouchers(data.vouchers || []) }).catch(() => {})
+        return () => controller.abort()
+    }, [showBulkOptions])
 
     const categoryOptions = allCategories
 
@@ -239,24 +249,22 @@ function CoursesTab() {
         }
     }
 
-    const handleBulkAction = async (newStatus: boolean) => {
-        const label = newStatus ? 'kích hoạt' : 'ẩn'
-        if (!confirm(`Xác nhận ${label} ${selectedIds.size} khóa học?`)) return
-
+    // Các lựa chọn áp dụng trong một yêu cầu; không tự thay mức tiền học phí.
+    const handleQuickBulk = async () => {
+        const opts: { status?: boolean; categoryId?: number | null; feeType?: string } = {}
+        if (quickBulk.status) opts.status = quickBulk.status === 'show'
+        if (quickBulk.categoryId) opts.categoryId = quickBulk.categoryId === 'none' ? null : Number(quickBulk.categoryId)
+        if (quickBulk.feeType) opts.feeType = quickBulk.feeType
+        if (!Object.keys(opts).length || !selectedIds.size) return
+        if (!confirm(`Áp dụng thay đổi cho ${selectedIds.size} khóa học đã chọn?`)) return
         setBatchLoading(true)
         try {
-            const res = await bulkToggleCourseStatusAction(Array.from(selectedIds), newStatus)
-            if (res.success) {
-                await fetchCourses(filterTeacher)
-                setSelectedIds(new Set())
-            } else {
-                alert(res.error || 'Có lỗi xảy ra')
-            }
-        } catch {
-            alert('Có lỗi xảy ra')
-        } finally {
-            setBatchLoading(false)
-        }
+            const res = await bulkUpdateCoursesOptionsAction([...selectedIds], opts)
+            if (!res.success) throw new Error(res.error || 'Không áp dụng được thay đổi')
+            setQuickBulk({ status: '', categoryId: '', feeType: '' })
+            await fetchCourses(filterTeacher)
+        } catch (error) { alert(error instanceof Error ? error.message : 'Có lỗi xảy ra') }
+        finally { setBatchLoading(false) }
     }
 
     const handleViewStudents = (courseId: number, courseName: string) => {
@@ -315,37 +323,13 @@ function CoursesTab() {
 
             {selectedIds.size > 0 && (
                 <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm">
-                    <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-bold text-gray-700"><input type="checkbox" aria-label="Chọn tất cả khóa học" checked={filteredCourses.length > 0 && filteredCourses.every(course => selectedIds.has(course.id))} ref={element => { if (element) element.indeterminate = filteredCourses.some(course => selectedIds.has(course.id)) && !filteredCourses.every(course => selectedIds.has(course.id)) }} disabled={batchLoading || bulkOptionsLoading} onChange={toggleSelectAll} className="h-4 w-4 accent-green-700" />Đã chọn {selectedIds.size} khóa học</label>
-                    <div className="ml-auto flex flex-wrap gap-2">
-                        <button
-                            onClick={() => handleBulkAction(true)}
-                            disabled={batchLoading}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-green-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-green-600 transition-colors disabled:opacity-50"
-                        >
-                            {batchLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Eye className="w-3 h-3" />}
-                            Kích hoạt
-                        </button>
-                        <button
-                            onClick={() => handleBulkAction(false)}
-                            disabled={batchLoading}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-yellow-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-yellow-600 transition-colors disabled:opacity-50"
-                        >
-                            {batchLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <EyeOff className="w-3 h-3" />}
-                            Ẩn
-                        </button>
-                        <button
-                            onClick={() => { setBulkOpts({...defaultBulkOpts}); setShowBulkOptions(true) }}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-gray-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-gray-800 transition-colors"
-                        >
-                            <Settings className="w-3 h-3" />
-                            Tùy chỉnh
-                        </button>
-                        <button
-                            onClick={() => setSelectedIds(new Set())}
-                            className="text-xs text-gray-400 hover:text-gray-600 font-bold px-2"
-                        >
-                            Bỏ chọn
-                        </button>
+                    <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-bold text-gray-700"><input type="checkbox" aria-label="Bỏ chọn khóa học đã chọn" checked disabled={batchLoading || bulkOptionsLoading} onChange={() => setSelectedIds(new Set())} className="h-4 w-4 accent-green-700" />Đã chọn {selectedIds.size} khóa học</label>
+                    <div className="ml-auto flex w-full flex-wrap items-end gap-2 sm:w-auto">
+                        <label className="text-xs text-gray-600">Ẩn/Hiện<select aria-label="Ẩn hoặc hiện khóa đã chọn" value={quickBulk.status} disabled={batchLoading || bulkOptionsLoading} onChange={event => setQuickBulk(prev => ({ ...prev, status: event.target.value }))} className="mt-1 block min-h-11 rounded-lg border px-3 text-sm"><option value="">Giữ nguyên</option><option value="hide">Ẩn</option><option value="show">Hiện</option></select></label>
+                        <label className="text-xs text-gray-600">Danh mục<select aria-label="Danh mục khóa đã chọn" value={quickBulk.categoryId} disabled={batchLoading || bulkOptionsLoading} onChange={event => setQuickBulk(prev => ({ ...prev, categoryId: event.target.value }))} className="mt-1 block min-h-11 max-w-full rounded-lg border px-3 text-sm"><option value="">Giữ nguyên</option><option value="none">Không có danh mục</option>{categoryOptions.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+                        <label className="text-xs text-gray-600">Miễn phí/Có phí<select aria-label="Học phí khóa đã chọn" value={quickBulk.feeType} disabled={batchLoading || bulkOptionsLoading} onChange={event => setQuickBulk(prev => ({ ...prev, feeType: event.target.value }))} className="mt-1 block min-h-11 rounded-lg border px-3 text-sm"><option value="">Giữ nguyên</option><option value="MIEN_PHI">Miễn phí</option><optgroup label="Có phí"><option value="PHI_TUY_TINH">Có phí · Tùy tâm</option><option value="PHI_CAM_KET">Có phí · Cam kết</option><option value="PHI_DONG_HANH">Có phí · Đồng hành</option><option value="PHI_TOI_THIEU">Có phí · Tối thiểu</option></optgroup></select></label>
+                        <button type="button" onClick={() => void handleQuickBulk()} disabled={batchLoading || bulkOptionsLoading || !Object.values(quickBulk).some(Boolean)} className="min-h-11 rounded-lg bg-brk-primary px-4 text-sm font-semibold text-white disabled:opacity-50">{batchLoading ? 'Đang áp dụng…' : 'Áp dụng'}</button>
+                        <button type="button" disabled={batchLoading || bulkOptionsLoading} onClick={() => { setBulkOpts({ ...defaultBulkOpts }); setShowBulkOptions(true) }} className="min-h-11 px-2 text-xs font-semibold text-gray-600">Nâng cao</button>
                     </div>
                 </div>
             )}

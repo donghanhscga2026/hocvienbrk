@@ -10,6 +10,9 @@ dom.window.HTMLDialogElement.prototype.close = function () { this.removeAttribut
 const course = { id: 1, id_khoa: 'AI', name_lop: 'Khóa thực hành AI', name_khoa: 'AI', type: 'NORMAL', status: true, pin: 0, teacherId: 8, categoryId: 1, category: 'Công nghệ', courseCategory: { name: 'Công nghệ' }, phi_coc: 1000000, mo_ta_ngan: 'Mô tả ngắn', mo_ta_dai: 'Mô tả dài', link_anh_bia: '/wi300/businesses/wi-tech.png', lessons: [{ id: 'l1', title: 'Bài thực hành', order: 1 }], _count: { lessons: 1, enrollments: 12 }, teacher: { name: 'Hương Lucy' } }
 const templates = [{ id: 'external-html', name: 'Mẫu HTML bên ngoài', description: 'Giữ nguồn HTML' }]
 const applied = []
+const bulkUpdates = []
+let bulkFail = false
+global.confirm = () => true; global.alert = () => {}
 let courseLoad = async () => ({ success: true, courses: Array.from({ length: 12 }, (_, index) => ({ ...course, id: index + 1, name_lop: course.name_lop + ' ' + (index + 1) })), isAdmin: true, userId: 8 })
 const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
 const stub = name => ({ __esModule: true, default: props => React.createElement('div', { 'data-panel': name }, name + (props.courseId || '')) })
@@ -30,7 +33,7 @@ const mocks = {
   '@/components/admin/courses/AddLessonModal': { AddLessonModal: () => null },
   '@/components/admin/courses/LessonAnnouncementModal': { LessonAnnouncementModal: () => null },
   '@/app/actions/course-actions': { getTeachersAction: async () => ({ success: true, teachers: [{ id: 8, name: 'Hương Lucy' }] }) },
-  '@/app/actions/admin-actions': { getAdminCoursesAction: (...args) => courseLoad(...args) },
+  '@/app/actions/admin-actions': { getAdminCoursesAction: (...args) => courseLoad(...args), bulkUpdateCoursesOptionsAction: async (ids, options) => { bulkUpdates.push({ ids, options }); return { success: !bulkFail, error: 'Fixture failure' } } },
   '@/app/actions/course-page-actions': { getCoursePages: async () => [{ id: 'page-1', slug: 'AI', useTemplate: true, status: 'draft' }], getCoursePage: async () => ({ id: 'page-1', slug: 'AI', useTemplate: true, status: 'draft', name: 'AI', sections: [] }), applyCoursePageTemplate: async (...args) => { applied.push(args); return { success: true } } },
   '@/app/actions/course-page-template-actions': { getStoredCoursePageTemplateOptions: async () => ({ success: true, templates }), applyStoredCoursePageTemplate: async (...args) => { applied.push(args); return { success: true } } },
   '@/lib/course-page/templates': { COURSE_TEMPLATE_LIBRARY: [{ key: 'test', name: 'Mẫu hệ thống', description: 'Mẫu có sẵn' }] },
@@ -55,9 +58,25 @@ async function run() {
     assert.equal(document.querySelectorAll('a[href="/tools/courses/templates"]').length, 0, 'Template library is removed from the course list header')
     assert.ok(document.querySelector('a[href$="tab=activity"]')); snapshot('course-list')
     await React.act(async () => document.querySelector('[aria-label="Chọn tất cả khóa học"]').click())
-    assert.ok(document.body.textContent.includes('Đã chọn 12 khóa học')); assert.equal(document.querySelector('[aria-label="Chọn tất cả khóa học"]').checked, true)
-    await React.act(async () => document.querySelector('[aria-label="Chọn tất cả khóa học"]').click())
+    assert.ok(document.body.textContent.includes('Đã chọn 12 khóa học')); assert.equal(document.querySelector('[aria-label="Bỏ chọn khóa học đã chọn"]').checked, true)
+    assert.ok(document.querySelector('[aria-label="Ẩn hoặc hiện khóa đã chọn"]'))
+    assert.ok(document.querySelector('[aria-label="Danh mục khóa đã chọn"]'))
+    assert.ok(document.querySelector('[aria-label="Học phí khóa đã chọn"] optgroup[label="Có phí"]'))
+    await React.act(async () => document.querySelector('[aria-label="Bỏ chọn khóa học đã chọn"]').click())
     assert.equal(document.querySelector('[aria-label="Chọn tất cả khóa học"]').checked, false); assert.ok(!document.body.textContent.includes('Đã chọn 12 khóa học'), 'Select-all can clear selection at the same location')
+    const rowCheck = () => document.querySelector('article input[type="checkbox"]')
+    await React.act(async () => rowCheck().click())
+    assert.ok(document.body.textContent.includes('Đã chọn 1 khóa học'))
+    await React.act(async () => document.querySelector('[aria-label="Bỏ chọn khóa học đã chọn"]').click())
+    assert.ok(!document.body.textContent.includes('Đã chọn 1 khóa học'), 'Clicking the selected bar clears a partial selection too')
+    await React.act(async () => rowCheck().click())
+    async function choose(label, value) { await React.act(async () => { const node = document.querySelector('[aria-label="' + label + '"]'); node.value = value; node.dispatchEvent(new window.Event('change', { bubbles: true })) }) }
+    await choose('Ẩn hoặc hiện khóa đã chọn', 'hide'); await choose('Danh mục khóa đã chọn', '1'); await choose('Học phí khóa đã chọn', 'PHI_CAM_KET')
+    bulkFail = true; await click('Áp dụng')
+    assert.ok(document.body.textContent.includes('Đã chọn 1 khóa học'), 'Failed updates preserve selection for retry')
+    bulkFail = false; await click('Áp dụng')
+    assert.deepEqual(bulkUpdates.at(-1), { ids: [1], options: { status: false, categoryId: 1, feeType: 'PHI_CAM_KET' } })
+    assert.ok(!document.body.textContent.includes('Đã chọn 1 khóa học'))
     await click('Thẻ'); assert.equal(document.querySelectorAll('article').length, 10); snapshot('course-cards'); await click('Danh sách')
     await click('Xuất học viên các khóa đang lọc'); assert.ok(document.querySelector('dialog[open]')); assert.equal(document.querySelector('dialog input[value="students"]').checked, true); assert.ok(document.querySelector('option[value="GOOGLE"]')); snapshot('course-export'); await click('Đóng lựa chọn xuất')
     await click('Sau'); assert.equal(document.querySelectorAll('article').length, 2)

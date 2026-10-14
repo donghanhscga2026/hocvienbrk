@@ -3,12 +3,12 @@ import { useEffect, useId, useState, type ReactNode } from 'react'
 import { useSession } from 'next-auth/react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, BookOpen, ChevronDown, ContactRound, Globe, GraduationCap, LayoutGrid, Menu, Network, Settings, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, BookOpen, ChevronDown, ContactRound, Globe, GraduationCap, Handshake, LayoutGrid, Link2, Menu, Network, Settings, ShieldCheck, UserRound, type LucideIcon } from 'lucide-react'
 import { managementLocation, managementNavigation } from '@/lib/wi300/management-navigation'
 import type { PersonalTool } from '@/lib/wi300/personal-space'
-import { ManagementFrameContext } from '@/components/layout/ManagementFrameContext'
+import { ManagementFrameContext, ManagementToolsContext } from '@/components/layout/ManagementFrameContext'
 
-const icons: Record<string, LucideIcon> = { BookOpen, ContactRound, Globe, GraduationCap, LayoutGrid, Network, Settings }
+const icons: Record<string, LucideIcon> = { BookOpen, ContactRound, Globe, GraduationCap, Handshake, LayoutGrid, Link2, Network, Settings, ShieldCheck, UserRound }
 
 export default function Wi300ManagementFrame({ children }: { children: ReactNode }) {
   const { data: session, status } = useSession()
@@ -17,7 +17,8 @@ export default function Wi300ManagementFrame({ children }: { children: ReactNode
   const [result, setResult] = useState<{ actor: string | null; role: string; tools: PersonalTool[] } | null>(null)
   const [failed, setFailed] = useState(false), [retry, setRetry] = useState(0)
   const [open, setOpen] = useState(false), [expanded, setExpanded] = useState<string | null>(null)
-  const groups = managementNavigation(role, result?.actor === actor && result.role === role ? result.tools : [])
+  const currentTools = result?.actor === actor && result.role === role ? result.tools : []
+  const groups = managementNavigation(role, currentTools)
   const location = managementLocation(path, new URLSearchParams(params.toString()), groups)
   const currentRoute = path + (params.toString() ? '?' + params.toString() : '')
   useEffect(() => {
@@ -51,7 +52,7 @@ export default function Wi300ManagementFrame({ children }: { children: ReactNode
         <nav aria-label="Đường dẫn quản lý" className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-brk-muted">{location.crumbs.map((crumb, index) => <span key={index} className="inline-flex min-w-0 items-center gap-2">{index > 0 && <span aria-hidden="true">/</span>}{crumb.href ? <Link href={crumb.href} className="inline-flex min-h-11 items-center break-words font-medium text-brk-primary">{crumb.label}</Link> : <span aria-current="page" className="break-words">{crumb.label}</span>}</span>)}</nav>
         {location.back && <Link href={location.back.href} className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-brk-outline bg-white px-4 text-sm font-semibold text-brk-primary"><ArrowLeft size={16} />{location.back.label}</Link>}
         {path.startsWith('/tools/') && !path.startsWith('/tools/courses') && path !== '/tools/crm' && <h1 data-navigation-title className="mb-5 text-2xl font-bold">{location.title}</h1>}
-        <div className="min-w-0">{children}</div>
+        <ManagementToolsContext value={{ tools: currentTools, loading: status === 'loading' || status === 'authenticated' && (!result || result.actor !== actor || result.role !== role) && !failed, failed }}><div className="min-w-0">{children}</div></ManagementToolsContext>
       </div>
     </div>
   </div></ManagementFrameContext>
