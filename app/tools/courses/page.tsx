@@ -20,22 +20,22 @@ export default function ToolsCoursesPage() {
     const [activeTab, setActiveTab] = useState<'courses' | 'categories'>('courses')
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-[#F8FAFC]">
             <MainHeader title="Quản lý khóa học" toolSlug="courses" />
 
             <ManagementWorkspace active="courses">
                 <div><h1 className="text-2xl font-bold text-brk-primary">Quản lý khóa học</h1><p className="mt-2 text-sm text-gray-600">Quản lý nội dung, học viên và hoạt động của từng khóa. Chọn mẫu Sales Page trong mục Trang bán khóa học.</p></div>
 
-                <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl mt-4">
+                <div className="mt-4 flex gap-2 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
                     <button
                         onClick={() => setActiveTab('courses')}
-                        className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'courses' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`flex-1 rounded-xl px-3 py-3 text-xs font-semibold tracking-wide transition-colors ${activeTab === 'courses' ? 'bg-brk-background text-brk-primary shadow-sm ring-1 ring-brk-primary/10' : 'text-slate-600 hover:bg-slate-50 hover:text-brk-primary'}`}
                     >
                         <BookOpen className="w-4 h-4 inline mr-2" /> Khóa học
                     </button>
                     <button
                         onClick={() => setActiveTab('categories')}
-                        className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'categories' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`flex-1 rounded-xl px-3 py-3 text-xs font-semibold tracking-wide transition-colors ${activeTab === 'categories' ? 'bg-brk-background text-brk-primary shadow-sm ring-1 ring-brk-primary/10' : 'text-slate-600 hover:bg-slate-50 hover:text-brk-primary'}`}
                     >
                         <Tag className="w-4 h-4 inline mr-2" /> Danh mục
                     </button>
