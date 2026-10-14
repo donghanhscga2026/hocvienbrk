@@ -56,7 +56,7 @@ function CoursesTab() {
     const [viewStudents, setViewStudents] = useState<{ courseId: number; courseName: string } | null>(null)
 
     const [search, setSearch] = useState('')
-    const [filterStatus, setFilterStatus] = useState('ACTIVE')
+    const [filterStatus, setFilterStatus] = useState('ALL')
     const [filterCategory, setFilterCategory] = useState('ALL')
     const [filterProject, setFilterProject] = useState('ALL')
     const [projects, setProjects] = useState<{ slug: string; name: string; courseIds: number[] }[]>([])
@@ -152,6 +152,7 @@ function CoursesTab() {
                 const match = (course.name_lop || '').toLowerCase().includes(q)
                     || (course.id_khoa || '').toLowerCase().includes(q)
                     || (course.name_khoa || '').toLowerCase().includes(q)
+                    || (course.teacher?.name || '').toLowerCase().includes(q)
                 if (!match) return false
             }
             if (filterStatus === 'ACTIVE' && !course.status) return false
@@ -261,56 +262,16 @@ function CoursesTab() {
                 <div className="flex flex-wrap gap-2"><CourseExportButton courseIds={selectedIds.size ? [...selectedIds] : filteredCourses.map(course => course.id)} label={selectedIds.size ? 'Xuất học viên khóa đã chọn' : 'Xuất học viên các khóa đang lọc'} /><Link data-help-id="link-new-course" href="/tools/courses/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brk-primary px-4 text-sm font-semibold text-white"><Plus size={17} />Tạo khóa học</Link></div>
             </div>
             <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-                {[{ label: 'Tổng khóa học', value: courses.length }, { label: 'Đang hiển thị', value: courses.filter(course => course.status).length }, { label: 'Đang ẩn', value: courses.filter(course => !course.status).length }, { label: 'Lượt học viên đang học', value: courses.reduce((sum, course) => sum + (course._count?.enrollments || 0), 0) }].map(stat => <div key={stat.label} className="rounded-2xl border border-brk-outline bg-white p-5"><p className="text-sm text-gray-500">{stat.label}</p><strong className="mt-2 block text-3xl text-brk-primary">{loading ? '…' : stat.value}</strong></div>)}
+                {[{ label: 'Tổng số khóa học', value: courses.length, icon: BookOpen, note: 'Trong phạm vi giảng viên đã chọn' }, { label: 'Tổng lượt học viên', value: courses.reduce((sum, course) => sum + (course._count?.enrollments || 0), 0), icon: Users, note: 'Một học viên có thể đăng ký nhiều khóa' }, { label: 'Khóa học đang hiển thị', value: courses.filter(course => course.status).length, icon: Eye, note: 'Các khóa đang được công khai' }, { label: 'Yêu cầu hỗ trợ', value: activity.reduce((sum, item) => sum + item.requests, 0), icon: BookOpen, note: 'Yêu cầu cần trả lời của các khóa ở trang này' }].map(stat => { const Icon = stat.icon; return <div key={stat.label} className="flex items-start gap-3 rounded-xl border border-brk-outline bg-white p-4"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brk-background text-brk-primary"><Icon size={21} /></span><div className="min-w-0"><p className="text-xs text-gray-600">{stat.label}</p><strong className="mt-1 block text-2xl text-brk-primary">{loading || (stat.label === 'Yêu cầu hỗ trợ' && activityLoading) ? '…' : stat.label === 'Yêu cầu hỗ trợ' && activityError ? '—' : stat.value}</strong><p className="mt-1 text-[11px] leading-4 text-gray-500">{stat.note}</p></div></div> })}
             </div>
-            <div className="bg-white border border-gray-200 rounded-xl p-3 space-y-2">
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                        type="text"
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        placeholder="Tìm khóa học..."
-                        className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-yellow-200 transition-all"
-                    />
-                </div>
-                <div className="flex flex-wrap gap-2 items-center">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Trạng Thái</span>
-                    <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-                        className="text-xs bg-gray-50 border border-gray-100 rounded-lg px-2 py-1.5 font-medium outline-none focus:ring-2 focus:ring-yellow-200">
-                        <option value="ALL">Tất cả trạng thái</option>
-                        <option value="ACTIVE">Đang mở</option>
-                        <option value="HIDDEN">Đã ẩn</option>
-                    </select>
-                    <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
-                        className="text-xs bg-gray-50 border border-gray-100 rounded-lg px-2 py-1.5 font-medium outline-none focus:ring-2 focus:ring-yellow-200">
-                        <option value="ALL">Tất cả danh mục</option>
-                        {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                    </select>
-                    {projects.length > 0 && <select aria-label="Lọc theo dự án" value={filterProject} onChange={event => setFilterProject(event.target.value)} className="min-h-11 rounded-lg border border-gray-100 bg-gray-50 px-2 text-xs"><option value="ALL">Tất cả dự án</option>{projects.map(project => <option key={project.slug} value={project.slug}>{project.name}</option>)}</select>}
-                    {isAdmin ? (
-                        <select value={filterTeacher} onChange={e => setFilterTeacher(e.target.value)}
-                            className="text-xs bg-gray-50 border border-gray-100 rounded-lg px-2 py-1.5 font-medium outline-none focus:ring-2 focus:ring-yellow-200">
-                            <option value="SELF">Khóa học của tôi</option>
-                            <option value="ALL">Tất cả GV</option>
-                            {teacherOptions.filter(t => t.id !== currentUserId).map(t => (
-                                <option key={t.id} value={t.id}>{t.name}</option>
-                            ))}
-                        </select>
-                    ) : (
-                        <select disabled value="SELF"
-                            className="text-xs bg-gray-100 border border-gray-200 rounded-lg px-2 py-1.5 font-medium outline-none text-gray-500 cursor-not-allowed">
-                            <option value="SELF">{teacherOptions.find(t => t.id === currentUserId)?.name || 'Khóa học của tôi'}</option>
-                        </select>
-                    )}
-                    {search || filterStatus !== 'ACTIVE' || filterCategory !== 'ALL' || filterProject !== 'ALL' || (isAdmin && filterTeacher !== 'SELF') ? (
-                        <button onClick={() => { setSearch(''); setFilterStatus('ACTIVE'); setFilterCategory('ALL'); setFilterProject('ALL'); if (isAdmin) setFilterTeacher('SELF') }}
-                            className="text-xs text-gray-400 hover:text-gray-600 font-bold px-2 py-1">
-                            Xóa lọc
-                        </button>
-                    ) : null}
-                </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(240px,2fr)_repeat(4,minmax(120px,1fr))]">
+                <div className="relative self-end"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" /><input aria-label="Tìm khóa học hoặc giảng viên" type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Tìm kiếm khóa học, giảng viên…" className="min-h-11 w-full rounded-xl border border-brk-outline bg-white pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-brk-primary/20" /></div>
+                <label className="space-y-1 text-xs text-gray-600">Giảng viên<select aria-label="Lọc giảng viên" disabled={!isAdmin} value={isAdmin ? filterTeacher : 'SELF'} onChange={event => setFilterTeacher(event.target.value)} className="block min-h-11 w-full rounded-xl border border-brk-outline bg-white px-3 text-sm disabled:bg-gray-50"><option value="SELF">Khóa học của tôi</option>{isAdmin && <option value="ALL">Tất cả</option>}{isAdmin && teacherOptions.filter(teacher => teacher.id !== currentUserId).map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}</select></label>
+                <label className="space-y-1 text-xs text-gray-600">Danh mục<select aria-label="Lọc danh mục" value={filterCategory} onChange={event => setFilterCategory(event.target.value)} className="block min-h-11 w-full rounded-xl border border-brk-outline bg-white px-3 text-sm"><option value="ALL">Tất cả</option>{categories.map(category => <option key={category} value={category}>{category}</option>)}</select></label>
+                <label className="space-y-1 text-xs text-gray-600">Dự án<select aria-label="Lọc theo dự án" value={filterProject} onChange={event => setFilterProject(event.target.value)} className="block min-h-11 w-full rounded-xl border border-brk-outline bg-white px-3 text-sm"><option value="ALL">Tất cả</option>{projects.map(project => <option key={project.slug} value={project.slug}>{project.name}</option>)}</select></label>
+                <label className="space-y-1 text-xs text-gray-600">Hiển thị<select aria-label="Lọc hiển thị" value={filterStatus} onChange={event => setFilterStatus(event.target.value)} className="block min-h-11 w-full rounded-xl border border-brk-outline bg-white px-3 text-sm"><option value="ALL">Tất cả</option><option value="ACTIVE">Đang hiển thị</option><option value="HIDDEN">Đang ẩn</option></select></label>
             </div>
+            {(search || filterStatus !== 'ALL' || filterCategory !== 'ALL' || filterProject !== 'ALL' || (isAdmin && filterTeacher !== 'SELF')) && <button type="button" onClick={() => { setSearch(''); setFilterStatus('ALL'); setFilterCategory('ALL'); setFilterProject('ALL'); if (isAdmin) setFilterTeacher('SELF') }} className="min-h-10 text-sm text-brk-primary">Xóa bộ lọc</button>}
 
             {selectedIds.size > 0 && (
                 <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm">
@@ -382,7 +343,7 @@ function CoursesTab() {
                     <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-gray-600">Danh sách khóa học</p><div className="flex rounded-xl border border-brk-outline bg-white p-1">{(['list', 'cards'] as const).map(mode => <button key={mode} type="button" aria-pressed={display === mode} onClick={() => setDisplay(mode)} className={`min-h-10 rounded-lg px-3 text-sm ${display === mode ? 'bg-brk-background font-semibold text-brk-primary' : 'text-gray-500'}`}>{mode === 'list' ? 'Danh sách' : 'Thẻ'}</button>)}</div></div>
                     <div className={display === 'list' ? 'overflow-x-auto rounded-2xl border border-brk-outline bg-white' : 'rounded-2xl'}>
                         <div className={display === 'list' ? 'min-w-[1100px]' : ''}>
-                        {display === 'list' && <div className="grid grid-cols-[24px_minmax(240px,2fr)_130px_minmax(100px,1fr)_100px_80px_minmax(140px,1.2fr)_120px] items-center gap-3 bg-gray-50 px-4 py-3 text-xs font-semibold text-gray-500"><span /><span>Khóa học / Giảng viên</span><span>Danh mục</span><span>Dự án</span><span>Hiển thị</span><span>Học viên</span><span>Hoạt động học viên</span><span>Thao tác</span></div>}
+                        {display === 'list' && <div className="grid grid-cols-[24px_minmax(240px,2fr)_130px_minmax(100px,1fr)_100px_80px_minmax(140px,1.2fr)_120px] items-center gap-3 bg-brk-background px-4 py-3 text-xs font-semibold text-brk-on-surface"><span /><span>Khóa học / Giảng viên</span><span>Danh mục</span><span>Dự án</span><span>Hiển thị</span><span>Học viên</span><span>Hoạt động</span><span>Thao tác</span></div>}
                         <div className={display === 'cards' ? 'grid gap-4 sm:grid-cols-2 xl:grid-cols-3' : 'divide-y divide-brk-outline'}>
                         {visibleCourses.map(course => {
                             const summary = activity.find(item => item.courseId === course.id)

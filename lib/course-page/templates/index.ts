@@ -3,7 +3,6 @@ import { createWiGrowCoursePage } from './wigrow'
 import { createClassicCoursePage } from './mfc-classic'
 
 export const COURSE_TEMPLATE_LIBRARY = [
-  { key: 'wi300-gift', name: 'Wi300 – Quà tặng', description: 'Mẫu xanh đậm và nền kem, ảnh mở đầu bên phải, thẻ lợi ích và đăng ký khóa học. Sửa chữ, ảnh và nội dung trực tiếp.' },
   {
     key: 'mfc-classic',
     name: 'MFC Classic',
@@ -16,7 +15,8 @@ export const COURSE_TEMPLATE_LIBRARY = [
   },
 ] as const
 
-export type CourseTemplateKey = typeof COURSE_TEMPLATE_LIBRARY[number]['key']
+// Giữ renderer tương thích cho trang đã lưu, nhưng không cho chọn mẫu Quà tặng mới.
+export type CourseTemplateKey = typeof COURSE_TEMPLATE_LIBRARY[number]['key'] | 'wi300-gift'
 
 export function createCoursePageFromTemplate(key: CourseTemplateKey, slug: string) {
   switch (key) {
