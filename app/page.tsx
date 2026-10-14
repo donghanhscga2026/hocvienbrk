@@ -17,7 +17,7 @@ import { getRoadmapPoints } from './actions/roadmap-actions'
 import { FALLBACK_PROFILE } from '@/lib/db-fallback'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import Wi300Home from '@/components/wi300/Wi300Home'
-import { websiteMetadata } from '@/lib/wi300/website-config'
+import { pageMetadata } from '@/lib/wi300/website-config'
 
 const getHomepageLanding = cache(async (landingId?: number, landingSlug?: string) => {
   if (!landingId && !landingSlug) return null
@@ -32,7 +32,7 @@ const getHomepageLanding = cache(async (landingId?: number, landingSlug?: string
 
 export async function generateMetadata(): Promise<Metadata> {
   const brand = await getCurrentDeploymentBrand()
-  if (brand) return { ...websiteMetadata(brand), title: { absolute: brand.seoTitle } }
+  if (brand) return pageMetadata(brand, 'home')
   const profile = await getCurrentSiteProfile()
   if (!profile) return { title: 'MFC' }
 

@@ -8,7 +8,7 @@ function load(file, mocks = {}) {
   const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
   }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name === '@/lib/wi300/appearance' ? load('lib/wi300/appearance.ts', { './projects': load('lib/wi300/projects.ts') }) : require(name), mod, mod.exports)
+  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name === '@/lib/wi300/website-config' ? load('lib/wi300/website-config.ts') : name === '@/lib/wi300/appearance' ? load('lib/wi300/appearance.ts', { './projects': load('lib/wi300/projects.ts') }) : require(name), mod, mod.exports)
   return mod.exports
 }
 const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }

@@ -5,15 +5,18 @@ process.env.WI300_APPEARANCE_SECRET = 'unit-tests-only-not-a-production-key'
 function load(file, mocks = {}) {
   const module = { exports: {} }
   const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name === '@/lib/wi300/projects' || name === './projects' ? load('lib/wi300/projects.ts') : name === '@/lib/wi300/appearance' || name === './appearance' ? load('lib/wi300/appearance.ts') : require(name), module, module.exports)
+  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name === '@/lib/wi300/website-config' ? load('lib/wi300/website-config.ts') : name === '@/lib/wi300/projects' || name === './projects' ? load('lib/wi300/projects.ts') : name === '@/lib/wi300/appearance' || name === './appearance' ? load('lib/wi300/appearance.ts') : require(name), module, module.exports)
   return module.exports
 }
 class CrmError extends Error { constructor(message, status = 400) { super(message); this.status = status } }
 async function run() {
   const shared = load('lib/wi300/appearance.ts')
   const legacy = structuredClone(shared.defaultAppearance)
-  delete legacy.seo; delete legacy.footer; delete legacy.common.name; delete legacy.common.tagline
+  delete legacy.pageSeo; delete legacy.seo; delete legacy.footer; delete legacy.common.name; delete legacy.common.tagline
   const upgraded = shared.appearanceSchema.parse(legacy)
+  const separateDefaults = structuredClone(upgraded)
+  separateDefaults.pageSeo.courses.title = 'Chỉ khóa học'
+  assert.equal(separateDefaults.pageSeo.home.title, '', 'Default SEO objects must be independent before first save')
   assert.deepEqual(upgraded.home, legacy.home, 'Old page settings preserved')
   assert.deepEqual(upgraded.footer, shared.defaultFooter)
   assert.equal(upgraded.common.name, '')
@@ -26,6 +29,24 @@ async function run() {
   assert.equal(publicBrand.name, 'Wi mới'); assert.equal(publicBrand.seoTitle, 'SEO mới')
   assert.equal(website.websiteMetadata(publicBrand).robots.index, false)
   assert.deepEqual(website.websiteMetadata(publicBrand).twitter.images, ['/share-new.png'])
+  assert.equal(website.pageMetadata(publicBrand, 'courses').robots.index, false, 'Unset page SEO inherits website robots')
+  configured.pageSeo.courses = { ...shared.defaultPageSeo, title: 'SEO khóa học riêng', description: 'Mô tả khóa học riêng', imageUrl: '/courses-share.png', inheritRobots: false, index: true, follow: false }
+  const ownBrand = website.configuredBrand(brandBase, configured)
+  assert.deepEqual(website.pageMetadata(ownBrand, 'courses').title, { absolute: 'SEO khóa học riêng' })
+  assert.deepEqual(website.pageMetadata(ownBrand, 'courses').robots, { index: true, follow: false })
+  assert.deepEqual(website.pageMetadata(ownBrand, 'courses').openGraph.images, ['/courses-share.png'])
+  assert.equal(website.pageMetadata(ownBrand, 'projects').description, 'Mô tả mới', 'One page does not overwrite other pages')
+  for (const page of website.WEBSITE_PAGES) assert.ok(upgraded.pageSeo[page.id].inheritRobots)
+  for (const [route, page] of [['khoa-hoc', 'courses'], ['du-an', 'projects'], ['giang-vien', 'teachers']]) {
+    const publicPage = load('app/' + route + '/page.tsx', {
+      '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => ownBrand },
+      '@/lib/get-session': { getSession: async () => null }, '@/lib/prisma': { __esModule: true, default: {} },
+      '@/components/wi300/Wi300Home': { __esModule: true, default: () => null },
+      '@/components/wi300/WiProjectDirectory': { __esModule: true, default: () => null },
+      '@/lib/wi300/project-service': { readPublicProjects: async () => [] },
+    })
+    assert.deepEqual(await publicPage.generateMetadata(), website.pageMetadata(ownBrand, page), 'Public route uses published page SEO')
+  }
   assert.equal(website.configuredBrand(brandBase, upgraded).seoTitle, brandBase.seoTitle, 'Empty fields preserve current deployment defaults')
   const Footer = load('components/wi300/Wi300Footer.tsx', { 'next/link': { __esModule: true, default: props => React.createElement('a', props) }, 'next/image': { __esModule: true, default: ({ unoptimized, ...props }) => React.createElement('img', props) }, './Wi300BrandContext': { useWi300Brand: () => publicBrand } }).default
   const footerHTML = require('react-dom/server').renderToStaticMarkup(React.createElement(Footer))
@@ -124,6 +145,26 @@ async function run() {
   assert.equal((await WebsitePage(pageArgs('footer'))).props.initialTab, 'footer')
   assert.equal((await WebsitePage(pageArgs('seo'))).props.mode, 'website')
   await assert.rejects(() => WebsitePage(pageArgs('unknown')), /404/)
+  const cardsHTML = require('react-dom/server').renderToStaticMarkup(await WebsitePage(pageArgs()))
+  assert.equal((cardsHTML.match(/<h2/g) || []).length, 3)
+  assert.ok(cardsHTML.includes('<svg')); assert.ok(!cardsHTML.includes('SEO website →'))
+  const Pages = load('app/tools/wi-appearance/page.tsx', {
+    'next/link': { __esModule: true, default: props => React.createElement('a', props) },
+    'next/navigation': { notFound: () => { throw new Error('404') }, redirect: () => { throw new Error('LOGIN') } },
+    '@/auth': { auth: async () => session }, '@/lib/prisma': { __esModule: true, default: db },
+    '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => brand },
+    '@/lib/wi300/appearance-service': service, '@/lib/site-profile/deployment-brand': { getDeploymentBrand: () => brandBase },
+    '@/components/wi300/WiAppearanceEditor': { __esModule: true, default: () => null },
+    '@/components/wi300/Wi300Home': { __esModule: true, default: async () => ({ props: {} }) },
+  }).default
+  const listHTML = require('react-dom/server').renderToStaticMarkup(await Pages({ searchParams: Promise.resolve({}) }))
+  assert.equal((listHTML.match(/<article/g) || []).length, 4)
+  assert.ok(listHTML.includes('/tools/wi-appearance?page=teachers'))
+  assert.equal((await Pages({ searchParams: Promise.resolve({ page: 'teachers' }) })).props.pageOnly, 'teachers')
+  await assert.rejects(() => Pages({ searchParams: Promise.resolve({ page: 'invalid' }) }), /404/)
+  session = { user: { id: '8', role: 'ADMIN' } }; await assert.rejects(() => Pages({ searchParams: Promise.resolve({}) }), /404/)
+  session = { user: { id: '0' } }
+  if (process.env.MANAGEMENT_UI_SNAPSHOT_DIR) { fs.mkdirSync(process.env.MANAGEMENT_UI_SNAPSHOT_DIR, { recursive: true }); fs.writeFileSync(path.join(process.env.MANAGEMENT_UI_SNAPSHOT_DIR, 'website-cards.html'), cardsHTML); fs.writeFileSync(path.join(process.env.MANAGEMENT_UI_SNAPSHOT_DIR, 'pages-list.html'), listHTML) }
 
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://wi300.vn/tools/wi-appearance' })
   global.window = dom.window; global.document = dom.window.document; global.IS_REACT_ACT_ENVIRONMENT = true
@@ -181,6 +222,23 @@ async function run() {
     const published = (await service.readAppearance(db, service.appearanceKey('editor'))).published
     assert.equal(published.seo.title, 'SEO từ editor'); assert.equal(published.footer.groups.length, 3)
     if (process.env.MANAGEMENT_UI_SNAPSHOT_DIR) { fs.mkdirSync(process.env.MANAGEMENT_UI_SNAPSHOT_DIR, { recursive: true }); fs.writeFileSync(path.join(process.env.MANAGEMENT_UI_SNAPSHOT_DIR, 'website-footer.html'), document.getElementById('root').innerHTML) }
+    const current = await service.readAppearance(db, service.appearanceKey('editor'))
+    await React.act(async () => root.render(React.createElement(Editor, { initial: current, previewData: { brand: brandBase }, mode: 'pages', initialTab: 'courses', pageOnly: 'courses' })))
+    assert.equal(document.querySelectorAll('[role="tab"]').length, 2)
+    await React.act(async () => button('SEO').click())
+    assert.equal(document.querySelector('[aria-label="Cài đặt trang"]').hidden, true)
+    const ownTitle = [...document.querySelectorAll('label')].find(item => item.textContent === 'Tiêu đề SEO của trang').querySelector('input')
+    await React.act(async () => { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(ownTitle, 'SEO qua giao diện'); ownTitle.dispatchEvent(new window.Event('input', { bubbles: true })) })
+    await React.act(async () => button('Lưu bản nháp').click())
+    assert.equal((await service.readAppearance(db, service.appearanceKey('editor'))).published.pageSeo.courses.title, '', 'SEO draft stays private')
+    await React.act(async () => button('Nội dung & giao diện').click())
+    await React.act(async () => button('SEO').click())
+    assert.equal(document.querySelector('[aria-label="SEO riêng của trang"] input').value, 'SEO qua giao diện', 'Switching panels retains SEO edits')
+    await React.act(async () => button('Áp dụng lên website').click())
+    const pagePublished = (await service.readAppearance(db, service.appearanceKey('editor'))).published
+    assert.equal(pagePublished.pageSeo.courses.title, 'SEO qua giao diện')
+    assert.equal(pagePublished.pageSeo.home.title, '')
+    if (process.env.MANAGEMENT_UI_SNAPSHOT_DIR) fs.writeFileSync(path.join(process.env.MANAGEMENT_UI_SNAPSHOT_DIR, 'page-seo.html'), document.getElementById('root').innerHTML)
   } finally { await React.act(async () => root.unmount()); dom.window.close(); global.fetch = savedFetch }
   console.log('Wi appearance: schema/URL limits, scope, fresh admin, draft/publish/restore, stale revision, CSRF, private GET, UI preview/save/retry and device selectors passed (isolated DB/DOM).')
 }

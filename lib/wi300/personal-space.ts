@@ -37,12 +37,12 @@ export function toolWorkspace(tool: PersonalTool) {
   const slug = routeSlug(tool) || tool.slug || ''
   if (slug === 'wi-projects') return 'business'
   if (['wi-website', 'wi-appearance', 'posts'].includes(slug)) return 'website-admin'
+  if (isContentTool(tool)) return 'business'
   if (tool.roles.length && tool.roles.every(role => ['ADMIN', 'DEVELOPER'].includes(role))) return 'admin'
   if (['reserved-ids', 'vouchers', 'dev-flow'].includes(slug)) return 'admin'
   if (['roadmap', 'my-learning'].includes(slug)) return 'learning'
   if (['affiliate', 'genealogy'].includes(slug)) return 'affiliate'
   if (['bank-accounts', 'brk', 'ho-tro', 'account-assistant', 'assistant-guide'].includes(slug)) return 'account'
-  if (isContentTool(tool)) return 'pages'
   if (['crm', 'email-mkt', 'payments'].includes(slug)) return 'business'
   if (['courses', 'students'].includes(slug)) return 'teaching'
   if (toolGroup(tool) === 'system') return 'admin'
@@ -89,13 +89,10 @@ export function spaceNavigation(role: string, tools: PersonalTool[]): SpaceNavGr
     ...(canTeach(role) ? [{ id: 'teaching', label: 'Giảng dạy', href: '/my-space?tab=teaching', icon: 'GraduationCap', items: [] }] : []),
     ...(loggedIn ? [{ id: 'affiliate', label: 'Cộng tác viên', href: '/my-space?tab=affiliate', icon: 'Link2', items: [{ label: 'Link giới thiệu & hoa hồng', href: '/tools/affiliate', icon: 'Link2' }] }] : []),
     ...(loggedIn ? [{ id: 'business', label: 'Quản lý & kinh doanh', href: '/my-space?tab=business', icon: 'Handshake', items: [] }] : []),
-    { id: 'pages', label: 'Nội dung & website', href: '/my-space?tab=pages', icon: 'Globe', items: [] },
     ...(role === 'ADMIN' ? [{ id: 'website-admin', label: 'Quản trị website', href: '/tools/wi-website', icon: 'Globe', items: [
       { label: 'Cấu hình chung', href: '/tools/wi-website?section=common', icon: 'Settings' },
-      { label: 'SEO website', href: '/tools/wi-website?section=seo', icon: 'Search' },
-      { label: 'Cấu hình các trang', href: '/tools/wi-appearance', icon: 'Palette' },
+      { label: 'Trang', href: '/tools/wi-appearance', icon: 'PanelsTopLeft' },
       { label: 'Bài viết', href: '/tools/posts', icon: 'FileText' },
-      { label: 'Footer', href: '/tools/wi-website?section=footer', icon: 'Layout' },
     ] }] : []),
     { id: 'tools', label: 'Công cụ & tiện ích', href: '/my-space?tab=tools', icon: 'LayoutGrid', items: [] },
     { id: 'account', label: 'Tài khoản & tài chính', href: '/my-space?tab=account', icon: 'UserRound', items: [
