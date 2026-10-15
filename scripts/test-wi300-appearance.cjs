@@ -10,7 +10,13 @@ async function run() {
   const shared = load('lib/wi300/appearance.ts')
   const legacy = structuredClone(shared.defaultAppearance)
   delete legacy.pageSeo; delete legacy.seo; delete legacy.footer; delete legacy.headerMenu; delete legacy.common.name; delete legacy.common.tagline
+  for (const field of ['showHero', 'heroVariant', 'heroImageUrl', 'heroLabel', 'heroUrl']) delete legacy.courses[field]
   const upgraded = shared.appearanceSchema.parse(legacy)
+  assert.equal(upgraded.courses.heroVariant, 'illustrated', 'Old settings receive hero template 2')
+  assert.equal(upgraded.courses.showHero, true)
+  assert.equal(upgraded.courses.title, legacy.courses.title)
+  const unsafeHero = structuredClone(upgraded); unsafeHero.courses.heroUrl = 'javascript:alert(1)'
+  assert.equal(shared.appearanceSchema.safeParse(unsafeHero).success, false)
   const separateDefaults = structuredClone(upgraded)
   separateDefaults.pageSeo.courses.title = 'Chỉ khóa học'
   assert.equal(separateDefaults.pageSeo.home.title, '', 'Default SEO objects must be independent before first save')
@@ -244,6 +250,21 @@ async function run() {
     const current = await service.readAppearance(db, service.appearanceKey('editor'))
     await React.act(async () => root.render(React.createElement(Editor, { initial: current, previewData: { brand: brandBase }, mode: 'pages', initialTab: 'courses', pageOnly: 'courses' })))
     assert.equal(document.querySelectorAll('[role="tab"]').length, 2)
+    const heroRadio = variant => document.querySelector(`input[name="course-hero-variant"][value="${variant}"]`)
+    assert.equal(heroRadio('illustrated').checked, true)
+    for (const variant of ['minimal', 'bold', 'illustrated']) {
+      await React.act(async () => heroRadio(variant).click())
+      assert.equal(heroRadio(variant).checked, true)
+    }
+    await React.act(async () => heroRadio('bold').click())
+    await React.act(async () => button('Lưu bản nháp').click())
+    assert.equal((await service.readAppearance(db, service.appearanceKey('editor'))).draft.courses.heroVariant, 'bold')
+    assert.equal((await service.readAppearance(db, service.appearanceKey('editor'))).published.courses.heroVariant, 'illustrated', 'Hero draft stays private')
+    await React.act(async () => button('Áp dụng lên website').click())
+    const heroPublished = (await service.readAppearance(db, service.appearanceKey('editor'))).published
+    assert.equal(heroPublished.courses.heroVariant, 'bold')
+    assert.equal(heroPublished.courses.title, shared.defaultAppearance.courses.title)
+    assert.deepEqual(heroPublished.home, current.published.home, 'Course hero does not overwrite home')
     await React.act(async () => button('SEO').click())
     assert.equal(document.querySelector('[aria-label="Cài đặt trang"]').hidden, true)
     const ownTitle = [...document.querySelectorAll('label')].find(item => item.textContent === 'Tiêu đề SEO của trang').querySelector('input')
