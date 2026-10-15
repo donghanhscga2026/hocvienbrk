@@ -8,7 +8,7 @@ const check=(value,label)=>{assert.ok(value,label);checks++}
 const profiles=[{id:7,userId:1,slug:'lucy',isActive:true,members:[],siteConfig:{}},{id:8,userId:2,slug:'other',isActive:true,members:[],siteConfig:{}}]
 class CrmError extends Error{constructor(message,status=400){super(message);this.status=status}}
 const config={findUnique:async({where})=>rows.has(where.key)?{value:rows.get(where.key)}:null,upsert:async({where,create,update})=>{writes++;rows.set(where.key,structuredClone(rows.has(where.key)?update.value:create.value))}}
-const db={systemConfig:config,user:{findUnique:async()=>({id:userId})},siteProfile:{findUnique:async({where})=>profiles.find(p=>p.userId===where.userId)},course:{findMany:async()=>[]},$executeRaw:async()=>0,$transaction:async fn=>fn(db),$queryRaw:async(strings,...values)=>(await sql.query(strings.reduce((out,s,i)=>out+s+(i<values.length?'$'+(i+1):''),''),values)).rows}
+const db={systemConfig:config,user:{findUnique:async()=>({id:userId,role:'TEACHER'})},siteProfile:{findUnique:async({where})=>profiles.find(p=>p.userId===where.userId)},course:{findMany:async()=>[]},$executeRaw:async()=>0,$transaction:async fn=>fn(db),$queryRaw:async(strings,...values)=>(await sql.query(strings.reduce((out,s,i)=>out+s+(i<values.length?'$'+(i+1):''),''),values)).rows}
 const sourceCache=new Map()
 function load(rel){
  let file=path.resolve(root,rel);if(!path.extname(file))file=fs.existsSync(file+'.ts')?file+'.ts':file+'.tsx'

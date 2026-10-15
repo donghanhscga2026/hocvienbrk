@@ -1,7 +1,9 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
+import { canCreateProfile } from '@/lib/auth/roles'
 import MainHeader from '@/components/layout/MainHeader'
 import MySiteTab from './MySiteTab'
 import LandingsTab from './LandingsTab'
@@ -9,14 +11,15 @@ import SiteProfilesTab from './SiteProfilesTab'
 
 function PagesPageContent() {
   const searchParams = useSearchParams()
-  const [tab, setTab] = useState<'my-site' | 'landings' | 'site-profiles'>('my-site')
+  const router = useRouter()
+  const { data: session, status } = useSession()
+  const isAdmin = session?.user?.role === 'ADMIN'
+  const requested = searchParams.get('tab')
+  const tab = isAdmin && (requested === 'landings' || requested === 'site-profiles') ? requested : 'my-site'
+  const setTab = (next: string) => router.replace('/tools/pages?tab=' + next, { scroll: false })
 
-  useEffect(() => {
-    const tabParam = searchParams.get('tab')
-    if (tabParam === 'my-site' || tabParam === 'landings' || tabParam === 'site-profiles') {
-      setTab(tabParam)
-    }
-  }, [searchParams])
+  if (status === 'loading') return <p role="status" className="p-4">Đang tải…</p>
+  if (!canCreateProfile(session?.user?.role)) return <p role="alert" className="p-4">Chỉ giảng viên và admin được quản lý Page.</p>
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -31,7 +34,7 @@ function PagesPageContent() {
         >
           🏠 Trang của tôi
         </button>
-        <button
+        {isAdmin && <><button
           onClick={() => setTab('landings')}
           className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
             tab === 'landings' ? 'bg-black text-yellow-400 shadow-sm' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
@@ -46,12 +49,12 @@ function PagesPageContent() {
           }`}
         >
           📄 Site Profile
-        </button>
+        </button></>}
       </div>
 
-      {tab === 'my-site' && <MySiteTab />}
-      {tab === 'landings' && <LandingsTab />}
-      {tab === 'site-profiles' && <SiteProfilesTab />}
+      {(tab === 'my-site' || !isAdmin) && <MySiteTab />}
+      {isAdmin && tab === 'landings' && <LandingsTab />}
+      {isAdmin && tab === 'site-profiles' && <SiteProfilesTab />}
     </div>
   )
 }

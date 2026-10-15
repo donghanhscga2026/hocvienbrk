@@ -1,4 +1,5 @@
 import NextAuth, { AuthError, CredentialsSignin, type NextAuthConfig } from "next-auth"
+import { normalizeRole } from '@/lib/auth/roles'
 import Credentials from "next-auth/providers/credentials"
 import Google from "next-auth/providers/google"
 import { z } from "zod"
@@ -307,7 +308,7 @@ export const authOptions: NextAuthConfig = {
                         select: { role: true, phone: true }
                     });
                     if (dbUser) {
-                        token.role = dbUser.role;
+                        token.role = normalizeRole(dbUser.role);
                         if (dbUser.phone) token.phone = dbUser.phone;
                     } else {
                         // Deleted users must not keep an authenticated identity from a stale JWT.
@@ -329,7 +330,7 @@ export const authOptions: NextAuthConfig = {
         async session({ session, token }) {
             if (token.sub != null && session.user) {
                 session.user.id = token.sub as string;
-                session.user.role = token.role as Role;
+                session.user.role = normalizeRole(token.role as Role);
                 const headerList=await (await import('next/headers')).headers()
                 // Domain riêng dùng phiên học viên; không mang quyền quản trị toàn hệ thống.
                 if(await activeDomain(requestHostname(headerList.get('host') || ''))) session.user.role=Role.STUDENT;
