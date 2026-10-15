@@ -13,7 +13,8 @@ const mocks = {
   '@/lib/course-page/templates': { COURSE_TEMPLATE_LIBRARY: [{ key: 'system', name: 'Built-in', description: 'True template preview' }] },
   '@/lib/course-page/template-workspace-client': { templateWorkspaceRequest: async (url, input) => {
     if (!input && url.includes('?page=')) return { template: { name: 'Current page copy', description: '', sourceType: 'html' }, source: { entryPath: 'index.html', files: [{ path: 'index.html', kind: 'html', content: '<section id="current"><h1>Applied page source</h1></section>' }] } }
-    if (!input) return { templates: [] }
+    if (!input) return { templates: [], admin: false }
+    if (input.action === 'apply') { applied.push([input.slug, input.name, input.id]); return { success: true } }
     if (failSave) throw new Error('Storage failed; code retained')
     saved.push(input); return { template: { id: 'saved', name: input.name, description: input.description, sourceType: input.sourceType, updatedAt: '2026-10-14T00:00:00.000Z' } }
   } },

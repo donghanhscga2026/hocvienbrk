@@ -100,6 +100,10 @@ jobs:
           node scripts/test-template-workspace-ui.cjs
           node scripts/test-course-builder-ui.cjs
           node scripts/test-course-template-publish.cjs
+          node scripts/test-template-library-access.cjs
+          node scripts/test-wi300-teacher-profile.cjs
+          node scripts/test-wi300-course-hero.cjs
+          node scripts/test-wi300-appearance.cjs
 
       - name: ZIP template source regression checks
         run: node scripts/test-zip-template-source.cjs

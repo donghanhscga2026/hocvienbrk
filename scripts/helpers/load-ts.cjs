@@ -13,7 +13,7 @@ module.exports = function load(file, mocks = {}) {
       if (name.startsWith('@/') || name.startsWith('.')) {
         const base = name.startsWith('@/') ? name.slice(2) : path.posix.join(path.posix.dirname(target), name)
         if ('@/' + base in mocks) return mocks['@/' + base]
-        const found = [base, base + '.ts', base + '.tsx', base + '.json'].find(file => fs.existsSync(path.join(root, file)) && fs.statSync(path.join(root, file)).isFile())
+        const found = [base, base + '.ts', base + '.tsx', base + '.json', base + '/index.ts', base + '/index.tsx'].find(file => fs.existsSync(path.join(root, file)) && fs.statSync(path.join(root, file)).isFile())
         if (found) return read(found)
       }
       return require(name)

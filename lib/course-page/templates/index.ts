@@ -1,8 +1,10 @@
+import { createExpertCoursePage } from './expert-course'
 import { createWi300GiftCoursePage } from './wi300-gift'
 import { createWiGrowCoursePage } from './wigrow'
 import { createClassicCoursePage } from './mfc-classic'
 
 export const COURSE_TEMPLATE_LIBRARY = [
+  { key: 'expert-course', name: 'Khóa học chuyên gia', description: 'Mẫu sáng, rõ lộ trình và lợi ích; sửa từng khối, đăng ký theo quy trình hiện có.' },
   {
     key: 'mfc-classic',
     name: 'MFC Classic',
@@ -20,6 +22,8 @@ export type CourseTemplateKey = typeof COURSE_TEMPLATE_LIBRARY[number]['key'] | 
 
 export function createCoursePageFromTemplate(key: CourseTemplateKey, slug: string) {
   switch (key) {
+    case 'expert-course':
+      return createExpertCoursePage(slug)
     case 'wi300-gift':
       return createWi300GiftCoursePage(slug)
     case 'mfc-classic':

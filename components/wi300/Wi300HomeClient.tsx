@@ -39,7 +39,7 @@ export default function Wi300HomeClient(props: Props) {
 // Khi chọn giảng viên trên cùng trang, áp dụng từ khóa mới và đặt lại bộ lọc.
 function HomeRoute(props: Props) {
   const searchParams = useSearchParams()
-  return <HomeContent key={(props.view || 'home') + ':' + (searchParams.get('q') || '')} {...props} />
+  return <HomeContent key={(props.view || 'home') + ':' + (searchParams.get('q') || '') + ':' + (searchParams.get('teacher') || '')} {...props} />
 }
 
 function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn, catalogError, accountError, teachingCourses = [], teachingError = false, view = 'home', projects, projectsError = false, appearance = defaultAppearance, catalogHeroRendered = false }: Props) {
@@ -55,7 +55,7 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
   const paymentCourse = loggedIn && paymentId !== dismissedPayment ? courses.find(course => String(course.id) === paymentId) : undefined
   const enrollmentMap = new Map(enrollments.map(enrollment => [enrollment.courseId, enrollment]))
   const categories = Array.from(new Set(courses.map(categoryName)))
-  const filtered = sortCourses(filterCourses(courses, query, page.showCategories ? category : '', page.showFee ? fee : 'all'), sort)
+  const filtered = sortCourses(filterCourses(courses.filter(course => !searchParams.get('teacher') || String(course.teacherId) === searchParams.get('teacher')), query, page.showCategories ? category : '', page.showFee ? fee : 'all'), sort)
   // Lấy giảng viên từ danh mục hiện có, gom theo mã tài khoản thay vì danh sách tên.
   const teacherMap = new Map<number, { id: number; name: string; image: string | null; count: number; fields: string[] }>()
   for (const course of courses) {

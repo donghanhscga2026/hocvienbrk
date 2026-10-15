@@ -81,7 +81,7 @@ async function run() {
   assert.ok(teachers.compareDocumentPosition(doc.querySelector('[aria-labelledby="wi300-course-partner-title"]')) & 4)
   assert.equal(teachers.querySelectorAll('ul[aria-label] li').length, 2, 'Only selected teachers with photos appear')
   assert.match(teachers.querySelector('h2').textContent, /Đội ngũ giảng viên/)
-  assert.ok(teachers.querySelector('a[href="/khoa-hoc?q=H%C6%B0%C6%A1ng%20Lucy"]'))
+  assert.ok(teachers.querySelector('a[href="/giang-vien/8"]'))
   assert.equal(teachers.querySelectorAll('ul[aria-hidden="true"]').length, 0, 'No repeated marquee copies')
   assert.ok(teachers.querySelector('a[href="/giang-vien"]'))
   dom.window.close()
