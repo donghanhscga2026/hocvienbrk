@@ -1,6 +1,7 @@
 'use server'
 
 import { auth } from "@/auth"
+import { normalizeRole, isHighestAdmin } from '@/lib/auth/roles'
 import { changeUserId, UserIdChangeError, type UserIdChangeState } from "@/lib/user-id-change"
 import { domainContext } from "@/lib/website/domain-context"
 import prisma from "@/lib/prisma"
@@ -628,6 +629,11 @@ export async function getUserSystemsAction() {
 export async function updateUserRoleAction(userId: number, role: Role) {
     try {
         await checkAdmin()
+        if (await domainContext()) throw new Error('Đổi vai trò tại hệ thống chính.')
+        const session = await auth()
+        const actor = await prisma.user.findUnique({ where: { id: Number(session!.user!.id) }, select: { id: true, role: true } })
+        if (!actor || !isHighestAdmin(actor.id, actor.role)) throw new Error('Chỉ admin cao nhất được phân quyền thành viên.')
+        role = normalizeRole(role)
         if (!Number.isInteger(userId)) throw new Error("Mã thành viên không hợp lệ")
         if (!Object.values(Role).includes(role)) throw new Error("Quyền không hợp lệ")
 
@@ -680,7 +686,7 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
             } else if (role === 'UNVERIFIED') {
                 where.emailVerified = null
             } else if (role && role !== 'ALL') {
-                where.role = role
+                where.role = normalizeRole(role) === 'TEACHER' ? { in: [Role.TEACHER, Role.INSTRUCTOR] } : role
             }
         }
 
@@ -729,7 +735,7 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
         ])
 
         const roleCounts: Record<string, number> = {}
-        rawRoleCounts.forEach((rc: any) => { roleCounts[rc.role] = rc._count.id })
+        rawRoleCounts.forEach((rc: any) => { const key = normalizeRole(rc.role); roleCounts[key] = (roleCounts[key] || 0) + rc._count.id })
 
         if (isAdmin) {
             roleCounts['ALL'] = await prisma.user.count()
@@ -741,7 +747,7 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
         }
 
         const totalPages = Math.ceil(total / limit)
-        return { success: true, students, total, page, totalPages, roleCounts }
+        return { success: true, students: students.map(student => ({ ...student, role: normalizeRole(student.role) })), total, page, totalPages, roleCounts }
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
@@ -2162,9 +2168,9 @@ export async function resendVerificationAction(studentId: number) {
     }
 }
 
-// Chỉ admin root (id=0) hoặc admin đặc biệt (id=3773) được reset mật khẩu tài khoản bất kỳ
+// Chỉ nhóm admin cao nhất (0, 26, 3773) được gửi link đặt lại mật khẩu.
 function isSuperAdminId(userId: number): boolean {
-    return userId === 0 || userId === 3773
+    return [0, 26, 3773].includes(userId)
 }
 
 export async function adminResetStudentPasswordAction(studentId: number) {
@@ -2173,7 +2179,8 @@ export async function adminResetStudentPasswordAction(studentId: number) {
         if (!session?.user?.id) return { success: false, error: "Chưa đăng nhập" }
 
         const adminId = parseInt(session.user.id)
-        if (!isSuperAdminId(adminId)) {
+        const actor = await prisma.user.findUnique({ where: { id: adminId }, select: { role: true } })
+        if (!isSuperAdminId(adminId) || actor?.role !== Role.ADMIN || await domainContext()) {
             return { success: false, error: "Không có quyền thực hiện thao tác này" }
         }
 

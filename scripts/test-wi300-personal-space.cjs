@@ -137,7 +137,7 @@ async function run() {
     assert.ok(document.querySelector('a[href="/tools/new-helper"]'))
     params = new URLSearchParams('tab=pages')
     await act(async () => render())
-    assert.ok(document.querySelector('a[href^="/tools/pages"]'))
+    assert.equal(document.querySelector('a[href^="/tools/pages"]'), null, 'Học viên không thấy công cụ quản lý Page')
     params = new URLSearchParams('tab=teaching')
     await act(async () => render())
     assert.equal(document.querySelector('a[href="/my-space?tab=teaching"]'), null, 'Học viên không thấy mục giảng dạy')

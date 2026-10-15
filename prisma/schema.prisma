@@ -2083,6 +2083,7 @@ enum Role {
   ADMIN
   DEVELOPER
   STUDENT
+  // Legacy read compatibility only. All new assignments use TEACHER.
   INSTRUCTOR
   AFFILIATE
   TEACHER

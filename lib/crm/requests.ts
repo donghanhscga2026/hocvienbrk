@@ -20,7 +20,7 @@ export const requestUpdate = z.object({ id: z.uuid(), version: z.number().int().
 
 export function requestScope(actor: CrmActor): Prisma.CrmRequestWhereInput {
   if (!canUseCrm(actor.role)) throw new CrmError('Bạn không có quyền sử dụng CRM.', 403)
-  return actor.role === 'ADMIN' ? {} : { ownerId: actor.id, OR: [{ course: { teacherId: actor.id } }, { courseId: null }] }
+  return actor.role === 'ADMIN' ? {} : { source: { not: PARTNER_SOURCE }, ownerId: actor.id, OR: [{ course: { teacherId: actor.id } }, { courseId: null }] }
 }
 export async function readRequests(db: PrismaClient, actor: CrmActor, page: number, status?: string, contactId?: number, requestId?: string, topic?: RequestTopic, ownerId?: number | null) {
   const scope = requestScope(actor)
@@ -55,6 +55,7 @@ export async function updateRequest(db: PrismaClient, actor: CrmActor, raw: unkn
     if (input.ownerId !== undefined) {
       if (actor.role !== 'ADMIN' || previous.courseId != null || await tx.crmFormSubmission.findUnique({ where: { requestId: previous.id }, select: { id: true } })) throw new CrmError('Yêu cầu từ khóa học hoặc Page thuộc người phụ trách nguồn; quản trị viên phân công yêu cầu chung.', 403)
       const owner = input.ownerId == null ? null : await tx.user.findUnique({ where: { id: input.ownerId }, select: { role: true } })
+      if (previous.source === PARTNER_SOURCE && owner && owner.role !== 'ADMIN') throw new CrmError('Chỉ admin được phụ trách đối tác Wi300.', 403)
       if (input.ownerId != null && (!owner || !canUseCrm(owner.role))) throw new CrmError('Người phụ trách không có quyền CRM.')
     }
     const now = new Date().toISOString()

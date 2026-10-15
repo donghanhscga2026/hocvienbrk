@@ -1,4 +1,5 @@
 import { searchText } from './catalog'
+import { normalizeRole, normalizeRoles, isProfileTool, canCreateProfile } from '@/lib/auth/roles'
 
 export type PersonalTool = { id: number; slug?: string; name: string; url: string; roles: string[]; isActive: boolean; icon?: string | null; description?: string | null }
 
@@ -66,6 +67,8 @@ export function pendingCourseLabel(payment?: { status: string; proofImage: strin
 
 // Quyền menu dùng cùng quy tắc với màn công cụ; không thay thế kiểm tra ở server.
 export function canUseTool(role: string, roles: string[]) {
+  role = normalizeRole(role)
+  roles = normalizeRoles(roles)
   return !roles.length || roles.includes(role) || (role === 'ADMIN' && roles.some(r => ['TEACHER', 'AFFILIATE', 'STUDENT'].includes(r))) || (role === 'TEACHER' && roles.some(r => ['AFFILIATE', 'STUDENT'].includes(r)))
 }
 export function safeToolUrl(url: string) {
@@ -103,6 +106,7 @@ export function spaceNavigation(role: string, tools: PersonalTool[]): SpaceNavGr
     ...(['ADMIN', 'DEVELOPER'].includes(role) ? [{ id: 'admin', label: 'Quản trị hệ thống', href: '/my-space?tab=admin', icon: 'ShieldCheck', items: [] }] : []),
   ]
   for (const tool of tools) {
+    if (tool && isProfileTool(tool) && !canCreateProfile(role)) continue
     if (!tool || !tool.isActive || !Array.isArray(tool.roles) || !tool.roles.every(r => typeof r === 'string') || !canUseTool(role, tool.roles) || typeof tool.url !== 'string' || !safeToolUrl(tool.url) || typeof tool.name !== 'string') continue
     const group = groups.find(g => g.id === toolWorkspace(tool))
     if (group && !groups.some(g => g.items.some(i => i.href === tool.url))) group.items.push({ label: wi300ToolName(tool), href: tool.url, icon: tool.icon })

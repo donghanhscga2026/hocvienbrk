@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { normalizeRoles } from '@/lib/auth/roles'
 import { Plus, Pencil, Trash2, Loader2, AlertTriangle, Check, X, ListOrdered, ArrowUp, ArrowDown } from 'lucide-react'
 
 interface GuideData {
@@ -15,7 +16,7 @@ interface GuideForm {
 
 const emptyForm: GuideForm = { pagePath: '', title: '', script: '', textContent: '', videoUrl: '', agentVideoUrl: '', isActive: true, roles: [] }
 
-const ROLE_OPTIONS = ['ADMIN', 'INSTRUCTOR', 'TEACHER', 'STUDENT', 'AFFILIATE', 'DEVELOPER']
+const ROLE_OPTIONS = ['ADMIN', 'TEACHER', 'STUDENT', 'AFFILIATE', 'DEVELOPER']
 
 interface StepData {
   id: number; guideId: number; stepOrder: number; title: string; body: string | null; imageUrl: string | null; videoUrl: string | null; targetSelector: string | null; isActive: boolean
@@ -80,7 +81,7 @@ export default function AssistantGuideTab() {
   }
 
   const handleEdit = (guide: GuideData) => {
-    setForm({ id: guide.id, pagePath: guide.pagePath, title: guide.title, script: guide.script || '', textContent: guide.textContent || '', videoUrl: guide.videoUrl || '', agentVideoUrl: guide.agentVideoUrl || '', isActive: guide.isActive, roles: guide.roles || [] })
+    setForm({ id: guide.id, pagePath: guide.pagePath, title: guide.title, script: guide.script || '', textContent: guide.textContent || '', videoUrl: guide.videoUrl || '', agentVideoUrl: guide.agentVideoUrl || '', isActive: guide.isActive, roles: normalizeRoles(guide.roles || []) })
     setShowForm(true)
   }
 

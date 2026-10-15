@@ -64,6 +64,14 @@ assert.ok(groups.find(group => group.id === 'business').items.some(item => item.
 assert.equal(model.managementLocation('/tools/courses/templates/legacy', new URLSearchParams('courseId=7&name=AI'), groups).back.href, '/tools/courses/new?id=7&tab=sales')
 assert.equal(model.managementLocation('/tools/courses/templates', new URLSearchParams('courseId=https://evil.invalid'), groups).back.href, '/tools/courses')
 assert.equal(model.managementLocation('/tools/crm', new URLSearchParams(), groups).groupId, 'business')
+for (const role of ['TEACHER', 'ADMIN']) {
+  for (const path of ['/tools/pages', '/tools/site-profiles/new', '/tools/site-profiles/7/edit', '/tools/my-site/manage', '/tools/my-site/edit', '/tools/my-site/pages/about/template']) {
+    assert.equal(model.managementLocation(path, new URLSearchParams('profileId=7'), model.managementNavigation(role, tools)).groupId, 'business', role + ': ' + path)
+  }
+}
+assert.equal(model.managementLocation('/tools/my-site/edit', new URLSearchParams('profileId=7'), groups).back.href, '/tools/my-site/manage?profileId=7')
+assert.equal(model.managementLocation('/tools/my-site/edit', new URLSearchParams('profileId=https://evil.invalid'), groups).back.href, '/tools/my-site/manage')
+assert.equal(model.isPageManagementRoute('/tools/my-site-other'), false)
 assert.equal(model.managementLocation('/du-an/quan-ly', new URLSearchParams('project=wi-tech'), groups).back.href, '/du-an/quan-ly')
 assert.equal(model.managementLocation('/du-an/noi-dung', new URLSearchParams('project=wi-tech'), groups).back.href, '/du-an/quan-ly?project=wi-tech')
 assert.equal(model.managementLocation('/tools/courses/7/lib-access', new URLSearchParams(), groups).back.href, '/tools/courses/new?id=7')
@@ -87,6 +95,12 @@ async function run() {
     assert.equal(document.querySelector('[aria-label="Mở hoặc đóng menu quản lý"]').getAttribute('aria-expanded'), 'false', 'Navigation closes mobile menu')
     assert.equal(document.querySelector('[aria-label="Menu quản lý chung"] a[aria-current="page"]').textContent, 'Quản lý & kinh doanh')
     assert.equal(requests, 1, 'Switching areas reuses the same loaded menu')
+    session = { user: { id: '71', role: 'TEACHER' } }
+    route = '/tools/site-profiles/new'; query = new URLSearchParams()
+    await React.act(async () => render())
+    assert.equal(document.querySelector('[aria-label="Menu quản lý chung"] a[aria-current="page"]').textContent, 'Quản lý & kinh doanh')
+    assert.equal(document.querySelector('a[href="/tools/pages"]').getAttribute('aria-current'), 'page')
+    session = { user: { id: '0', role: 'ADMIN' } }
     route = '/tools/courses/templates/legacy'; query = new URLSearchParams('courseId=7&name=Khóa AI')
     await React.act(async () => render())
     assert.ok([...document.querySelectorAll('a')].some(node => node.textContent === 'Về khóa học này' && node.getAttribute('href') === '/tools/courses/new?id=7&tab=sales'))
