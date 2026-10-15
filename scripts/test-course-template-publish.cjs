@@ -23,6 +23,7 @@ function load(file) {
   const code = ts.transpileModule(fs.readFileSync(path.join(repo, file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText
   new Function('require', 'module', 'exports', code)(name => {
     if (name === '@/lib/prisma') return { __esModule: true, default: db }
+    if (name === '@/lib/course-page/permissions') return { coursePageActionAccess: async () => denied, courseEditorActor: async () => ({ id: 0, role: 'ADMIN' }), assertCourseEditor: async () => {} }
     if (name === '@/lib/api-auth') return { requireAdminAction: async () => denied }
     if (name === 'next/cache') return { revalidatePath() {} }
     if (!name.startsWith('@/') && !name.startsWith('.')) return require(name)

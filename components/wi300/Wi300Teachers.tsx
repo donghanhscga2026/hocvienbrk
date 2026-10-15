@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowRight, ChevronLeft, ChevronRight, Pause, Play, Search } from 'lucide-react'
+import { teacherHref } from '@/lib/wi300/teacher-profile'
 import WiKnowledgeArt from './WiKnowledgeArt'
 
 type Teacher = { id: number | string; name: string; count: number | null; image?: string | null; fields?: string[] }
@@ -72,9 +73,9 @@ export default function Wi300Teachers({ teachers, catalogError, directory = fals
         <div className={directory || !carousel || !slide.arrows ? '' : 'relative mt-6 px-6 sm:px-8'}>
           <ul ref={track} id="wi300-teacher-track" aria-label="Đội ngũ giảng viên" onScroll={() => { const node = track.current; if (node) setPosition(Math.round(node.scrollLeft / (((node.children[0] as HTMLElement)?.offsetWidth || 1) + (parseFloat(getComputedStyle(node).columnGap) || 20)))) }} className={directory || slide.teacherLayout === 'grid' ? `mt-6 grid gap-5 ${gridColumns[directory ? settings.columns : slide.teacherPerView]}` : 'wi300-teacher-track mt-6 flex snap-x snap-mandatory gap-5 overflow-x-auto py-2'}>
             {visibleTeachers.map(teacher => <li key={teacher.id} className={directory || slide.teacherLayout === 'grid' ? 'min-w-0' : `min-w-0 shrink-0 basis-full snap-start ${slideColumns[slide.teacherPerView]}`}>
-              <Link href={`/khoa-hoc?q=${encodeURIComponent(teacher.name)}`} className="wi300-teacher-card wi300-teacher-visual flex h-full flex-col overflow-hidden rounded-2xl border border-brk-outline text-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brk-primary">
+              <Link href={teacherHref(teacher.id)} className="wi300-teacher-card wi300-teacher-visual flex h-full flex-col overflow-hidden rounded-2xl border border-brk-outline text-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brk-primary">
                 <div className="wi300-teacher-media relative flex items-center justify-center px-3 py-4"><div className="wi300-teacher-portrait relative"><div className="relative z-10 aspect-square w-full overflow-hidden rounded-full border-4 border-white shadow-md"><Image src={teacher.image!} alt={teacher.name} width={208} height={208} sizes="(max-width: 639px) 200px, (max-width: 1279px) 220px, 180px" unoptimized className="h-full w-full object-cover" /></div></div></div>
-                <div className="flex flex-1 flex-col items-center px-3 pb-3 pt-1"><h3 className="wi300-project-action break-words text-base font-bold leading-6">{teacher.name}</h3><p className="mb-1 mt-1 text-sm text-brk-muted">{teacher.count != null ? `${teacher.count} khóa học` : 'Giảng viên trong hệ sinh thái Wi'}</p><span className="wi300-project-action mt-auto inline-flex min-h-11 items-center justify-center gap-2 text-sm font-semibold">Xem khóa học<ArrowRight className="h-4 w-4" aria-hidden="true" /></span></div>
+                <div className="flex flex-1 flex-col items-center px-3 pb-3 pt-1"><h3 className="wi300-project-action break-words text-base font-bold leading-6">{teacher.name}</h3><p className="mb-1 mt-1 text-sm text-brk-muted">{teacher.count != null ? `${teacher.count} khóa học` : 'Giảng viên trong hệ sinh thái Wi'}</p><span className="wi300-project-action mt-auto inline-flex min-h-11 items-center justify-center gap-2 text-sm font-semibold">Xem hồ sơ & khóa học<ArrowRight className="h-4 w-4" aria-hidden="true" /></span></div>
               </Link>
             </li>)}
           </ul>

@@ -9,11 +9,16 @@ import type { CoursePage } from '@/lib/course-page/types'
 import { Save, Plus, Trash2, ArrowUp, ArrowDown, Settings, FileText, Palette, Copy, ExternalLink, ChevronDown, ChevronUp, Monitor, Smartphone, GripVertical, RefreshCw } from 'lucide-react'
 import { updateCoursePage, saveCourseSections, publishCoursePage, getCoursePageVersions, restoreCoursePageVersion, createCoursePageCheckpoint } from '@/app/actions/course-page-actions'
 
+// Chỉ gọi trong thao tác thêm/nhân bản; mã định danh không phụ thuộc đồng hồ render.
+function newEditorId() { return globalThis.crypto.randomUUID() }
+
 interface EditCoursePageFormProps {
   embedded?: boolean
+  panel?: 'sections' | 'theme' | 'info'
   onDirtyChange?: (dirty: boolean) => void
   onEditCode?: () => void
   onSaved?: () => void
+  onShowPreview?: () => void
   initialPage: {
     id: string
     slug: string
@@ -28,9 +33,10 @@ interface EditCoursePageFormProps {
   }
 }
 
-export default function EditCoursePageForm({ initialPage, embedded = false, onDirtyChange, onEditCode, onSaved }: EditCoursePageFormProps) {
+export default function EditCoursePageForm({ initialPage, embedded = false, onDirtyChange, onEditCode, onSaved, panel, onShowPreview }: EditCoursePageFormProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'info' | 'theme' | 'sections'>('sections')
+  const effectiveTab = panel || activeTab
   const [expandedSection, setExpandedSection] = useState<number | null>(0)
   const [advanced, setAdvanced] = useState(false)
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop')
@@ -143,7 +149,7 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
   // Section manipulation
   const handleAddSection = (type: string) => {
     const newSec = {
-      sectionKey: `${type}_${Date.now()}`,
+      sectionKey: `${type}_${newEditorId()}`,
       sectionType: type,
       enabled: true,
       sortOrder: sections.length + 1,
@@ -215,7 +221,7 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
   const duplicateSection = (index: number) => {
     setDirty(true)
     const source = sections[index]
-    const copy = { ...source, id: undefined, sectionKey: `${source.sectionKey}_copy_${Date.now()}`, content: JSON.parse(JSON.stringify(source.content || {})) }
+    const copy = { ...source, id: undefined, sectionKey: `${source.sectionKey}_copy_${newEditorId()}`, content: JSON.parse(JSON.stringify(source.content || {})) }
     const next = [...sections]
     next.splice(index + 1, 0, copy)
     setSections(next.map((sec, i) => ({ ...sec, sortOrder: i + 1 })))
@@ -248,7 +254,7 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
 
   const addListItem = (sectionIndex: number, key: string) => {
     const items = [...(sections[sectionIndex]?.content?.[key] || [])]
-    items.push({ id: `item_${Date.now()}`, title: '', description: '' })
+    items.push({ id: `item_${newEditorId()}`, title: '', description: '' })
     updateContent(sectionIndex, key, items)
   }
 
@@ -282,7 +288,7 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
   }
 
   const addNestedItem = (sectionIndex:number, key:string, seed:any) => {
-    updateContent(sectionIndex,key,[...(sections[sectionIndex]?.content?.[key] || []),{id:`item_${Date.now()}`,...seed}])
+    updateContent(sectionIndex,key,[...(sections[sectionIndex]?.content?.[key] || []),{id:`item_${newEditorId()}`,...seed}])
   }
 
   const removeNestedItem = (sectionIndex:number,key:string,itemIndex:number) => {
@@ -463,19 +469,6 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
 
   return (
     <fieldset disabled={saving || publishing} className="min-w-0 space-y-5">
-      <div className="sticky top-2 z-40 flex flex-wrap items-center gap-3 rounded-2xl border bg-white/95 backdrop-blur px-4 py-3 shadow-sm">
-        <div className="flex-1 min-w-0">
-          <div className="font-black text-sm text-gray-900 truncate">{name}</div>
-          <div className={`text-xs ${dirty?'text-amber-600':'text-green-600'}`}>{dirty?'Có thay đổi chưa lưu':'Mọi thay đổi đã được lưu'}</div>
-        </div>
-        <button type="button" onClick={handleLoadVersions} className="rounded-xl border border-gray-200 px-3 py-2.5 text-xs font-bold text-gray-600">Lịch sử</button>
-        <button type="button" onClick={handleSavePage} disabled={saving || !dirty} className="inline-flex items-center gap-2 rounded-xl border border-gray-900 px-4 py-2.5 text-xs font-black text-gray-900 disabled:opacity-40">
-          <Save className="w-4 h-4"/>{saving?'Đang lưu...':'Lưu bản nháp'}
-        </button>
-        <button type="button" onClick={handlePublish} disabled={publishing || saving || dirty} className="rounded-xl bg-brk-primary px-4 py-2.5 text-xs font-black text-white disabled:opacity-40">
-          {publishing?'Đang xuất bản...':'Xuất bản'}
-        </button>
-      </div>
       {showVersions && (
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
           <div className="flex items-center justify-between mb-3"><h3 className="font-black text-sm">Lịch sử phiên bản</h3><button onClick={() => setShowVersions(false)} className="text-xs text-gray-500">Đóng</button></div>
@@ -502,7 +495,7 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-100 pb-3 overflow-x-auto">
+      <div hidden={embedded} className="flex gap-2 border-b border-gray-100 pb-3 overflow-x-auto">
         <button
           onClick={() => setActiveTab('info')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
@@ -530,7 +523,7 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
       </div>
 
       {/* Tab: Info & Checkout */}
-      {activeTab === 'info' && (
+      {effectiveTab === 'info' && (
         <div className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
             <div>
@@ -550,7 +543,7 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-black text-sm bg-white"
               >
                 <option value="draft">Bản nháp (Draft)</option>
-                <option value="published">Xuất bản công khai (Published)</option>
+                <option value="published" disabled>Đã có bản công khai (dùng nút Xuất bản để cập nhật)</option>
               </select>
             </div>
           </div>
@@ -590,11 +583,33 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
               </div>
             </div>
           </div>
+          <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+            <h3 className="font-bold text-sm text-gray-800 mb-3">SEO Metadata</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Tiêu đề SEO (Meta Title)</label>
+                <input
+                  type="text"
+                  value={seo.title || ''}
+                  onChange={(e) => { setSeo({ ...seo, title: e.target.value }); setDirty(true) }}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Mô tả SEO (Meta Description)</label>
+                <textarea
+                  value={seo.description || ''}
+                  onChange={(e) => { setSeo({ ...seo, description: e.target.value }); setDirty(true) }}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs h-20"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Tab: Theme & SEO */}
-      {activeTab === 'theme' && (
+      {effectiveTab === 'theme' && (
         <div className="space-y-4">
           <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
             <h3 className="font-bold text-sm text-gray-800 mb-3">Màu sắc chủ đạo (Bảng mã HEX)</h3>
@@ -638,38 +653,17 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
             </div>
           </div>
 
-          <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-            <h3 className="font-bold text-sm text-gray-800 mb-3">SEO Metadata</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Tiêu đề SEO (Meta Title)</label>
-                <input
-                  type="text"
-                  value={seo.title || ''}
-                  onChange={(e) => { setSeo({ ...seo, title: e.target.value }); setDirty(true) }}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Mô tả SEO (Meta Description)</label>
-                <textarea
-                  value={seo.description || ''}
-                  onChange={(e) => { setSeo({ ...seo, description: e.target.value }); setDirty(true) }}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs h-20"
-                />
-              </div>
-            </div>
-          </div>
+
         </div>
       )}
 
-      {activeTab === 'sections' && <div className="space-y-4">
+      {effectiveTab === 'sections' && <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brk-outline bg-white p-3">
           <div className="text-sm"><span className="text-brk-muted">Mẫu hiện tại:</span> <strong>{templateName}</strong></div>
           <div className="flex flex-wrap gap-2">{embedded ? <button type="button" onClick={onEditCode} className="min-h-11 rounded-lg border border-brk-outline px-3 text-sm text-brk-primary">Sửa code</button> : <Link href={`/tools/courses/templates?course=${encodeURIComponent(initialPage.slug)}&name=${encodeURIComponent(name)}`} onClick={event => { if (dirty && !confirm('Bạn có thay đổi chưa lưu. Rời trang để đổi mẫu?')) event.preventDefault() }} className="inline-flex min-h-11 items-center rounded-lg border border-brk-outline px-3 text-sm font-semibold text-brk-primary">Đổi mẫu / Sửa code</Link>}<a href={`/khoa-hoc/${initialPage.slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-brk-outline px-3 text-sm">Xem trang công khai <ExternalLink size={15} /></a></div>
         </div>
         <div className="flex gap-2 xl:hidden">{(['edit', 'preview'] as const).map(pane => <button type="button" key={pane} aria-pressed={mobilePane === pane} onClick={() => setMobilePane(pane)} className={`min-h-11 flex-1 rounded-lg border border-brk-outline px-3 text-sm ${mobilePane === pane ? 'bg-brk-primary text-white' : 'bg-white'}`}>{pane === 'edit' ? 'Chỉnh sửa' : 'Xem trước'}</button>)}</div>
-        <div className="grid min-w-0 gap-4 xl:grid-cols-[200px_minmax(0,1fr)_290px]">
+        <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(300px,380px)_minmax(0,1fr)]">
           <aside className={`${mobilePane === 'preview' ? 'hidden xl:block' : ''} min-w-0 rounded-xl border border-brk-outline bg-white p-3`}>
             <h3 className="mb-3 font-bold">Nội dung trang</h3>
             <button type="button" aria-expanded={showAdd} onClick={() => setShowAdd(value => !value)} className="mb-3 min-h-11 w-full rounded-lg bg-brk-primary px-3 text-sm font-semibold text-white">+ Thêm nội dung</button>
@@ -679,13 +673,7 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
               <button type="button" aria-pressed={expandedSection === index} onClick={() => setExpandedSection(index)} className="min-h-11 min-w-0 flex-1 text-left text-xs font-semibold"><span className="block">{section.variant === 'imported-v1' ? section.content?.importedMeta?.label || sectionName(section.sectionType) : section.variant === 'wi300-gift-testimonials' ? 'Cảm nhận học viên' : sectionName(section.sectionType || section.type)}</span><span className="block font-normal text-brk-muted">{section.enabled ? 'Đang hiện' : 'Đang ẩn'}</span></button>
               <input type="checkbox" aria-label={`Hiển thị ${sectionName(section.sectionType || section.type)} ${index + 1}`} checked={section.enabled} onChange={event => handleUpdateSectionContent(index, 'enabled', event.target.checked)} className="h-4 w-4 accent-green-700" />
             </div>)}</div>
-          </aside>
-          <div className={`${mobilePane === 'edit' ? 'hidden xl:block' : ''} min-w-0 rounded-xl border border-brk-outline bg-slate-100 p-3`}>
-            <div className="mb-3 flex flex-wrap items-center gap-2"><strong className="mr-auto text-xs">Xem trước bản nháp</strong><button type="button" aria-pressed={previewMode === 'desktop'} onClick={() => setPreviewMode('desktop')} title="Máy tính" className={`min-h-10 rounded-lg p-2 ${previewMode === 'desktop' ? 'bg-brk-primary text-white' : 'bg-white'}`}><Monitor size={18} /></button><button type="button" aria-pressed={previewMode === 'mobile'} onClick={() => setPreviewMode('mobile')} title="Điện thoại" className={`min-h-10 rounded-lg p-2 ${previewMode === 'mobile' ? 'bg-brk-primary text-white' : 'bg-white'}`}><Smartphone size={18} /></button><select aria-label="Đối tượng xem bản nháp" value={previewRegistered ? 'registered' : 'unregistered'} onChange={event => setPreviewRegistered(event.target.value === 'registered')} className="min-h-10 max-w-full rounded-lg border border-brk-outline bg-white px-2 text-xs"><option value="unregistered">Chưa đăng ký</option><option value="registered">Đã đăng ký</option></select></div>
-            <CourseDraftPreview key={previewKey} page={draftPage} width={previewMode === 'mobile' ? 390 : 1120} selectedKey={currentSection?.sectionKey} onSelect={key => { setExpandedSection(sections.findIndex(section => section.sectionKey === key)); setMobilePane('edit') }} registered={previewRegistered} />
-            <p className="mt-2 text-xs leading-5 text-brk-muted">Bấm vào nội dung trong preview để chọn khối. Thay đổi hiển thị ngay; trang công khai chỉ đổi khi Xuất bản.</p>
-          </div>
-          <aside className={`${mobilePane === 'preview' ? 'hidden xl:block' : ''} min-w-0 rounded-xl border border-brk-outline bg-white p-4`}>
+<div className="mt-5 border-t border-brk-outline pt-5">
             {currentSection && expandedSection !== null ? <>
               <h3 className="mb-3 font-bold">{sectionName(currentSection.sectionType || currentSection.type)}</h3>
               <div className="mb-4 flex gap-2">{(['content', 'display'] as const).map(tab => <button type="button" key={tab} aria-pressed={propertyTab === tab} onClick={() => setPropertyTab(tab)} className={`min-h-10 rounded-lg px-3 text-sm ${propertyTab === tab ? 'bg-brk-background font-semibold text-brk-primary' : 'text-brk-muted'}`}>{tab === 'content' ? 'Nội dung' : 'Hiển thị'}</button>)}</div>
@@ -697,9 +685,31 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
               </div>}
               <p className="mt-4 rounded-lg bg-brk-background p-3 text-xs leading-5 text-brk-muted">Thay đổi đang hiển thị trong bản nháp. Bấm Lưu bản nháp trước khi Xuất bản.</p>
             </> : <p className="text-sm text-brk-muted">Chọn hoặc thêm một khối để chỉnh sửa.</p>}
+          </div>
           </aside>
+          <div id="course-draft-preview" className={`${mobilePane === 'edit' ? 'hidden xl:block' : ''} min-w-0 rounded-xl border border-brk-outline bg-slate-100 p-3`}>
+            <div className="mb-3 flex flex-wrap items-center gap-2"><strong className="mr-auto text-xs">Xem trước bản nháp</strong><button type="button" aria-pressed={previewMode === 'desktop'} onClick={() => setPreviewMode('desktop')} title="Máy tính" className={`min-h-10 rounded-lg p-2 ${previewMode === 'desktop' ? 'bg-brk-primary text-white' : 'bg-white'}`}><Monitor size={18} /></button><button type="button" aria-pressed={previewMode === 'mobile'} onClick={() => setPreviewMode('mobile')} title="Điện thoại" className={`min-h-10 rounded-lg p-2 ${previewMode === 'mobile' ? 'bg-brk-primary text-white' : 'bg-white'}`}><Smartphone size={18} /></button><select aria-label="Đối tượng xem bản nháp" value={previewRegistered ? 'registered' : 'unregistered'} onChange={event => setPreviewRegistered(event.target.value === 'registered')} className="min-h-10 max-w-full rounded-lg border border-brk-outline bg-white px-2 text-xs"><option value="unregistered">Chưa đăng ký</option><option value="registered">Đã đăng ký</option></select></div>
+            <CourseDraftPreview key={previewKey} page={draftPage} width={previewMode === 'mobile' ? 390 : 1120} selectedKey={currentSection?.sectionKey} onSelect={key => { setExpandedSection(sections.findIndex(section => section.sectionKey === key)); setMobilePane('edit') }} registered={previewRegistered} />
+            <p className="mt-2 text-xs leading-5 text-brk-muted">Bấm vào nội dung trong preview để chọn khối. Thay đổi hiển thị ngay; trang công khai chỉ đổi khi Xuất bản.</p>
+          </div>
+
         </div>
       </div>}
+
+      <div className="sticky bottom-0 z-40 flex flex-wrap items-center gap-3 rounded-2xl border bg-white/95 backdrop-blur px-4 py-3 shadow-sm">
+        <div className="flex-1 min-w-0">
+          <div className="font-black text-sm text-gray-900 truncate">{name}</div>
+          <div className={`text-xs ${dirty?'text-amber-600':'text-green-600'}`}>{dirty?'Có thay đổi chưa lưu':'Mọi thay đổi đã được lưu'}</div>
+        </div>
+        <button type="button" onClick={handleLoadVersions} className="rounded-xl border border-gray-200 px-3 py-2.5 text-xs font-bold text-gray-600">Lịch sử</button>
+        <button type="button" onClick={handleSavePage} disabled={saving || !dirty} className="inline-flex items-center gap-2 rounded-xl border border-gray-900 px-4 py-2.5 text-xs font-black text-gray-900 disabled:opacity-40">
+          <Save className="w-4 h-4"/>{saving?'Đang lưu...':'Lưu bản nháp'}
+        </button>
+        <button type="button" onClick={() => { onShowPreview?.(); setActiveTab('sections'); setMobilePane('preview'); window.requestAnimationFrame(() => document.getElementById('course-draft-preview')?.scrollIntoView({ block: 'center' })) }} className="min-h-11 rounded-xl border px-4 text-xs font-bold">Xem trước</button>
+        <button type="button" onClick={handlePublish} disabled={publishing || saving || dirty} className="rounded-xl bg-brk-primary px-4 py-2.5 text-xs font-black text-white disabled:opacity-40">
+          {publishing?'Đang xuất bản...':'Xuất bản'}
+        </button>
+      </div>
 
       {/* Save Trigger */}
       <div hidden={embedded} className="pt-6 border-t border-gray-100 flex justify-end gap-3">

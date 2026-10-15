@@ -1,8 +1,10 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, GraduationCap, Sparkles, UsersRound, ChartNoAxesColumnIncreasing } from 'lucide-react'
+import { ArrowRight, GraduationCap, Sparkles, UsersRound, ChartNoAxesColumnIncreasing, BookOpen, Heart, Target, Clock } from 'lucide-react'
 import type { WiAppearance } from '@/lib/wi300/appearance'
 import WiKnowledgeArt from './WiKnowledgeArt'
+
+const icons = { graduation: GraduationCap, users: UsersRound, chart: ChartNoAxesColumnIncreasing, book: BookOpen, heart: Heart, target: Target, clock: Clock }
 
 /** Dùng chung cho trang công khai và xem trước; không cần dữ liệu khóa học. */
 export default function WiCourseHero({ settings }: { settings: WiAppearance['courses'] }) {
@@ -12,16 +14,16 @@ export default function WiCourseHero({ settings }: { settings: WiAppearance['cou
   return <section data-course-hero={settings.heroVariant} aria-labelledby="wi300-course-hero-title" className="overflow-hidden border-b border-brk-outline" style={{ background: dark ? '#153b36' : 'linear-gradient(120deg, #fffaf0, var(--color-surface))', color: dark ? '#ffffff' : 'var(--color-on-surface)' }}>
     <div className={`mx-auto grid max-w-7xl items-center gap-7 px-4 py-9 sm:px-6 sm:py-12 ${illustrated ? 'lg:grid-cols-[1.15fr_1fr]' : ''}`}>
       <div className="min-w-0">
-        <p className="mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold" style={{ borderColor: dark ? '#ffffff40' : 'var(--color-outline)' }}><Sparkles className="h-4 w-4" aria-hidden="true" />Tri thức cho hành trình phát triển</p>
+        {settings.heroEyebrow && <p className="mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold" style={{ borderColor: dark ? '#ffffff40' : 'var(--color-outline)' }}><Sparkles className="h-4 w-4" aria-hidden="true" />{settings.heroEyebrow}</p>}
         <h1 id="wi300-course-hero-title" className="max-w-3xl whitespace-pre-line break-words text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl">{settings.title}</h1>
         <p className="mt-4 max-w-2xl whitespace-pre-line break-words text-base leading-7" style={{ color: dark ? '#e0eeea' : 'var(--color-muted)' }}>{settings.description}</p>
         <Link href={settings.heroUrl} className="mt-6 inline-flex min-h-12 max-w-full items-center justify-center gap-3 rounded-xl px-5 py-3 font-semibold focus-visible:outline-2 focus-visible:outline-offset-4" style={{ background: 'var(--color-accent)', color: 'var(--color-on-primary)' }}><span className="min-w-0 break-words">{settings.heroLabel}</span><ArrowRight className="h-5 w-5 shrink-0" aria-hidden="true" /></Link>
         {/* Ba lợi ích dùng icon vector sắc nét; xếp dọc khi màn hình hẹp. */}
         <ul className="mt-6 grid gap-4 sm:grid-cols-3">
-          {[{ icon: GraduationCap, title: 'Chất lượng thực tiễn', description: 'Kiến thức ứng dụng cao' }, { icon: UsersRound, title: 'Giảng viên giàu kinh nghiệm', description: 'Đồng hành cùng bạn' }, { icon: ChartNoAxesColumnIncreasing, title: 'Học mọi lúc, mọi nơi', description: 'Linh hoạt, hiệu quả' }].map(({ icon: Icon, title, description }) => <li key={title} className="flex min-w-0 items-start gap-3">
+          {settings.heroBenefits.filter(item => item.visible).map(({ icon, title, description }, index) => { const Icon = icons[icon]; return <li key={index} className="flex min-w-0 items-start gap-3">
             <Icon className="mt-0.5 h-6 w-6 shrink-0" strokeWidth={1.5} aria-hidden="true" style={{ color: dark ? '#ffffff' : 'var(--color-primary)' }} />
             <div className="min-w-0 break-words"><p className="text-sm font-semibold leading-5">{title}</p><p className="mt-1 text-xs leading-5" style={{ color: dark ? '#e0eeea' : 'var(--color-muted)' }}>{description}</p></div>
-          </li>)}
+          </li> })}
         </ul>
       </div>
       {illustrated && <div className="mx-auto w-full max-w-md lg:max-w-xl">

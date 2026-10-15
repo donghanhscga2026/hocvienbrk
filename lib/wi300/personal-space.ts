@@ -86,7 +86,7 @@ export function spaceNavigation(role: string, tools: PersonalTool[]): SpaceNavGr
       { label: 'Đăng ký chờ xử lý', href: '/my-space?tab=learning&status=pending', icon: 'CreditCard' },
       ...(loggedIn ? [{ label: 'Yêu cầu của tôi', href: '/my-requests', icon: 'MessageCircle' }] : []),
     ] },
-    ...(canTeach(role) ? [{ id: 'teaching', label: 'Giảng dạy', href: '/my-space?tab=teaching', icon: 'GraduationCap', items: [] }] : []),
+    ...(canTeach(role) ? [{ id: 'teaching', label: 'Giảng dạy', href: '/my-space?tab=teaching', icon: 'GraduationCap', items: [{ label: 'Hồ sơ giảng viên', href: '/tools/wi-teacher-profile', icon: 'UserRound' }, { label: 'Thư viện mẫu trang bán', href: '/tools/courses/templates', icon: 'PanelsTopLeft' }] }] : []),
     ...(loggedIn ? [{ id: 'affiliate', label: 'Cộng tác viên', href: '/my-space?tab=affiliate', icon: 'Link2', items: [{ label: 'Link giới thiệu & hoa hồng', href: '/tools/affiliate', icon: 'Link2' }] }] : []),
     ...(loggedIn ? [{ id: 'business', label: 'Quản lý & kinh doanh', href: '/my-space?tab=business', icon: 'Handshake', items: [] }] : []),
     ...(role === 'ADMIN' ? [{ id: 'website-admin', label: 'Quản trị website', href: '/tools/wi-website', icon: 'Globe', items: [

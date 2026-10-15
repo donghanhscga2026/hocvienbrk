@@ -92,6 +92,11 @@ export function sourceFromHtml(html: string, selectedBlockKeys?: string[] | null
   const files: TemplateSourceFile[] = [{ path: 'index.html', kind: 'html', content: html }]
   const doc = parse(html) as any
   const visit = (node: any) => {
+    // Bridge do hệ thống chèn lúc render không thuộc mã nguồn người dùng chỉnh.
+    if (node.tagName === 'script' && node.attrs?.some((attr: any) => attr.name === 'data-mfc-zip-bridge')) {
+      node.parentNode.childNodes = node.parentNode.childNodes.filter((child: any) => child !== node)
+      return
+    }
     const blockKey = node.attrs?.find((item: any) => item.name === 'data-mfc-block')?.value
     if (selectedBlockKeys && blockKey && !selectedBlockKeys.includes(blockKey)) {
       node.parentNode.childNodes = node.parentNode.childNodes.filter((child: any) => child !== node)
