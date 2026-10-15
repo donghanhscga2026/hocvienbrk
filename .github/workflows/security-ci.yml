@@ -52,6 +52,7 @@ jobs:
           node scripts/test-page-template-courses.cjs
           node scripts/test-page-template-assets.cjs
           node scripts/test-website-pages.cjs
+          node scripts/test-website-management-access.cjs
           node scripts/test-page-crm-forms.cjs
 
       - name: CRM requests and personal space regression checks

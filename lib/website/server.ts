@@ -1,3 +1,4 @@
+import { managedProfile } from './management'
 import 'server-only'
 import prisma from '@/lib/prisma'
 import { auth } from '@/auth'
@@ -5,15 +6,10 @@ import { CrmError } from '@/lib/crm/service'
 import { getCoursesForProfile, getPostsForProfile } from '@/app/actions/site-profile-actions'
 import {getCourseWhereForProfile,getSiteRuntimeConfig} from '@/lib/site-profile/config'
 
-export async function ownedProfile() {
-  const session = await auth()
-  const id = Number(session?.user?.id)
-  if(!session?.user?.id || !Number.isInteger(id)) throw new CrmError('Vui lòng đăng nhập.', 401)
-  const user = await prisma.user.findUnique({ where: { id }, select: { id: true } })
-  if(!user) throw new CrmError('Phiên đăng nhập không hợp lệ.', 401)
-  const profile = await prisma.siteProfile.findUnique({ where: { userId: id }, include: { members: true, user: { select: { role: true } } } })
-  if(!profile) throw new CrmError('Bạn chưa có trang riêng. Hãy nhờ quản trị viên cấp trang trước.', 404)
-  return profile
+// Giữ tên hàm cho các API cũ; quyền quản trị nay gồm admin và cộng sự được cấp.
+export async function ownedProfile(request?: Request, ownerOnly = false) {
+  const raw = request ? new URL(request.url).searchParams.get('profileId') : null
+  return managedProfile(raw === null ? undefined : Number(raw), ownerOnly, request)
 }
 export async function websiteData(profile: Parameters<typeof getCoursesForProfile>[0], options: {strict?:boolean;courses?:boolean} = {}) {
   const config=getSiteRuntimeConfig(profile)

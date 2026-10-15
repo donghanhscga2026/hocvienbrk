@@ -19,6 +19,7 @@ function load(rel){
   if(name==='@/lib/prisma')return {__esModule:true,default:db}
   if(name==='@/lib/crm/service')return {CrmError}
   if(name==='@/app/actions/site-profile-actions')return {getCoursesForProfile:async()=>[],getPostsForProfile:async()=>[]}
+  if(name==='next/headers')return {headers:async()=>new Headers({host:'giautoandien.io.vn'})}
   if(name==='next/cache')return {unstable_cache:fn=>fn,revalidateTag:()=>{},revalidatePath:()=>{}}
   if(name==='next/navigation')return {redirect:url=>{throw Error('redirect:'+url)}}
   if(name.startsWith('@/'))return load(name.slice(2))

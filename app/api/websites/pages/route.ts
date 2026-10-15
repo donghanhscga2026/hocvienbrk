@@ -9,7 +9,7 @@ import {CrmError} from '@/lib/crm/service'
 
 async function manager(request:Request){
   if(!isPlatformHost(requestHostname(request.headers.get('host') || '')))throw new CrmError('Quản lý trang tại hệ thống chính.',403)
-  return ownedProfile()
+  return ownedProfile(request)
 }
 export async function GET(request:Request){
   try{const profile=await manager(request);return crmResponse({content:await readWebsitePages(profile.id),slug:profile.slug,active:profile.isActive})}catch(error){return websiteFailure(error)}

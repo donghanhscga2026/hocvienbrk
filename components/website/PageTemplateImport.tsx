@@ -1,4 +1,5 @@
 'use client'
+import {useWebsiteScope} from './WebsiteScope'
 /* eslint-disable @next/next/no-html-link-for-pages -- Page and management have independent lifecycles. */
 import {useEffect,useMemo,useRef,useState} from 'react'
 import {prepareWebsiteZip} from '@/lib/course-page/importer/zip-browser'
@@ -25,6 +26,8 @@ function regions(html:string) {
     .filter((n,i,all)=>all.findIndex(x=>x.id===n.id)===i).slice(0,100)
 }
 export default function PageTemplateImport({pageSlug=''}:{pageSlug?:string}) {
+  const website=useWebsiteScope()
+
   const endpoint=pageSlug?'/api/websites/pages/template?slug='+encodeURIComponent(pageSlug):'/api/websites/page-template'
   const [saved,setSaved]=useState<ContentTemplate|null>(null),[html,setHtml]=useState(''),[name,setName]=useState('')
   const [region,setRegion]=useState('__append__'),[courses,setCourses]=useState<PageCourse[]>([]),[slug,setSlug]=useState('')
@@ -46,7 +49,7 @@ export default function PageTemplateImport({pageSlug=''}:{pageSlug?:string}) {
     let active=true
     setConfigLoading(true);setConfigError('');setLoaded(false)
     const timeout=setTimeout(()=>controller.abort(),30000)
-    fetch(endpoint,{signal:controller.signal}).then(async response=>{
+    website.fetch(endpoint,{signal:controller.signal}).then(async response=>{
       const data=await response.json();if(!response.ok)throw new Error(data.error)
       if(!active)return
       setSaved(data.template);setCourses(data.courses);setSlug(data.slug);setLoaded(true)
@@ -59,7 +62,7 @@ export default function PageTemplateImport({pageSlug=''}:{pageSlug?:string}) {
     }).catch(e=>{if(active)setConfigError(e.name==='AbortError'?'Tải cấu hình Page quá lâu. Bấm thử lại; bạn vẫn có thể chọn file.':e.message)})
       .finally(()=>{clearTimeout(timeout);if(active)setConfigLoading(false)})
     return()=>{active=false;clearTimeout(timeout);controller.abort()}
-  },[loadAttempt,endpoint])
+  },[loadAttempt,endpoint,website])
   const options=useMemo(()=>html?regions(html):[],[html])
   const preview=useMemo(()=>{
     if(!html)return {html:'',error:''}
@@ -112,7 +115,7 @@ export default function PageTemplateImport({pageSlug=''}:{pageSlug?:string}) {
     const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),60000)
     try {
       const payload=action==='apply'?{action,revision:saved?.revision || 0,name,region:region==='__original__'?null:region,source:await pack(html)}:{action,revision:saved?.revision || 0}
-      const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal})
+      const response=await website.fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal})
       const data=await response.json();if(!response.ok)throw new Error(data.error)
       setSaved(data.template);if(action==='apply')setSavedHtml(html);setMessage(action==='apply'?'Đã áp dụng template. Mở Page để kiểm tra nút khóa học.':'Đã trở về giao diện có sẵn trước đó.')
     }catch(e){setError(e instanceof Error?(e.name==='AbortError'?'Yêu cầu đã hết thời gian. Tải lại trang để kiểm tra trạng thái trước khi thử lại.':e.message):'Không thể lưu.')}
@@ -120,7 +123,7 @@ export default function PageTemplateImport({pageSlug=''}:{pageSlug?:string}) {
   }
   const button='rounded-xl border px-4 py-3 text-sm disabled:opacity-50'
   return <main className="min-h-screen bg-slate-50 p-4 sm:p-8"><div className="mx-auto max-w-7xl space-y-5">
-    <a href={pageSlug?"/tools/my-site/pages":"/tools/my-site/manage"} className="text-violet-700 underline">← Quản lý website</a>
+    <a href={website.href(pageSlug?"/tools/my-site/pages":"/tools/my-site/manage")} className="text-violet-700 underline">← Quản lý website</a>
     <header><h1 className="text-2xl font-bold">{pageSlug?'Nhập template · '+pageSlug:'Nhập template cho Page'}</h1><p className="mt-2 text-slate-600">Giữ giao diện của bạn, thay một vùng bằng danh sách khóa học thật do bạn tạo và được phép hiển thị trên Page.</p></header>
     {configLoading && <p role="status" className="rounded-xl bg-blue-50 p-4 text-blue-800">Đang tải cấu hình Page. Bạn vẫn có thể chọn file để xem trước.</p>}
     {configError && <div role="alert" className="rounded-xl bg-red-50 p-4 text-red-700"><p>{configError}</p><button className="mt-3 rounded-lg border px-4 py-2" disabled={configLoading || busy} onClick={()=>setLoadAttempt(n=>n+1)}>Thử tải lại cấu hình</button></div>}

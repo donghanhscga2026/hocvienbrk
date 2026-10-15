@@ -1,3 +1,4 @@
+import { websiteActor, canManageWebsite } from '@/lib/website/management'
 import {getSiteRuntimeConfig} from '@/lib/site-profile/config'
 import {z} from 'zod'
 import prisma from '@/lib/prisma'
@@ -11,7 +12,7 @@ import {CrmError} from '@/lib/crm/service'
 
 async function manager(request:Request) {
   if(!isPlatformHost(requestHostname(request.headers.get('host') || ''))) throw new CrmError('Quản lý website tại hệ thống chính.',403)
-  return ownedProfile()
+  return ownedProfile(request)
 }
 async function snapshot(profile:Awaited<ReturnType<typeof ownedProfile>>) {
   const profileId=profile.id
@@ -26,7 +27,7 @@ async function snapshot(profile:Awaited<ReturnType<typeof ownedProfile>>) {
   return {access,basic:template.modules,basicApplications:template.applications,domains:[...domains,...managed.filter(d=>!domains.some(v=>v.hostname===d.hostname)).map(d=>({hostname:d.hostname,enabled:d.isActive}))],configured:!!row}
 }
 export async function GET(request:Request) {
-  try {const profile=await manager(request);return crmResponse({...await snapshot(profile),profileId:profile.id,admin:profile.user?.role==='ADMIN',name:profile.title,slug:profile.slug})} catch(e) {return websiteFailure(e)}
+  try {const profile=await manager(request);return crmResponse({...await snapshot(profile),profileId:profile.id,admin:(await websiteActor(request)).role==='ADMIN',canManageMembers:canManageWebsite(profile,await websiteActor(request),true),name:profile.title,slug:profile.slug})} catch(e) {return websiteFailure(e)}
 }
 const command=z.discriminatedUnion('action',[
   z.object({action:z.literal('basic'),modules:modulesSchema,applications:applicationsSchema.optional()}).strict(),
@@ -34,7 +35,8 @@ const command=z.discriminatedUnion('action',[
 ])
 export async function POST(request:Request) {
   try {
-    const profile=await manager(request),admin=profile.user?.role==='ADMIN'
+    const profile=await manager(request),admin=(await websiteActor(request)).role==='ADMIN'
+    if(!canManageWebsite(profile,await websiteActor(request),true)) throw new CrmError('Chỉ chủ website hoặc admin được quản lý kết nối ứng dụng.',403)
     const input=command.parse(await crmBody(request,4000))
     if(input.action==='basic') {
       if(!admin) throw new CrmError('Chỉ quản trị viên được sửa gói cơ bản.',403)
@@ -60,6 +62,6 @@ export async function POST(request:Request) {
         await tx.siteDomain.updateMany({where:{profileId:profile.id},data:effectiveModules(next)})
       })
     }
-    return crmResponse({...await snapshot(profile),profileId:profile.id,admin,name:profile.title,slug:profile.slug})
+    return crmResponse({...await snapshot(profile),profileId:profile.id,admin,canManageMembers:true,name:profile.title,slug:profile.slug})
   } catch(e) {return websiteFailure(e)}
 }

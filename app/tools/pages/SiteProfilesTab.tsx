@@ -111,8 +111,9 @@ export default function SiteProfilesTab() {
                     </td>
                     <td className="px-5 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
+                        <Link href={`/tools/my-site/manage?profileId=${profile.id}`} className="min-h-11 inline-flex items-center px-2 text-violet-700">Quản trị web</Link>
                         <Link href={`/page/${profile.slug}`} target="_blank" className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all"><Eye className="w-3.5 h-3.5" /></Link>
-                        {!profile.isDefault && (
+                        {(
                           <Link href={`/tools/site-profiles/${profile.id}/edit`} className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-gray-400 hover:text-green-600 hover:bg-green-50 transition-all"><Edit className="w-3.5 h-3.5" /></Link>
                         )}
                       </div>

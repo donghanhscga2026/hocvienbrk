@@ -1,4 +1,5 @@
 'use client'
+import {useWebsiteScope} from '@/components/website/WebsiteScope'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -45,6 +46,7 @@ const PRESET_COLORS = [
 ]
 
 export default function MySiteEditPage() {
+  const website=useWebsiteScope()
   const { data: session } = useSession()
   const userId = session?.user?.id as string | null
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -71,7 +73,7 @@ export default function MySiteEditPage() {
 
   async function loadProfile() {
     try {
-      const data = await getMySiteProfile(parseInt(userId!))
+      const data = await getMySiteProfile(parseInt(userId!),website.profileId)
       if (data) {
         setProfile(data)
         setFormData({
@@ -158,7 +160,7 @@ export default function MySiteEditPage() {
               Vui lòng liên hệ Admin để tạo trang chủ cho bạn.
             </p>
             <Link
-              href="/tools/my-site"
+              href={website.href("/tools/my-site")}
               className="inline-block px-6 py-2 bg-amber-500 text-white rounded-xl font-medium hover:bg-amber-600 transition-colors"
             >
               Quay lại
@@ -174,7 +176,8 @@ export default function MySiteEditPage() {
       <MainHeader title="Chỉnh sửa mẫu có sẵn" toolSlug="my-site" />
 
       <div className="p-4 max-w-lg mx-auto pb-20">
-        <Link href="/tools/my-site/manage" className="block mb-4 text-violet-700 underline">← Quản lý website của tôi</Link>
+        <Link href={website.href("/tools/my-site/manage")}  className="block mb-4 text-violet-700 underline">← Quản lý website của tôi</Link>
+        <h1 className="mb-3 break-words text-xl font-bold">{profile.title || profile.slug}</h1>
         <p className="mb-4 rounded-xl bg-violet-50 text-violet-900 p-4 text-sm">Bạn đang sửa mẫu có sẵn. Các thay đổi chỉ hiển thị khi chọn “Mẫu có sẵn” trong Quản lý website.</p>
         <form onSubmit={handleSubmit}>
           {saved && (
@@ -359,7 +362,7 @@ export default function MySiteEditPage() {
             </div>
           </div>
 
-          <Link href="/tools/my-site/data" className="block mb-4 rounded-xl bg-white border p-4 text-violet-700">Quản lý nguồn khóa học & giáo viên liên kết →</Link>
+          <Link href={website.href("/tools/my-site/data")}  className="block mb-4 rounded-xl bg-white border p-4 text-violet-700">Quản lý nguồn khóa học & giáo viên liên kết →</Link>
 
           <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
             <h2 className="text-lg font-bold text-gray-800 mb-4">Footer</h2>
