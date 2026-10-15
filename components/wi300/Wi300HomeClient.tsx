@@ -16,11 +16,13 @@ import Wi300PersonalSpace from './Wi300PersonalSpace'
 import Wi300Businesses from './Wi300Businesses'
 import Wi300Teachers from './Wi300Teachers'
 import WiKnowledgeArt from './WiKnowledgeArt'
+import WiCourseHero from './WiCourseHero'
 import type { PublicWiProject } from '@/lib/wi300/projects'
 
 const PaymentModal = dynamic(() => import('@/components/course/PaymentModal'), { ssr: false })
 export type Wi300HomeClientProps = {
   appearance?: WiAppearance;
+  catalogHeroRendered?: boolean;
   projects?: PublicWiProject[]; projectsError?: boolean;
   brand: DeploymentBrand; courses: Wi300Course[]; enrollments: Wi300Enrollment[];
   teachingCourses?: Wi300TeachingCourse[]; teachingError?: boolean;
@@ -40,7 +42,7 @@ function HomeRoute(props: Props) {
   return <HomeContent key={(props.view || 'home') + ':' + (searchParams.get('q') || '')} {...props} />
 }
 
-function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn, catalogError, accountError, teachingCourses = [], teachingError = false, view = 'home', projects, projectsError = false, appearance = defaultAppearance }: Props) {
+function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn, catalogError, accountError, teachingCourses = [], teachingError = false, view = 'home', projects, projectsError = false, appearance = defaultAppearance, catalogHeroRendered = false }: Props) {
   const page = appearance.courses
   const searchParams = useSearchParams()
   const [query, setQuery] = useState(searchParams.get('q') || '')
@@ -170,9 +172,10 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
     {view === 'discover' && <><Wi300Businesses projects={projects} error={projectsError} />
       <Wi300Teachers appearance={appearance} teachers={teachers} catalogError={catalogError} />
     </>}
+    {view === 'catalog' && !catalogHeroRendered && <WiCourseHero settings={page} />}
     {view === 'space' && <Wi300PersonalSpace teachingCourses={teachingCourses} teachingError={teachingError} courses={courses} enrollments={enrollments} userId={userId} userPhone={userPhone} accountError={accountError || catalogError} />}
     {(view === 'catalog' || view === 'discover') && <section id="khoa-hoc" className="mx-auto max-w-7xl scroll-mt-40 px-4 py-12 lg:scroll-mt-24 lg:px-6">
-      {view === 'catalog' ? <h1 className="text-3xl font-bold">{page.title}</h1> : <h2 className="text-2xl font-bold sm:text-3xl">Khám phá khóa học</h2>}<p className="mt-2 text-sm leading-6 text-brk-muted">{page.description}</p>
+      {view === 'catalog' && !page.showHero ? <><h1 className="text-3xl font-bold">{page.title}</h1><p className="mt-2 text-sm leading-6 text-brk-muted">{page.description}</p></> : <h2 className="text-2xl font-bold sm:text-3xl">{view === 'catalog' ? 'Danh sách khóa học' : 'Khám phá khóa học'}</h2>}{view === 'discover' && <p className="mt-2 text-sm leading-6 text-brk-muted">{page.description}</p>}
       <div className="mt-6 flex flex-col gap-3 lg:flex-row"><label hidden={!page.showSearch} className="flex min-h-12 flex-1 items-center gap-3 rounded-xl border border-brk-outline bg-white px-4"><Search className="h-5 w-5 shrink-0 text-brk-muted" /><span className="sr-only">Tìm khóa học hoặc giảng viên</span><input value={query} onChange={event => { setQuery(event.target.value); setLimit(9) }} placeholder="Tìm khóa học, giảng viên…" className="min-w-0 flex-1 bg-transparent py-3 text-sm outline-none" type="search" /></label><label className="sr-only" htmlFor="wi300-fee">Lọc theo học phí</label><select hidden={!page.showFee} id="wi300-fee" value={fee} onChange={event => { setFee(event.target.value); setLimit(9) }} className="min-h-12 rounded-xl border border-brk-outline bg-white px-4 text-sm"><option value="all">Tất cả học phí</option><option value="free">Miễn phí</option><option value="paid">Có phí</option></select><label className="sr-only" htmlFor="wi300-sort">Sắp xếp khóa học</label><select id="wi300-sort" value={sort} onChange={event => { setSort(event.target.value as CourseSort); setLimit(9) }} className="min-h-12 rounded-xl border border-brk-outline bg-white px-4 text-sm"><option value="recommended">Đề xuất</option><option value="newest">Mới nhất</option><option value="price-asc">Giá thấp đến cao</option><option value="price-desc">Giá cao đến thấp</option></select></div>
       <div hidden={!page.showCategories} role="group" aria-label="Danh mục khóa học" className="mt-4 flex flex-wrap gap-2">{['', ...categories].map(name => <button key={name} type="button" aria-pressed={category === name} onClick={() => { setCategory(name); setLimit(9) }} className={`min-h-11 rounded-xl border px-4 text-sm font-medium ${category === name ? 'border-brk-primary bg-brk-primary text-white' : 'border-brk-outline bg-white text-brk-muted hover:border-brk-primary'}`}>{name || 'Tất cả'}</button>)}</div>
       <p role="status" className="my-5 text-sm text-brk-muted">{catalogError ? 'Danh mục tạm thời chưa tải được.' : `${filtered.length} khóa học${category ? ` · ${category}` : ''}`}</p>

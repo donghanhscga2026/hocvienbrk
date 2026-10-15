@@ -20,22 +20,22 @@ export default function ToolsCoursesPage() {
     const [activeTab, setActiveTab] = useState<'courses' | 'categories'>('courses')
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-[#F7F9F5] text-[#24352A]">
             <MainHeader title="Quản lý khóa học" toolSlug="courses" />
 
             <ManagementWorkspace active="courses">
-                <div><h1 className="text-2xl font-bold text-brk-primary">Quản lý khóa học</h1><p className="mt-2 text-sm text-gray-600">Quản lý nội dung, học viên và hoạt động của từng khóa. Chọn mẫu Sales Page trong mục Trang bán khóa học.</p></div>
+                <div><h1 className="text-2xl font-bold text-brk-primary">Quản lý khóa học</h1><p className="mt-2 text-sm text-[#617066]">Quản lý nội dung, học viên và hoạt động của từng khóa. Chọn mẫu Sales Page trong mục Trang bán khóa học.</p></div>
 
-                <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl mt-4">
+                <div className="mt-4 flex gap-2 rounded-2xl border border-[#E2E8DC] bg-white p-1.5 shadow-sm">
                     <button
                         onClick={() => setActiveTab('courses')}
-                        className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'courses' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`flex-1 rounded-xl px-3 py-3 text-xs font-semibold tracking-wide transition-colors ${activeTab === 'courses' ? 'bg-[#EAF3E7] text-[#206B25] shadow-sm ring-1 ring-[#CFE2CB]' : 'text-[#506153] hover:bg-[#F7F9F5] hover:text-[#206B25]'}`}
                     >
                         <BookOpen className="w-4 h-4 inline mr-2" /> Khóa học
                     </button>
                     <button
                         onClick={() => setActiveTab('categories')}
-                        className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'categories' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`flex-1 rounded-xl px-3 py-3 text-xs font-semibold tracking-wide transition-colors ${activeTab === 'categories' ? 'bg-[#EAF3E7] text-[#206B25] shadow-sm ring-1 ring-[#CFE2CB]' : 'text-[#506153] hover:bg-[#F7F9F5] hover:text-[#206B25]'}`}
                     >
                         <Tag className="w-4 h-4 inline mr-2" /> Danh mục
                     </button>
@@ -375,7 +375,7 @@ function CoursesTab() {
                             const names = projects.filter(project => project.courseIds.includes(course.id)).map(project => project.name)
                             return <article key={course.id} className={`gap-3 p-4 ${display === 'list' ? 'grid grid-cols-[24px_minmax(240px,2fr)_130px_minmax(100px,1fr)_100px_80px_minmax(140px,1.2fr)_120px] items-center' : 'grid rounded-2xl border border-brk-outline bg-white'} ${selectedIds.has(course.id) ? 'bg-brk-background ring-2 ring-inset ring-brk-primary' : ''}`}>
                                 <input type="checkbox" aria-label={`Chọn ${course.name_lop}`} checked={selectedIds.has(course.id)} onChange={() => toggleSelect(course.id)} className="h-4 w-4 accent-green-700" />
-                                <div className="flex min-w-0 items-center gap-3">{course.link_anh_bia ? <img src={course.link_anh_bia} alt="" className="h-16 w-20 shrink-0 rounded-lg object-cover" /> : <div className="flex h-16 w-20 shrink-0 items-center justify-center rounded-lg bg-brk-background text-brk-primary"><BookOpen size={24} /></div>}<div className="min-w-0"><Link href={`/tools/courses/new?id=${course.id}`} className="break-words text-sm font-bold text-brk-primary">{course.name_lop}</Link><p className="mt-1 text-xs text-gray-500">{course.id_khoa}</p><p className="mt-1 text-xs text-gray-500">{course.teacher?.name || course.teacher?.email || 'Chưa phân công'} · {course._count?.lessons || 0} bài</p></div></div>
+                                <div className="flex min-w-0 items-center gap-3">{course.link_anh_bia ? <img src={course.link_anh_bia} alt="" loading="lazy" decoding="async" width={80} height={64} className="h-16 w-20 shrink-0 rounded-lg object-cover" /> : <div className="flex h-16 w-20 shrink-0 items-center justify-center rounded-lg bg-brk-background text-brk-primary"><BookOpen size={24} /></div>}<div className="min-w-0"><Link href={`/tools/courses/new?id=${course.id}`} className="break-words text-sm font-bold text-brk-primary">{course.name_lop}</Link><p className="mt-1 text-xs text-gray-500">{course.id_khoa}</p><p className="mt-1 text-xs text-gray-500">{course.teacher?.name || course.teacher?.email || 'Chưa phân công'} · {course._count?.lessons || 0} bài</p></div></div>
                                 <p className="break-words text-xs font-medium text-brk-primary">{course.courseCategory?.name || course.category || 'Khác'}</p>
                                 <p className="break-words text-xs text-gray-600">{names.join(', ') || 'Chưa liên kết'}</p>
                                 <span className={`w-fit rounded-full px-2 py-1 text-xs ${course.status ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{course.status ? 'Hiển thị' : 'Đang ẩn'}</span>

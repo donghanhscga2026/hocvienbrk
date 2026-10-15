@@ -63,7 +63,7 @@ export async function saveAppearance(db: PrismaClient, id: number, raw: unknown,
     if (input.action === 'restore' && !current.previous) throw new CrmError('Chưa có bản trước để khôi phục.')
     const settings = input.action === 'restore' ? current.previous! : input.settings!
     function selected(base: AppearanceState['draft']) {
-      if (input.scope === 'website') return { ...structuredClone(base), common: settings.common, seo: settings.seo, footer: settings.footer }
+      if (input.scope === 'website') return { ...structuredClone(base), common: settings.common, seo: settings.seo, footer: settings.footer, headerMenu: settings.headerMenu }
       if (!input.page) return settings
       const copy = structuredClone(base)
       copy[input.page] = settings[input.page] as never
