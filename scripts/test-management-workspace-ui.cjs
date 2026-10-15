@@ -18,6 +18,7 @@ const link = { __esModule: true, default: ({ children, ...props }) => React.crea
 const stub = name => ({ __esModule: true, default: props => React.createElement('div', { 'data-panel': name }, name + (props.courseId || '')) })
 let params = new URLSearchParams('id=1')
 const mocks = {
+  '@/lib/auth/roles': require('./helpers/load-ts.cjs')('lib/auth/roles.ts'),
   'next/link': link,
   'next/navigation': { useRouter: () => ({ push: () => {}, refresh: () => {}, replace: () => {} }), useSearchParams: () => params },
   '@/components/layout/MainHeader': { __esModule: true, default: props => React.createElement('header', { className: 'bg-white p-4 text-xl font-bold' }, props.title) },
