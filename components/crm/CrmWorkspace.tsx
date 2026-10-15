@@ -125,7 +125,7 @@ function TaskForm({ busy, onSave }: { busy: boolean; onSave: (data: Command) => 
 export default function CrmWorkspace() {
   const shared = useManagementFrame()
   const queryView = useSearchParams().get('view')
-  const [tab, setTab] = useState<'overview' | 'contacts' | 'cards' | 'board' | 'tasks' | 'requests' | 'students' | 'reports' | 'tools' | 'partners'>('overview')
+  const [requestedTab, setTab] = useState<'overview' | 'contacts' | 'cards' | 'board' | 'tasks' | 'requests' | 'students' | 'reports' | 'tools' | 'partners'>('overview')
   useEffect(() => { if (queryView === 'requests' || queryView === 'tasks' || queryView === 'contacts' || queryView === 'overview' || queryView === 'partners') setTab(queryView) }, [queryView])
   // Giữ kiểu xem khách hàng khi chuyển qua các mục chức năng khác.
   const [contactView, setContactView] = useState<'contacts' | 'cards'>('contacts')
@@ -136,6 +136,7 @@ export default function CrmWorkspace() {
   const [total, setTotal] = useState(0)
   const [owners, setOwners] = useState<CrmOwner[]>([])
   const [actor, setActor] = useState<{ id: number; isAdmin: boolean } | null>(null)
+  const tab = requestedTab === 'partners' && !actor?.isAdmin ? 'overview' : requestedTab
   const [tasks, setTasks] = useState<TasksResult>({ tasks: [], total: 0, stats: { today: 0, overdue: 0, unscheduled: 0 } })
   const [query, setQuery] = useState('')
   const [search, setSearch] = useState('')
@@ -257,7 +258,7 @@ export default function CrmWorkspace() {
             { key: 'board', label: 'Tư vấn & công việc', icon: GitBranch },
             { key: 'reports', label: 'Báo cáo', icon: BarChart3 },
             { key: 'tools', label: 'Cài đặt CRM', icon: Settings },
-          ] as const).map(item => {
+          ] as const).filter(item => item.key !== 'partners' || actor?.isAdmin).map(item => {
             const active = item.key === 'contacts' ? customerSection : item.key === 'board' ? tab === 'board' || tab === 'tasks' : item.key === 'tools' ? tab === 'tools' || tab === 'students' : tab === item.key
             const Icon = item.icon
             const count = item.key === 'requests' ? newRequests : item.key === 'board' ? tasks.stats.overdue || tasks.stats.today : null
@@ -270,7 +271,7 @@ export default function CrmWorkspace() {
         <p className={shared ? "hidden" : "hidden px-2 pt-3 text-xs leading-relaxed text-slate-500 lg:block"}>Ưu tiên yêu cầu mới và công việc đến hạn.</p>
       </aside>
       <section aria-label={sectionTitle} className="min-w-0 space-y-5">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="mb-1 text-xs font-medium text-slate-400">CRM · Chăm sóc & hỗ trợ</p><h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{sectionTitle}</h1><p className="mt-1 text-xs leading-5 text-slate-500">{tab === "overview" ? "Yêu cầu chờ phản hồi, lịch đến hạn và những cập nhật mới nhất." : tab === "partners" ? "Theo dõi doanh nghiệp, giảng viên và kết quả hợp tác." : "Thông tin và công việc trong phạm vi phụ trách của bạn."}</p></div>{customerSection && <button disabled={!actor || busy} className={button} onClick={() => { setCreate(true); setError(''); setNotice('') }}><Plus size={18} />Thêm khách</button>}</div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="mb-1 text-xs font-medium text-slate-400">CRM · Chăm sóc & hỗ trợ</p><h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{sectionTitle}</h1><p className="mt-1 text-xs leading-5 text-slate-500">{tab === "overview" ? "Yêu cầu chờ phản hồi, lịch đến hạn và những cập nhật mới nhất." : tab === "partners" ? "Theo dõi doanh nghiệp, giảng viên và kết quả hợp tác." : "Thông tin và công việc trong phạm vi phụ trách của bạn."}</p></div>{customerSection && <button disabled={!actor || busy} className={button} onClick={() => { setCreate(true); setError(''); setNotice('') }}><Plus size={18} />Thêm khách tư vấn</button>}</div>
     {feedback}
     {(tab === 'tasks' || tab === 'board') && <div className="grid grid-cols-3 gap-2 sm:gap-4">{[
       { label: 'Việc hôm nay', value: tasks.stats.today, run: () => { setTab('tasks'); setDue('today'); setTaskPage(1) } },
@@ -320,7 +321,7 @@ export default function CrmWorkspace() {
       </section>
     </div>
 
-    {create && actor && <Modal title="Thêm khách mới" onClose={close}>{feedback}<ContactEditor owners={owners} actorId={actor.id} isAdmin={actor.isAdmin} busy={busy} onCancel={close} onSave={async data => { const ok = await mutate({ action: 'contact.create', data }); if (ok) { setCreate(false); setPage(1) } return ok }} /></Modal>}
+    {create && actor && <Modal title="Thêm khách tư vấn" onClose={close}>{feedback}<p className="text-sm text-slate-600">Ghi nhận người đang quan tâm đến khóa học của bạn. Thao tác này không tạo tài khoản hoặc đăng ký khóa học, và không tự cấp quyền nhận email marketing.</p><ContactEditor owners={owners} actorId={actor.id} isAdmin={actor.isAdmin} busy={busy} onCancel={close} onSave={async data => { const ok = await mutate({ action: 'contact.create', data }); if (ok) { setCreate(false); setPage(1) } return ok }} /></Modal>}
     {selected != null && <CrmDrawer title={detail?.name || 'Hồ sơ khách'} onClose={close}>{feedback}{detailLoading ? <p role="status">Đang tải hồ sơ…</p> : detail && actor ? <>
       <nav aria-label="Các phần hồ sơ CRM" className="flex gap-1 overflow-x-auto border-b pb-3">{([{ id: 'summary', label: 'Tóm tắt' }, { id: 'requests', label: 'Yêu cầu' }, { id: 'learning', label: 'Học tập' }, { id: 'history', label: 'Lịch sử' }] as const).map(item => <button key={item.id} aria-pressed={detailTab === item.id} className={(detailTab === item.id ? button : secondary) + ' shrink-0'} onClick={() => setDetailTab(item.id)}>{item.label}</button>)}</nav>
       <div hidden={detailTab !== 'summary'} className="space-y-4">

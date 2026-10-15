@@ -18,6 +18,7 @@ export const partnerQuery = z.object({
 import { partnerDetails } from './partner-details'
 export { partnerDetails } from './partner-details'
 export async function readCrmPartners(db: PrismaClient, actor: CrmActor, query: z.infer<typeof partnerQuery>) {
+  if (actor.role !== 'ADMIN') throw new CrmError('Chỉ admin được quản lý đối tác Wi300.', 403)
   // Apply authorization in DB before projecting, counting, filtering or exporting.
   const where = { AND: [requestScope(actor), { source: PARTNER_SOURCE }], ...(query.status ? { status: query.status } : {}), ...(query.owner !== undefined ? { ownerId: query.owner === 'unassigned' ? null : query.owner } : {}) }
   const stats = { new: 0, unassigned: 0, moreInfo: 0, accepted: 0 }
