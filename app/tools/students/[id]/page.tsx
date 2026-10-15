@@ -1,4 +1,5 @@
 import { auth } from "@/auth"
+import { learningProfileHref } from '@/lib/learning-profile/shared'
 import Link from "next/link"
 import Image from "next/image"
 import { redirect } from "next/navigation"
@@ -19,7 +20,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
   if (!res.success || !res.user) redirect("/tools/students")
 
   const student = res.user
-  const logsRes = await getStudentEmailLogsAction(studentId)
+  const logsRes = res.canViewEmailLogs ? await getStudentEmailLogsAction(studentId) : { success: true, logs: [] }
   const emailLogs: any[] = logsRes.success && logsRes.logs ? logsRes.logs : []
   const roleLabels: Record<string, string> = {
     ADMIN: "Quản trị",
@@ -62,6 +63,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
 
             <h1 className="text-xl font-bold text-gray-900 mt-4">{student.name || "Chưa có tên"}</h1>
             <span className="text-sm font-mono text-gray-400">#{student.id}</span>
+            <Link href={learningProfileHref(student.id)} className="mt-3 inline-flex min-h-11 items-center rounded-xl border px-4 text-sm font-semibold text-emerald-800">Mở hồ sơ học tập</Link>
           </div>
 
           <div className="mt-6 space-y-3 text-left">
@@ -145,7 +147,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
           </div>
         )}
 
-        <div className="mt-4">
+        {res.canViewEmailLogs && <div className="mt-4">
           <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">
             Lịch sử gửi email
           </h2>
@@ -187,7 +189,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
               </div>
             )}
           </div>
-        </div>
+        </div>}
       </div>
     </div>
   )

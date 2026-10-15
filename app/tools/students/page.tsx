@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useSession } from 'next-auth/react'
 import { isHighestAdmin } from '@/lib/auth/roles'
+import { learningProfileHref } from '@/lib/learning-profile/shared'
 import { getStudentsAction, getAdminCoursesAction, resendVerificationAction, resendAllVerificationAction, adminResetStudentPasswordAction, updateUserRoleAction } from '@/app/actions/admin-actions'
 import { Search, User, Mail, Phone, Loader2, ArrowUpDown, ArrowLeft, Users, Shield, GraduationCap, Handshake, Trophy, ChevronLeft, ChevronRight, X, Upload, ScrollText, KeyRound } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
@@ -468,7 +469,7 @@ export default function ToolsStudentsPage() {
               return (
                 <div key={student.id} className="relative group">
                   <Link
-                    href={`/tools/students/${student.id}`}
+                    href={learningProfileHref(student.id)}
                     prefetch={false}
                     className="block bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-gray-200 transition-all"
                   >
