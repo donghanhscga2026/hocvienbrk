@@ -24,7 +24,7 @@ const RESERVED_PATHS = new Set([
     'auth', 'dashboard', 'account', 'settings', 'profile',
     'user', 'checkout', 'payment', 'static', 'assets', '_next',
     'landing', 'forgot-password', 'tools', 'account-settings',
-    'tca', 'ktc', 'khoa-hoc', 'land', 'page', 'du-an'
+    'tca', 'ktc', 'khoa-hoc', 'land', 'page', 'du-an', 'ho-so-hoc-tap'
 ])
 
 const RESOURCE_PREFIXES = new Set(['khoa-hoc', 'land', 'page', 'du-an'])

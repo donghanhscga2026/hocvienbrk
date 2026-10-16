@@ -7,6 +7,7 @@ import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime
 import { getCurrentSiteProfile, getCourseWhereForProfile } from '@/lib/site-profile/runtime'
 import { wi300CoursePreferences, wi300CourseWhere } from '@/lib/wi300/course-visibility'
 import { teacherProfileKey, teacherProfileSchema } from '@/lib/wi300/teacher-profile'
+import { canCreateProfile } from '@/lib/auth/roles'
 
 // Chỉ đọc thông tin công khai và khóa trong đúng phạm vi website, không tải tài khoản người xem.
 const readTeacher = cache(async (raw: string) => {
@@ -17,11 +18,11 @@ const readTeacher = cache(async (raw: string) => {
   const preferences = await wi300CoursePreferences(prisma)
   const where = { AND: [wi300CourseWhere(getCourseWhereForProfile(scope || { userId: 0 }), preferences), { teacherId: id }] }
   const [user, courses, row] = await Promise.all([
-    prisma.user.findUnique({ where: { id }, select: { name: true, image: true, siteProfile: { select: { slug: true, isActive: true } } } }),
+    prisma.user.findUnique({ where: { id }, select: { name: true, image: true, role: true, siteProfile: { select: { slug: true, isActive: true } } } }),
     prisma.course.findMany({ where, take: 13, orderBy: { updatedAt: 'desc' }, select: { id: true, id_khoa: true, name_lop: true, mo_ta_ngan: true, link_anh_bia: true, courseCategory: { select: { name: true } } } }),
     prisma.systemConfig.findUnique({ where: { key: teacherProfileKey(id) } }),
   ])
-  if (!user || !courses.length) return null
+  if (!user || !canCreateProfile(user.role) || !courses.length) return null
   const parsed = teacherProfileSchema.safeParse(row?.value || {})
   return { user, courses, profile: parsed.success ? parsed.data : teacherProfileSchema.parse({}) }
 })

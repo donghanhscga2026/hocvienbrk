@@ -10,7 +10,7 @@ import {decodePageSource,pageCourses,readPageTemplate} from '@/lib/website/page-
 
 async function owner(request:Request) {
   if(!isPlatformHost(requestHostname(request.headers.get('host') || '')))throw new CrmError('Nhập template tại hệ thống chính.',403)
-  return ownedProfile()
+  return ownedProfile(request)
 }
 export async function GET(request:Request) {
   try {

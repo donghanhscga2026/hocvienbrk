@@ -11,6 +11,7 @@ URL.createObjectURL=()=> 'blob:test';URL.revokeObjectURL=()=>{}
 const exportRuns=[],images=[];let failImage=false
 global.fetch=async(url,options={})=>{if(!options.body)return Response.json({summary:[{courseId:1,requests:2}]});const input=JSON.parse(options.body);exportRuns.push(input);return input.format==='GOOGLE'?Response.json({sheetUrl:'https://docs.google.com/spreadsheets/d/testsheet'}):new Response(new Uint8Array([1,2,3]),{headers:{'content-type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}})}
 const mocks={
+ '@/lib/learning-profile/shared':require('./helpers/load-ts.cjs')('lib/learning-profile/shared.ts'),
  './MemberDetailPanel':{__esModule:true,default:props=>React.createElement('div',{'data-detail':props.member.enrollmentId,'data-tab':props.initialTab},'Detail')},
  '@/lib/course/export-roster-image':{downloadRosterAsImage:async(...args)=>{images.push(args);if(failImage)throw new Error('Image fixture failed')}}
 }
