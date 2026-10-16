@@ -35,6 +35,7 @@ function whereSql(where,values=[]){
       if('in' in value){parts.push(value.in.length?'('+value.in.map(v=>{values.push(v);return quote(key)+'=$'+values.length}).join(' OR ')+')':'FALSE');continue}
       if('notIn' in value){parts.push(value.notIn.length?'('+value.notIn.map(v=>{values.push(v);return quote(key)+'<>$'+values.length}).join(' AND ')+')':'TRUE');continue}
       if('gte' in value){op='>=';v=value.gte}
+      else if('not' in value){op='<>';v=value.not}
       else if('equals' in value){v=value.equals;if(value.mode==='insensitive'){values.push(v);parts.push('lower('+quote(key)+')=lower($'+values.length+')');continue}}
       else throw new Error('Unsupported filter: '+key)
     }

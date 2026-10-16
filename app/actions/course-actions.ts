@@ -865,6 +865,9 @@ export async function createCourseAction(formData: FormData) {
     if (teacherIdFromForm) {
         teacherId = parseInt(teacherIdFromForm)
     }
+    if (!Number.isSafeInteger(teacherId) || (!isAdmin && teacherId !== userId)) {
+        return { success: false, error: 'Bạn chỉ được tạo khóa học cho chính mình.' }
+    }
 
     try {
         // ✅ Check unique id_khoa
@@ -1050,7 +1053,7 @@ export async function getTeachersAction() {
 
     try {
         const teachers = await prisma.user.findMany({
-            where: { role: { in: [Role.TEACHER, Role.ADMIN] } },
+            where: { role: { in: [Role.TEACHER, Role.INSTRUCTOR, Role.ADMIN] } },
             select: { id: true, name: true, email: true }
         })
         return { success: true, teachers }

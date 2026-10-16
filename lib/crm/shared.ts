@@ -45,7 +45,7 @@ export function vietnamDayBounds(now = new Date()) {
   const start = new Date(part('year') + '-' + part('month') + '-' + part('day') + 'T00:00:00+07:00')
   return { start, end: new Date(start.getTime() + 86400000) }
 }
-export type CrmOwner = { id: number; name: string | null; email: string }
+export type CrmOwner = { id: number; name: string | null; email: string; role?: string }
 export type CrmTaskView = { id: number; contactId: number; title: string; dueAt: string; completedAt: string | null }
 export type CrmOpportunityView = { id: number; title: string; stage: CrmStageValue; amount: number; lostReason: string; version: number; courseId?: number | null }
 export type CrmContactView = {

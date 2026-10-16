@@ -26,7 +26,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
     STUDENT: "Thành viên",
     INSTRUCTOR: "Giảng viên",
     AFFILIATE: "Đối tác",
-    TEACHER: "Giáo viên",
+    TEACHER: "Giảng viên",
   }
 
   return (
