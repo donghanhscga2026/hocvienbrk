@@ -1,6 +1,11 @@
 'use server'
 
 import { auth } from "@/auth"
+import { normalizeRole, isHighestAdmin } from '@/lib/auth/roles'
+import { isTeachingRole } from '@/lib/auth/roles'
+import { changeMemberRole } from '@/lib/auth/change-member-role'
+import { learningProfileActor } from '@/lib/learning-profile/server'
+import { assertLearningStudent } from '@/lib/learning-profile/service'
 import { changeUserId, UserIdChangeError, type UserIdChangeState } from "@/lib/user-id-change"
 import { domainContext } from "@/lib/website/domain-context"
 import prisma from "@/lib/prisma"
@@ -628,16 +633,19 @@ export async function getUserSystemsAction() {
 export async function updateUserRoleAction(userId: number, role: Role) {
     try {
         await checkAdmin()
+        if (await domainContext()) throw new Error('Đổi vai trò tại hệ thống chính.')
+        const session = await auth()
+        const actor = await prisma.user.findUnique({ where: { id: Number(session!.user!.id) }, select: { id: true, role: true } })
+        if (!actor || !isHighestAdmin(actor.id, actor.role)) throw new Error('Chỉ admin cao nhất được phân quyền thành viên.')
+        role = normalizeRole(role)
         if (!Number.isInteger(userId)) throw new Error("Mã thành viên không hợp lệ")
         if (!Object.values(Role).includes(role)) throw new Error("Quyền không hợp lệ")
 
-        const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true } })
-        if (!user) throw new Error("Không tìm thấy thành viên")
-        if (user.role === role) return { success: true, role }
-
-        await prisma.user.update({ where: { id: userId }, data: { role } })
+        const result = await changeMemberRole(prisma, actor.id, userId, role)
         revalidatePath('/tools/students')
-        return { success: true, role }
+        revalidatePath('/ho-so-hoc-tap/' + userId)
+        revalidatePath('/giang-vien/' + userId)
+        return result
     } catch (error: any) {
         return { success: false, error: error.message || "Không thể cập nhật quyền" }
     }
@@ -645,12 +653,10 @@ export async function updateUserRoleAction(userId: number, role: Role) {
 
 export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'COURSE_86_DAYS' | 'UNVERIFIED', page: number = 0, limit: number = 20, sortBy: 'createdAt' | 'id' = 'createdAt', sortOrder: 'asc' | 'desc' = 'desc', courseId?: number) {
     try {
-        const session = await auth()
-        if (!session?.user?.id) throw new Error("Unauthorized")
-
-        const userId = parseInt(session.user.id)
-        const isAdmin = session.user.role === Role.ADMIN
-        const isTeacher = session.user.role === Role.TEACHER
+        const actor = await learningProfileActor()
+        const userId = actor.id
+        const isAdmin = actor.role === Role.ADMIN
+        const isTeacher = isTeachingRole(actor.role)
 
         if (!isAdmin && !isTeacher) throw new Error("Unauthorized")
 
@@ -680,7 +686,7 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
             } else if (role === 'UNVERIFIED') {
                 where.emailVerified = null
             } else if (role && role !== 'ALL') {
-                where.role = role
+                where.role = normalizeRole(role) === 'TEACHER' ? { in: [Role.TEACHER, Role.INSTRUCTOR] } : role
             }
         }
 
@@ -712,6 +718,7 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
                 where,
                 include: {
                     enrollments: {
+                        where: isAdmin ? {} : { course: { teacherId: userId } },
                         include: {
                             course: { select: { name_lop: true } },
                             _count: { select: { lessonProgress: { where: { status: 'COMPLETED' } } } }
@@ -729,7 +736,7 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
         ])
 
         const roleCounts: Record<string, number> = {}
-        rawRoleCounts.forEach((rc: any) => { roleCounts[rc.role] = rc._count.id })
+        rawRoleCounts.forEach((rc: any) => { const key = normalizeRole(rc.role); roleCounts[key] = (roleCounts[key] || 0) + rc._count.id })
 
         if (isAdmin) {
             roleCounts['ALL'] = await prisma.user.count()
@@ -741,7 +748,7 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
         }
 
         const totalPages = Math.ceil(total / limit)
-        return { success: true, students, total, page, totalPages, roleCounts }
+        return { success: true, students: students.map(student => ({ ...student, role: normalizeRole(student.role) })), total, page, totalPages, roleCounts }
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
@@ -963,6 +970,7 @@ export async function getMemberSubmissionHistoryAction(enrollmentId: number) {
 
         const access = await checkCourseRosterAccess(enrollment.courseId)
         if (access.error) return { success: false, error: access.error }
+        if (!access.canViewPhone && Number((await auth())?.user?.id) !== enrollment.userId) return { success: false, error: 'Bạn chỉ được xem bài nộp của chính mình.' }
 
         const base = enrollment.startedAt || enrollment.activatedAt || enrollment.createdAt
         const baseMid = toVnMidnightUTC(base)
@@ -2062,13 +2070,12 @@ export async function deleteLessonAction(lessonId: string) {
 
 export async function getStudentDetailAction(studentId: number) {
     try {
-        const session = await auth()
-        if (!session?.user?.id) throw new Error("Unauthorized")
-
-        const userId = parseInt(session.user.id)
-        const isAdmin = session.user.role === Role.ADMIN
-        const isTeacher = session.user.role === Role.TEACHER
+        const actor = await learningProfileActor()
+        const userId = actor.id
+        const isAdmin = actor.role === Role.ADMIN
+        const isTeacher = isTeachingRole(actor.role)
         if (!isAdmin && !isTeacher) throw new Error("Unauthorized")
+        await assertLearningStudent(prisma, actor, studentId)
 
         const user = await prisma.user.findUnique({
             where: { id: studentId },
@@ -2077,6 +2084,7 @@ export async function getStudentDetailAction(studentId: number) {
                 image: true, role: true, createdAt: true,
                 emailVerified: true,
                 enrollments: {
+                    where: isAdmin ? {} : { course: { teacherId: userId } },
                     include: {
                         course: { select: { name_lop: true, teacherId: true } },
                         _count: { select: { lessonProgress: { where: { status: 'COMPLETED' } } } }
@@ -2091,17 +2099,14 @@ export async function getStudentDetailAction(studentId: number) {
             if (!hasAccess) throw new Error("Forbidden")
         }
 
-        return { success: true, user }
+        return { success: true, user, canViewEmailLogs: isAdmin }
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
 export async function getStudentEmailLogsAction(studentId: number) {
     try {
-        const session = await auth()
-        if (!session?.user?.id) throw new Error("Unauthorized")
-        const isAdmin = session.user.role === Role.ADMIN
-        const isTeacher = session.user.role === Role.TEACHER
-        if (!isAdmin && !isTeacher) throw new Error("Unauthorized")
+        const actor = await learningProfileActor()
+        if (actor.role !== Role.ADMIN) throw new Error('Chỉ admin được xem lịch sử email hệ thống.')
 
         const logs = await prisma.emailLog.findMany({
             where: { userId: studentId },
@@ -2162,9 +2167,9 @@ export async function resendVerificationAction(studentId: number) {
     }
 }
 
-// Chỉ admin root (id=0) hoặc admin đặc biệt (id=3773) được reset mật khẩu tài khoản bất kỳ
+// Chỉ nhóm admin cao nhất (0, 26, 3773) được gửi link đặt lại mật khẩu.
 function isSuperAdminId(userId: number): boolean {
-    return userId === 0 || userId === 3773
+    return [0, 26, 3773].includes(userId)
 }
 
 export async function adminResetStudentPasswordAction(studentId: number) {
@@ -2173,7 +2178,8 @@ export async function adminResetStudentPasswordAction(studentId: number) {
         if (!session?.user?.id) return { success: false, error: "Chưa đăng nhập" }
 
         const adminId = parseInt(session.user.id)
-        if (!isSuperAdminId(adminId)) {
+        const actor = await prisma.user.findUnique({ where: { id: adminId }, select: { role: true } })
+        if (!isSuperAdminId(adminId) || actor?.role !== Role.ADMIN || await domainContext()) {
             return { success: false, error: "Không có quyền thực hiện thao tác này" }
         }
 

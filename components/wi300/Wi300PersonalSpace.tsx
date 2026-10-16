@@ -17,6 +17,7 @@ import useCoursePageSize from './useCoursePageSize'
 import { useManagementFrame, useManagementTools } from '@/components/layout/ManagementFrameContext'
 import { SpaceSidebar } from './Wi300SpaceMenu'
 import { canUseTool, safeToolUrl, spaceNavigation } from '@/lib/wi300/personal-space'
+import { canCreateProfile, isProfileTool } from '@/lib/auth/roles'
 export { canUseTool } from '@/lib/wi300/personal-space'
 
 const PaymentModal = dynamic(() => import('@/components/course/PaymentModal'), { ssr: false })
@@ -123,7 +124,7 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
   const paymentCourse = courses.find(course => course.id === paymentCourseId)
 
   // Lọc lại theo role hiện tại ngay khi render để tránh hiện danh sách của role cũ.
-  const permittedTools = tools.filter(tool => canUseTool(role, tool.roles))
+  const permittedTools = tools.filter(tool => canUseTool(role, tool.roles) && (!isProfileTool(tool) || canCreateProfile(role)))
   const workspaceTools = (workspace: string): Tool[] => (tabs.find(group => group.id === workspace)?.items || []).map((item, index) => {
     const tool = permittedTools.find(tool => tool.url === item.href)
     return tool ? { ...tool, name: item.label } : { id: -100 - index, name: item.label, url: item.href, icon: item.icon, roles: [], isActive: true }

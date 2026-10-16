@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
+import { normalizeRole } from '@/lib/auth/roles'
 import bcrypt from 'bcryptjs'
 import { requireAdmin } from '@/lib/api-auth'
 
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
             name: ut.name,
             phone: ut.phone,
             email: ut.email,
-            role: ut.role,
+            role: normalizeRole(ut.role),
             referrerId: ut.referrerId
           }
         })
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
             email: ut.email,
             phone: ut.phone,
             password: ut.password,
-            role: ut.role,
+            role: normalizeRole(ut.role),
             referrerId: ut.referrerId,
             passwordChanged: ut.passwordChanged
           }

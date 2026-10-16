@@ -1,6 +1,7 @@
 import 'server-only'
 import { cache } from 'react'
 import { auth } from '@/auth'
+import { canCreateProfile } from '@/lib/auth/roles'
 import prisma from '@/lib/prisma'
 import { headers } from 'next/headers'
 import { CrmError } from '@/lib/crm/service'
@@ -17,7 +18,7 @@ export const websiteActor = cache(async (request?: Request) => {
   return user
 })
 export function canManageWebsite(profile: { userId: number | null; members: { userId: number; role: string }[] }, actor: { id: number; role: string }, ownerOnly = false) {
-  return actor.role === 'ADMIN' || profile.userId === actor.id || !ownerOnly && profile.members.some(member => member.userId === actor.id && member.role === WEBSITE_MANAGER_ROLE)
+  return actor.role === 'ADMIN' || profile.userId === actor.id && canCreateProfile(actor.role) || !ownerOnly && profile.members.some(member => member.userId === actor.id && member.role === WEBSITE_MANAGER_ROLE)
 }
 /** Mã website đến từ URL của chính tab đang mở; luôn kiểm tra quyền lại ở máy chủ. */
 export async function managedProfile(profileId?: number, ownerOnly = false, request?: Request) {

@@ -11,6 +11,9 @@ const management=load('lib/website/management.ts',mocks)
 const request=id=>new Request('https://'+host+'/api/websites/access?profileId='+id,{headers:{host}})
 async function run(){
  assert.equal((await management.managedProfile()).id,7)
+ actor={id:1,role:'STUDENT'};await assert.rejects(management.managedProfile(7),e=>e.status===404)
+ actor={id:1,role:'INSTRUCTOR'};assert.equal((await management.managedProfile(7)).id,7)
+ actor={id:1,role:'TEACHER'}
  await assert.rejects(management.managedProfile(8),e=>e.status===404)
  actor={id:2,role:'TEACHER'};await assert.rejects(management.managedProfile(7),e=>e.status===404)
  actor={id:3,role:'STUDENT'};assert.equal((await management.managedProfile(7)).id,7)
@@ -40,6 +43,8 @@ async function run(){
  selection='8';renderToStaticMarkup(React.createElement(scope.WebsiteScopeProvider,null,React.createElement(Probe)));assert.equal(href('/api/websites/pages'),'/api/websites/pages?profileId=8');assert.equal(first('/api/websites/pages'),'/api/websites/pages?profileId=7')
  // Exercise the rendered list and the actual collaborator permission checkbox.
  const {JSDOM}=require('jsdom'),dom=new JSDOM('<div id="root"></div>',{url:'https://giautoandien.io.vn/tools/pages'})
+ const navigatorDescriptor=Object.getOwnPropertyDescriptor(global,'navigator')
+ Object.defineProperty(global,'navigator',{configurable:true,value:dom.window.navigator})
  global.window=dom.window;global.document=dom.window.document;global.IS_REACT_ACT_ENVIRONMENT=true
  const {createRoot}=require('react-dom/client'),ui=createRoot(document.getElementById('root'))
  global.fetch=async()=>({ok:true,json:async()=>({profiles:[{id:7,slug:'lucy',title:'Lucy',isActive:true,user:{name:'Lucy'},access:'collaborator'}],nextPage:null})})
@@ -55,6 +60,7 @@ async function run(){
  await React.act(async()=>ui.render(React.createElement(Member,{profileId:7,initialMembers:[member],canManage:false})))
  assert.ok([...document.querySelectorAll('input[type="checkbox"]')].every(input=>input.disabled));assert.ok(!document.querySelector('button[title="Xóa cộng sự"]'))
  await React.act(async()=>ui.unmount());dom.window.close()
+ if(navigatorDescriptor)Object.defineProperty(global,'navigator',navigatorDescriptor);else delete global.navigator
  console.log('PASS website management: owner/admin/delegate permissions, revocation, fresh roles, ID 0, host isolation, list projection, protected member grants, safe edits and independent tab scope.')
 }
 run().catch(e=>{console.error(e);process.exitCode=1})

@@ -1,8 +1,6 @@
 import { managedProfile } from './management'
 import 'server-only'
 import prisma from '@/lib/prisma'
-import { auth } from '@/auth'
-import { CrmError } from '@/lib/crm/service'
 import { getCoursesForProfile, getPostsForProfile } from '@/app/actions/site-profile-actions'
 import {getCourseWhereForProfile,getSiteRuntimeConfig} from '@/lib/site-profile/config'
 

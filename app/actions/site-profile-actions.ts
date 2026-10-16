@@ -4,6 +4,8 @@ import prisma from '@/lib/prisma'
 import { managedProfile, websiteActor, WEBSITE_MANAGER_ROLE } from '@/lib/website/management'
 import { FALLBACK_PROFILE, FALLBACK_COURSES, FALLBACK_POSTS, FALLBACK_SURVEY } from '@/lib/db-fallback'
 import { auth } from '@/auth'
+import { canCreateProfile } from '@/lib/auth/roles'
+import { domainContext } from '@/lib/website/domain-context'
 import { requireAdminAction } from '@/lib/api-auth'
 import { unstable_cache, revalidateTag } from 'next/cache'
 import {presentationKey,presentationSchema} from '@/lib/website/presentation'
@@ -348,10 +350,18 @@ export async function getPostCategories() {
  * Tạo profile mới cho Teacher (Admin chọn teacher để gán profile)
  */
 export async function createSiteProfile(userId: number | null, slug: string) {
-  const denied = await requireAdminAction()
-  if (denied) return { error: denied.error }
-
   try {
+        if (await domainContext()) return { error: 'Tạo website tại hệ thống chính.' }
+        const session = await auth()
+        if (session?.user?.id == null) return { error: 'Vui lòng đăng nhập.' }
+        const actor = await prisma.user.findUnique({ where: { id: Number(session.user.id) }, select: { id: true, role: true } })
+        if (!actor || !canCreateProfile(actor.role)) return { error: 'Chỉ giảng viên hoặc admin được tạo website.' }
+        if (actor.role !== 'ADMIN') {
+          if (userId != null && userId !== actor.id) return { error: 'Bạn chỉ được tạo website cho chính mình.' }
+          userId = actor.id
+        }
+        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 50) return { error: 'Đường dẫn không hợp lệ.' }
+        if (userId != null && (!Number.isSafeInteger(userId) || userId < 0)) return { error: 'Mã chủ website không hợp lệ.' }
         const existing = await prisma.siteProfile.findUnique({ where: { slug } })
         if (existing) return { error: 'Slug đã được sử dụng' }
 

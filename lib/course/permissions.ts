@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { Role } from '@prisma/client'
 import { domainContext } from '@/lib/website/domain-context'
+import { isTeachingRole } from '@/lib/auth/roles'
 
 export type CourseAuthContext = {
     userId: number
@@ -17,13 +18,13 @@ export async function getCourseAuthContext(): Promise<CourseAuthContext | null> 
     return {
         userId: parseInt(session.user.id),
         isAdmin: session.user.role === Role.ADMIN,
-        isTeacher: session.user.role === Role.TEACHER,
+        isTeacher: isTeachingRole(session.user.role),
     }
 }
 
 /** ADMIN luôn được phép. TEACHER chỉ được thao tác course/lesson của chính mình. */
 export function canManageCourse(ctx: CourseAuthContext, courseTeacherId: number | null): boolean {
-    return ctx.isAdmin || courseTeacherId === ctx.userId
+    return ctx.isAdmin || (ctx.isTeacher && courseTeacherId === ctx.userId)
 }
 
 /**

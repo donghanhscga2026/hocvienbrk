@@ -4,7 +4,8 @@ const { renderToStaticMarkup } = require('react-dom/server')
 const load = require('./helpers/load-ts.cjs')
 async function run() {
   let actor = { id: 8, role: 'TEACHER' }, saved, select, query, visible = true, brand = { appearance: { hiddenPages: [] } }
-  const db = { user: { findUnique: async args => { select = args.select; return { name: 'Người dạy', image: null, siteProfile: { slug: 'nguoi-day', isActive: true } } } }, systemConfig: { findUnique: async () => ({ value: saved || {} }), upsert: async ({ create }) => { saved = create.value } }, course: { findMany: async args => { query = args; return visible ? [{ id: 1, id_khoa: 'OWN', name_lop: 'Khóa công khai', mo_ta_ngan: '', link_anh_bia: null, courseCategory: { name: 'Công nghệ' } }] : [] } } }
+  let publicRole = 'TEACHER'
+  const db = { user: { findUnique: async args => { select = args.select; return { role: publicRole, name: 'Người dạy', image: null, siteProfile: { slug: 'nguoi-day', isActive: true } } } }, systemConfig: { findUnique: async () => ({ value: saved || {} }), upsert: async ({ create }) => { saved = create.value } }, course: { findMany: async args => { query = args; return visible ? [{ id: 1, id_khoa: 'OWN', name_lop: 'Khóa công khai', mo_ta_ngan: '', link_anh_bia: null, courseCategory: { name: 'Công nghệ' } }] : [] } } }
   const api = load('app/api/wi300/teacher-profile/route.ts', { '@/lib/prisma': { __esModule: true, default: db }, '@/lib/course-page/permissions': { courseEditorActor: async () => actor }, 'next/cache': { revalidatePath() {} } })
   assert.equal((await api.GET(new Request('https://test.invalid/api/wi300/teacher-profile?teacher=9'))).status, 403)
   const body = { headline: 'Giảng viên tận tâm', introduction: 'Giới thiệu thật', fields: ['Công nghệ'], website: '' }
@@ -32,6 +33,9 @@ async function run() {
   assert.equal(query.take, 13, 'Bounded course query supports first 12 and a link for more')
   assert.deepEqual(query.where.AND, [{ id: { in: [1] } }, { teacherId: 8 }])
   assert.equal(select.email, undefined); assert.equal(select.phone, undefined); assert.equal(select.password, undefined)
+  publicRole = 'STUDENT'
+  await assert.rejects(() => page({ params: Promise.resolve({ id: '8' }) }), /404/)
+  publicRole = 'TEACHER'
   visible = false
   await assert.rejects(() => page({ params: Promise.resolve({ id: '8' }) }), /404/)
   visible = true; brand = null
