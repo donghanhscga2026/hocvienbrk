@@ -19,7 +19,7 @@ export default function Wi300ManagementFrame({ children }: { children: ReactNode
   const [open, setOpen] = useState(false), [expanded, setExpanded] = useState<string | null>(null)
   const currentTools = result?.actor === actor && result.role === role ? result.tools : []
   const groups = managementNavigation(role, currentTools)
-  const location = managementLocation(path, new URLSearchParams(params.toString()), groups)
+  const location = managementLocation(path, new URLSearchParams(params.toString()), groups, actor)
   const currentRoute = path + (params.toString() ? '?' + params.toString() : '')
   useEffect(() => {
     if (status !== 'authenticated') return
@@ -35,6 +35,7 @@ export default function Wi300ManagementFrame({ children }: { children: ReactNode
   useEffect(() => { setOpen(false); setExpanded(null) }, [currentRoute, actor, role])
   const activeItem = (href: string) => {
     const target = new URL(href, 'https://wi300.invalid')
+    if (target.pathname === '/ho-so-hoc-tap') return location.groupId === 'learning' && /^\/ho-so-hoc-tap\/\d+$/.test(path)
     if (target.pathname === '/tools/pages' && path !== target.pathname && isPageManagementRoute(path)) return true
     return path === target.pathname && [...target.searchParams].every(([key, value]) => params.get(key) === value)
   }

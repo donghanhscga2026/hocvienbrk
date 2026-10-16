@@ -88,6 +88,7 @@ export function spaceNavigation(role: string, tools: PersonalTool[]): SpaceNavGr
       { label: 'Khóa đã hoàn thành', href: '/my-space?tab=learning&status=completed', icon: 'GraduationCap' },
       { label: 'Đăng ký chờ xử lý', href: '/my-space?tab=learning&status=pending', icon: 'CreditCard' },
       ...(loggedIn ? [{ label: 'Yêu cầu của tôi', href: '/my-requests', icon: 'MessageCircle' }] : []),
+      ...(loggedIn ? [{ label: 'Hồ sơ học tập của tôi', href: '/ho-so-hoc-tap', icon: 'UserRound' }] : []),
     ] },
     ...(canTeach(role) ? [{ id: 'teaching', label: 'Giảng dạy', href: '/my-space?tab=teaching', icon: 'GraduationCap', items: [{ label: 'Hồ sơ giảng viên', href: '/tools/wi-teacher-profile', icon: 'UserRound' }, { label: 'Thư viện mẫu trang bán', href: '/tools/courses/templates', icon: 'PanelsTopLeft' }] }] : []),
     ...(loggedIn ? [{ id: 'affiliate', label: 'Cộng tác viên', href: '/my-space?tab=affiliate', icon: 'Link2', items: [{ label: 'Link giới thiệu & hoa hồng', href: '/tools/affiliate', icon: 'Link2' }] }] : []),

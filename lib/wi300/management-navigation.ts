@@ -7,14 +7,14 @@ export function managementNavigation(role: string, tools: PersonalTool[]): Space
 }
 
 export function isManagementRoute(path: string) {
-  return (path === '/my-space' || path === '/tools' || path.startsWith('/tools/') || path === '/account-settings' || path === '/my-requests' || path === '/du-an/quan-ly' || path === '/du-an/noi-dung') && path !== '/tools/courses/templates/preview'
+  return (path === '/my-space' || path === '/tools' || path.startsWith('/tools/') || /^\/ho-so-hoc-tap\/\d+$/.test(path) || path === '/account-settings' || path === '/my-requests' || path === '/du-an/quan-ly' || path === '/du-an/noi-dung') && path !== '/tools/courses/templates/preview'
 }
 
 export type NavigationLocation = { groupId: string; title: string; crumbs: { label: string; href?: string }[]; back: { label: string; href: string } | null }
 export function isPageManagementRoute(path: string) {
   return ['/tools/pages', '/tools/my-site', '/tools/site-profiles', '/tools/landings'].some(parent => path === parent || path.startsWith(parent + '/'))
 }
-export function managementLocation(path: string, params: URLSearchParams, groups: SpaceNavGroup[]): NavigationLocation {
+export function managementLocation(path: string, params: URLSearchParams, groups: SpaceNavGroup[], viewerId?: string | number | null): NavigationLocation {
   const root = { label: 'Không gian của tôi', href: '/my-space' }
   const courseList = { label: 'Quản lý khóa học', href: '/tools/courses' }
   const courseId = params.get('courseId')
@@ -33,6 +33,15 @@ export function managementLocation(path: string, params: URLSearchParams, groups
     title = groups.find(group => group.id === groupId)?.label || 'Không gian của tôi'
     crumbs = tab === 'home' ? [{ label: root.label }] : [root, { label: title }]
     if (tab === 'home') back = null
+  } else if (/^\/ho-so-hoc-tap\/\d+$/.test(path)) {
+    // Teaching accounts also learn: use the viewed account, not just the role.
+    const profileId = Number(path.split('/').pop())
+    const knownViewer = viewerId != null && String(viewerId).trim() !== '' && Number.isSafeInteger(Number(viewerId))
+    const ownProfile = knownViewer && profileId === Number(viewerId)
+    const teaching = knownViewer && !ownProfile && groups.some(group => group.id === 'teaching')
+    groupId = teaching ? 'teaching' : 'learning'; title = 'Hồ sơ học tập'
+    crumbs.push({ label: title })
+    back = { label: teaching ? 'Về danh sách học viên' : 'Về Học tập', href: teaching ? '/tools/students' : '/my-space?tab=learning' }
   } else if (isPageManagementRoute(path)) {
     groupId = 'business'
     const pageList = { label: 'Page', href: '/tools/pages?tab=my-site' }
