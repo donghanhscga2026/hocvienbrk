@@ -5,7 +5,7 @@ const { learningProfileHref } = load('lib/learning-profile/shared.ts')
 const rows = [11, 22].map((teacherId, i) => ({ id: i + 1, userId: 7, courseId: i + 101, status: 'ACTIVE', startedAt: new Date('2026-10-15'), activatedAt: null, createdAt: new Date('2026-10-01'), course: { id: i + 101, teacherId, id_khoa: 'K' + i, name_lop: 'Lớp ' + i, _count: { lessons: 1 } } }))
 function matches(row, where) {
   if (where.AND) return where.AND.every(part => matches(row, part))
-  return (where.userId == null || row.userId === where.userId) && (where.courseId == null || row.courseId === where.courseId) && (!where.course || row.course.teacherId === where.course.teacherId)
+  return (where.userId == null || row.userId === where.userId) && (where.courseId == null || row.courseId === where.courseId) && (where.course?.teacherId == null || row.course.teacherId === where.course.teacherId) && (!where.course?.name_lop || row.course.name_lop.toLowerCase().includes(where.course.name_lop.contains.toLowerCase()))
 }
 let identityReads = 0, submittedAt = new Date('2026-10-15T16:58:00Z'), queries = []
 const db = {
@@ -41,9 +41,36 @@ async function run() {
   const commentQuery = queries.find(q => q.where?.OR)
   assert.deepEqual(commentQuery.where.OR, [{ userId: 7 }, { userId: 11, parent: { userId: 7 } }])
   const React = require('react'), { renderToStaticMarkup } = require('react-dom/server')
-  const View = load('components/learning-profile/LearningProfileView.tsx', { 'next/link': { __esModule: true, default: props => React.createElement('a', props) }, 'next/image': { __esModule: true, default: props => React.createElement('img', props) } }).default
+  const View = load('components/learning-profile/LearningProfileView.tsx', { 'next/navigation': { useRouter: () => ({ push() {} }) }, 'next/link': { __esModule: true, default: props => React.createElement('a', props) }, 'next/image': { __esModule: true, default: props => React.createElement('img', props) } }).default
   const html = renderToStaticMarkup(React.createElement(View, { data }))
   assert.ok(!html.includes('<script>')); assert.ok(!html.includes('javascript:')); assert.ok(html.includes('https://example.org/evidence'))
+  assert.ok(html.includes('Xem tất cả khóa')); assert.ok(!html.includes('<aside'))
+  assert.ok(!/<details[^>]*open=""/.test(html), 'Course list and lessons start collapsed')
+  for (let i = 0; i < 30; i++) rows.push({ ...rows[0], id: 100 + i, courseId: 200 + i, course: { ...rows[0].course, id: 200 + i, name_lop: 'Khóa tìm kiếm ' + i } })
+  const many = await service.readLearningProfile(db, teacher, 7)
+  assert.equal(many.totalCourses, 31); assert.equal(many.courses.length, 12)
+  const found = await service.readLearningProfile(db, teacher, 7, { q: 'kiếm 29', course: 101 })
+  assert.deepEqual(found.courses.map(row => row.courseId), [229], 'Search reaches beyond page one')
+  assert.equal(found.matchedCourses, 1); assert.equal(found.totalCourses, 31)
+  assert.equal(found.selected.courseId, 101, 'Search preserves currently selected course')
+  const foreign = await service.readLearningProfile(db, teacher, 7, { q: 'Lớp 1', course: 101 })
+  assert.equal(foreign.matchedCourses, 0, 'Search cannot reveal another teacher course')
+  const next = await service.readLearningProfile(db, teacher, 7, { page: 2, course: 229 })
+  assert.equal(next.courses.length, 12); assert.equal(next.selected.courseId, 229)
+  const manyHtml = renderToStaticMarkup(React.createElement(View, { data: next }))
+  assert.ok(manyHtml.includes('max-h-80')); assert.ok(manyHtml.includes('course=229'))
+  rows.splice(2)
+  // Exercise the real picker event: switching courses navigates without resetting scroll.
+  const { JSDOM } = require('jsdom'), dom = new JSDOM('<div id="picker"></div>')
+  global.window = dom.window; global.document = dom.window.document; global.IS_REACT_ACT_ENVIRONMENT = true
+  let navigation
+  const Picker = load('components/learning-profile/CoursePicker.tsx', { 'next/navigation': { useRouter: () => ({ push: (...args) => { navigation = args } }) } }).default
+  const root = require('react-dom/client').createRoot(document.getElementById('picker'))
+  try {
+    await React.act(async () => root.render(React.createElement(Picker, { value: 101, options: [{ id: 101, name: 'Một', href: '/ho-so-hoc-tap/7?course=101' }, { id: 229, name: 'Hai', href: '/ho-so-hoc-tap/7?course=229' }] })))
+    await React.act(async () => { const select = document.querySelector('select'); select.value = '229'; select.dispatchEvent(new window.Event('change', { bubbles: true })) })
+    assert.deepEqual(navigation, ['/ho-so-hoc-tap/7?course=229', { scroll: false }])
+  } finally { await React.act(async () => root.unmount()); dom.window.close(); delete global.window; delete global.document }
   let role = 'STUDENT', session = { user: { id: '11', role: 'ADMIN' } }
   const actor = load('lib/learning-profile/server.ts', { 'server-only': {}, '@/auth': { auth: async () => session }, '@/lib/website/domain-context': { domainContext: async () => null }, '@/lib/prisma': { __esModule: true, default: { user: { findUnique: async () => ({ id: 11, role }) } } } }).learningProfileActor
   assert.equal((await actor()).role, 'STUDENT', 'Ignore stale elevated JWT role')

@@ -28,14 +28,18 @@ const enrollmentSelect = {
 } as const
 
 /** Only explicit learning fields leave this service. No CRM notes or email logs. */
-export async function readLearningProfile(db: PrismaClient, actor: LearningActor, studentId: number, options: { course?: number; page?: number; lessonPage?: number } = {}) {
+export async function readLearningProfile(db: PrismaClient, actor: LearningActor, studentId: number, options: { course?: number; page?: number; lessonPage?: number; q?: string } = {}) {
   const page = options.page ?? 1, lessonPage = options.lessonPage ?? 1
   if (![page, lessonPage].every(n => Number.isSafeInteger(n) && n > 0 && n <= 10000) || (options.course != null && (!validId(options.course) || options.course === 0))) throw new LearningProfileError('Tham số không hợp lệ.', 400)
   const scope = await assertLearningStudent(db, actor, studentId)
-  const [student, totalCourses, rows] = await Promise.all([
+  const q = (options.q ?? '').trim().slice(0, 120)
+  // Search every permitted course in SQL, including courses beyond the first page.
+  const listScope: Prisma.EnrollmentWhereInput = q ? { AND: [scope, { course: { name_lop: { contains: q, mode: 'insensitive' } } }] } : scope
+  const [student, totalCourses, matchedCourses, rows] = await Promise.all([
     db.user.findUnique({ where: { id: studentId }, select: { id: true, name: true, email: true, phone: true, image: true, role: true } }),
     db.enrollment.count({ where: scope }),
-    db.enrollment.findMany({ where: scope, select: enrollmentSelect, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
+    q ? db.enrollment.count({ where: listScope }) : Promise.resolve(null),
+    db.enrollment.findMany({ where: listScope, select: enrollmentSelect, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
   ])
   if (!student) throw denied()
   // A course ID from the URL must pass the same scope even if off this course-list page.
@@ -46,15 +50,16 @@ export async function readLearningProfile(db: PrismaClient, actor: LearningActor
   const enrollmentIds = [...new Set([...rows.map(row => row.id), ...(selected ? [selected.id] : [])])]
   const [states, submissions] = enrollmentIds.length ? await Promise.all([
     db.lessonProgress.groupBy({ by: ['enrollmentId', 'status'], where: { enrollmentId: { in: enrollmentIds }, status: { not: 'RESET' } }, _count: { _all: true }, _max: { updatedAt: true } }),
-    db.lessonProgress.groupBy({ by: ['enrollmentId'], where: { enrollmentId: { in: enrollmentIds }, status: { not: 'RESET' }, submittedAt: { not: null } }, _count: { _all: true } }),
+    db.lessonProgress.groupBy({ by: ['enrollmentId'], where: { enrollmentId: { in: enrollmentIds }, status: { not: 'RESET' }, submittedAt: { not: null } }, _count: { _all: true }, _avg: { totalScore: true } }),
   ]) : [[], []]
   const summarize = (row: typeof rows[number]) => {
     const state = states.filter(item => item.enrollmentId === row.id)
     const lastActivityAt = state.map(item => item._max.updatedAt).filter((date): date is Date => date != null).sort((a, b) => b.getTime() - a.getTime())[0] ?? null
     const completed = state.filter(item => item.status === 'COMPLETED').reduce((sum, item) => sum + item._count._all, 0)
-    return { ...row, completed, submitted: submissions.find(item => item.enrollmentId === row.id)?._count._all ?? 0, total: row.course._count.lessons, lastActivityAt }
+    const submitted = submissions.find(item => item.enrollmentId === row.id)
+    return { ...row, completed, submitted: submitted?._count._all ?? 0, averageScore: submitted?._avg.totalScore ?? null, total: row.course._count.lessons, lastActivityAt }
   }
-  const base = { student, viewer: actor.role === 'ADMIN' ? 'admin' : actor.id === studentId ? 'self' : 'teacher', courses: rows.map(summarize), totalCourses, page, pageSize: PAGE_SIZE }
+  const base = { student, viewer: actor.role === 'ADMIN' ? 'admin' : actor.id === studentId ? 'self' : 'teacher', courses: rows.map(summarize), totalCourses, matchedCourses: matchedCourses ?? totalCourses, q, page, pageSize: PAGE_SIZE }
   if (!selected) return { ...base, selected: null }
   const [lessons, totalLessons] = await Promise.all([
     db.lesson.findMany({ where: { courseId: selected.courseId }, orderBy: [{ order: 'asc' }, { id: 'asc' }], select: { id: true, order: true, title: true, isDailyChallenge: true }, skip: (lessonPage - 1) * LESSON_PAGE_SIZE, take: LESSON_PAGE_SIZE }),

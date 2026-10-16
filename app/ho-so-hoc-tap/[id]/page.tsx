@@ -10,7 +10,7 @@ import LearningProfileView from '@/components/learning-profile/LearningProfileVi
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 export const metadata: Metadata = { title: 'Hồ sơ học tập', robots: { index: false, follow: false }, referrer: 'same-origin' }
-const querySchema = z.object({ course: z.coerce.number().int().positive().optional(), page: z.coerce.number().int().min(1).max(10000).optional(), lessonPage: z.coerce.number().int().min(1).max(10000).optional() })
+const querySchema = z.object({ q: z.string().trim().max(120).optional(), course: z.coerce.number().int().positive().optional(), page: z.coerce.number().int().min(1).max(10000).optional(), lessonPage: z.coerce.number().int().min(1).max(10000).optional() })
 
 export default async function Page({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const [{ id }, raw] = await Promise.all([params, searchParams])
