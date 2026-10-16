@@ -1,4 +1,5 @@
 'use client'
+import {useWebsiteScope} from './WebsiteScope'
 /* eslint-disable @next/next/no-html-link-for-pages -- Các công cụ quản lý có vòng đời riêng. */
 import {useEffect,useState} from 'react'
 import {moduleKeys,moduleLabels,moduleScopes,noModules,type WebsiteAccess} from '@/lib/website/access'
@@ -8,8 +9,10 @@ import type {DomainModules} from '@/lib/website/domain-shared'
 
 type Section='design'|'data'|'domains'|'apps'|'package'
 type Presentation={homepageType?:string;mode:'template';revision:number;customPublished:boolean}
-type Snapshot={profileId?:number;access:WebsiteAccess;basic:DomainModules;basicApplications:ApplicationFlags;admin:boolean;name:string;slug:string;configured:boolean;domains:{hostname:string;enabled:boolean}[]}
+type Snapshot={profileId?:number;access:WebsiteAccess;basic:DomainModules;basicApplications:ApplicationFlags;admin:boolean;canManageMembers?:boolean;name:string;slug:string;configured:boolean;domains:{hostname:string;enabled:boolean}[]}
 export default function WebsiteManager() {
+  const website=useWebsiteScope()
+
   const [imported,setImported]=useState<Pick<PageTemplate,'name'|'active'|'revision'>|null>(null)
   const [presentation,setPresentation]=useState<Presentation|null>(null)
   const [data,setData]=useState<Snapshot|null>(null),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false)
@@ -31,15 +34,15 @@ export default function WebsiteManager() {
   },[websiteDirty,basicDirty])
   useEffect(()=>{
     const abort=new AbortController()
-    fetch('/api/websites/access',{signal:abort.signal}).then(async r=>{const value=await r.json();if(!r.ok)throw new Error(value.error);receive(value)}).catch(e=>{if(!abort.signal.aborted)setError(e.message)})
-    fetch('/api/websites/page-template?summary=1',{signal:abort.signal}).then(async r=>{const value=await r.json();if(!r.ok)throw new Error(value.error);setImported(value.template || null)}).catch(e=>{if(!abort.signal.aborted)setError(e.message)})
-    fetch('/api/websites/presentation',{signal:abort.signal}).then(async r=>{const value=await r.json();if(!r.ok)throw new Error(value.error);setPresentation(value)}).catch(e=>{if(!abort.signal.aborted)setError(e.message)})
+    website.fetch('/api/websites/access',{signal:abort.signal}).then(async r=>{const value=await r.json();if(!r.ok)throw new Error(value.error);receive(value)}).catch(e=>{if(!abort.signal.aborted)setError(e.message)})
+    website.fetch('/api/websites/page-template?summary=1',{signal:abort.signal}).then(async r=>{const value=await r.json();if(!r.ok)throw new Error(value.error);setImported(value.template || null)}).catch(e=>{if(!abort.signal.aborted)setError(e.message)})
+    website.fetch('/api/websites/presentation',{signal:abort.signal}).then(async r=>{const value=await r.json();if(!r.ok)throw new Error(value.error);setPresentation(value)}).catch(e=>{if(!abort.signal.aborted)setError(e.message)})
     return()=>abort.abort()
-  },[])
+  },[website])
   async function save(body:object,scope:'website'|'basic'='website') {
     setBusy(true);setError('');setMessage('')
     try {
-      const r=await fetch('/api/websites/access',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      const r=await website.fetch('/api/websites/access',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
       const value=await r.json();if(!r.ok)throw new Error(value.error);receive(value,scope);setMessage(scope==='basic'?'Đã lưu mẫu gói cơ bản. Bạn có thể áp dụng cho website này.':'Đã lưu kết nối của website.')
     } catch(e) {setError(e instanceof Error ? e.message : 'Không thể lưu.')} finally {setBusy(false)}
   }
@@ -48,10 +51,10 @@ export default function WebsiteManager() {
     setBusy(true);setError('');setMessage('')
     try {
       if(imported?.active){
-        const response=await fetch('/api/websites/page-template',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'builtin',revision:imported.revision})})
+        const response=await website.fetch('/api/websites/page-template',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'builtin',revision:imported.revision})})
         const result=await response.json();if(!response.ok)throw new Error(result.error);setImported(result.template)
       }
-      const r=await fetch('/api/websites/presentation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode,revision:presentation.revision})})
+      const r=await website.fetch('/api/websites/presentation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode,revision:presentation.revision})})
       const value=await r.json();if(!r.ok)throw new Error(value.error);setPresentation(value);setMessage('Đã chọn giao diện. Nội dung cả hai mẫu được giữ nguyên; tải lại website để xem.')
     } catch(e){setError(e instanceof Error?e.message:'Không thể đổi giao diện.')} finally{setBusy(false)}
   }
@@ -76,7 +79,7 @@ export default function WebsiteManager() {
   const button='inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-violet-600 disabled:opacity-50'
   const primary=button.replace('border-slate-200 bg-white','border-violet-700 bg-violet-700').replace('hover:bg-slate-50','hover:bg-violet-800')+' text-white'
   const landing=presentation?.homepageType==='landing'
-  const editHref=imported?.active?'/tools/my-site/template':landing && data?.profileId?'/tools/site-profiles/'+data.profileId+'/edit':'/tools/my-site/edit'
+  const editHref=imported?.active?'/tools/my-site/template':landing && data?.admin && data?.profileId?'/tools/site-profiles/'+data.profileId+'/edit':'/tools/my-site/edit'
   function applicationRow(id:string,name:string,audience:string,scope:string,base:boolean,extraFlag:boolean,connected:boolean,onExtra:(value:boolean)=>void,onConnected:(value:boolean)=>void) {
     const granted=base || extraFlag
     return <article key={id} className="rounded-xl border border-slate-200 px-4 py-3">
@@ -88,10 +91,11 @@ export default function WebsiteManager() {
     </article>
   }
   return <main className="min-h-screen bg-slate-50 p-4 text-slate-900 sm:p-8"><div className="mx-auto max-w-6xl space-y-6">
+    <a className="inline-block min-h-11 text-sm text-violet-700 underline" href="/tools/pages?tab=my-site">← Chọn website khác</a>
     <nav aria-label="Breadcrumb" className="flex flex-wrap gap-2 text-sm text-slate-500"><a href="/tools/pages?tab=my-site" className="text-violet-700 hover:underline">Trang của tôi</a><span aria-hidden="true">/</span><span>Quản lý website</span></nav>
     <header className="flex flex-wrap items-center justify-between gap-5 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
       <div className="min-w-0"><p className="mb-2 text-sm text-violet-700">Quản lý website của tôi</p><h1 className="break-words text-2xl font-bold sm:text-3xl">{data?.name || 'Website của tôi'}</h1><div className="mt-3 flex flex-wrap items-center gap-2 text-sm"><span className="rounded-full bg-violet-50 px-3 py-1 text-violet-800">{presentation?imported?.active?'Template đã nhập':landing?'Trang landing':'Mẫu có sẵn':'Đang tải giao diện…'}</span>{data && <span className="break-all text-slate-500">{view?.hostname || 'Chưa kết nối tên miền riêng'}</span>}</div></div>
-      <div className="flex flex-wrap gap-2">{data && <a className={button} href={view?'https://'+view.hostname:'/page/'+data.slug} target="_blank" rel="noreferrer">Xem website ↗</a>}{presentation && <a className={primary} href={editHref}>Chỉnh sửa →</a>}</div>
+      <div className="flex flex-wrap gap-2">{data && <a className={button} href={view?'https://'+view.hostname:'/page/'+data.slug} target="_blank" rel="noreferrer">Xem website ↗</a>}{presentation && <a className={primary} href={website.href(editHref)}>Chỉnh sửa →</a>}</div>
     </header>
     {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">{error}</p>}
     {message && <p role="status" className="rounded-xl bg-green-50 p-4 text-green-800">{message}</p>}
@@ -105,25 +109,25 @@ export default function WebsiteManager() {
         <h2 className="text-xl font-bold">{current.label}</h2><p className="mb-6 mt-1 text-sm text-slate-500">{current.description}</p>
         {section==='design' && <div className="space-y-5">
           {!presentation?<p>Đang tải mẫu đang dùng…</p>:<>
-            <div className="rounded-xl bg-slate-50 p-5"><p className="mb-2 text-sm text-slate-500">Giao diện đang hiển thị</p>{landing && <p className="mb-3 text-sm text-violet-700">Trang chủ đang dùng landing được chọn trong cấu hình quản trị. Đổi mẫu dưới đây sẽ thay lựa chọn đó.</p>}<h3 className="text-lg font-semibold">{imported?.active?imported.name:landing?'Trang landing':'Mẫu có sẵn'}</h3><p className="mb-4 mt-2 text-sm text-slate-600">{'Ảnh bìa, thông điệp, khóa học và bảng tin của bạn.'}</p><a className={primary} href={editHref}>Chỉnh sửa giao diện đang dùng →</a></div>
+            <div className="rounded-xl bg-slate-50 p-5"><p className="mb-2 text-sm text-slate-500">Giao diện đang hiển thị</p>{landing && <p className="mb-3 text-sm text-violet-700">Trang chủ đang dùng landing được chọn trong cấu hình quản trị. Đổi mẫu dưới đây sẽ thay lựa chọn đó.</p>}<h3 className="text-lg font-semibold">{imported?.active?imported.name:landing?'Trang landing':'Mẫu có sẵn'}</h3><p className="mb-4 mt-2 text-sm text-slate-600">{'Ảnh bìa, thông điệp, khóa học và bảng tin của bạn.'}</p><a className={primary} href={website.href(editHref)}>Chỉnh sửa giao diện đang dùng →</a></div>
             <details className="rounded-xl border border-slate-200 p-4"><summary className="cursor-pointer font-medium text-violet-700">Đổi giao diện</summary><p className="my-4 text-sm text-slate-600">Mẫu có sẵn dùng nguồn khóa học, tên miền và kết nối ứng dụng của bạn.</p><div className="grid gap-4 sm:grid-cols-1">
-              <article className="space-y-3 rounded-xl border p-4"><h3 className="font-semibold">Mẫu có sẵn</h3><a href="/tools/my-site/edit" className="block text-sm text-violet-700 underline">Chỉnh sửa mẫu</a><button className={button} disabled={busy || !imported?.active && !landing && presentation.mode==='template'} onClick={()=>void chooseMode('template')}>{!imported?.active && !landing && presentation.mode==='template'?'Đang sử dụng':'Dùng mẫu có sẵn'}</button></article>
+              <article className="space-y-3 rounded-xl border p-4"><h3 className="font-semibold">Mẫu có sẵn</h3><a href={website.href("/tools/my-site/edit")}  className="block text-sm text-violet-700 underline">Chỉnh sửa mẫu</a><button className={button} disabled={busy || !imported?.active && !landing && presentation.mode==='template'} onClick={()=>void chooseMode('template')}>{!imported?.active && !landing && presentation.mode==='template'?'Đang sử dụng':'Dùng mẫu có sẵn'}</button></article>
             </div></details>
-            <a className={button} href="/tools/my-site/template">Nhập HTML / ZIP và chèn danh sách khóa học →</a>
-            <a className={button} href="/tools/my-site/pages">Quản lý trang con & menu →</a>
+            <a className={button} href={website.href("/tools/my-site/template")} >Nhập HTML / ZIP và chèn danh sách khóa học →</a>
+            <a className={button} href={website.href("/tools/my-site/pages")} >Quản lý trang con & menu →</a>
             <p className="text-sm text-slate-500">Chỉnh màu, ảnh bìa và nội dung trong mẫu có sẵn. Chọn nguồn khóa học tại Dữ liệu & giáo viên.</p>
           </>}
         </div>}
-        {section==='data' && <div className="space-y-5"><div className="rounded-xl bg-slate-50 p-5"><h3 className="font-semibold">Nguồn khóa học</h3><p className="mt-2 text-sm text-slate-600">Chọn các khóa học được hiển thị và truy cập trên website. Bạn có thể dùng nguồn tự động từ chủ website, giáo viên liên kết hoặc chọn từng khóa học.</p></div><div className="rounded-xl border p-5"><h3 className="font-semibold">Giáo viên liên kết</h3><p className="mt-2 text-sm text-slate-600">Quản lý người phụ trách và nguồn khóa học dùng chung. Quyền sử dụng công cụ vẫn theo vai trò của từng tài khoản.</p></div><a className={primary} href="/tools/my-site/data">Quản lý dữ liệu & giáo viên →</a></div>}
-        {section==='domains' && data && <div className="space-y-5"><p className="text-sm text-slate-600">Tên miền hiển thị website theo mẫu có sẵn.</p>{data.domains.length?data.domains.map(domain=><div key={domain.hostname} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"><span className="break-all font-medium">{domain.hostname}</span><span className={'rounded-full px-3 py-1 text-xs '+(domain.enabled?'bg-green-50 text-green-800':'bg-slate-100 text-slate-600')}>{domain.enabled?'Đang bật':'Đang tắt'}</span></div>):<p className="rounded-xl bg-slate-50 p-5 text-sm text-slate-600">Bạn chưa kết nối tên miền riêng.</p>}<div className="flex flex-wrap gap-2"><a className={primary} href="/tools/my-site/domains">Quản lý tên miền →</a><a className={button} href={'/page/'+data.slug} target="_blank" rel="noreferrer">Xem địa chỉ trên hệ thống ↗</a></div></div>}
-        {section==='apps' && data && <div className="space-y-5">
+        {section==='data' && <div className="space-y-5"><div className="rounded-xl bg-slate-50 p-5"><h3 className="font-semibold">Nguồn khóa học</h3><p className="mt-2 text-sm text-slate-600">Chọn các khóa học được hiển thị và truy cập trên website. Bạn có thể dùng nguồn tự động từ chủ website, giáo viên liên kết hoặc chọn từng khóa học.</p></div><div className="rounded-xl border p-5"><h3 className="font-semibold">Giáo viên liên kết</h3><p className="mt-2 text-sm text-slate-600">Quản lý người phụ trách và nguồn khóa học dùng chung. Quyền sử dụng công cụ vẫn theo vai trò của từng tài khoản.</p></div><a className={primary} href={website.href("/tools/my-site/data")} >Quản lý dữ liệu & giáo viên →</a></div>}
+        {section==='domains' && data && <div className="space-y-5"><p className="text-sm text-slate-600">Tên miền hiển thị website theo mẫu có sẵn.</p>{data.domains.length?data.domains.map(domain=><div key={domain.hostname} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"><span className="break-all font-medium">{domain.hostname}</span><span className={'rounded-full px-3 py-1 text-xs '+(domain.enabled?'bg-green-50 text-green-800':'bg-slate-100 text-slate-600')}>{domain.enabled?'Đang bật':'Đang tắt'}</span></div>):<p className="rounded-xl bg-slate-50 p-5 text-sm text-slate-600">Bạn chưa kết nối tên miền riêng.</p>}<div className="flex flex-wrap gap-2"><a className={primary} href={website.href("/tools/my-site/domains")} >Quản lý tên miền →</a><a className={button} href={'/page/'+data.slug} target="_blank" rel="noreferrer">Xem địa chỉ trên hệ thống ↗</a></div></div>}
+        {section==='apps' && data && <fieldset disabled={data.canManageMembers===false} className="space-y-5">{data.canManageMembers===false && <p className="text-sm text-slate-600">Chỉ chủ website hoặc admin được thay đổi kết nối ứng dụng.</p>}
           <p className="text-sm text-slate-600">Bật ứng dụng đã được cấp cho website. Học viên dùng phần cá nhân; giáo viên liên kết dùng phần được phép quản lý.</p>
           <div className="flex flex-wrap gap-2"><button className={button} disabled={busy} onClick={connectGranted}>Bật tất cả đã được cấp</button><button className={button} disabled={busy} onClick={()=>{setEnabled({...noModules});setEnabledApps({...noApplications})}}>Tắt tất cả</button></div>
           <div className="space-y-3"><h3 className="font-semibold">Trên website riêng</h3>{moduleKeys.map(key=>applicationRow(key,moduleLabels[key],key==='crm'?'Chủ website / giáo viên liên kết':'Theo quyền tài khoản',moduleScopes[key],data.access.base[key],extra[key],enabled[key],value=>setExtra({...extra,[key]:value}),value=>setEnabled({...enabled,[key]:value})))}</div>
           <div className="space-y-3"><h3 className="font-semibold">Mở trên hệ thống chính</h3><p className="text-sm text-slate-500">Đây là lối mở ứng dụng trên hệ thống chính, chưa phải ứng dụng chạy bên trong website riêng. Khi bật, thành viên có quyền sẽ thấy nút mở trong tab mới và đăng nhập tại đó. Dữ liệu theo tài khoản trên hệ thống chính, có thể bao gồm dữ liệu ngoài website này.</p>{applicationKeys.map(key=>applicationRow(key,applications[key].name,applications[key].audience==='staff'?'Chủ website / giáo viên liên kết':'Thành viên theo quyền tài khoản',applications[key].scope,data.access.applications.base[key],extraApps[key],enabledApps[key],value=>setExtraApps({...extraApps,[key]:value}),value=>setEnabledApps({...enabledApps,[key]:value})))}</div>
           <p className="text-sm text-slate-500">Tắt lối mở ứng dụng giữ nguyên dữ liệu và quyền dùng trực tiếp trên hệ thống chính. Muốn ngừng dùng ứng dụng đó, cần điều chỉnh quyền tài khoản trên hệ thống chính.</p>
-          <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t bg-white p-4 sm:-mx-6 sm:px-6"><p role="status" className={'text-sm '+(websiteDirty?'text-amber-800':'text-slate-500')}>{websiteDirty?'Có thay đổi chưa lưu':'Kết nối đã được lưu'}</p><button className={primary} disabled={busy || !websiteDirty} onClick={()=>void save(websiteCommand())}>{busy?'Đang lưu…':'Lưu kết nối'}</button></div>
-        </div>}
+          <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t bg-white p-4 sm:-mx-6 sm:px-6"><p role="status" className={'text-sm '+(websiteDirty?'text-amber-800':'text-slate-500')}>{websiteDirty?'Có thay đổi chưa lưu':'Kết nối đã được lưu'}</p><button className={primary} disabled={busy || !websiteDirty || data.canManageMembers===false} onClick={()=>void save(websiteCommand())}>{busy?'Đang lưu…':'Lưu kết nối'}</button></div>
+        </fieldset>}
         {section==='package' && data?.admin && <fieldset disabled={busy} className="space-y-5">
           <p className="text-sm text-slate-600">Chọn ứng dụng đi cùng gói cơ bản, lưu mẫu rồi áp dụng cho website này. Sau đó chuyển sang Ứng dụng & quyền truy cập để bật kết nối. Lưu mẫu không tự đổi quyền của website đang hoạt động.</p>
           <button className={button} onClick={()=>{setBasic({courses:true,crm:true,affiliate:true});setBasicApps({...allApplications})}}>Chọn bộ cơ bản đầy đủ</button>

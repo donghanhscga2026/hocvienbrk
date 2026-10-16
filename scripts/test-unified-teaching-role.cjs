@@ -6,6 +6,8 @@ const roleHelpers = load('lib/auth/roles.ts')
 const { normalizeRole, canCreateProfile, isHighestAdmin } = roleHelpers
 let actor = { id: 26, role: 'ADMIN' }, writes = 0, created, profile = null, domain = null
 const db = {
+  $transaction: async fn => fn(db),
+  course: { count: async () => 0 },
   user: { findUnique: async ({ where }) => where.id === actor.id ? actor : { id: where.id, role: 'STUDENT' }, update: async args => { writes++; return args.data } },
   siteProfile: {
     findUnique: async ({ where }) => where.userId != null ? profile : null,
@@ -19,6 +21,7 @@ function isolated(file) {
   const mocks = {}
   for (const match of fs.readFileSync(require('node:path').join(__dirname, '..', file), 'utf8').matchAll(/from ['"]([^'"]+)['"]/g)) mocks[match[1]] = {}
   return load(file, { ...mocks, '@/auth': auth, '@/lib/prisma': { __esModule: true, default: db }, '@/lib/auth/roles': roleHelpers,
+    '@/lib/auth/change-member-role': load('lib/auth/change-member-role.ts'),
     '@prisma/client': require('@prisma/client'), 'next/cache': { unstable_cache: fn => fn, revalidatePath() {}, revalidateTag() {} },
     '@/lib/website/domain-context': { domainContext: async () => domain },
   })

@@ -52,11 +52,13 @@ jobs:
           node scripts/test-page-template-courses.cjs
           node scripts/test-page-template-assets.cjs
           node scripts/test-website-pages.cjs
+          node scripts/test-website-management-access.cjs
           node scripts/test-page-crm-forms.cjs
 
       - name: CRM requests and personal space regression checks
         run: |
           node scripts/test-unified-teaching-role.cjs
+          node scripts/test-learning-profiles.cjs
           node scripts/test-crm-request-workflow.cjs
           node scripts/test-crm-request-ui.cjs
           node scripts/test-crm-request-bulk.cjs

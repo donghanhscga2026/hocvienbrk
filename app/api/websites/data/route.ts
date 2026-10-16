@@ -1,3 +1,4 @@
+import { websiteActor, canManageWebsite } from '@/lib/website/management'
 import prisma from '@/lib/prisma'
 import {z} from 'zod'
 import {ownedProfile} from '@/lib/website/server'
@@ -10,7 +11,7 @@ import {revalidateTag} from 'next/cache'
 
 async function manager(request:Request) {
   if(!isPlatformHost(requestHostname(request.headers.get('host') || ''))) throw new CrmError('Quản lý dữ liệu tại hệ thống chính.',403)
-  return ownedProfile()
+  return ownedProfile(request)
 }
 function scope(profile:Awaited<ReturnType<typeof ownedProfile>>) {
   const config=getSiteRuntimeConfig(profile)
@@ -25,7 +26,7 @@ export async function GET(request:Request) {
       prisma.siteProfileMember.findMany({where:{profileId:profile.id},include:{user:{select:{id:true,name:true,email:true,image:true}}}}),
       prisma.course.findMany({where:{status:true,...selection.where},orderBy:{id:'desc'},select:{id:true,name_lop:true,teacherId:true}}),
     ])
-    return crmResponse({profileId:profile.id,scopeMode:getSiteRuntimeConfig(profile).courseScope.mode,selected:selection.selected,members,courses})
+    return crmResponse({profileId:profile.id,canManageMembers:canManageWebsite(profile,await websiteActor(request),true),scopeMode:getSiteRuntimeConfig(profile).courseScope.mode,selected:selection.selected,members,courses})
   } catch(e){return websiteFailure(e)}
 }
 const command=z.object({courseIds:z.array(z.number().int().positive()).max(500)}).strict()

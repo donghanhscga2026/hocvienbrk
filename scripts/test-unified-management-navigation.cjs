@@ -75,6 +75,17 @@ assert.equal(model.isPageManagementRoute('/tools/my-site-other'), false)
 assert.equal(model.managementLocation('/du-an/quan-ly', new URLSearchParams('project=wi-tech'), groups).back.href, '/du-an/quan-ly')
 assert.equal(model.managementLocation('/du-an/noi-dung', new URLSearchParams('project=wi-tech'), groups).back.href, '/du-an/quan-ly?project=wi-tech')
 assert.equal(model.managementLocation('/tools/courses/7/lib-access', new URLSearchParams(), groups).back.href, '/tools/courses/new?id=7')
+for (const role of ['TEACHER', 'INSTRUCTOR', 'ADMIN', 'STUDENT']) {
+  const nav = model.managementNavigation(role, tools)
+  for (const id of ['0', '71']) {
+    const own = model.managementLocation('/ho-so-hoc-tap/' + id, new URLSearchParams('course=7'), nav, id)
+    assert.equal(own.groupId, 'learning', role + ': own learning belongs to Học tập')
+    assert.equal(own.back.href, '/my-space?tab=learning')
+    const other = model.managementLocation('/ho-so-hoc-tap/99', new URLSearchParams(), nav, id)
+    assert.equal(other.groupId, role === 'STUDENT' ? 'learning' : 'teaching')
+  }
+}
+assert.equal(model.managementLocation('/ho-so-hoc-tap/0', new URLSearchParams(), groups, null).groupId, 'learning', 'No teaching expansion while session loads')
 const Frame = load('components/wi300/Wi300ManagementFrame.tsx').default, Workspace = load('components/layout/ManagementWorkspace.tsx').default
 const root = require('react-dom/client').createRoot(document.getElementById('root'))
 const originalFetch = global.fetch
@@ -100,6 +111,16 @@ async function run() {
     await React.act(async () => render())
     assert.equal(document.querySelector('[aria-label="Menu quản lý chung"] a[aria-current="page"]').textContent, 'Quản lý & kinh doanh')
     assert.equal(document.querySelector('a[href="/tools/pages"]').getAttribute('aria-current'), 'page')
+    route = '/ho-so-hoc-tap/71'; query = new URLSearchParams('course=7')
+    await React.act(async () => render())
+    assert.equal(document.querySelector('[aria-label="Các mục Học tập"]').getAttribute('aria-expanded'), 'true')
+    assert.equal(document.querySelector('[aria-label="Các mục Giảng dạy"]').getAttribute('aria-expanded'), 'false')
+    assert.equal(document.querySelector('a[href="/ho-so-hoc-tap"]').getAttribute('aria-current'), 'page')
+    assert.equal(document.querySelector('[aria-label="Menu quản lý chung"] a[aria-current="page"]').textContent, 'Học tập')
+    route = '/ho-so-hoc-tap/99'
+    await React.act(async () => render())
+    assert.equal(document.querySelector('[aria-label="Các mục Giảng dạy"]').getAttribute('aria-expanded'), 'true')
+    assert.equal(document.querySelector('a[href="/ho-so-hoc-tap"]').getAttribute('aria-current'), null)
     session = { user: { id: '0', role: 'ADMIN' } }
     route = '/tools/courses/templates/legacy'; query = new URLSearchParams('courseId=7&name=Khóa AI')
     await React.act(async () => render())
