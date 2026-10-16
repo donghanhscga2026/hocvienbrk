@@ -56,8 +56,11 @@ export default async function AffiliateConversionsPage() {
   const tableData = conversions.map((c, index) => {
     const customer = customerMap.get(c.customerId)
     const enrolls = customer ? (userEnrollmentsMap.get(customer.id) || []) : []
-    // Ưu tiên tìm enrollment của khóa học BRK #22, fallback về enrollment đầu tiên
-    const enrollment = enrolls.find(e => e.courseId === 22) || enrolls[0] || null
+    // Ưu tiên enrollment mà conversion này ghi nhận (c.enrollmentId),
+    // fallback về enrollment mới nhất của khách
+    const enrollment = (c.enrollmentId ? enrolls.find(e => e.id === c.enrollmentId) : null)
+      || enrolls.sort((a, b) => b.id - a.id)[0]
+      || null
 
     if (enrollment) {
       if (enrollment.status === 'ACTIVE') activeCount++

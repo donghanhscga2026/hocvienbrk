@@ -36,6 +36,16 @@ export async function POST(request: NextRequest) {
     const ipAddress = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown"
     const userAgent = request.headers.get("user-agent") || ""
 
+    // Affiliate v2 — GĐ5 chống spam click: bỏ qua nếu cùng link + IP trong 1 giờ qua
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+    const recent = await prisma.affiliateClick.findFirst({
+      where: { linkId: link.id, ipAddress, createdAt: { gte: oneHourAgo } },
+      select: { id: true }
+    })
+    if (recent) {
+      return NextResponse.json({ success: true, clickId: recent.id, userId, deduped: true })
+    }
+
     const click = await prisma.affiliateClick.create({
       data: { linkId: link.id, ipAddress, userAgent }
     })
