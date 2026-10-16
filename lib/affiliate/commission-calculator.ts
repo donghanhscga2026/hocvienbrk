@@ -11,6 +11,12 @@ interface LevelConfig {
     minOrder?: number | null
 }
 
+/**
+ * @deprecated Affiliate v2 (2026-10-16): engine đa tầng F1/F2/F3 đã được thay thế
+ * bởi mô hình 2 thành phần (trực tiếp + tri ân) trong
+ * `lib/affiliate/unified-commission.ts` (`processOrderCommission`).
+ * Giữ lại để tương thích ngược — KHÔNG gọi trong code mới.
+ */
 export async function processEnrollmentCommission(
     userId: number,
     enrollmentId: number,
