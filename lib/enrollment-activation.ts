@@ -162,15 +162,25 @@ export async function processEnrollmentActivation(options: ActivationOptions): P
   let commissionResult: any = null
   if (enrollment.course.type !== 'SYS') {
     try {
-      const amount = transferData?.amount || enrollment.payment?.amount || 0
+      // Hoa hồng tính trên GIÁ NIÊM YẾT (quyết định nghiệp vụ 2026-10-15):
+      // các phần trừ (MBV/ví/quà tặng) là quyền lợi, giảng viên chấp nhận bù.
+      const listedPrice = enrollment.course.phi_coc || 0
       commissionResult = await processEnrollmentCommission(
         enrollment.userId,
         enrollmentId,
-        amount
+        listedPrice
       )
     } catch (err) {
       console.error(`[Activation] Commission processing failed for enrollment#${enrollmentId}:`, err)
     }
+  }
+
+  // Tự động kích hoạt quyền lợi voucher (quà tặng các khóa B, C, D...)
+  try {
+    const { grantVoucherBenefits } = await import('@/lib/voucher/voucher-service')
+    await grantVoucherBenefits(enrollment.userId)
+  } catch (err) {
+    console.error(`[Activation] grantVoucherBenefits failed for enrollment#${enrollmentId}:`, err)
   }
 
   // ════════════════════════════════════════════════════════════

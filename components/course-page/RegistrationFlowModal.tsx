@@ -7,7 +7,7 @@ import { X, CheckCircle2, ExternalLink, Loader2 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import AccountAssistantModal from '@/components/auth/AccountAssistantModal'
 import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
-import { enrollInCourseAction, checkEnrollmentStatusAction, getBrkMbvBalanceAction, getBrkVndWalletBalanceAction } from '@/app/actions/course-actions'
+import { enrollInCourseAction, checkEnrollmentStatusAction, getBrkMbvBalanceAction, getBrkVndWalletBalanceAction, getApplicableVouchersAction } from '@/app/actions/course-actions'
 import { resolveBankBin } from '@/lib/bank-bin'
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
 
@@ -59,6 +59,17 @@ export default function RegistrationFlowModal({
   const [vndBalance, setVndBalance] = useState<number>(0)
   const [useVndWallet, setUseVndWallet] = useState<boolean>(false)
 
+  // ── Quà tặng voucher (quyền lợi khóa học đã gán sẵn — KHÔNG nhập mã) ──────
+  // Loại trừ lẫn nhau với ví MBV/VNĐ: dùng quà tặng thì thôi ví.
+  const [applicableVouchers, setApplicableVouchers] = useState<any[]>([])
+  const [loadingBenefits, setLoadingBenefits] = useState<boolean>(false)
+  const [useVoucherBenefit, setUseVoucherBenefit] = useState<boolean>(false)
+  const [selectedVoucherId, setSelectedVoucherId] = useState<number>(0)
+  const selectedBenefit = applicableVouchers.find(v => v.userVoucherId === selectedVoucherId)
+  const benefitDue = useVoucherBenefit && selectedBenefit
+    ? (selectedBenefit.benefitType === 'FREE_100' ? 0 : Math.max(0, selectedBenefit.extraAmount || 0))
+    : null
+
   // Effective session = server-passed OR live from hook
   const effectiveSession = session || liveSession
   const effectiveUserId = effectiveSession?.user?.id ? parseInt(effectiveSession.user.id as string) : userId
@@ -69,6 +80,21 @@ export default function RegistrationFlowModal({
       setStep('voucher_confirm')
     }
   }, [liveSession, step])
+
+  // Quà tặng voucher: luôn tải khi vào bước xác nhận (không phụ thuộc cấu hình ví)
+  useEffect(() => {
+    if (step === 'voucher_confirm' && effectiveSession && course?.id) {
+      setLoadingBenefits(true)
+      getApplicableVouchersAction(course.id)
+        .then((list: any[]) => {
+          setApplicableVouchers(Array.isArray(list) ? list : [])
+          setUseVoucherBenefit(false)
+          setSelectedVoucherId(0)
+        })
+        .catch(() => setApplicableVouchers([]))
+        .finally(() => setLoadingBenefits(false))
+    }
+  }, [step, effectiveSession, course?.id])
 
   useEffect(() => {
     if (step === 'voucher_confirm' && effectiveSession && course.voucherConfig === 'WALLET' && course.allowMbvDeduction) {
@@ -103,16 +129,20 @@ export default function RegistrationFlowModal({
       const res: any = await enrollInCourseAction(
         course.id,
         getClientRef(),
-        useVoucher,
-        voucherAmountToUse,
-        useVndWallet
+        useVoucherBenefit ? false : useVoucher,
+        useVoucherBenefit ? 0 : voucherAmountToUse,
+        useVoucherBenefit ? false : useVndWallet,
+        useVoucherBenefit,
+        selectedVoucherId
       )
       if (res.success) {
         setEnrollment(res.enrollment)
         if (onEnrolled) onEnrolled(res.enrollment)
 
         // Calculate final effective amount that client expected
-        const finalDue = Math.max(0, (course.phi_coc || 0) - (useVoucher ? voucherAmountToUse : 0) - (useVndWallet ? Math.min(vndBalance, Math.max(0, (course.phi_coc || 0) - (useVoucher ? voucherAmountToUse : 0))) : 0))
+        const finalDue = benefitDue !== null
+          ? benefitDue
+          : Math.max(0, (course.phi_coc || 0) - (useVoucher ? voucherAmountToUse : 0) - (useVndWallet ? Math.min(vndBalance, Math.max(0, (course.phi_coc || 0) - (useVoucher ? voucherAmountToUse : 0))) : 0))
 
         if (finalDue === 0) {
           setStep('thankyou')
@@ -128,7 +158,7 @@ export default function RegistrationFlowModal({
     } finally {
       setEnrolling(false)
     }
-  }, [enrollment, enrolling, course.id, course.phi_coc, useVoucher, voucherAmountToUse, useVndWallet, vndBalance, onEnrolled])
+  }, [enrollment, enrolling, course.id, course.phi_coc, useVoucher, voucherAmountToUse, useVndWallet, vndBalance, onEnrolled, useVoucherBenefit, selectedVoucherId, benefitDue])
 
   // Poll every 10s for payment verification (only when active)
   useEffect(() => {
@@ -289,6 +319,69 @@ export default function RegistrationFlowModal({
                   </span>
                 </div>
 
+                {/* Quà tặng voucher (quyền lợi khóa học đã gán sẵn — không nhập mã) */}
+                {/* Loại trừ lẫn nhau với ví MBV/VNĐ: dùng quà tặng thì thôi ví */}
+                {loadingBenefits ? (
+                  <div style={{ padding: '10px', textAlign: 'center' }}>
+                    <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '11px', color: '#A8A39C' }}>Đang kiểm tra quà tặng...</p>
+                  </div>
+                ) : applicableVouchers.length > 0 && (
+                  <div style={{
+                    background: 'rgba(120, 160, 90, 0.06)',
+                    border: '1px solid rgba(120, 160, 90, 0.25)',
+                    borderRadius: '9px',
+                    padding: '9px 11px',
+                    marginBottom: '10px',
+                  }}>
+                    <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '12px', fontWeight: 700, color: '#F8F1E6', margin: '0 0 6px' }}>
+                      🎁 Quà tặng của bạn
+                    </p>
+                    {applicableVouchers.map((v: any) => {
+                      const checked = useVoucherBenefit && selectedVoucherId === v.userVoucherId
+                      const benefitText = v.benefitType === 'FREE_100'
+                        ? 'Miễn phí 100%'
+                        : `Chỉ trả thêm ${(v.extraAmount || 0).toLocaleString('vi-VN')}đ`
+                      return (
+                        <label key={v.userVoucherId} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '6px 0', cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="voucherBenefit"
+                            checked={checked}
+                            onChange={() => {
+                              setSelectedVoucherId(v.userVoucherId)
+                              setUseVoucherBenefit(true)
+                              // Loại trừ lẫn nhau: dùng quà tặng thì tắt ví
+                              setUseVoucher(false)
+                              setVoucherAmountToUse(0)
+                              setUseVndWallet(false)
+                            }}
+                            style={{ width: '15px', height: '15px', flexShrink: 0, marginTop: '2px', cursor: 'pointer' }}
+                          />
+                          <span style={{ fontSize: '12px', color: '#F8F1E6', lineHeight: 1.5 }}>
+                            <strong>{v.voucherName}</strong>
+                            <span style={{ color: '#9DBE8C' }}> — {benefitText}</span>
+                            {v.expiresAt && (
+                              <span style={{ color: '#A8A39C', fontSize: '11px' }}> (HSD: {new Date(v.expiresAt).toLocaleDateString('vi-VN')})</span>
+                            )}
+                          </span>
+                        </label>
+                      )
+                    })}
+                    {useVoucherBenefit && (
+                      <button
+                        type="button"
+                        onClick={() => { setUseVoucherBenefit(false); setSelectedVoucherId(0) }}
+                        style={{ background: 'transparent', border: 'none', color: '#A8A39C', fontSize: '11px', cursor: 'pointer', padding: '4px 0 0', textDecoration: 'underline' }}
+                      >
+                        Bỏ chọn quà tặng (dùng ví thay thế)
+                      </button>
+                    )}
+                    <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '10px', color: '#A8A39C', margin: '6px 0 0' }}>
+                      * Dùng quà tặng thì không áp dụng đồng thời điểm MBV / ví VNĐ.
+                    </p>
+                  </div>
+                )}
+
                 {/* Voucher select box */}
                 {course.voucherConfig === 'WALLET' && course.allowMbvDeduction && (
                   <div style={{
@@ -308,12 +401,14 @@ export default function RegistrationFlowModal({
                             const active = e.target.checked
                             setUseVoucher(active)
                             if (active) {
+                              // Loại trừ lẫn nhau: dùng ví thì thôi quà tặng
+                              setUseVoucherBenefit(false)
                               setVoucherAmountToUse(Math.min(voucherBalance, course.phi_coc || 0))
                             } else {
                               setVoucherAmountToUse(0)
                             }
                           }}
-                          disabled={voucherBalance === 0}
+                          disabled={voucherBalance === 0 || useVoucherBenefit}
                           style={{ width: '15px', height: '15px', flexShrink: 0, cursor: voucherBalance > 0 ? 'pointer' : 'not-allowed' }}
                         />
                         <label
@@ -326,7 +421,7 @@ export default function RegistrationFlowModal({
                             cursor: voucherBalance > 0 ? 'pointer' : 'not-allowed',
                           }}
                         >
-                          Dùng ví MBV
+                          Dùng điểm MBV
                         </label>
                       </div>
                       <span style={{ fontSize: '11px', color: '#C8C3BA', flexShrink: 0 }}>
@@ -372,8 +467,14 @@ export default function RegistrationFlowModal({
                           type="checkbox"
                           id="useVndWalletCheckbox"
                           checked={useVndWallet}
-                          onChange={(e) => setUseVndWallet(e.target.checked)}
-                          disabled={vndBalance === 0}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              // Loại trừ lẫn nhau: dùng ví thì thôi quà tặng
+                              setUseVoucherBenefit(false)
+                            }
+                            setUseVndWallet(e.target.checked)
+                          }}
+                          disabled={vndBalance === 0 || useVoucherBenefit}
                           style={{ width: '15px', height: '15px', flexShrink: 0, cursor: vndBalance > 0 ? 'pointer' : 'not-allowed' }}
                         />
                         <label
@@ -402,9 +503,15 @@ export default function RegistrationFlowModal({
                     <span>Học phí gốc:</span>
                     <span>{(course.phi_coc || 0).toLocaleString('vi-VN')} VND</span>
                   </div>
+                  {useVoucherBenefit && selectedBenefit && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#9DBE8C', fontWeight: 500 }}>
+                      <span>Quà tặng ({selectedBenefit.voucherName}):</span>
+                      <span>-{((course.phi_coc || 0) - (benefitDue ?? 0)).toLocaleString('vi-VN')} VND</span>
+                    </div>
+                  )}
                   {course.voucherConfig === 'WALLET' && course.allowMbvDeduction && useVoucher && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#647B5E', fontWeight: 500 }}>
-                      <span>Trừ MBV:</span>
+                      <span>Trừ điểm MBV:</span>
                       <span>-{voucherAmountToUse.toLocaleString('vi-VN')} VND</span>
                     </div>
                   )}
@@ -418,7 +525,7 @@ export default function RegistrationFlowModal({
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700 }}>
                     <span style={{ color: '#F8F1E6' }}>Cần chuyển:</span>
                     <span style={{ color: '#C86B3D' }}>
-                      {Math.max(0, (course.phi_coc || 0) - (useVoucher ? voucherAmountToUse : 0) - finalPaidWithVnd).toLocaleString('vi-VN')} VND
+                      {(benefitDue !== null ? benefitDue : Math.max(0, (course.phi_coc || 0) - (useVoucher ? voucherAmountToUse : 0) - finalPaidWithVnd)).toLocaleString('vi-VN')} VND
                     </span>
                   </div>
                 </div>
@@ -594,7 +701,7 @@ export default function RegistrationFlowModal({
                 <div style={{ fontFamily: 'Inter, sans-serif', fontSize: '14px', color: '#C8C3BA', marginTop: '4px' }}>VNĐ</div>
                 {finalPaidWithVoucher > 0 && (
                   <div style={{ fontFamily: 'Inter, sans-serif', fontSize: '11px', color: '#647B5E', fontWeight: 'bold', marginTop: '6px' }}>
-                    * Đã giảm trừ {finalPaidWithVoucher.toLocaleString('vi-VN')} VND bằng ví MBV
+                    * Đã giảm trừ {finalPaidWithVoucher.toLocaleString('vi-VN')} VND bằng điểm MBV
                   </div>
                 )}
               </div>

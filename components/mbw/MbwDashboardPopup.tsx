@@ -77,7 +77,7 @@ export default function MbwDashboardPopup({ title = 'Tài khoản Dòng chảy P
                   <p className="text-sm font-black text-amber-600">{formatMoney(data.balance.brkd)}</p>
                 </div>
                 <div className="bg-gradient-to-br from-purple-50 to-fuchsia-50 rounded-xl p-3 border border-purple-200 flex items-center justify-between">
-                  <p className="text-xs font-bold text-purple-700">{walletText('Voucher quy đổi (MBV)', wi300)}</p>
+                  <p className="text-xs font-bold text-purple-700">{walletText('Điểm MBV', wi300)}</p>
                   <p className="text-sm font-black text-purple-600">{formatMoney(data.balance.mbvBalance)}</p>
                 </div>
                 <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-3 border border-green-200 flex items-center justify-between">
@@ -89,10 +89,10 @@ export default function MbwDashboardPopup({ title = 'Tài khoản Dòng chảy P
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
                   <Ticket className="w-3.5 h-3.5 text-purple-500" />
-                  <p className="text-xs font-bold text-gray-700">Voucher ({data.vouchers.length})</p>
+                  <p className="text-xs font-bold text-gray-700">Quà tặng ({data.vouchers.length})</p>
                 </div>
                 {data.vouchers.length === 0 ? (
-                  <p className="text-center text-gray-400 text-xs py-4">Chưa có voucher nào</p>
+                  <p className="text-center text-gray-400 text-xs py-4">Chưa có quà tặng nào</p>
                 ) : (
                   <div className="space-y-2">
                     {data.vouchers.map(v => (
