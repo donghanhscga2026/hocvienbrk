@@ -1,3 +1,4 @@
+import { websiteActor } from '@/lib/website/management'
 import { accessKey, accessSchema, effectiveModules } from '@/lib/website/access'
 import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
@@ -12,8 +13,8 @@ import { CrmError } from '@/lib/crm/service'
 
 async function manager(request: Request) {
   if(!isPlatformHost(requestHostname(request.headers.get('host') || ''))) throw new CrmError('Quản lý tên miền trên hệ thống chính.',403)
-  const profile=await ownedProfile()
-  if(profile.user?.role!=='ADMIN') throw new CrmError('Custom domain đang thử nghiệm; quản trị viên cần cấp quyền.',403)
+  const profile=await ownedProfile(request,true)
+  if((await websiteActor(request)).role!=='ADMIN' && profile.user?.role!=='ADMIN') throw new CrmError('Custom domain đang thử nghiệm; quản trị viên cần cấp quyền.',403)
   return profile
 }
 const command=z.discriminatedUnion('action',[

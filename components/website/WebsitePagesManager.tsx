@@ -1,4 +1,5 @@
 'use client'
+import {useWebsiteScope} from './WebsiteScope'
 /* eslint-disable @next/next/no-html-link-for-pages -- Open saved website pages with fresh permissions. */
 import {useEffect,useState} from 'react'
 import {blankWebsitePages,websitePagesSchema,type WebsitePages,type WebsitePage} from '@/lib/website/pages'
@@ -7,6 +8,8 @@ const targets=[['home','Trang chủ'],['courses','Khóa học'],['tools','Công 
 const input='w-full rounded-xl border border-slate-300 bg-white px-3 py-2'
 const button='rounded-xl border px-4 py-2 text-sm disabled:opacity-50'
 export default function WebsitePagesManager(){
+  const website=useWebsiteScope()
+
   const [value,setValue]=useState<WebsitePages>(blankWebsitePages),[original,setOriginal]=useState<WebsitePages>(blankWebsitePages)
   const [slug,setSlug]=useState(''),[loaded,setLoaded]=useState(false),[busy,setBusy]=useState(false),[attempt,setAttempt]=useState(0)
   const [error,setError]=useState(''),[message,setMessage]=useState('')
@@ -15,10 +18,10 @@ export default function WebsitePagesManager(){
     const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),30000)
     let active=true
     setLoaded(false);setError('')
-    fetch('/api/websites/pages',{signal:controller.signal}).then(async r=>{const data=await r.json();if(!r.ok)throw new Error(data.error);if(active){setValue(data.content);setOriginal(data.content);setSlug(data.slug);setLoaded(true)}})
+    website.fetch('/api/websites/pages',{signal:controller.signal}).then(async r=>{const data=await r.json();if(!r.ok)throw new Error(data.error);if(active){setValue(data.content);setOriginal(data.content);setSlug(data.slug);setLoaded(true)}})
       .catch(e=>{if(active)setError(e.name==='AbortError'?'Tải trang quá lâu. Hãy thử lại.':e.message)}).finally(()=>clearTimeout(timeout))
     return()=>{active=false;clearTimeout(timeout);controller.abort()}
-  },[attempt])
+  },[attempt,website])
   useEffect(()=>{
     if(!dirty)return
     const warn=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue=''}
@@ -32,14 +35,14 @@ export default function WebsitePagesManager(){
     setBusy(true);setError('');setMessage('')
     const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),60000)
     try{
-      const r=await fetch('/api/websites/pages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(parsed.data),signal:controller.signal})
+      const r=await website.fetch('/api/websites/pages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(parsed.data),signal:controller.signal})
       const data=await r.json();if(!r.ok)throw new Error(data.error)
       setValue(data.content);setOriginal(data.content);setMessage('Đã lưu trang và menu. Trang được xuất bản sẽ hiển thị trên website của bạn.')
     }catch(e){setError(e instanceof Error?(e.name==='AbortError'?'Lưu quá lâu. Tải lại để kiểm tra trạng thái trước khi thử lại.':e.message):'Không thể lưu.')}
     finally{clearTimeout(timeout);setBusy(false)}
   }
   return <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-8"><div className="mx-auto max-w-5xl space-y-6">
-    <a href="/tools/my-site/manage" className="text-violet-700 underline">← Quản lý website</a>
+    <a href={website.href("/tools/my-site/manage")}  className="text-violet-700 underline">← Quản lý website</a>
     <header><h1 className="text-3xl font-bold">Trang con & menu</h1><p className="mt-3 text-slate-600">Tạo trang Giới thiệu, Liên hệ… hoặc nhập template riêng cho từng trang. Các trang dùng chung tên miền và quyền tài khoản của website.</p></header>
     {error && <div role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">{error}{!loaded && <button className={button+' ml-3'} onClick={()=>setAttempt(n=>n+1)}>Thử lại</button>}</div>}
     {message && <p role="status" className="rounded-xl bg-green-50 p-4 text-green-800">{message}</p>}
@@ -55,7 +58,7 @@ export default function WebsitePagesManager(){
             <label className="block">Mô tả ngắn<textarea className={input+' mt-1'} rows={2} maxLength={500} value={page.description} onChange={e=>updatePage(index,{description:e.target.value})}/></label>
             <label className="block">Nội dung văn bản<textarea className={input+' mt-1'} rows={6} maxLength={20000} value={page.body} onChange={e=>updatePage(index,{body:e.target.value})}/><span className="mt-1 block text-xs text-slate-500">Dùng khi chưa áp dụng template HTML/ZIP.</span></label>
             <div className="flex flex-wrap gap-5"><label className="flex items-center gap-2"><input type="checkbox" checked={page.published} onChange={e=>updatePage(index,{published:e.target.checked})}/>Xuất bản trang</label><label className="flex items-center gap-2"><input type="checkbox" checked={page.showInMenu} onChange={e=>updatePage(index,{showInMenu:e.target.checked})}/>Tự thêm vào menu</label></div>
-            <div className="flex flex-wrap gap-3 text-sm">{saved && !dirty?<a className="text-violet-700 underline" href={'/tools/my-site/pages/'+page.slug+'/template'}>Nhập HTML / ZIP cho trang này →</a>:<span className="text-slate-500">Lưu trang và menu trước khi nhập template.</span>}{saved && page.published && !dirty && <a className="text-violet-700 underline" target="_blank" rel="noreferrer" href={'/page/'+slug+'/'+page.slug}>Mở trang ↗</a>}</div>
+            <div className="flex flex-wrap gap-3 text-sm">{saved && !dirty?<a className="text-violet-700 underline" href={website.href('/tools/my-site/pages/'+page.slug+'/template')}>Nhập HTML / ZIP cho trang này →</a>:<span className="text-slate-500">Lưu trang và menu trước khi nhập template.</span>}{saved && page.published && !dirty && <a className="text-violet-700 underline" target="_blank" rel="noreferrer" href={'/page/'+slug+'/'+page.slug}>Mở trang ↗</a>}</div>
             <p className="text-xs text-slate-500">Muốn ngừng hiển thị trang, bỏ chọn Xuất bản. Nội dung và template vẫn được giữ lại.</p>
           </article>
         })}
