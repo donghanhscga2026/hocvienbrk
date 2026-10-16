@@ -1,6 +1,7 @@
 import 'server-only'
 import prisma from '@/lib/prisma'
 import { auth } from '@/auth'
+import { canCreateProfile } from '@/lib/auth/roles'
 import { CrmError } from '@/lib/crm/service'
 import { getCoursesForProfile, getPostsForProfile } from '@/app/actions/site-profile-actions'
 import {getCourseWhereForProfile,getSiteRuntimeConfig} from '@/lib/site-profile/config'
@@ -9,8 +10,9 @@ export async function ownedProfile() {
   const session = await auth()
   const id = Number(session?.user?.id)
   if(!session?.user?.id || !Number.isInteger(id)) throw new CrmError('Vui lòng đăng nhập.', 401)
-  const user = await prisma.user.findUnique({ where: { id }, select: { id: true } })
+  const user = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } })
   if(!user) throw new CrmError('Phiên đăng nhập không hợp lệ.', 401)
+  if(!canCreateProfile(user.role)) throw new CrmError('Chỉ giảng viên hoặc admin được quản lý website.', 403)
   const profile = await prisma.siteProfile.findUnique({ where: { userId: id }, include: { members: true, user: { select: { role: true } } } })
   if(!profile) throw new CrmError('Bạn chưa có trang riêng. Hãy nhờ quản trị viên cấp trang trước.', 404)
   return profile

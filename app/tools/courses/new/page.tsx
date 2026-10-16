@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { isTeachingRole } from '@/lib/auth/roles'
 import { createCourseAction, getTeachersAction } from '@/app/actions/course-actions'
 import { updateCourseAction, updateLessonAction, deleteLessonAction } from '@/app/actions/admin-actions'
 import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle2, AlertCircle, List, Play, Edit2, X, FileSpreadsheet, Download, Save, Trash2, Plus, Mail, ArrowUp, ArrowDown, Bell } from 'lucide-react'
@@ -179,7 +180,7 @@ function CreateCourseContent() {
         const fetchData = async () => {
             const res = await fetch('/api/auth/session').then(r => r.json())
             const isAdminUser = res?.user?.role === 'ADMIN'
-            const isTeacherUser = res?.user?.role === 'TEACHER'
+            const isTeacherUser = isTeachingRole(res?.user?.role)
             setIsAdmin(isAdminUser)
             setIsTeacher(isTeacherUser)
              

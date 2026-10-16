@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
+import { canCreateProfile } from '@/lib/auth/roles'
 import { Shield, AlertCircle } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
 import { createSiteProfile } from '@/app/actions/site-profile-actions'
@@ -61,13 +62,13 @@ export default function NewSiteProfilePage() {
       return
     }
 
-    const result = await createSiteProfile(teacherId, slug)
+    const result = await createSiteProfile(isAdmin ? teacherId : Number(session?.user?.id), slug)
     
     if (result.error) {
       setError(result.error)
       setLoading(false)
     } else if (result.profile) {
-      router.push(`/tools/site-profiles/${result.profile.id}/edit`)
+      router.push(isAdmin ? `/tools/site-profiles/${result.profile.id}/edit` : '/tools/my-site/edit')
     } else {
       setError('Đã xảy ra lỗi không xác định')
       setLoading(false)
@@ -94,7 +95,7 @@ export default function NewSiteProfilePage() {
     )
   }
 
-  if (!isAdmin) {
+  if (!canCreateProfile(session.user.role)) {
     return (
       <div className="min-h-screen bg-gray-50">
         <MainHeader title="TẠO PROFILE MỚI" />
@@ -126,7 +127,7 @@ export default function NewSiteProfilePage() {
             </div>
           )}
           
-          <div>
+          {isAdmin && <div>
             <label className="block text-sm font-black text-gray-500 uppercase mb-2">
               Teacher (tùy chọn)
             </label>
@@ -148,7 +149,6 @@ export default function NewSiteProfilePage() {
                   }
                 }}
                 className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-800"
-                required
               >
                 <option value="">-- Không gắn Teacher / Website thương hiệu --</option>
                 {teachers.map(t => (
@@ -159,7 +159,7 @@ export default function NewSiteProfilePage() {
             <p className="text-gray-400 text-xs mt-2">
               Có thể để trống cho website thương hiệu/cộng đồng; nếu chọn Teacher thì profile có thể lọc khóa học theo Teacher đó.
             </p>
-          </div>
+          </div>}
 
           <div>
             <label className="block text-sm font-black text-gray-500 uppercase mb-2">

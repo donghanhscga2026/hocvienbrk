@@ -11,6 +11,9 @@ export function isManagementRoute(path: string) {
 }
 
 export type NavigationLocation = { groupId: string; title: string; crumbs: { label: string; href?: string }[]; back: { label: string; href: string } | null }
+export function isPageManagementRoute(path: string) {
+  return ['/tools/pages', '/tools/my-site', '/tools/site-profiles', '/tools/landings'].some(parent => path === parent || path.startsWith(parent + '/'))
+}
 export function managementLocation(path: string, params: URLSearchParams, groups: SpaceNavGroup[]): NavigationLocation {
   const root = { label: 'Không gian của tôi', href: '/my-space' }
   const courseList = { label: 'Quản lý khóa học', href: '/tools/courses' }
@@ -30,6 +33,24 @@ export function managementLocation(path: string, params: URLSearchParams, groups
     title = groups.find(group => group.id === groupId)?.label || 'Không gian của tôi'
     crumbs = tab === 'home' ? [{ label: root.label }] : [root, { label: title }]
     if (tab === 'home') back = null
+  } else if (isPageManagementRoute(path)) {
+    groupId = 'business'
+    const pageList = { label: 'Page', href: '/tools/pages?tab=my-site' }
+    const profileId = params.get('profileId')
+    const suffix = profileId && /^\d+$/.test(profileId) && Number.isSafeInteger(Number(profileId)) ? '?profileId=' + profileId : ''
+    const manager = { label: 'Quản lý website', href: '/tools/my-site/manage' + suffix }
+    const section = path.split('/')[3]
+    title = path === '/tools/pages' ? 'Page'
+      : path === '/tools/site-profiles/new' ? 'Tạo website'
+      : path.startsWith('/tools/site-profiles/') ? 'Chỉnh sửa website'
+      : path.startsWith('/tools/landings') ? 'Landing Page'
+      : ({ edit: 'Chỉnh sửa website', data: 'Dữ liệu & giảng viên', domains: 'Tên miền riêng', pages: 'Trang con & menu', template: 'Mẫu website', design: 'Giao diện website', forms: 'Form đăng ký' } as Record<string, string>)[section] || 'Quản lý website'
+    crumbs.push(path === '/tools/pages' ? { label: title } : pageList)
+    if (path !== '/tools/pages') {
+      if (path.startsWith('/tools/my-site/') && section !== 'manage') crumbs.push(manager)
+      crumbs.push({ label: title })
+    }
+    back = path.startsWith('/tools/my-site/') && section !== 'manage' ? { label: 'Về website đang quản lý', href: manager.href } : { label: 'Về Page', href: pageList.href }
   } else if (path.startsWith('/tools/courses')) {
     groupId = 'teaching'; crumbs.push(courseList)
     if (path === '/tools/courses') { title = courseList.label; crumbs[1] = { label: title } }

@@ -2,7 +2,7 @@
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict'), ts = require('typescript')
 const React = require('react'), { JSDOM } = require('jsdom')
 function load(file, mocks = {}) {
-  mocks = { '@/auth': { auth: async () => null }, ...mocks }
+  mocks = { '@/auth': { auth: async () => null }, '@/lib/auth/roles': require('./helpers/load-ts.cjs')('lib/auth/roles.ts'), ...mocks }
   const module = { exports: {} }
   const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
   new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name === '@/lib/wi300/projects' ? load('lib/wi300/projects.ts') : name.startsWith('@/components/') || name.startsWith('./') ? load(name.startsWith('@/') ? name.slice(2) + '.tsx' : path.posix.join(path.posix.dirname(file), name + '.tsx'), mocks) : require(name), module, module.exports)

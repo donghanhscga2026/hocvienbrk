@@ -7,7 +7,7 @@ window.HTMLDialogElement.prototype.showModal = function () { this.open = true }
 window.HTMLDialogElement.prototype.close = function () { this.open = false }
 document.addEventListener('click', event => { if (event.target.closest?.('a')) event.preventDefault() })
 const { createRoot } = require('react-dom/client')
-let query = new URLSearchParams(), signedIn = false, checks = 0, calls = []
+let query = new URLSearchParams(), signedIn = false, checks = 0, calls = [], crmAdmin = true
 const ok = (value, message) => { assert.ok(value, message); checks++ }
 const placeholder = { __esModule: true, default: () => null }
 const overrides = {
@@ -30,7 +30,7 @@ function load(file) {
   }, mod, mod.exports)
   cache.set(absolute, mod.exports); return mod.exports
 }
-const owners = [{ id: 0, name: 'Điều phối WI300', email: 'admin@example.com' }, { id: 1, name: 'Nguyễn Mai', email: 'teacher@example.com' }]
+const owners = [{ id: 0, name: 'Điều phối WI300', email: 'admin@example.com', role: 'ADMIN' }, { id: 1, name: 'Nguyễn Mai', email: 'teacher@example.com', role: 'TEACHER' }]
 const rows = ['PARTNER','LEARNING','SUPPORT','ACCOUNT','FEEDBACK'].map((topic, index) => ({ id: '00000000-0000-4000-8000-00000000000' + (index + 1), contactId: null, ownerId: index < 2 ? 1 : null, name: ['Lê Minh Anh','Phạm Hà','Nguyễn Hồng','Trần Quân','Mai Ngọc'][index], email: 'member@example.com', phone: '+84912345678', userId: topic === 'ACCOUNT' ? null : 3, category: topic === 'LEARNING' ? 'LEARNING' : 'SUPPORT', topic, source: topic === 'PARTNER' ? 'Wi300: Đăng ký đối tác' : 'Yêu cầu thành viên', status: index ? 'NEW' : 'IN_PROGRESS', content: ['Đăng ký: Giảng viên và doanh nghiệp. Tôi muốn hợp tác giảng dạy về chuyển đổi số.', 'Nhờ giải thích thêm ví dụ ở bài 3 trong khóa xây dựng thương hiệu.', 'Tôi cần hỗ trợ tìm tài liệu và lộ trình phù hợp.', 'Tôi không nhận được mã xác minh khi tạo tài khoản.', 'Góp ý cách sắp xếp phần học tập trên điện thoại.'][index], resolution: 'Đã kiểm tra hồ sơ, chờ bổ sung thông tin.', publicReply: '', version: 1, createdAt: '2026-10-11T06:30:00Z', lessonId: null, course: null, outcome: 'MORE_INFO', events: [] }))
 rows[0].partner = { kind: 'BOTH', organization: 'Wi.Tech', expertise: 'Chuyển đổi số', proposal: 'Phối hợp đào tạo AI cho doanh nghiệp', portfolio: '', legacy: false }
 const contacts = rows.slice(0,3).map((row,index) => ({ id: index+1, name: row.name, email: row.email, phone: row.phone, source: 'Thành viên WI300', needs: 'Quan tâm ứng dụng AI trong doanh nghiệp', tags: [], ownerId: 1, owner: owners[1], archived: false, version: 1, lastContactAt: null, updatedAt: row.createdAt, opportunities: [{ id: index+1, title: 'Tư vấn khóa AI', stage: 'QUALIFIED', amount: 1000000, version: 1, lostReason: '' }], tasks: [{ id: index+1, title: 'Gọi lại trao đổi lộ trình', dueAt: '2026-10-12T02:00:00Z', completedAt: null }], learning: [{ courseId: 10+index, title: 'Ứng dụng AI trong công việc và phát triển doanh nghiệp', slug: 'ai-business', status: 'ACTIVE', completed: index+2, total: 10, lastActivityAt: row.createdAt, lastLesson: 'Bài 3' }], pendingRequests: index+1 }))
@@ -46,7 +46,7 @@ global.fetch = async (url, options = {}) => {
   else if (String(url).includes('/api/crm/requests')) data = { requests: rows, total: rows.length }
   else if (String(url).includes('/api/crm/automation')) data = { from: '2026-09-11', to: '2026-10-11', contacts: 25, verifiedPayments: 3, verifiedAmount: 1500000, sources: Array.from({ length: 12 }, (_, i) => ({ label: 'Nguồn ' + i, count: i + 1 })), owners: Array.from({ length: 15 }, (_, i) => ({ label: 'Phụ trách ' + i, count: i + 1 })), stages: [] }
   else if (String(url).includes('view=overview')) data = { stats: { newRequests: 42, processing: 7, resolved: 12, overdue: 1, today: 3, completed: 8 }, queue: rows.slice(0, 3), appointments: [], recent: rows.slice(0, 3).map(row => ({ ...row, updatedAt: row.createdAt })), generatedAt: rows[0].createdAt }
-  else if (String(url).includes('view=owners')) data = { owners, actor: { id: 0, isAdmin: true } }
+  else if (String(url).includes('view=owners')) data = { owners, actor: { id: crmAdmin ? 0 : 1, isAdmin: crmAdmin } }
   else if (String(url).includes('view=tasks')) data = { tasks: [], total: 0, stats: { today: 3, overdue: 1, unscheduled: 2 } }
   else if (String(url).includes('view=detail')) data = { contact: { ...contacts[0], activities: [], activityTotal: 0 } }
   else data = { contacts, total: contacts.length }
@@ -140,6 +140,15 @@ async function run() {
   await click(button('Đăng ký cả hai'))
   ok(calls.at(-1).url.includes('kind=BOTH') && calls.at(-1).url.includes('page=1'), 'Partner kind changes reset pagination and query server')
   ok(document.querySelector('a[href*="view=requests&request="]'), 'Partner opens existing handling/profile drawer through anchored request')
+  crmAdmin = false
+  await act(async () => root.render(React.createElement(Workspace, { key: 'teacher' })))
+  ok(!button('Đối tác WI300'), 'Teacher has no partner menu, including with view=partners in URL')
+  ok(!document.querySelector('nav[aria-label="Nhóm đối tác"]'), 'Direct partner URL does not mount partner data for teacher')
+  await click([...document.querySelectorAll('nav[aria-label="Các mục CRM"] button')].find(node => node.textContent.startsWith('Yêu cầu & phản hồi')))
+  ok(!document.querySelector('select[aria-label="Chủ đề yêu cầu"] option[value="PARTNER"]'), 'Teacher request filters omit partner topic')
+  await click(button('Khách hàng / Học viên'))
+  await click(button('Thêm khách tư vấn'))
+  ok(document.body.textContent.includes('không tạo tài khoản hoặc đăng ký khóa học'), 'Manual prospect dialog explains its scope')
   await act(async () => root.unmount())
   dom.window.close()
   console.log(JSON.stringify({ result: 'passed', assertions: checks, scope: 'Real React components with isolated fetch fixtures' }))

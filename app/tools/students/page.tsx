@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSession } from 'next-auth/react'
+import { isHighestAdmin } from '@/lib/auth/roles'
 import { getStudentsAction, getAdminCoursesAction, resendVerificationAction, resendAllVerificationAction, adminResetStudentPasswordAction, updateUserRoleAction } from '@/app/actions/admin-actions'
 import { Search, User, Mail, Phone, Loader2, ArrowUpDown, ArrowLeft, Users, Shield, GraduationCap, Handshake, Trophy, ChevronLeft, ChevronRight, X, Upload, ScrollText, KeyRound } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
@@ -34,8 +35,7 @@ const roleConfig: Record<string, { label: string; icon: any; color: string; bgCo
   STUDENT: { label: 'Thành viên', icon: GraduationCap, color: 'text-gray-600', bgColor: 'bg-gray-100', textColor: 'text-gray-700' },
   ADMIN: { label: 'Quản trị', icon: Shield, color: 'text-red-600', bgColor: 'bg-red-100', textColor: 'text-red-700' },
   DEVELOPER: { label: 'Phát triển', icon: Shield, color: 'text-indigo-600', bgColor: 'bg-indigo-100', textColor: 'text-indigo-700' },
-  TEACHER: { label: 'Giáo viên', icon: Users, color: 'text-cyan-600', bgColor: 'bg-cyan-100', textColor: 'text-cyan-700' },
-  INSTRUCTOR: { label: 'Giảng viên', icon: Users, color: 'text-blue-600', bgColor: 'bg-blue-100', textColor: 'text-blue-700' },
+  TEACHER: { label: 'Giảng viên', icon: Users, color: 'text-cyan-600', bgColor: 'bg-cyan-100', textColor: 'text-cyan-700' },
   AFFILIATE: { label: 'Đối tác', icon: Handshake, color: 'text-green-600', bgColor: 'bg-green-100', textColor: 'text-green-700' },
   COURSE_86_DAYS: { label: 'Coach 1:1', icon: Trophy, color: 'text-purple-600', bgColor: 'bg-purple-100', textColor: 'text-purple-700' },
   UNVERIFIED: { label: 'Chưa xác minh', icon: Mail, color: 'text-orange-600', bgColor: 'bg-orange-100', textColor: 'text-orange-700' },
@@ -98,8 +98,7 @@ function ResendVerifyBtn({ studentId }: { studentId: number }) {
 
 const assignableRoles = [
   ['STUDENT', 'Thành viên'],
-  ['TEACHER', 'Giáo viên'],
-  ['INSTRUCTOR', 'Giảng viên'],
+  ['TEACHER', 'Giảng viên'],
   ['AFFILIATE', 'Đối tác'],
   ['DEVELOPER', 'Phát triển'],
   ['ADMIN', 'Quản trị'],
@@ -133,10 +132,11 @@ function RoleSelect({ student, onUpdated }: { student: StudentData; onUpdated: (
     <select
       defaultValue={student.role}
       disabled={saving}
-      onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
+      onClick={(e) => { e.stopPropagation() }}
       onChange={handleChange}
       className="text-[11px] font-bold border border-gray-200 bg-white rounded-lg px-2 py-1.5 disabled:opacity-50"
       title="Phân quyền thành viên"
+      aria-label={`Vai trò của ${student.name || student.email}`}
     >
       {assignableRoles.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
     </select>
@@ -188,7 +188,7 @@ export default function ToolsStudentsPage() {
   const isAdmin = session?.user?.role === 'ADMIN'
   const isTeacher = session?.user?.role === 'TEACHER'
   const isRoot = session?.user?.id === '0'
-  const isSuperAdmin = session?.user?.id === '0' || session?.user?.id === '3773'
+  const isSuperAdmin = isHighestAdmin(session?.user?.id, session?.user?.role)
 
   const [students, setStudents] = useState<StudentData[]>([])
   const [loading, setLoading] = useState(true)
@@ -515,7 +515,7 @@ export default function ToolsStudentsPage() {
                     </div>
                   </Link>
                   {(isRoot || isSuperAdmin) && (
-                    <div className="absolute top-3 right-3 flex items-center gap-0.5">
+                    <div className="flex flex-wrap items-center justify-end gap-2 rounded-b-2xl border border-t-0 border-gray-100 bg-white px-3 py-2">
                       {isRoot && (
                         <button
                           onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActivityLogTarget({ id: student.id, name: student.name || 'Chưa có tên' }) }}
@@ -525,7 +525,7 @@ export default function ToolsStudentsPage() {
                           <ScrollText className="w-4 h-4 text-blue-400 hover:text-blue-600" />
                         </button>
                       )}
-                      {isAdmin && (
+                      {isSuperAdmin && (
                         <RoleSelect student={student} onUpdated={() => fetchStudents(page)} />
                       )}
                       {isSuperAdmin && (
