@@ -29,7 +29,9 @@ export async function enrollInCourseAction(
     clientRef?: number | null,
     useVoucher: boolean = false,
     voucherAmountToUse: number = 0,
-    useVndWallet: boolean = false
+    useVndWallet: boolean = false,
+    useVoucherBenefit: boolean = false,
+    benefitUserVoucherId: number = 0
 ) {
     try {
         await requireDomainCourse(courseId)
@@ -136,6 +138,35 @@ export async function enrollInCourseAction(
             }
         }
 
+        // 3. Áp quyền lợi voucher (quà tặng khóa học) — LOẠI TRỪ với ví MBV/VNĐ
+        // Chỉ validate ở đây; đánh dấu USED sau khi enrollment được tạo/cập nhật thành công.
+        let benefitVoucherId: number | null = null
+        let chosenBenefit: { userVoucherId: number; voucherId: number; benefitType: string; extraAmount: number } | null = null
+        const markBenefitUsed = async () => {
+            if (chosenBenefit) {
+                const { markVoucherUsed } = await import('@/lib/voucher/voucher-service')
+                await markVoucherUsed(chosenBenefit.userVoucherId, courseId)
+            }
+        }
+        if (useVoucherBenefit) {
+            if (useVoucher || useVndWallet) {
+                throw new Error("Không thể dùng đồng thời quà tặng và ví MBV/VNĐ. Vui lòng chỉ chọn một.")
+            }
+            const { getApplicableVoucherBenefits } = await import('@/lib/voucher/voucher-service')
+            const applicable = await getApplicableVoucherBenefits(userId, courseId)
+            const chosen = applicable.find(a => a.userVoucherId === benefitUserVoucherId)
+            if (!chosen) {
+                throw new Error("Quà tặng không hợp lệ, đã hết hạn hoặc đã được sử dụng.")
+            }
+            chosenBenefit = chosen
+            benefitVoucherId = chosen.voucherId
+            if (chosen.benefitType === 'FREE_100') {
+                effectivePhiCoc = 0
+            } else {
+                effectivePhiCoc = Math.max(0, chosen.extraAmount)
+            }
+        }
+
         if (existing && existing.status !== 'REJECTED') {
             if (existing.status === 'PENDING') {
                 const isAutoActiveExisting = effectivePhiCoc === 0
@@ -153,6 +184,7 @@ export async function enrollInCourseAction(
                         status: isAutoActiveExisting ? 'ACTIVE' : 'PENDING'
                     }
                 })
+                await markBenefitUsed()
 
                 if (isAutoActiveExisting) {
                     const { sendTelegram, sendActivationEmail } = await import("@/lib/notifications")
@@ -166,6 +198,13 @@ export async function enrollInCourseAction(
 
                     if (user?.email) {
                         await sendActivationEmail(user.email, user.name || '', user.id, course.name_lop || course.id_khoa, course.noidung_email);
+                    }
+                    // Tự động kích hoạt quyền lợi voucher (quà tặng các khóa B, C, D...)
+                    try {
+                        const { grantVoucherBenefits } = await import('@/lib/voucher/voucher-service')
+                        await grantVoucherBenefits(userId)
+                    } catch (e) {
+                        console.error('[Enroll] grantVoucherBenefits error:', e)
                     }
                     return { success: true, status: 'ACTIVE', enrollment: updatedEnrollment }
                 }
@@ -212,7 +251,10 @@ export async function enrollInCourseAction(
                             qrCodeUrl: qrCodeUrl,
                             bankName: bankAcc.bankName || 'Sacombank',
                             accountNumber: bankAcc.accountNumber,
-                            phone: user?.phone
+                            phone: user?.phone,
+                            voucherId: benefitVoucherId,
+                            discountAmount: Math.max(0, course.phi_coc - effectivePhiCoc),
+                            mbvDeducted: voucherDeducted
                         }
                     })
 
@@ -381,6 +423,7 @@ export async function enrollInCourseAction(
         for (const award of awards) {
             await awardVoucher(userId, award.voucherId, courseId)
         }
+        await markBenefitUsed()
 
         // Track affiliate conversion for purchase
         if (enrollmentReferrerId) {
@@ -413,7 +456,7 @@ export async function enrollInCourseAction(
                     userId,
                     type: 'PURCHASE',
                     enrollmentId: newEnrollment.id,
-                    orderAmount: effectivePhiCoc
+                    orderAmount: course.phi_coc
                 })
                 console.log(`[Enroll-Track] Tracked conversion for user #${userId} under refCode ${finalRefCode}`)
             } catch (trackErr) {
@@ -449,6 +492,14 @@ export async function enrollInCourseAction(
 
             if (user?.email) {
                 await sendActivationEmail(user.email, user.name || '', user.id, course.name_lop || course.id_khoa, course.noidung_email);
+            }
+
+            // Tự động kích hoạt quyền lợi voucher (quà tặng các khóa B, C, D...)
+            try {
+                const { grantVoucherBenefits } = await import('@/lib/voucher/voucher-service')
+                await grantVoucherBenefits(userId)
+            } catch (e) {
+                console.error('[Enroll] grantVoucherBenefits error:', e)
             }
         }
 
@@ -495,7 +546,10 @@ export async function enrollInCourseAction(
                     qrCodeUrl: qrCodeUrl,
                     bankName: bankAcc.bankName || 'Sacombank',
                     accountNumber: bankAcc.accountNumber,
-                    phone: user?.phone
+                    phone: user?.phone,
+                    voucherId: benefitVoucherId,
+                    discountAmount: Math.max(0, course.phi_coc - effectivePhiCoc),
+                    mbvDeducted: voucherDeducted
                 }
             })
         }
@@ -1144,6 +1198,22 @@ export async function getBrkVndWalletBalanceAction() {
         return Number(wallet?.balance || 0)
     } catch {
         return 0
+    }
+}
+
+/**
+ * Lấy các quà tặng (voucher quyền lợi khóa học) mà user hiện tại
+ * có thể dùng cho khóa học — chỉ voucher đã gán sẵn, không nhập mã.
+ */
+export async function getApplicableVouchersAction(courseId: number) {
+    try {
+        const session = await auth()
+        if (!session?.user?.id) return []
+        const userId = Number(session.user.id)
+        const { getApplicableVoucherBenefits } = await import('@/lib/voucher/voucher-service')
+        return await getApplicableVoucherBenefits(userId, courseId)
+    } catch {
+        return []
     }
 }
 
