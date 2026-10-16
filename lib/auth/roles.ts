@@ -71,6 +71,6 @@ export function getAssignableRoles(
     return ASSIGNABLE_ROLES.filter((r) => r !== 'ADMIN')
   }
   // Giáo viên/Giảng viên: chỉ phân quyền cộng sự — target phải đang là Thành viên/Cộng sự
-  if (!COLLABORATOR_ROLES.includes(normalizeRole(targetRole))) return null
+  if (!COLLABORATOR_ROLES.includes(normalizeRole(targetRole ?? ''))) return null
   return COLLABORATOR_ROLES
 }
