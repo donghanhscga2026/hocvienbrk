@@ -34,6 +34,11 @@ model User {
   affiliateLinks               AffiliateLink[]
   affiliatePayouts             AffiliatePayout[]
   affiliateRefs                AffiliateRef[]
+  orders                     Order[]                 @relation("BuyerOrders")
+  affiliateOrders            Order[]                 @relation("AffiliateOrders")
+  productAffiliateConfigs    ProductAffiliateConfig[] @relation("ProductAffiliateConfigCreator")
+  leaderboardSnapshots       LeaderboardSnapshot[]
+  userBadges                 UserBadge[]
   wallet                       AffiliateWallet?
   courses                      Course[]
   emailCampaigns               EmailCampaign[]       @relation("UserToEmailCampaign")
@@ -1271,6 +1276,7 @@ model AffiliateConversion {
   customerId   Int
   enrollmentId Int?
   orderId      String?
+  orderRecordId Int?
   orderAmount  Float
   productType  ProductType           @default(COURSE)
   status       ConversionStatus      @default(PENDING)
@@ -1284,6 +1290,7 @@ model AffiliateConversion {
   campaign     AffiliateCampaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   landing      LandingPage?          @relation(fields: [landingId], references: [id])
   link         AffiliateLink         @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  orderRecord  Order?                @relation(fields: [orderRecordId], references: [id])
 
   @@index([campaignId, status])
   @@index([customerId])
@@ -1387,6 +1394,107 @@ model AffiliatePayout {
 
   @@index([status])
   @@index([userId, status])
+}
+
+// ─── Affiliate v2 (Phase 1): đơn hàng sàn, cấu hình theo sản phẩm, vinh danh ───
+
+model Order {
+  id                 Int         @id @default(autoincrement())
+  buyerId            Int
+  affiliateId        Int?
+  refCode            String?
+  totalAmount        Float
+  status             OrderStatus @default(PENDING)
+  commissionProcessed Boolean    @default(false)
+  paidAt             DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  buyer              User        @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Cascade)
+  affiliate          User?       @relation("AffiliateOrders", fields: [affiliateId], references: [id])
+  items              OrderItem[]
+  conversions        AffiliateConversion[]
+
+  @@index([buyerId])
+  @@index([affiliateId, status])
+  @@index([status])
+}
+
+model OrderItem {
+  id          Int         @id @default(autoincrement())
+  orderId     Int
+  productType ProductType
+  productId   Int
+  productName String
+  unitPrice   Float
+  quantity    Int         @default(1)
+  order       Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([productType, productId])
+}
+
+model ProductAffiliateConfig {
+  id          Int         @id @default(autoincrement())
+  productType ProductType
+  productId   Int
+  directRate  Float
+  isActive    Boolean     @default(true)
+  createdBy   Int?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  creator     User?       @relation("ProductAffiliateConfigCreator", fields: [createdBy], references: [id])
+
+  @@unique([productType, productId])
+  @@index([productType, productId])
+}
+
+model SystemAffiliateConfig {
+  id            Int      @id @default(1)
+  gratitudeRate Float    @default(2)
+  taxRate       Float    @default(0)
+  pendingDays   Int      @default(30)
+  minPayout     Float    @default(200000)
+  updatedAt     DateTime @updatedAt
+}
+
+model LeaderboardSnapshot {
+  id               Int      @id @default(autoincrement())
+  period           String
+  userId           Int
+  rank             Int
+  gmv              Float
+  commissionEarned Float    @default(0)
+  orderCount       Int      @default(0)
+  createdAt        DateTime @default(now())
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([period, userId])
+  @@index([period, rank])
+}
+
+model Badge {
+  id           Int         @id @default(autoincrement())
+  code         String      @unique
+  name         String
+  description  String?
+  tier         Int         @default(1)
+  thresholdGmv Float       @default(0)
+  userBadges   UserBadge[]
+
+  @@index([tier])
+}
+
+model UserBadge {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  badgeId   Int
+  period    String?
+  awardedAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId, period])
+  @@index([userId])
 }
 
 model SiteSettings {
@@ -2197,6 +2305,15 @@ enum PaymentMethod {
 enum ProductType {
   COURSE
   POINT_REDEMPTION
+  PRODUCT
+  SERVICE
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+  REFUNDED
 }
 
 enum SystemType {
