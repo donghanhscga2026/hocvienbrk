@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSession } from 'next-auth/react'
-import { isHighestAdmin } from '@/lib/auth/roles'
+import { isHighestAdmin, isTeachingRole, getAssignableRoles } from '@/lib/auth/roles'
 import { getStudentsAction, getAdminCoursesAction, resendVerificationAction, resendAllVerificationAction, adminResetStudentPasswordAction, updateUserRoleAction } from '@/app/actions/admin-actions'
 import { Search, User, Mail, Phone, Loader2, ArrowUpDown, ArrowLeft, Users, Shield, GraduationCap, Handshake, Trophy, ChevronLeft, ChevronRight, X, Upload, ScrollText, KeyRound } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
@@ -104,15 +104,16 @@ const assignableRoles = [
   ['ADMIN', 'Quản trị'],
 ] as const
 
-function RoleSelect({ student, onUpdated }: { student: StudentData; onUpdated: () => void }) {
+function RoleSelect({ student, allowedRoles, onUpdated }: { student: StudentData; allowedRoles: readonly string[]; onUpdated: () => void }) {
   const [saving, setSaving] = useState(false)
+  const options = assignableRoles.filter(([value]) => allowedRoles.includes(value))
 
   const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     e.preventDefault()
     e.stopPropagation()
     const nextRole = e.target.value
     if (nextRole === student.role) return
-    const label = assignableRoles.find(([value]) => value === nextRole)?.[1] || nextRole
+    const label = options.find(([value]) => value === nextRole)?.[1] || nextRole
     if (!window.confirm(`Đổi quyền của "${student.name || student.email}" thành "${label}"?`)) {
       e.target.value = student.role
       return
@@ -138,7 +139,7 @@ function RoleSelect({ student, onUpdated }: { student: StudentData; onUpdated: (
       title="Phân quyền thành viên"
       aria-label={`Vai trò của ${student.name || student.email}`}
     >
-      {assignableRoles.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      {options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
     </select>
   )
 }
@@ -186,7 +187,7 @@ function ResetPasswordBtn({ studentId, studentName }: { studentId: number; stude
 export default function ToolsStudentsPage() {
   const { data: session } = useSession()
   const isAdmin = session?.user?.role === 'ADMIN'
-  const isTeacher = session?.user?.role === 'TEACHER'
+  const isTeacher = isTeachingRole(session?.user?.role) // Giáo viên + Giảng viên
   const isRoot = session?.user?.id === '0'
   const isSuperAdmin = isHighestAdmin(session?.user?.id, session?.user?.role)
 
@@ -461,6 +462,9 @@ export default function ToolsStudentsPage() {
           <div className="space-y-3">
             {students.map((student) => {
               const isCoach = student.enrollments?.some((e: any) => e.courseId === 1 && e.status === 'ACTIVE')
+              // Ma trận phân quyền (đồng bộ với server action updateUserRoleAction):
+              // root (0/3773): mọi vai trò; admin thường: trừ Quản trị; giáo viên: chỉ Cộng sự/Thành viên
+              const allowedRoles = getAssignableRoles(session?.user?.id, session?.user?.role, student.id, student.role)
               const displayRole = isCoach ? 'COURSE_86_DAYS' : student.role
               const bgColor = roleCardColors[displayRole] || 'bg-gray-100'
               const textColor = roleTextColors[displayRole] || 'text-gray-900'
@@ -514,7 +518,7 @@ export default function ToolsStudentsPage() {
                       </div>
                     </div>
                   </Link>
-                  {(isRoot || isSuperAdmin) && (
+                  {(allowedRoles || isRoot || isSuperAdmin) && (
                     <div className="flex flex-wrap items-center justify-end gap-2 rounded-b-2xl border border-t-0 border-gray-100 bg-white px-3 py-2">
                       {isRoot && (
                         <button
@@ -525,8 +529,8 @@ export default function ToolsStudentsPage() {
                           <ScrollText className="w-4 h-4 text-blue-400 hover:text-blue-600" />
                         </button>
                       )}
-                      {isSuperAdmin && (
-                        <RoleSelect student={student} onUpdated={() => fetchStudents(page)} />
+                      {allowedRoles && (
+                        <RoleSelect student={student} allowedRoles={allowedRoles} onUpdated={() => fetchStudents(page)} />
                       )}
                       {isSuperAdmin && (
                         <ResetPasswordBtn studentId={student.id} studentName={student.name || 'Chưa có tên'} />
