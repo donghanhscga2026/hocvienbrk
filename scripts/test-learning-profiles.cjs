@@ -62,6 +62,8 @@ async function run() {
   rows.splice(2)
   // Exercise the real picker event: switching courses navigates without resetting scroll.
   const { JSDOM } = require('jsdom'), dom = new JSDOM('<div id="picker"></div>')
+  const navigatorDescriptor = Object.getOwnPropertyDescriptor(global, 'navigator')
+  Object.defineProperty(global, 'navigator', { configurable: true, value: dom.window.navigator })
   global.window = dom.window; global.document = dom.window.document; global.IS_REACT_ACT_ENVIRONMENT = true
   let navigation
   const Picker = load('components/learning-profile/CoursePicker.tsx', { 'next/navigation': { useRouter: () => ({ push: (...args) => { navigation = args } }) } }).default
@@ -70,7 +72,11 @@ async function run() {
     await React.act(async () => root.render(React.createElement(Picker, { value: 101, options: [{ id: 101, name: 'Một', href: '/ho-so-hoc-tap/7?course=101' }, { id: 229, name: 'Hai', href: '/ho-so-hoc-tap/7?course=229' }] })))
     await React.act(async () => { const select = document.querySelector('select'); select.value = '229'; select.dispatchEvent(new window.Event('change', { bubbles: true })) })
     assert.deepEqual(navigation, ['/ho-so-hoc-tap/7?course=229', { scroll: false }])
-  } finally { await React.act(async () => root.unmount()); dom.window.close(); delete global.window; delete global.document }
+  } finally {
+    await React.act(async () => root.unmount()); dom.window.close(); delete global.window; delete global.document
+    if (navigatorDescriptor) Object.defineProperty(global, 'navigator', navigatorDescriptor)
+    else delete global.navigator
+  }
   let role = 'STUDENT', session = { user: { id: '11', role: 'ADMIN' } }
   const actor = load('lib/learning-profile/server.ts', { 'server-only': {}, '@/auth': { auth: async () => session }, '@/lib/website/domain-context': { domainContext: async () => null }, '@/lib/prisma': { __esModule: true, default: { user: { findUnique: async () => ({ id: 11, role }) } } } }).learningProfileActor
   assert.equal((await actor()).role, 'STUDENT', 'Ignore stale elevated JWT role')
