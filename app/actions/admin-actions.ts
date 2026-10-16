@@ -1,7 +1,7 @@
 'use server'
 
 import { auth } from "@/auth"
-import { normalizeRole, isHighestAdmin } from '@/lib/auth/roles'
+import { normalizeRole, isTeachingRole, isRootAdmin, getAssignableRoles } from '@/lib/auth/roles'
 import { changeUserId, UserIdChangeError, type UserIdChangeState } from "@/lib/user-id-change"
 import { domainContext } from "@/lib/website/domain-context"
 import prisma from "@/lib/prisma"
@@ -628,18 +628,39 @@ export async function getUserSystemsAction() {
 
 export async function updateUserRoleAction(userId: number, role: Role) {
     try {
-        await checkAdmin()
         if (await domainContext()) throw new Error('Đổi vai trò tại hệ thống chính.')
         const session = await auth()
-        const actor = await prisma.user.findUnique({ where: { id: Number(session!.user!.id) }, select: { id: true, role: true } })
-        if (!actor || !isHighestAdmin(actor.id, actor.role)) throw new Error('Chỉ admin cao nhất được phân quyền thành viên.')
+        if (!session?.user?.id) throw new Error("Chưa đăng nhập")
+        const actor = await prisma.user.findUnique({ where: { id: Number(session.user.id) }, select: { id: true, role: true } })
+        if (!actor) throw new Error("Không tìm thấy tài khoản thực hiện")
         role = normalizeRole(role)
         if (!Number.isInteger(userId)) throw new Error("Mã thành viên không hợp lệ")
         if (!Object.values(Role).includes(role)) throw new Error("Quyền không hợp lệ")
 
         const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true } })
         if (!user) throw new Error("Không tìm thấy thành viên")
-        if (user.role === role) return { success: true, role }
+        if (normalizeRole(user.role) === role) return { success: true, role }
+
+        // Ma trận phân quyền (lib/auth/roles.ts#getAssignableRoles):
+        // - Root (id 0, 3773): toàn quyền — DUY NHẤT được gán/thu hồi quyền Quản trị.
+        // - Quản trị thường: mọi vai trò TRỪ Quản trị; không đụng vào Quản trị viên khác.
+        // - Giáo viên/Giảng viên: chỉ Cộng sự (AFFILIATE) / Thành viên (STUDENT).
+        const allowed = getAssignableRoles(actor.id, actor.role, user.id, user.role)
+        if (!allowed) throw new Error("Không có quyền thay đổi vai trò của thành viên này")
+        if (!allowed.includes(role)) {
+            throw new Error(role === Role.ADMIN
+                ? "Chỉ tài khoản root mới được phân quyền Quản trị"
+                : "Vai trò này vượt quá quyền của bạn")
+        }
+
+        // Giáo viên/Giảng viên chỉ được phân quyền trong phạm vi lớp mình phụ trách
+        if (isTeachingRole(actor.role) && actor.role !== Role.ADMIN && !isRootAdmin(actor.id, actor.role)) {
+            const inScope = await prisma.enrollment.findFirst({
+                where: { userId, course: { teacherId: actor.id } },
+                select: { id: true },
+            })
+            if (!inScope) throw new Error("Chỉ được phân quyền cho thành viên trong lớp của bạn")
+        }
 
         await prisma.user.update({ where: { id: userId }, data: { role } })
         revalidatePath('/tools/students')
@@ -656,7 +677,7 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
 
         const userId = parseInt(session.user.id)
         const isAdmin = session.user.role === Role.ADMIN
-        const isTeacher = session.user.role === Role.TEACHER
+        const isTeacher = isTeachingRole(session.user.role) // Giáo viên + Giảng viên (INSTRUCTOR đã gộp vào TEACHER)
 
         if (!isAdmin && !isTeacher) throw new Error("Unauthorized")
 
@@ -756,7 +777,7 @@ async function checkCourseMemberAccess(courseId: number) {
     const session = await auth()
     if (!session?.user?.id) return { error: "Unauthorized" as const }
     const isAdmin = session.user.role === Role.ADMIN
-    const isTeacher = session.user.role === Role.TEACHER
+    const isTeacher = isTeachingRole(session.user.role) // Giáo viên + Giảng viên (INSTRUCTOR đã gộp vào TEACHER)
     if (!isAdmin && !isTeacher) return { error: "Unauthorized" as const }
 
     const userId = parseInt(session.user.id)
@@ -2073,7 +2094,7 @@ export async function getStudentDetailAction(studentId: number) {
 
         const userId = parseInt(session.user.id)
         const isAdmin = session.user.role === Role.ADMIN
-        const isTeacher = session.user.role === Role.TEACHER
+        const isTeacher = isTeachingRole(session.user.role) // Giáo viên + Giảng viên (INSTRUCTOR đã gộp vào TEACHER)
         if (!isAdmin && !isTeacher) throw new Error("Unauthorized")
 
         const user = await prisma.user.findUnique({
