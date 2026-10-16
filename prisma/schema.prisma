@@ -392,6 +392,7 @@ model Course {
   autoVerifyConfig            AutoVerifyConfig?
   acceptedVouchers            CourseAcceptedVoucher[]
   voucherAwards               CourseVoucherAward[]
+  benefitVouchers             VoucherCourseBenefit[]
   systemTree                  SystemTree?
 
   @@index([teacherId])
@@ -558,7 +559,13 @@ model Payment {
   updatedAt       DateTime      @updatedAt
   qrCodeUrl       String?
   transferContent String?
+  voucherId       Int?
+  voucher         Voucher?        @relation(fields: [voucherId], references: [id], onDelete: SetNull)
+  discountAmount  Int             @default(0)
+  mbvDeducted     Int             @default(0)
   enrollment      Enrollment    @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@index([voucherId])
 }
 
 model YouTubeToken {
@@ -1637,6 +1644,8 @@ model Voucher {
   acceptedCourses CourseAcceptedVoucher[]
   awardedCourses  CourseVoucherAward[]
   userVouchers    UserVoucher[]
+  courseBenefits  VoucherCourseBenefit[]
+  payments        Payment[]
 
   @@index([type])
   @@index([code])
@@ -1681,6 +1690,22 @@ model CourseAcceptedVoucher {
 
   @@unique([courseId, voucherId])
   @@map("course_accepted_voucher")
+}
+
+model VoucherCourseBenefit {
+  id           Int                @id @default(autoincrement())
+  voucherId    Int
+  courseId     Int
+  benefitType  VoucherBenefitType @default(FREE_100)
+  extraAmount  Int                @default(0)
+  createdAt    DateTime           @default(now())
+  voucher      Voucher            @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  course       Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([voucherId, courseId])
+  @@index([voucherId])
+  @@index([courseId])
+  @@map("voucher_course_benefit")
 }
 
 model CronRun {
@@ -2236,6 +2261,11 @@ enum UserVoucherStatus {
   ACTIVE
   USED
   EXPIRED
+}
+
+enum VoucherBenefitType {
+  FREE_100
+  PARTIAL
 }
 
 // Thông báo riêng tư; chỉ API NextAuth đọc/đánh dấu, không mở Data API.
