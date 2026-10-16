@@ -204,10 +204,19 @@ export async function POST(request: NextRequest) {
         await sendActivationEmail(user.email, user.name || '', user.id, course.name_lop || course.id_khoa, course.noidung_email)
       }
 
-      // Xử lý commission cho enrollment miễn phí — tính trên GIÁ NIÊM YẾT (quyết định 2026-10-15)
+      // Xử lý commission cho enrollment miễn phí (Affiliate v2: tạo Order + 2 thành phần)
+      // — tính trên GIÁ NIÊM YẾT (quyết định 2026-10-15)
       try {
-        const { processEnrollmentCommission } = await import("@/lib/affiliate/commission-calculator")
-        await processEnrollmentCommission(userIdNum, newEnrollment.id, course.phi_coc)
+        const {
+          createOrderForEnrollment,
+          processOrderCommission,
+          resolveAffiliateIdFromCookie
+        } = await import("@/lib/affiliate/unified-commission")
+        const { affiliateId, refCode } = await resolveAffiliateIdFromCookie()
+        const orderRes: any = await createOrderForEnrollment(newEnrollment.id, { affiliateId, refCode })
+        if (orderRes.success && orderRes.orderId) {
+          await processOrderCommission(orderRes.orderId)
+        }
       } catch (e) {
         console.error("[EnrollAfterRegister] Commission error:", e)
       }
