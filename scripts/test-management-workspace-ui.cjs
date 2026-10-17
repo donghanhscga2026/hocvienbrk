@@ -19,6 +19,7 @@ const stub = name => ({ __esModule: true, default: props => React.createElement(
 let params = new URLSearchParams('id=1')
 const mocks = {
   '@/lib/auth/roles': require('./helpers/load-ts.cjs')('lib/auth/roles.ts'),
+  '@/lib/course-page/template-workspace-client': { templateWorkspaceRequest: async () => ({ success: true }) },
   'next/link': link,
   'next/navigation': { useRouter: () => ({ push: () => {}, refresh: () => {}, replace: () => {} }), useSearchParams: () => params },
   '@/components/layout/MainHeader': { __esModule: true, default: props => React.createElement('header', { className: 'bg-white p-4 text-xl font-bold' }, props.title) },
@@ -129,8 +130,9 @@ async function run() {
     await click('Thống kê'); assert.ok(document.querySelector('[data-panel="Học viên"]'))
     await click('Nhật ký'); assert.ok(document.querySelector('[data-panel="Nhật ký"]'))
     await click('Trang bán khóa học'); snapshot('course-sales')
-    assert.ok(document.querySelector('[data-panel="Trình chỉnh nội dung"]'), 'Sales editor is rendered inside the course tab');
-    await click('Sửa code'); assert.ok(document.querySelector('[data-panel="Trình chỉnh code"]'));
+    assert.equal(document.querySelector('[data-panel="Trình chỉnh nội dung"]'), null, 'Heavy editor waits until opened');
+    await click('Mở Nội dung'); assert.ok(document.querySelector('[data-panel="Trình chỉnh nội dung"]'));
+    await click('Các mục chỉnh sửa'); await click('Tùy chỉnh bằng code riêng'); assert.ok(document.querySelector('[data-panel="Trình chỉnh code"]'));
     assert.ok(document.querySelector('iframe[src*="preview?page=page-1"]'), 'Information sidebar shows actual saved page preview');
     assert.ok(!document.querySelector('iframe[src="/tools/courses/templates"]'), 'No nested management page')
     console.log('PASS management UI: course pagination, stale response rejection, load error/retry, factual totals, category tab, exclusive descriptions, retained edits, teaching tools and dedicated template context')
