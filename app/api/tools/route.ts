@@ -43,6 +43,8 @@ export async function GET() {
     const session = await auth()
     const visibleTools = tools.filter(tool => !isProfileTool(tool) || canCreateProfile(session?.user?.role)).map(tool => ({
       ...tool,
+      // Công cụ cũ đã được gộp vào tab mặc định của trang Hỗ trợ.
+      url: tool.url.split(/[?#]/)[0] === '/tools/account-assistant' ? '/tools/ho-tro' : tool.url,
       roles: ['/tools/site-profiles', '/tools/landings'].includes(tool.url.split(/[?#]/)[0]) ? ['ADMIN']
         : isProfileTool(tool) || tool.url.split('?')[0] === '/tools/courses'
         ? ['ADMIN', 'TEACHER']
