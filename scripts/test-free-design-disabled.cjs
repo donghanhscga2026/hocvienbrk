@@ -2,6 +2,7 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),ts=require('typescript')
 const root=path.resolve(__dirname,'..'),cache=new Map()
 let writes=0,designReads=0
+let queryParams='section=design'
 const saved={mode:'custom',revision:4},profile={id:7,userId:1,slug:'lucy',title:'Lucy',siteConfig:{homepage:{type:'website'},branding:{name:'Brand'},courseScope:{mode:'ids',courseIds:[8]}},members:[],user:{role:'ADMIN'}}
 class CrmError extends Error{constructor(message,status=400){super(message);this.status=status}}
 const db={user:{findUnique:async()=>({id:1,role:'ADMIN'})},siteProfile:{findUnique:async()=>profile},systemConfig:{findUnique:async({where})=>where.key.startsWith('website-pages:')?null:({value:saved})},siteWebsite:{findUnique:async()=>{designReads++;throw Error('Retained design must not be read')}},$transaction:async()=>{writes++;throw Error('Unexpected write')}}
@@ -21,7 +22,7 @@ function load(rel){
   if(name==='@/app/actions/site-profile-actions')return {getCoursesForProfile:async()=>[],getPostsForProfile:async()=>[]}
   if(name==='next/headers')return {headers:async()=>new Headers({host:'giautoandien.io.vn'})}
   if(name==='next/cache')return {unstable_cache:fn=>fn,revalidateTag:()=>{},revalidatePath:()=>{}}
-  if(name==='next/navigation')return {redirect:url=>{throw Error('redirect:'+url)}}
+  if(name==='next/navigation')return {useSearchParams:()=>new URLSearchParams(queryParams),usePathname:()=>'/tools/my-site/manage',redirect:url=>{throw Error('redirect:'+url)}}
   if(name.startsWith('@/'))return load(name.slice(2))
   if(name.startsWith('.'))return load(path.relative(root,path.resolve(path.dirname(file),name)))
   return require(name)
@@ -58,6 +59,26 @@ async function run(){
  await React.act(async()=>{ui.render(React.createElement(load('components/website/WebsiteManager').default));await new Promise(r=>setTimeout(r,0))})
  assert.ok(document.body.textContent.includes('Mẫu có sẵn'));assert.ok(!document.body.textContent.includes('Thiết kế tự do'))
  assert.ok(!document.querySelector('[href="/tools/my-site/design"]'));assert.ok(document.querySelector('[href="/tools/my-site/edit"]'))
+ assert.ok(!document.body.textContent.includes('HTML / ZIP'),'Manager has no upload entry')
+ queryParams=''
+ await React.act(async()=>ui.render(React.createElement(load('components/website/WebsiteManager').default)))
+ assert.ok(document.body.textContent.includes('Bạn muốn làm gì tiếp theo?'))
+ for(const href of ['/tools/my-site/pages','/tools/my-site/manage?section=design','/tools/my-site/data','/tools/my-site/manage?section=domains'])assert.ok(document.querySelector('a[href="'+href+'"]'),'Overview task '+href)
+ queryParams='profileId=26'
+ const Scope=load('components/website/WebsiteScope').WebsiteScopeProvider
+ await React.act(async()=>ui.render(React.createElement(Scope,null,React.createElement(load('components/website/WebsiteNavigation').default))))
+ const nav=document.querySelector('nav[aria-label="Các mục quản lý website"]')
+ assert.equal(nav.querySelectorAll('a').length,5)
+ assert.equal(nav.querySelector('[aria-current="page"]').textContent,'Tổng quan')
+ for(const link of nav.querySelectorAll('a'))assert.equal(new URL(link.href).searchParams.get('profileId'),'26','Navigation preserves selected website')
+ const pageState={revision:1,pages:[{slug:'gioi-thieu',title:'Giới thiệu',description:'',body:'Existing content',published:true,showInMenu:true}],menu:[]}
+ global.fetch=async()=>({ok:true,json:async()=>({content:pageState,slug:'lucy'})})
+ await React.act(async()=>{ui.render(React.createElement(Scope,null,React.createElement(load('components/website/WebsitePagesManager').default)));await new Promise(r=>setTimeout(r,0))})
+ assert.ok(document.getElementById('website-pages'));assert.ok(document.getElementById('website-menu'))
+ assert.ok(document.querySelector('a[href="/tools/my-site/pages/gioi-thieu/template?profileId=26"]'),'Saved page code editor retains scope')
+ assert.equal(document.querySelector('article details').open,false,'Existing page settings start collapsed')
+ assert.equal(document.querySelector('textarea[maxlength="20000"]').value,'Existing content','Collapsed settings retain content')
+ assert.ok(!document.body.textContent.includes('HTML / ZIP'))
  await React.act(async()=>ui.unmount());dom.window.close()
  console.log('Page templates-only: fallback, retained settings, removed editor and retired APIs, custom-domain document, admin guard and manager UI passed; no data writes.')
 }
