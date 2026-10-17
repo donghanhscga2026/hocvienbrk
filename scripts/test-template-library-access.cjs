@@ -82,7 +82,7 @@ async function run() {
   requestActor = bob
   assert.equal((await api.GET(new Request('https://test.invalid/api/course-templates?id=' + encodeURIComponent(privateTemplate.id)))).status, 404)
   assert.equal((await api.POST(request({ action: 'apply', id: 'expert-course', system: true, slug: 'OWN', name: 'Unauthorized' }))).status, 403)
-  assert.equal((await api.POST(request({ action: 'save', ...input, scope: 'shared' }))).status, 403)
+  assert.equal((await api.POST(request({ action: 'save', ...input, scope: 'shared' }))).status, 410)
   requestActor = alice
   const ownResponse = await api.GET(new Request('https://test.invalid/api/course-templates?id=' + encodeURIComponent(privateTemplate.id)))
   assert.equal(ownResponse.status, 200); assert.match(ownResponse.headers.get('cache-control'), /no-store/)

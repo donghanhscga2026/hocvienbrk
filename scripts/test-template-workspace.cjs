@@ -49,26 +49,14 @@ async function run() {
   const api = load('app/api/admin/course-page-templates/workspace/route.ts', mocks)
   const input = { action: 'save', name: 'Editable', sourceType: 'zip', source }
   const request = (body = input, origin = 'https://test.invalid', gzip = false) => new Request('https://test.invalid/api/admin/course-page-templates/workspace', { method: 'POST', headers: { origin, 'content-type': gzip ? 'application/gzip' : 'application/json' }, body: gzip ? zlib.gzipSync(JSON.stringify(body)) : JSON.stringify(body) })
-  assert.equal((await api.POST(request(input, 'https://other.invalid'))).status, 403); assert.equal(uploads.length, 0)
+  assert.equal((await api.POST(request(input, 'https://other.invalid'))).status, 410); assert.equal(uploads.length, 0)
   role = 'TEACHER'; assert.equal((await api.POST(request())).status, 403); role = 'ADMIN'
   session = null; assert.equal((await api.POST(request())).status, 401); session = { user: { id: '0' } }
   domain = {}; assert.equal((await api.POST(request())).status, 403); domain = null
-  assert.equal((await api.POST(request(input, undefined, true))).status, 200)
-  assert.equal(uploads.length, 0); assert.deepEqual(saved.analysis.editorSource, source); assert.equal(saved.snapshot.sections[0].variant, 'zip-source-v1')
-  assert.equal(saved.sourceUrl, null)
-  assert.match(saved.snapshot.sections[0].content.exactSource.html, /authorRan/)
-  assert.equal((await api.POST(request({ ...input, id: saved.id }))).status, 409)
-  const priorUploadCount = uploads.length
-  assert.equal((await api.POST(request({ ...input, id: saved.id, expectedUpdatedAt: '2026-10-13T00:00:00.000Z' }))).status, 409)
-  assert.equal(uploads.length, priorUploadCount, 'Stale revision fails before upload')
-  conflict = true; assert.equal((await api.POST(request({ ...input, id: saved.id, expectedUpdatedAt: now.toISOString() }))).status, 409); conflict = false
-  const beforeOversized = saved
-  const expanded = { entryPath: 'index.html', files: [
-    { path: 'index.html', kind: 'html', content: '<section><img src="a.png"><img src="a.png"><img src="a.png"></section>' },
-    { path: 'a.png', kind: 'asset', content: 'data:image/png;base64,' + 'A'.repeat(3 * 1024 * 1024) },
-  ] }
-  assert.equal((await api.POST(request({ ...input, source: expanded }, undefined, true))).status, 400, 'Expanded HTML remains bounded before storing it in the database')
-  assert.equal(saved, beforeOversized, 'Oversized compiled HTML does not replace a saved template')
+  assert.equal((await api.POST(request(input, undefined, true))).status, 410, 'Legacy writes are disabled even for admin')
+  saved = { id: 'new-template', name: 'Existing template', snapshot: { sections: [{ variant: 'zip-source-v1', content: { exactSource: { html: compiled.html } } }] }, analysis: { editorSource: source } }
+  records.set(saved.id, saved)
+  assert.equal(uploads.length, 0)
   const originalFetch = global.fetch
   try {
     let reads = 0
@@ -96,7 +84,7 @@ async function run() {
     assert.equal((await api.GET(new Request('https://test.invalid/api/admin/course-page-templates/workspace?id=bad'))).status, 400)
   } finally { global.fetch = originalFetch }
   const badGzip = new Request('https://test.invalid/api/admin/course-page-templates/workspace', { method: 'POST', headers: { origin: 'https://test.invalid', 'content-type': 'application/gzip' }, body: 'broken' })
-  assert.equal((await api.POST(badGzip)).status, 400)
-  console.log('PASS template workspace: HTML/CSS/JS execution, asset packaging, block preservation, fresh roles, origin/domain guards, database-only save/reopen, legacy URLs, raw source round trip and optimistic updates')
+  assert.equal((await api.POST(badGzip)).status, 410)
+  console.log('PASS template workspace: HTML/CSS/JS execution, asset packaging, block preservation, fresh roles, origin/domain guards, legacy reads preserved with all legacy writes disabled')
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })
