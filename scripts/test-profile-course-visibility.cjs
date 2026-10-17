@@ -100,23 +100,33 @@ async function run() {
   assert.deepEqual(ids(view.courses), [1, 3]); assert.deepEqual(view.myActiveCourses, [])
   view = await render(12)
   assert.deepEqual(ids(view.courses), [1, 3], 'Hidden enrolled courses never enter public recommendations')
-  assert.deepEqual(ids(view.myActiveCourses), [2], 'Only own active enrollment within this Page survives catalog hiding')
+  assert.deepEqual(view.myActiveCourses, [], 'Enrollment cannot restore hidden courses in Page gift sections')
   assert.deepEqual(ids(view.groupedOtherCourses.flatMap(group => group.courses)), [1, 3])
+  records.push({ ...records[0], id: 100, courseId: 1 })
+  view = await render(12)
+  assert.deepEqual(ids(view.myActiveCourses), [1], 'Public enrolled courses still appear in the Page gift section')
   records[0].status = 'COMPLETED'
   view = await render(12)
-  assert.deepEqual(ids(view.myCompletedCourses), [2]); assert.deepEqual(view.myActiveCourses, [])
+  assert.deepEqual(view.myCompletedCourses, [], 'Completed enrollments cannot restore hidden Page courses either')
+  assert.deepEqual(ids(view.myActiveCourses), [1])
+  records.at(-1).status = 'COMPLETED'
+  view = await render(12)
+  assert.deepEqual(ids(view.myCompletedCourses), [1], 'Completed public courses keep their existing display')
+  records.at(-1).status = 'ACTIVE'
   records[0].status = 'ACTIVE'
   view = await render(14)
   assert.deepEqual(view.myActiveCourses, [], 'Another learner cannot inherit hidden enrollments')
   view = await render(0)
-  assert.deepEqual(ids(view.myActiveCourses), [2], 'Account zero retains its own learning')
+  assert.deepEqual(view.myActiveCourses, [], 'Account zero also sees only public courses on a Page')
   view = await render(12, { ...profile, siteConfig: { courseScope: { mode: 'ids', courseIds: [1, 3] } } })
-  assert.deepEqual(view.myActiveCourses, [], 'Enrollment never widens the Page selected-course scope')
+  assert.deepEqual(ids(view.myActiveCourses), [1], 'The Page retains its selected-course scope')
   const templates = load('lib/website/page-template-server.ts', { 'server-only': {}, '@/lib/prisma': { __esModule: true, default: db }, '@/lib/site-profile/deployment-runtime': branding })
   assert.deepEqual(ids(await templates.pageCourses(profile)), [1, 3], 'Imported Page catalog also excludes hidden and unconfigured courses')
   brand = null
   assert.deepEqual(ids(await actions.getCoursesForProfile(profile)), [1, 2, 4, 6, 7], 'Giautoandien keeps its existing Course.status behavior')
   assert.deepEqual(ids(await templates.pageCourses(profile)), [1, 2, 4, 6, 7])
+  view = await render(12)
+  assert.deepEqual(ids(view.myActiveCourses), [1, 2], 'Giautoandien Page enrollment display is unchanged')
   cache.clear(); fail = true; brand = { variant: 'wi300' }
   const originalError = console.error
   try {
@@ -126,6 +136,6 @@ async function run() {
     assert.deepEqual(ids(await actions.getCoursesForProfile(profile)), [999], 'Original-site fallback behavior is preserved')
   } finally { console.error = originalError }
   assert.equal(writes, 0)
-  console.log('PASS Site Profile visibility: independent WI300 catalog, Page scopes, cache isolation, own active/completed learning, hidden/pending/other enrollments, imported Pages and original-site behavior (isolated DB).')
+  console.log('PASS Site Profile visibility: independent WI300 catalog, Page scopes, cache isolation, public active/completed gifts, hidden enrollment exclusion for all viewers, imported Pages and original-site behavior (isolated DB).')
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })
