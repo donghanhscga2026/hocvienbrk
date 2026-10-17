@@ -31,7 +31,6 @@ import { analyzeWebsiteHtml } from '@/lib/course-page/importer/html-analyzer'
 import { isImportedRegistrationSection } from '@/lib/course-page/importer/registration'
 import { saveImportedTemplate } from '@/lib/course-page/importer/save-template'
 import { zipFrameSource } from '@/lib/course-page/importer/source-url'
-import { supabase } from '@/lib/supabase'
 import {
   deleteStoredCoursePageTemplate,
   getStoredCoursePageTemplates,
@@ -117,7 +116,7 @@ export default function CourseTemplateLibraryPage() {
     () => orderedSections.filter(section => selected.has(section.id)),
     [orderedSections, selected],
   )
-  const isExactAnalysis = Boolean(analysis?.exactSource?.url)
+  const isExactAnalysis = Boolean(analysis?.exactSource?.url || analysis?.exactSource?.html)
   const selectableSectionIds = useMemo(
     () => orderedSections.filter(section => !isImportedRegistrationSection(section)).map(section => section.id),
     [orderedSections],
@@ -149,35 +148,12 @@ export default function CourseTemplateLibraryPage() {
 
       if (sourceZip) {
         const prepared = await prepareWebsiteZip(sourceZip)
-        const safeBase = sourceZip.name
-          .replace(/\.zip$/i, '')
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .replace(/[^a-z0-9_-]+/gi, '-')
-          .replace(/^-+|-+$/g, '')
-          .slice(0, 60) || 'website'
-        const storagePath = `course-template-sources/${safeBase}-${Date.now().toString(36)}.html`
-        const exactFile = new Blob([prepared.html], { type: 'text/html;charset=utf-8' })
-        const { error: uploadError } = await supabase.storage
-          .from('uploads')
-          .upload(storagePath, exactFile, {
-            contentType: 'text/html;charset=utf-8',
-            upsert: false,
-          })
-        if (uploadError) {
-          throw new Error(`Không thể lưu trang ZIP vào kho dữ liệu: ${uploadError.message}`)
-        }
-
-        const { data: publicData } = supabase.storage.from('uploads').getPublicUrl(storagePath)
-        if (!publicData?.publicUrl) throw new Error('Không lấy được URL công khai của trang ZIP đã lưu.')
-
         result = analyzeWebsiteHtml({
           html: prepared.analysisHtml,
           sourceType: 'zip',
-          sourceUrl: publicData.publicUrl,
         })
         result.exactSource = {
-          url: publicData.publicUrl,
+          html: prepared.html,
           zipFileName: sourceZip.name,
           entryPath: prepared.entryPath,
           fileCount: prepared.fileCount,
@@ -582,7 +558,7 @@ export default function CourseTemplateLibraryPage() {
                       ['--course-body-font' as any]: analysis.theme.bodyFont || 'system-ui',
                     }}
                   >
-                    {isExactAnalysis && analysis.exactSource?.url ? (
+                    {isExactAnalysis ? (
                       <div>
                         <ZipSourceSection
                           content={{

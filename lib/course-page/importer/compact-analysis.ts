@@ -1,8 +1,8 @@
 import type { WebsiteTemplateAnalysis } from './types'
 
-// Trang nguyên bản đã lưu riêng; chỉ cần metadata để chọn khối và nối đăng ký.
+// Giữ nguồn nguyên trang một lần; các khối chỉ cần metadata để chọn và nối đăng ký.
 export function compactExactAnalysis(analysis: WebsiteTemplateAnalysis): WebsiteTemplateAnalysis {
-  if (!analysis.exactSource?.url || !['html', 'zip'].includes(analysis.sourceType)) return analysis
+  if (!(analysis.exactSource?.url || analysis.exactSource?.html) || !['html', 'zip'].includes(analysis.sourceType)) return analysis
   return {
     ...analysis,
     sections: analysis.sections.map(section => ({

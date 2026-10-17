@@ -105,7 +105,8 @@ export type WebsiteTemplateAnalysis = {
   }
   warnings: string[]
   exactSource?: {
-    url: string
+    url?: string
+    html?: string
     zipFileName?: string
     entryPath?: string
     fileCount?: number
