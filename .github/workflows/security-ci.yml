@@ -102,6 +102,7 @@ jobs:
           node scripts/test-course-student-ui.cjs
           node scripts/test-template-workspace.cjs
           node scripts/test-course-code.cjs
+          node scripts/test-course-sales-flow.cjs
           node scripts/test-template-workspace-ui.cjs
           node scripts/test-course-builder-ui.cjs
           node scripts/test-course-template-publish.cjs
