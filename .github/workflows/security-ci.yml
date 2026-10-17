@@ -46,6 +46,7 @@ jobs:
 
       - name: Website and custom domain isolation tests
         run: |
+          node scripts/test-r2-public-images.cjs
           npm run test:website-templates
           npm run test:custom-domains
           node scripts/test-domain-snapshot.cjs

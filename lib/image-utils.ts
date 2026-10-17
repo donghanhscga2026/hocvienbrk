@@ -1,13 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
-import { supabase } from './supabase';
+import { isPublicImageDirectory, uploadPublicImage } from './public-image-storage';
 import { isBlockedHost } from './security/url-safety';
 
 /**
- * Lưu 1 file (Buffer) lên Supabase Storage (ưu tiên) — chỉ dự phòng ghi ổ đĩa
- * cục bộ khi thiếu cấu hình Supabase (chỉ dùng được lúc chạy local/VPS,
- * KHÔNG chạy được trên Vercel vì filesystem chỉ đọc lúc runtime).
+ * Ảnh công khai đi R2; file nghiệp vụ/template nguồn giữ luồng Supabase hiện có.
+ * Nhánh R2 không ghi ổ đĩa và không tự quay lại Supabase khi lỗi.
  * Dùng cho các route nhận file qua FormData (khác saveBase64Image ở trên,
  * vốn dành cho ảnh dạng base64).
  */
@@ -17,6 +16,8 @@ export async function saveUploadedFile(
     subDir: string,
     contentType: string
 ): Promise<string> {
+    if (isPublicImageDirectory(subDir)) return uploadPublicImage(buffer, subDir);
+    const { supabase } = await import('./supabase');
     const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -53,15 +54,24 @@ export async function saveUploadedFile(
 }
 
 /**
- * Saves a base64 image string to either Supabase Storage (Production)
- * or the local filesystem (Development).
+ * Ảnh đại diện/ảnh công khai dạng base64 được giải mã và lưu R2.
+ * Ảnh minh chứng thanh toán tiếp tục dùng luồng lưu trữ cũ.
  */
 export async function saveBase64Image(base64Data: string, subDir: string = 'avatars'): Promise<string> {
     if (!base64Data || !base64Data.startsWith('data:image')) {
         return base64Data;
     }
 
+    // Public image errors must reach the form; never save raw base64 or silently use Supabase.
+    if (isPublicImageDirectory(subDir)) {
+        if (base64Data.length > 12 * 1024 * 1024) throw new Error('Ảnh quá lớn (tối đa 8 MB).');
+        const matches = /^data:image\/(?:jpeg|png|webp|gif|avif);base64,([A-Za-z0-9+/]+={0,2})$/.exec(base64Data);
+        if (!matches) throw new Error('Định dạng ảnh không hợp lệ.');
+        return uploadPublicImage(Buffer.from(matches[1], 'base64'), subDir);
+    }
+
     try {
+        const { supabase } = await import('./supabase');
         const matches = base64Data.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
         if (!matches || matches.length !== 3) {
             throw new Error('Định dạng base64 không hợp lệ');
@@ -141,13 +151,8 @@ function isAlreadyStoredUrl(url: string): boolean {
 }
 
 /**
- * Với link ảnh do người dùng dán tay (postimg.cc, imgur, ibb.co...), tải ảnh
- * về, nén/resize qua sharp rồi đẩy lên Supabase Storage, trả về link Supabase
- * thay cho link ngoài. Mục đích: next/image không còn phải fetch trực tiếp
- * các host ngoài không ổn định lúc render (nguồn gốc lỗi "upstream image
- * response timed out"). Nếu tải/nén thất bại (mạng lỗi, không phải ảnh, quá
- * lớn...) thì trả lại nguyên url gốc để không chặn việc lưu dữ liệu — trang
- * quản trị vẫn lưu được, chỉ là ảnh đó sẽ còn phụ thuộc host ngoài như cũ.
+ * Ảnh công khai: giữ URL HTTPS ngoài, chỉ lưu ảnh base64 mới lên R2.
+ * Các thư mục nghiệp vụ khác giữ cơ chế tải/nén và lưu Supabase cũ.
  */
 export async function resolveImageUrl(
     url: string | null | undefined,
@@ -156,6 +161,17 @@ export async function resolveImageUrl(
     if (!url) return null;
     const trimmed = url.trim();
     if (!trimmed) return null;
+
+    // Keep external artwork on its original host. Existing Supabase URLs stay readable,
+    // but new external URLs are no longer copied into Supabase (or R2) automatically.
+    if (isPublicImageDirectory(subDir) && !trimmed.startsWith('data:image')) {
+        if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.includes('\\')) return trimmed;
+        try {
+            const external = new URL(trimmed);
+            if (external.protocol === 'https:' && !external.username && !external.password && !isBlockedHost(external.hostname)) return trimmed;
+        } catch { /* Show the same validation message for malformed links. */ }
+        throw new Error('Vui lòng dùng đường dẫn ảnh HTTPS công khai hợp lệ.');
+    }
 
     if (trimmed.startsWith('data:image')) {
         return saveBase64Image(trimmed, subDir);
