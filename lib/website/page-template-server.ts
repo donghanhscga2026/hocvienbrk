@@ -2,6 +2,8 @@ import 'server-only'
 import {gunzipSync} from 'node:zlib'
 import prisma from '@/lib/prisma'
 import {getCourseWhereForProfile,type CourseScopeProfile} from '@/lib/site-profile/config'
+import {getCurrentDeploymentBrand} from '@/lib/site-profile/deployment-runtime'
+import {wi300CoursePreferences,wi300CourseWhere} from '@/lib/wi300/course-visibility'
 import {PAGE_HTML_LIMIT,PAGE_COMPRESSED_LIMIT,pageTemplateKey,pageTemplateSchema,type PageTemplate} from './page-template'
 import {PLATFORM_ORIGIN} from './domain-shared'
 
@@ -16,12 +18,14 @@ export async function readPageTemplate(id:number):Promise<PageTemplate|null> {
   const result=pageTemplateSchema.safeParse(entry?.value)
   return result.success?result.data:null
 }
-export function pageCourseWhere(profile:CourseScopeProfile) {
-  return {AND:[getCourseWhereForProfile(profile),{teacherId:profile.userId ?? -1}]}
+export function pageCourseWhere(profile:CourseScopeProfile,preferences?:Map<number,boolean>) {
+  const base=getCourseWhereForProfile(profile)
+  return {AND:[preferences ? wi300CourseWhere(base,preferences) : base,{teacherId:profile.userId ?? -1}]}
 }
 export async function pageCourses(profile:CourseScopeProfile,enabled=true,customDomain=false) {
   if(!enabled || profile.userId==null)return []
-  const rows=await prisma.course.findMany({where:pageCourseWhere(profile),orderBy:[{pin:'asc'},{id:'asc'}],take:100,select:{id:true,id_khoa:true,name_khoa:true,name_lop:true,mo_ta_ngan:true,link_anh_bia:true,phi_coc:true,feeType:true,teacher:{select:{name:true}}}})
+  const preferences=await getCurrentDeploymentBrand() ? await wi300CoursePreferences(prisma) : undefined
+  const rows=await prisma.course.findMany({where:pageCourseWhere(profile,preferences),orderBy:[{pin:'asc'},{id:'asc'}],take:100,select:{id:true,id_khoa:true,name_khoa:true,name_lop:true,mo_ta_ngan:true,link_anh_bia:true,phi_coc:true,feeType:true,teacher:{select:{name:true}}}})
   return rows.map(c=>({id:c.id,title:c.name_khoa || c.name_lop,description:c.mo_ta_ngan || '',teacherName:c.teacher?.name?.trim() || '',price:c.phi_coc,feeType:c.feeType,image:publicImage(c.link_anh_bia),href:(customDomain ? '' : PLATFORM_ORIGIN)+'/khoa-hoc/'+encodeURIComponent(c.id_khoa)}))
 }
 function publicImage(value:string|null) {

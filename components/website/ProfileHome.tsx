@@ -11,6 +11,8 @@ import {getHeroMessageForProfile} from '@/app/actions/message-actions'
 import {getRoadmapPoints} from '@/app/actions/roadmap-actions'
 import {getCourseWhereForProfile,getSiteRuntimeConfig} from '@/lib/site-profile/config'
 import type {DomainModules} from '@/lib/website/domain-shared'
+import {getCurrentDeploymentBrand} from '@/lib/site-profile/deployment-runtime'
+import {wi300CourseWhere} from '@/lib/wi300/course-visibility'
 
 /** Giữ mẫu trang cá nhân hiện có; domain chỉ đọc dữ liệu thuộc website, không dùng dữ liệu dự phòng. */
 export default async function ProfileHome({profile,customDomain=false,modules}:{profile:any;customDomain?:boolean;modules?:DomainModules}) {
@@ -22,7 +24,7 @@ export default async function ProfileHome({profile,customDomain=false,modules}:{
     const session=await getSession()
     const teachers=[profile.userId,...(profile.members || []).map((m:{userId:number})=>m.userId)].filter((v):v is number=>typeof v==='number')
     const [
-        courses,
+        catalogCourses,
         survey,
         message,
         userRecord,
@@ -90,7 +92,17 @@ export default async function ProfileHome({profile,customDomain=false,modules}:{
         }
     })
 
-    const myCourses = courses.filter((c: any) => myCourseIds.has(c.id))
+    // Only this viewer's verified learning records can retain a hidden WI300 course.
+    // Keep these courses out of public recommendations and the discovery catalog.
+    const missingLearningIds = [...myCourseIds].filter(id => !catalogCourses.some((c: any) => c.id === id))
+    const learningCourses = missingLearningIds.length && await getCurrentDeploymentBrand()
+        ? await prisma.course.findMany({
+            where: wi300CourseWhere(courseWhere, new Map(), false, missingLearningIds),
+            include:{courseCategory:true,teacherBankAccount:true,teacher:{select:{name:true}},_count:{select:{enrollments:{where:{status:'ACTIVE'}},lessons:true}}},
+            orderBy:[{pin:'asc'},{id:'asc'}]
+        }).then(rows=>rows.map(c=>({...c,activeStudentCount:c._count.enrollments})))
+        : []
+    const myCourses = [...catalogCourses, ...learningCourses].filter((c: any) => myCourseIds.has(c.id))
 
     // Tách active vs completed
     const myActiveCourses = myCourses
@@ -103,7 +115,7 @@ export default async function ProfileHome({profile,customDomain=false,modules}:{
     const myCompletedCourses = myCourses
         .filter((c: any) => enrollmentsMap[c.id]?.status === 'COMPLETED')
 
-    const otherCourses = courses.filter((c: any) => !myCourseIds.has(c.id))
+    const otherCourses = catalogCourses.filter((c: any) => !myCourseIds.has(c.id))
 
     const groupedOtherCourses = otherCourses.reduce((acc: any[], course: any) => {
         const category = course.courseCategory?.name || course.category || "Khác"
@@ -163,7 +175,7 @@ export default async function ProfileHome({profile,customDomain=false,modules}:{
 
             <HomePageClient
                 profile={profile}
-                courses={courses}
+                courses={catalogCourses}
                 myActiveCourses={myActiveCourses}
                 myCompletedCourses={myCompletedCourses}
                 groupedOtherCourses={groupedOtherCourses}

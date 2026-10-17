@@ -50,6 +50,7 @@ jobs:
           npm run test:custom-domains
           node scripts/test-domain-snapshot.cjs
           node scripts/test-page-template-courses.cjs
+          node scripts/test-profile-course-visibility.cjs
           node scripts/test-page-template-assets.cjs
           node scripts/test-website-pages.cjs
           node scripts/test-website-management-access.cjs
