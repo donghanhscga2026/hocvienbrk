@@ -3,9 +3,7 @@ import { gunzipSync } from 'node:zlib'
 import { requireAdmin } from '@/lib/api-auth'
 import { analyzeWebsiteHtml } from '@/lib/course-page/importer/html-analyzer'
 import { fetchRemoteHtml } from '@/lib/course-page/importer/fetch-html'
-import { mirrorAnalysisImages } from '@/lib/course-page/importer/image-mirror'
 import { prepareStandaloneHtml } from '@/lib/course-page/importer/prepare-html'
-import { saveUploadedFile } from '@/lib/image-utils'
 
 const MAX_HTML_BYTES = 8 * 1024 * 1024
 
@@ -15,10 +13,8 @@ export const runtime = 'nodejs'
 async function analyzeStandalone(html: string, sourceUrl?: string, filename = 'website.html') {
   const prepared = await prepareStandaloneHtml(html, sourceUrl)
   const analysis = analyzeWebsiteHtml({ html: prepared.analysisHtml, sourceType: 'html', sourceUrl })
-  const safeName = filename.replace(/\.html?$/i, '').replace(/[^a-z0-9_-]+/gi, '-').slice(0, 60) || 'website'
-  const url = await saveUploadedFile(Buffer.from(prepared.html, 'utf8'),
-    `${safeName}-${Date.now().toString(36)}.html`, 'course-template-sources', 'text/html; charset=utf-8')
-  analysis.exactSource = { url, entryPath: filename }
+  // Nguồn đi cùng bản mẫu trong database, không ghi Storage/ổ đĩa Vercel.
+  analysis.exactSource = { html: prepared.html, entryPath: filename }
   analysis.warnings = [...new Set([...analysis.warnings, ...prepared.warnings,
     'HTML giữ nguyên trang: bố cục không bị chia khung; form nguồn được thay bằng đăng ký khóa học MFC.',
   ])]
@@ -70,29 +66,11 @@ export async function POST(request: NextRequest) {
         try { filename = decodeURIComponent(headerName) } catch {}
         return NextResponse.json({ success: true, analysis: await analyzeStandalone(html, sourceUrl, filename) })
       }
-      const rawAnalysis = analyzeWebsiteHtml({ html, sourceType: requestedSourceType, sourceUrl })
-      const analysis = await mirrorAnalysisImages(rawAnalysis, {
-        dataOnly: true,
-        failOnEmbeddedData: true,
-      })
+      const analysis = analyzeWebsiteHtml({ html, sourceType: requestedSourceType, sourceUrl })
 
       if (requestedSourceType === 'zip') {
-        const safeName = (zipFileName || 'website')
-          .replace(/\.zip$/i, '')
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .replace(/[^a-z0-9_-]+/gi, '-')
-          .replace(/^-+|-+$/g, '')
-          .slice(0, 60) || 'website'
-        const sourceFilename = `${safeName}-${Date.now().toString(36)}.html`
-        const exactUrl = await saveUploadedFile(
-          htmlBuffer,
-          sourceFilename,
-          'course-template-sources',
-          'text/html; charset=utf-8',
-        )
         analysis.exactSource = {
-          url: exactUrl,
+          html,
           zipFileName: zipFileName || undefined,
           entryPath: zipEntry || undefined,
           fileCount: zipFileCount,
@@ -132,6 +110,7 @@ export async function POST(request: NextRequest) {
     const html = typeof body?.html === 'string' ? body.html : ''
 
     if (url) {
+      const { mirrorAnalysisImages } = await import('@/lib/course-page/importer/image-mirror')
       const remote = await fetchRemoteHtml(url)
       const rawAnalysis = analyzeWebsiteHtml({
         html: remote.html,

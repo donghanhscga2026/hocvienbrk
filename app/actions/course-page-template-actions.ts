@@ -3,7 +3,6 @@
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { requireAdminAction } from '@/lib/api-auth'
-import { mirrorAnalysisImages } from '@/lib/course-page/importer/image-mirror'
 import {
   ImportedSectionCandidate,
   StoredTemplateSnapshot,
@@ -84,7 +83,7 @@ function buildSnapshot(
 
   if (!selected.length) throw new Error('Hãy chọn ít nhất một phần nội dung (form đăng ký nguồn luôn được thay bằng quy trình MFC)')
 
-  if ((analysis.sourceType === 'zip' || analysis.sourceType === 'html') && analysis.exactSource?.url) {
+  if ((analysis.sourceType === 'zip' || analysis.sourceType === 'html') && (analysis.exactSource?.url || analysis.exactSource?.html)) {
     return {
       name,
       seo: {
@@ -248,8 +247,11 @@ export async function createStoredCoursePageTemplate(input: {
     if (!name) return { success: false, error: 'Vui lòng đặt tên cho mẫu' }
     if (!input.analysis?.sections?.length) return { success: false, error: 'Chưa có kết quả phân tích website' }
 
+    if (input.analysis.exactSource?.html && (typeof input.analysis.exactSource.html !== 'string' || Buffer.byteLength(input.analysis.exactSource.html, 'utf8') > 8 * 1024 * 1024)) {
+      return { success: false, error: 'Nguồn HTML không hợp lệ hoặc vượt giới hạn 8 MB.' }
+    }
     const selectedSet = new Set(input.selectedSectionIds)
-    const unresolvedLocalImages = input.analysis.exactSource?.url
+    const unresolvedLocalImages = (input.analysis.exactSource?.url || input.analysis.exactSource?.html)
       ? []
       : input.analysis.sections
           .filter(section => selectedSet.has(section.id) && !isImportedRegistrationSection(section))
@@ -270,9 +272,9 @@ export async function createStoredCoursePageTemplate(input: {
       const section = input.analysis.sections.find(item => item.id === id)
       return section ? !isImportedRegistrationSection(section) : false
     })
-    const storedAnalysis = input.analysis.exactSource?.url
+    const storedAnalysis = (input.analysis.exactSource?.url || input.analysis.exactSource?.html)
       ? jsonSafe(compactExactAnalysis(input.analysis))
-      : await mirrorAnalysisImages(input.analysis, {
+      : await (await import('@/lib/course-page/importer/image-mirror')).mirrorAnalysisImages(input.analysis, {
           sectionIds: safeSelectedIds,
         })
     const snapshot = buildSnapshot(name, storedAnalysis, safeSelectedIds)

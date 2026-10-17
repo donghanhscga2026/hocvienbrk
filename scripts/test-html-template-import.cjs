@@ -5,7 +5,7 @@ const ts = require('typescript')
 const { JSDOM } = require('jsdom')
 const root = path.resolve(__dirname, '..')
 const cache = new Map()
-let uploadedHtml = ''
+let storageCalls = 0, savedTemplate
 let denied = null
 function load(file) {
   if (cache.has(file)) return cache.get(file)
@@ -16,11 +16,11 @@ function load(file) {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true,
   } }).outputText
   new Function('require', 'exports', 'module', code)(name => {
-    if (name === '@/lib/api-auth') return { requireAdmin: async () => denied }
-    if (name === '@/lib/image-utils') return { saveUploadedFile: async buffer => { uploadedHtml = buffer.toString(); return 'https://project.supabase.co/storage/v1/object/public/uploads/course-template-sources/test.html' } }
-    if (name === '@/lib/prisma') return {}
-    if (name === 'next/cache') return {}
-    if (name === '@/lib/course-page/importer/image-mirror') return { mirrorAnalysisImages: async value => value }
+    if (name === '@/lib/api-auth') return { requireAdmin: async () => denied, requireAdminAction: async () => denied ? { error: 'denied' } : null }
+    if (name === '@/lib/image-utils') return { saveUploadedFile: async () => { storageCalls++; throw Error('Storage restricted; Vercel filesystem unavailable') } }
+    if (name === '@/lib/prisma') return { __esModule: true, default: { coursePageTemplate: { create: async ({ data }) => { savedTemplate = { id: 'inline-template', ...data }; return savedTemplate } } } }
+    if (name === 'next/cache') return { revalidatePath() {} }
+    if (name === '@/lib/course-page/importer/image-mirror') return { mirrorAnalysisImages: async () => { storageCalls++; throw Error('Image storage unavailable') } }
     if (name.startsWith('@/')) return load(name.slice(2) + '.ts')
     if (name.startsWith('.')) return load(path.posix.join(path.posix.dirname(file), name) + '.ts')
     return require(name)
@@ -98,8 +98,30 @@ async function run() {
   const response = await POST(new NextRequest(url, { method: 'POST', headers: { 'Content-Type': 'application/gzip' }, body }))
   const result = await response.json()
   assert.equal(response.status, 200)
-  assert.ok(result.analysis.exactSource.url)
-  assert.ok(uploadedHtml.includes('data-mfc-compiled-tailwind'))
+  assert.equal(result.analysis.exactSource.url, undefined)
+  assert.ok(result.analysis.exactSource.html.includes('data-mfc-compiled-tailwind'))
+  const actions = load('app/actions/course-page-template-actions.ts')
+  const stored = await actions.createStoredCoursePageTemplate({ name: 'Inline HTML', analysis: result.analysis, selectedSectionIds: result.analysis.sections.map(s => s.id) })
+  assert.equal(stored.success, true)
+  assert.equal(savedTemplate.sourceUrl, null)
+  const storedContent = savedTemplate.snapshot.sections[0].content
+  assert.equal(storedContent.exactSource.html, result.analysis.exactSource.html)
+  assert.equal(savedTemplate.analysis.sections[0].fidelity, undefined, 'Database metadata does not duplicate the full source per section')
+  const React = require('react'), { renderToStaticMarkup } = require('react-dom/server')
+  const Section = require('./helpers/load-ts.cjs')('components/course-page/sections/ZipSourceSection.tsx', { '@/components/wi300/Wi300BrandContext': { useWi300Brand: () => null } }).default
+  const frame = new JSDOM(renderToStaticMarkup(React.createElement(Section, { content: storedContent }))).window.document.querySelector('iframe')
+  assert.equal(frame.getAttribute('src'), null, 'Rendering database-backed HTML never requests the old Storage proxy')
+  assert.equal(frame.getAttribute('srcdoc'), result.analysis.exactSource.html)
+  assert.equal(frame.getAttribute('sandbox'), 'allow-scripts', 'Stored scripts remain isolated')
+  const zipResponse = await POST(new NextRequest(url, { method: 'POST', headers: { 'Content-Type': 'application/gzip', 'X-Source-Type': 'zip', 'X-Zip-Filename': 'sample.zip', 'X-Zip-Entry': 'index.html' }, body: require('node:zlib').gzipSync(prepared.html) }))
+  const zipResult = await zipResponse.json()
+  assert.equal(zipResponse.status, 200)
+  assert.equal(zipResult.analysis.exactSource.html, prepared.html)
+  assert.equal(zipResult.analysis.exactSource.zipFileName, 'sample.zip')
+  const storedZip = await actions.createStoredCoursePageTemplate({ name: 'Inline ZIP', analysis: zipResult.analysis, selectedSectionIds: zipResult.analysis.sections.map(s => s.id) })
+  assert.equal(storedZip.success, true)
+  assert.equal(savedTemplate.snapshot.sections[0].content.exactSource.html, prepared.html)
+  assert.equal(storageCalls, 0, 'Analyze, database save and rendering all work with Storage/filesystem disabled')
   const multipart = new FormData()
   multipart.append('file', new File([fixture], 'sample.html', { type: 'text/html' }))
   assert.equal((await POST(new NextRequest(url, { method: 'POST', body: multipart }))).status, 200)

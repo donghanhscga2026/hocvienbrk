@@ -3,7 +3,6 @@ import { gunzipSync } from 'node:zlib'
 import { z, ZodError } from 'zod'
 import { auth } from '@/auth'
 import prisma from '@/lib/prisma'
-import { supabase } from '@/lib/supabase'
 import { domainContext } from '@/lib/website/domain-context'
 import { CrmError } from '@/lib/crm/service'
 import { crmResponse } from '@/lib/crm/http'
@@ -54,8 +53,11 @@ export async function GET(request: Request) {
       const page = await prisma.coursePage.findUnique({ where: { id: pageId }, include: { sections: { orderBy: { sortOrder: 'asc' } } } })
       if (!page) throw new CrmError('Không tìm thấy trang khóa học.', 404)
       const exact = page.sections.find(section => section.variant === 'zip-source-v1')
-      const content = exact?.content as { exactSource?: { url?: string }; selectedBlockKeys?: unknown } | undefined
+      const content = exact?.content as { exactSource?: { url?: string; html?: string }; selectedBlockKeys?: unknown } | undefined
       // Đọc bản HTML bất biến đã áp dụng cho khóa, không lấy mẫu thư viện có thể đã đổi.
+      if (content?.exactSource?.html) {
+        return crmResponse({ template: { name: page.name + ' – Bản sao', description: 'Mã trang hiện tại của khóa học', sourceType: 'html' }, source: sourceFromHtml(content.exactSource.html, zipSelectedBlockKeys(content.selectedBlockKeys)) })
+      }
       if (content?.exactSource?.url) {
         const source = sourceFromHtml(await readSource(content.exactSource.url, 'html'), zipSelectedBlockKeys(content.selectedBlockKeys))
         return crmResponse({ template: { name: page.name + ' – Bản sao', description: 'Mã trang hiện tại của khóa học', sourceType: 'html' }, source })
@@ -72,7 +74,13 @@ export async function GET(request: Request) {
     if (new URL(request.url).searchParams.get('preview') === '1') return crmResponse({ snapshot: template.snapshot, name: template.name })
     const analysis = template.analysis as any
     let source
-    if (analysis?.editorSourceUrl) source = templateSourceSchema.parse(JSON.parse(await readSource(analysis.editorSourceUrl, 'json')))
+    if (analysis?.editorSource) source = templateSourceSchema.parse(analysis.editorSource)
+    else if (analysis?.editorSourceUrl) source = templateSourceSchema.parse(JSON.parse(await readSource(analysis.editorSourceUrl, 'json')))
+    else if (analysis?.exactSource?.html) {
+      const snapshot = template.snapshot as any
+      const exact = snapshot?.sections?.find((section: any) => section.variant === 'zip-source-v1')
+      source = sourceFromHtml(analysis.exactSource.html, zipSelectedBlockKeys(exact?.content?.selectedBlockKeys))
+    }
     else if (analysis?.exactSource?.url) {
       const snapshot = template.snapshot as any
       const exact = snapshot?.sections?.find((section: any) => section.variant === 'zip-source-v1')
@@ -104,12 +112,6 @@ async function body(request: Request) {
   try { decoded = contentType.includes('gzip') ? gunzipSync(bytes, { maxOutputLength: 10 * 1024 * 1024 }) : bytes }
   catch { throw new CrmError('File gzip không hợp lệ hoặc vượt giới hạn.', 400) }
   return inputSchema.parse(JSON.parse(decoded.toString('utf8')))
-}
-async function upload(name: string, text: string, contentType: string) {
-  const path = `course-template-sources/${name}`
-  const { error } = await supabase.storage.from('uploads').upload(path, Buffer.from(text), { contentType, upsert: false, cacheControl: '31536000' })
-  if (error) throw new CrmError('Không lưu được file mẫu vào kho dữ liệu. Mã đang sửa được giữ lại.', 502)
-  return supabase.storage.from('uploads').getPublicUrl(path).data.publicUrl
 }
 export async function POST(request: Request) {
   try {
@@ -145,14 +147,14 @@ export async function POST(request: Request) {
     let compiled
     try { compiled = compileTemplateSource(input.source) }
     catch (error) { throw new CrmError(error instanceof Error ? error.message : 'Mã nguồn không hợp lệ.') }
+    if (Buffer.byteLength(compiled.html, 'utf8') > 8 * 1024 * 1024) throw new CrmError('HTML sau đóng gói vượt giới hạn 8 MB.')
     const analysis = analyzeWebsiteHtml({ html: compiled.analysisHtml, sourceType: input.sourceType })
     const ids = analysis.sections.filter(section => !isImportedRegistrationSection(section)).map(section => section.id)
     if (!ids.length) throw new CrmError('Mẫu chưa có nội dung ngoài form đăng ký.')
     const revision = randomUUID()
-    const [htmlUrl, editorSourceUrl] = await Promise.all([upload(`${revision}.html`, compiled.html, 'text/html; charset=utf-8'), upload(`${revision}.json`, JSON.stringify(input.source), 'application/json')])
-    analysis.exactSource = { url: htmlUrl, entryPath: input.source.entryPath, fileCount: input.source.files.length }
+    analysis.exactSource = { html: compiled.html, entryPath: input.source.entryPath, fileCount: input.source.files.length }
     const compact = compactExactAnalysis({ ...analysis, sourceType: input.sourceType === 'url' ? 'html' : input.sourceType }), snapshot = await buildEditableTemplateSnapshot(input.name, compact, ids)
-    const data = { name: input.name, description: input.description || null, sourceType: input.sourceType, sourceUrl: htmlUrl, thumbnailUrl: null, snapshot: JSON.parse(JSON.stringify(snapshot)), analysis: JSON.parse(JSON.stringify({ ...compact, editorSourceUrl, sections: compact.sections.map(section => ({ ...section, enabled: ids.includes(section.id) })) })) }
+    const data = { name: input.name, description: input.description || null, sourceType: input.sourceType, sourceUrl: null, thumbnailUrl: null, snapshot: JSON.parse(JSON.stringify(snapshot)), analysis: JSON.parse(JSON.stringify({ ...compact, editorSource: input.source, sections: compact.sections.map(section => ({ ...section, enabled: ids.includes(section.id) })) })) }
     const template = await prisma.$transaction(async tx => {
       if (!input.id) return tx.coursePageTemplate.create({ data: { ...data, key: `custom-editor-${revision}` } })
       const changed = await tx.coursePageTemplate.updateMany({ where: { id: input.id, updatedAt: new Date(input.expectedUpdatedAt!) }, data })

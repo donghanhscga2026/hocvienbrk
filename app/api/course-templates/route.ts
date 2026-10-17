@@ -9,6 +9,7 @@ import { templateSourceSchema, compileTemplateSource, sourceFromHtml } from '@/l
 import { stageTemplate } from '@/lib/course-page/stage-template'
 import { COURSE_TEMPLATE_LIBRARY, createCoursePageFromTemplate } from '@/lib/course-page/templates'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { zipSelectedBlockKeys } from '@/lib/course-page/importer/source-url'
 import { CrmError } from '@/lib/crm/service'
 
 const json = (value: unknown, status = 200) => NextResponse.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } })
@@ -22,8 +23,8 @@ export async function GET(request: Request) {
       await assertCourseEditor(prisma, actor, { pageId: id })
       const page = await prisma.coursePage.findUnique({ where: { id }, include: { sections: { orderBy: { sortOrder: 'asc' } } } })
       const section = page?.sections.find(item => item.variant === 'zip-source-v1')
-      const content = section?.content as { exactSource?: { html?: string; url?: string } } | undefined
-      if (content?.exactSource?.html) return json({ template: { name: page!.name + ' – Bản sao', description: '', sourceType: 'html', scope: 'private', published: false }, source: sourceFromHtml(content.exactSource.html) })
+      const content = section?.content as { exactSource?: { html?: string; url?: string }; selectedBlockKeys?: unknown } | undefined
+      if (content?.exactSource?.html) return json({ template: { name: page!.name + ' – Bản sao', description: '', sourceType: 'html', scope: 'private', published: false }, source: sourceFromHtml(content.exactSource.html, zipSelectedBlockKeys(content.selectedBlockKeys)) })
       if (content?.exactSource?.url && actor.role !== 'ADMIN') {
         const url = new URL(content.exactSource.url), storage = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || '')
         if (url.origin !== storage.origin || url.search || url.hash || !/^\/storage\/v1\/object\/public\/uploads\/course-template-sources\/[a-z0-9_-]+\.html$/i.test(url.pathname)) throw new CrmError('Nguồn mẫu cũ không hợp lệ.')

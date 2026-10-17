@@ -54,21 +54,40 @@ async function run() {
   session = null; assert.equal((await api.POST(request())).status, 401); session = { user: { id: '0' } }
   domain = {}; assert.equal((await api.POST(request())).status, 403); domain = null
   assert.equal((await api.POST(request(input, undefined, true))).status, 200)
-  assert.equal(uploads.length, 2); assert.match(saved.analysis.editorSourceUrl, /\.json$/); assert.equal(saved.snapshot.sections[0].variant, 'zip-source-v1')
-  assert.match(uploads.find(file => file.name.endsWith('.json')).text, /site\/js\/main.js/)
+  assert.equal(uploads.length, 0); assert.deepEqual(saved.analysis.editorSource, source); assert.equal(saved.snapshot.sections[0].variant, 'zip-source-v1')
+  assert.equal(saved.sourceUrl, null)
+  assert.match(saved.snapshot.sections[0].content.exactSource.html, /authorRan/)
   assert.equal((await api.POST(request({ ...input, id: saved.id }))).status, 409)
   const priorUploadCount = uploads.length
   assert.equal((await api.POST(request({ ...input, id: saved.id, expectedUpdatedAt: '2026-10-13T00:00:00.000Z' }))).status, 409)
   assert.equal(uploads.length, priorUploadCount, 'Stale revision fails before upload')
   conflict = true; assert.equal((await api.POST(request({ ...input, id: saved.id, expectedUpdatedAt: now.toISOString() }))).status, 409); conflict = false
+  const beforeOversized = saved
+  const expanded = { entryPath: 'index.html', files: [
+    { path: 'index.html', kind: 'html', content: '<section><img src="a.png"><img src="a.png"><img src="a.png"></section>' },
+    { path: 'a.png', kind: 'asset', content: 'data:image/png;base64,' + 'A'.repeat(3 * 1024 * 1024) },
+  ] }
+  assert.equal((await api.POST(request({ ...input, source: expanded }, undefined, true))).status, 400, 'Expanded HTML remains bounded before storing it in the database')
+  assert.equal(saved, beforeOversized, 'Oversized compiled HTML does not replace a saved template')
   const originalFetch = global.fetch
   try {
-    global.fetch = async url => { const name = new URL(url).pathname.split('/').at(-1); return new Response(uploads.find(file => file.name.endsWith(name)).text) }
+    let reads = 0
+    const legacyFiles = new Map([['legacy.json', JSON.stringify(source)], ['legacy.html', compiled.html]])
+    global.fetch = async url => { reads++; const name = new URL(url).pathname.split('/').at(-1); assert.ok(legacyFiles.has(name)); return new Response(legacyFiles.get(name)) }
     const opened = await (await api.GET(new Request('https://test.invalid/api/admin/course-page-templates/workspace?id=new-template'))).json()
     assert.deepEqual(opened.source, source, 'Raw file tree round trips unchanged')
     const current = await (await api.GET(new Request('https://test.invalid/api/admin/course-page-templates/workspace?page=current'))).json()
     assert.ok(current.source.files.some(file => file.kind === 'js'), 'Current applied HTML restores its packaged files')
     assert.equal(current.template.id, undefined, 'Editing an applied snapshot makes a new template, never overwrites a library version')
+    assert.equal(reads, 0, 'Database-backed template and applied page reopen without fetching Storage')
+    const legacyBase = 'https://project.supabase.co/storage/v1/object/public/uploads/course-template-sources/'
+    records.set('legacy-json', { ...saved, analysis: { editorSourceUrl: legacyBase + 'legacy.json' } })
+    assert.deepEqual((await (await api.GET(new Request('https://test.invalid/api/admin/course-page-templates/workspace?id=legacy-json'))).json()).source, source, 'Old editor JSON links still round trip')
+    records.set('legacy-html', { ...saved, analysis: { exactSource: { url: legacyBase + 'legacy.html' } } })
+    const legacyHtml = await (await api.GET(new Request('https://test.invalid/api/admin/course-page-templates/workspace?id=legacy-html'))).json()
+    assert.ok(legacyHtml.source.files.some(file => file.kind === 'js'), 'Old HTML links retain editable scripts')
+    records.set('inline-html', { ...saved, analysis: { exactSource: { html: compiled.html } } })
+    assert.equal((await api.GET(new Request('https://test.invalid/api/admin/course-page-templates/workspace?id=inline-html'))).status, 200, 'Analyzed inline templates can be edited without raw editor files')
     const native = await (await api.GET(new Request('https://test.invalid/api/admin/course-page-templates/workspace?page=native'))).json()
     assert.equal(native.renderPage, true, 'Native pages are copied from their actual renderer')
     role = 'TEACHER'; assert.equal((await api.GET(new Request('https://test.invalid/api/admin/course-page-templates/workspace?page=current'))).status, 403); role = 'ADMIN'
@@ -78,6 +97,6 @@ async function run() {
   } finally { global.fetch = originalFetch }
   const badGzip = new Request('https://test.invalid/api/admin/course-page-templates/workspace', { method: 'POST', headers: { origin: 'https://test.invalid', 'content-type': 'application/gzip' }, body: 'broken' })
   assert.equal((await api.POST(badGzip)).status, 400)
-  console.log('PASS template workspace: HTML/CSS/JS execution, asset packaging, block preservation, malformed sources, fresh roles, origin/domain guards, immutable storage, raw source round trip and optimistic updates')
+  console.log('PASS template workspace: HTML/CSS/JS execution, asset packaging, block preservation, fresh roles, origin/domain guards, database-only save/reopen, legacy URLs, raw source round trip and optimistic updates')
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })
