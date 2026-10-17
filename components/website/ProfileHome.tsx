@@ -11,8 +11,6 @@ import {getHeroMessageForProfile} from '@/app/actions/message-actions'
 import {getRoadmapPoints} from '@/app/actions/roadmap-actions'
 import {getCourseWhereForProfile,getSiteRuntimeConfig} from '@/lib/site-profile/config'
 import type {DomainModules} from '@/lib/website/domain-shared'
-import {getCurrentDeploymentBrand} from '@/lib/site-profile/deployment-runtime'
-import {wi300CourseWhere} from '@/lib/wi300/course-visibility'
 
 /** Giữ mẫu trang cá nhân hiện có; domain chỉ đọc dữ liệu thuộc website, không dùng dữ liệu dự phòng. */
 export default async function ProfileHome({profile,customDomain=false,modules}:{profile:any;customDomain?:boolean;modules?:DomainModules}) {
@@ -92,17 +90,9 @@ export default async function ProfileHome({profile,customDomain=false,modules}:{
         }
     })
 
-    // Only this viewer's verified learning records can retain a hidden WI300 course.
-    // Keep these courses out of public recommendations and the discovery catalog.
-    const missingLearningIds = [...myCourseIds].filter(id => !catalogCourses.some((c: any) => c.id === id))
-    const learningCourses = missingLearningIds.length && await getCurrentDeploymentBrand()
-        ? await prisma.course.findMany({
-            where: wi300CourseWhere(courseWhere, new Map(), false, missingLearningIds),
-            include:{courseCategory:true,teacherBankAccount:true,teacher:{select:{name:true}},_count:{select:{enrollments:{where:{status:'ACTIVE'}},lessons:true}}},
-            orderBy:[{pin:'asc'},{id:'asc'}]
-        }).then(rows=>rows.map(c=>({...c,activeStudentCount:c._count.enrollments})))
-        : []
-    const myCourses = [...catalogCourses, ...learningCourses].filter((c: any) => myCourseIds.has(c.id))
+    // Page sections share the public catalog, even for an enrolled viewer.
+    // Hidden enrolled courses remain available in the separate personal space.
+    const myCourses = catalogCourses.filter((c: any) => myCourseIds.has(c.id))
 
     // Tách active vs completed
     const myActiveCourses = myCourses
