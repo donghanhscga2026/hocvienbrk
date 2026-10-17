@@ -17,6 +17,7 @@ function load(rel){
  const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText
  new Function('require','exports','module',code)(name=>{
   if(name==='server-only')return {}
+  if(name==='@/lib/site-profile/deployment-runtime')return {getCurrentDeploymentBrand:async()=>null}
   if(name==='@/lib/prisma')return {__esModule:true,default:db}
   if(name==='@/lib/crm/service')return {CrmError}
   if(name==='@/lib/website/server')return {ownedProfile:async()=>{if(!user)throw new CrmError('Login',401);return profiles.find(p=>p.id===profileId)}}
