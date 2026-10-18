@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import TemplateVideoOverlays from '@/components/course/TemplateVideoOverlays'
 import { useWi300Brand } from '@/components/wi300/Wi300BrandContext'
 import { zipFrameSource, zipSelectedBlockKeys, zipCourseLinks } from '@/lib/course-page/importer/source-url'
 
@@ -169,6 +170,7 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
   }
 
   return (
+    <div className="relative">
     <iframe
       ref={frameRef}
       id={id}
@@ -204,5 +206,7 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
         } catch {}
       }}
     />
+    <TemplateVideoOverlays frame={frameRef} revision={sourceHtml || sourceUrl} />
+    </div>
   )
 }
