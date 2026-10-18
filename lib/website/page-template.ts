@@ -1,6 +1,7 @@
 import {parse, parseFragment, serialize, type DefaultTreeAdapterMap} from 'parse5'
 import {z} from 'zod'
 import {formBindingsSchema} from '@/lib/crm/form-shared'
+import {prepareYouTubeSlot,YOUTUBE_BRIDGE} from '@/lib/course-page/youtube-embed'
 
 export const PAGE_HTML_LIMIT = 8 * 1024 * 1024
 export const PAGE_COMPRESSED_LIMIT = 2500 * 1024
@@ -79,7 +80,8 @@ export function renderPageTemplate(html:string,region:string|null,courses:PageCo
   const prototype=slot.childNodes.find(n=>element(n)&&hasClass(n,'course'))
   // ZIP importer bridge belongs to the sale-page renderer; it must not intercept this Page.
   for(const n of nodes) {
-    if(n.tagName==='base' || (n.tagName==='meta' && /^(?:content-security-policy|refresh)$/i.test(attr(n,'http-equiv'))) || (n.tagName==='script' && (n.attrs.some(a=>a.name==='data-mfc-zip-bridge') || !!attr(n,'src')))) {
+    prepareYouTubeSlot(n)
+    if(['base','iframe'].includes(n.tagName) || (n.tagName==='meta' && /^(?:content-security-policy|refresh)$/i.test(attr(n,'http-equiv'))) || (n.tagName==='script' && (n.attrs.some(a=>['data-mfc-zip-bridge','data-mfc-youtube-bridge'].includes(a.name)) || !!attr(n,'src')))) {
       if(n.parentNode && 'childNodes' in n.parentNode)n.parentNode.childNodes=n.parentNode.childNodes.filter(c=>c!==n)
     }
   }
@@ -156,6 +158,7 @@ document.addEventListener('click',function(e){
 },true);
 </script>`)
   head.childNodes=[...head.childNodes.slice(originalHeadLength),...head.childNodes.slice(0,originalHeadLength)]
+  append(head,YOUTUBE_BRIDGE)
   append(head,`<style data-system-course-style>
 [data-system-course-list][data-system-course-layout="cards"]{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:24px;max-width:1120px;margin:0 auto;padding:8px 0;align-items:stretch}
 [data-system-course-list] .system-course-card{min-width:0;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;background:#fff;color:#0f172a;box-shadow:0 6px 24px #0f172a0a;transition:transform .2s,box-shadow .2s;font-size:16px;text-align:left}

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { parse, serialize } from 'parse5'
 import { BRIDGE } from './importer/zip-browser'
+import { prepareYouTubeSlot, YOUTUBE_BRIDGE } from './youtube-embed'
 
 export const sourceFileSchema = z.object({ path: z.string().min(1).max(200).regex(/^[\w@() .\/-]+$/).refine(path => !path.startsWith('/') && !path.split('/').some(part => !part || part === '.' || part === '..'), 'Đường dẫn file không hợp lệ.'), kind: z.enum(['html', 'css', 'js', 'asset']), content: z.string().max(8 * 1024 * 1024) }).strict()
 export const templateSourceSchema = z.object({ entryPath: z.string().min(1).max(200), baseUrl: z.string().url().optional(), files: z.array(sourceFileSchema).min(1).max(200) }).strict().superRefine((source, ctx) => {
@@ -44,6 +45,8 @@ export function compileTemplateSource(raw: TemplateSource) {
   const remove = (node: any) => { if (node.parentNode) node.parentNode.childNodes = node.parentNode.childNodes.filter((child: any) => child !== node) }
   const structural = new Set(['header', 'nav', 'section', 'footer']), keys = new Set<string>(); let index = 0
   for (const node of nodes) {
+    if (prepareYouTubeSlot(node)) continue
+    if (node.tagName === 'script' && node.attrs.some((item: any) => item.name === 'data-mfc-youtube-bridge')) { remove(node); continue }
     if (['iframe', 'object', 'embed', 'base'].includes(node.tagName) || node.tagName === 'meta' && attr(node, 'http-equiv')) { remove(node); continue }
     if (node.tagName === 'script' && (attr(node, 'data-mfc-zip-bridge') || node.attrs.some((item: any) => item.name === 'data-mfc-zip-bridge'))) { remove(node); continue }
     node.attrs = node.attrs.filter((item: any) => !['action', 'formaction', 'srcdoc', 'data-mfc-block'].includes(item.name))
@@ -77,7 +80,7 @@ export function compileTemplateSource(raw: TemplateSource) {
     }
   }
   const head = nodes.find(node => node.tagName === 'head')
-  const policy = parse(`<html><head><meta http-equiv="Content-Security-Policy" content="${TEMPLATE_CSP}">${BRIDGE}</head><body></body></html>`) as any
+  const policy = parse(`<html><head><meta http-equiv="Content-Security-Policy" content="${TEMPLATE_CSP}">${BRIDGE}${YOUTUBE_BRIDGE}</head><body></body></html>`) as any
   const extras = policy.childNodes.find((node: any) => node.tagName === 'html').childNodes.find((node: any) => node.tagName === 'head').childNodes
   for (const node of extras) node.parentNode = head
   const analysisHtml = '<!doctype html>\n' + serialize(doc)
@@ -93,7 +96,7 @@ export function sourceFromHtml(html: string, selectedBlockKeys?: string[] | null
   const doc = parse(html) as any
   const visit = (node: any) => {
     // Bridge do hệ thống chèn lúc render không thuộc mã nguồn người dùng chỉnh.
-    if (node.tagName === 'script' && node.attrs?.some((attr: any) => attr.name === 'data-mfc-zip-bridge')) {
+    if (node.tagName === 'script' && node.attrs?.some((attr: any) => ['data-mfc-zip-bridge', 'data-mfc-youtube-bridge'].includes(attr.name))) {
       node.parentNode.childNodes = node.parentNode.childNodes.filter((child: any) => child !== node)
       return
     }
