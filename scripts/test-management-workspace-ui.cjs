@@ -41,6 +41,7 @@ const mocks = {
   '@/lib/course-page/templates': { COURSE_TEMPLATE_LIBRARY: [{ key: 'test', name: 'Mẫu hệ thống', description: 'Mẫu có sẵn' }] },
 }
 function load(file) {
+  if (!fs.existsSync(path.join(repo, file)) && file.endsWith('.tsx')) file = file.slice(0, -1)
   if (cache.has(file)) return cache.get(file)
   const module = { exports: {} }
   const code = ts.transpileModule(fs.readFileSync(path.join(repo, file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
