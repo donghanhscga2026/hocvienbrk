@@ -4,9 +4,11 @@ const fs = require('node:fs')
 const path = require('node:path')
 const ts = require('typescript')
 const bcrypt = require('bcryptjs')
+const { Prisma } = require('@prisma/client')
 const root = path.resolve(__dirname, '..'), cache = new Map()
 let role = 'ADMIN', customDomain = false, duplicate = false, usageRows = [], usageError = false
 let created, uploads = [], removals = [], transactionCalls = 0, metadata = new Map(), listOptions
+let usageQueries = 0, missingSources = false, deniedSources = false, emptyRemoval = false
 const storage = {
   getPublicUrl: p => ({ data: { publicUrl: 'https://test.supabase.co/storage/v1/object/public/uploads/' + p } }),
   list: async (folder, options) => {
@@ -14,11 +16,16 @@ const storage = {
     return { data: Array.from({ length: 61 }, (_, i) => ({ id: i === 0 ? null : String(i), name: i === 0 ? 'legacy-folder' : `file${i}.png`, metadata: { size: 500, mimetype: 'image/png' } })), error: null }
   },
   upload: async (...args) => { uploads.push(args); return { error: null } },
-  remove: async values => { removals.push(...values); return { error: null } },
+  remove: async values => { removals.push(...values); return { data: emptyRemoval ? [] : values.map(name => ({ name })), error: null } },
 }
 const db = {
   $executeRaw: async () => 0,
-  $queryRaw: async () => { if (usageError) throw Error('DB unavailable'); return usageRows },
+  $queryRaw: async query => {
+    usageQueries++
+    if (usageError) throw Error('DB unavailable')
+    if ((missingSources || deniedSources) && /FROM public\."(?:CoursePage|CourseSection|CoursePageVersion|CoursePageTemplate)"/.test(query.sql)) throw new Prisma.PrismaClientKnownRequestError('Source unavailable', { code: 'P2010', clientVersion: '5.22.0', meta: { code: deniedSources ? '42501' : '42P01' } })
+    return usageRows
+  },
   $transaction: async fn => { transactionCalls++; return fn(db) },
   user: { findFirst: async () => duplicate ? { id: 1 } : null, findMany: async () => [] },
   userClosure: { create: async () => ({}) },
@@ -51,10 +58,11 @@ const req = (method, body, suffix = '') => new Request('https://wi300.vn/api/adm
 async function run() {
   process.env.SUPABASE_URL = 'https://test.supabase.co'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'server-test-secret'
-  const accounts = load('app/api/admin/users/route'), media = load('app/api/admin/media/route'), helper = load('lib/admin-media')
+  const accounts = load('app/api/admin/users/route'), media = load('app/api/admin/media/route'), batch = load('app/api/admin/media/batch/route'), helper = load('lib/admin-media')
   for (const deniedRole of [null, 'STUDENT', 'TEACHER', 'DEVELOPER']) {
     role = deniedRole
     assert.equal((await accounts.POST(req('POST', {}))).status, 403)
+    assert.equal((await batch.POST(req('POST', { paths: ['x.png'] }))).status, 403)
     for (const method of ['GET', 'POST', 'PATCH', 'DELETE']) assert.equal((await media[method](req(method, {}))).status, 403)
   }
   role = 'ADMIN'; customDomain = true
@@ -86,7 +94,7 @@ async function run() {
   const preview = await media.DELETE(req('DELETE', { path: 'avatars/x.png' }))
   assert.equal((await preview.json()).dryRun, true); assert.equal(removals.length, 0)
   assert.equal((await media.DELETE(req('DELETE', { path: 'avatars/x.png', execute: true }))).status, 400)
-  usageRows = [{ id: '42' }]
+  usageRows = [{ path: 'avatars/x.png', id: '42' }]
   assert.equal((await media.DELETE(req('DELETE', { path: 'avatars/x.png', execute: true, confirm: 'DELETE' }))).status, 409)
   usageRows = []; usageError = true
   assert.equal((await media.DELETE(req('DELETE', { path: 'avatars/x.png', execute: true, confirm: 'DELETE' }))).status, 409)
@@ -94,6 +102,55 @@ async function run() {
   assert.equal(removals.length, 0)
   assert.equal((await media.DELETE(req('DELETE', { path: 'avatars/x.png', execute: true, confirm: 'DELETE' }))).status, 200)
   assert.deepEqual(removals, ['avatars/x.png'])
+  const paths = Array.from({ length: 20 }, (_, i) => `media/file${i}.png`)
+  const beforeQueries = usageQueries, beforeRemovals = removals.length
+  missingSources = true
+  const batchPreview = await (await batch.POST(req('POST', { paths }))).json()
+  assert.equal(batchPreview.dryRun, true); assert.equal(batchPreview.items.length, 20)
+  assert.equal(usageQueries - beforeQueries, 13, 'Twenty files must use one scan per source, not 260 scans')
+  assert.equal(removals.length, beforeRemovals, 'Preview must never mutate Storage')
+  assert.deepEqual(batchPreview.items[0].missingTables, ['CoursePage', 'CourseSection', 'CoursePageVersion', 'CoursePageTemplate'])
+  assert.deepEqual(batchPreview.items[0].unchecked, [], 'Absent optional tables contain no references')
+  assert.equal((await batch.POST(req('POST', { paths, execute: true }))).status, 400)
+  deniedSources = true
+  const blocked = await (await batch.POST(req('POST', { paths, execute: true, confirm: 'DELETE' }))).json()
+  assert.equal(blocked.deleted.length, 0); assert.equal(blocked.blocked.length, 20)
+  assert.equal(removals.length, beforeRemovals, 'Permission errors must still block all affected deletions')
+  deniedSources = false
+  usageRows = [{ path: paths[0], id: '42' }]
+  const mixed = await (await batch.POST(req('POST', { paths, execute: true, confirm: 'DELETE' }))).json()
+  assert.equal(mixed.deleted.length, 19); assert.equal(mixed.blocked.length, 1)
+  assert.ok(!mixed.deleted.includes(paths[0]), 'References are rechecked before executing')
+  usageRows = []; missingSources = false; emptyRemoval = true
+  const empty = await (await batch.POST(req('POST', { paths: ['empty.png'], execute: true, confirm: 'DELETE' }))).json()
+  assert.deepEqual(empty.deleted, []); assert.equal(empty.failed.length, 1, 'Empty Storage results must not report success')
+  emptyRemoval = false
+  assert.equal((await batch.POST(req('POST', { paths: [...paths, 'overflow.png'] }))).status, 400)
+  // Execute the real generated SQL against isolated PostgreSQL, including the legacy schema.
+  const { PGlite } = require('@electric-sql/pglite'), pg = new PGlite()
+  const originalTransaction = db.$transaction
+  try {
+    for (const table of ['Course', 'Lesson', 'Post', 'SiteProfile', 'LandingPage', 'LessonComment', 'Payment']) await pg.exec(`CREATE TABLE "${table}" (id int, body text)`)
+    await pg.exec('CREATE TABLE "User" (id int, image text); CREATE TABLE "SystemConfig" (key text, value jsonb)')
+    await pg.query('INSERT INTO "Course" VALUES (1,$1)', [paths[0]])
+    await pg.query('INSERT INTO "User" VALUES (0,$1)', [paths[1]])
+    await pg.query('INSERT INTO "SystemConfig" VALUES ($1,$2)', ['admin-media:metadata', JSON.stringify({ url: paths[2] })])
+    await pg.query('INSERT INTO "SystemConfig" VALUES ($1,$2)', ['website-config', JSON.stringify({ url: paths[3] })])
+    db.$transaction = fn => pg.transaction(tx => fn({
+      $executeRaw: q => tx.query(q.text, q.values),
+      $queryRaw: async q => {
+        try { return (await tx.query(q.text, q.values)).rows }
+        catch (error) { throw new Prisma.PrismaClientKnownRequestError(error.message, { code: 'P2010', clientVersion: '5.22.0', meta: { code: error.code } }) }
+      },
+    }))
+    const sqlResults = await helper.mediaUsageBatch(paths.map(path => ({ path, url: storage.getPublicUrl(path).data.publicUrl })))
+    assert.equal(sqlResults[0].references[0].type, 'Course')
+    assert.equal(sqlResults[1].references[0].type, 'Ảnh đại diện')
+    assert.deepEqual(sqlResults[2].references, [], 'Management metadata is not a content reference')
+    assert.equal(sqlResults[3].references[0].type, 'SystemConfig')
+    assert.deepEqual(sqlResults[0].unchecked, [])
+    assert.equal(sqlResults[0].missingTables.length, 4)
+  } finally { db.$transaction = originalTransaction; await pg.close() }
   const upload = async file => { const form = new FormData(); form.set('file', file); return media.POST(new Request('https://wi300.vn/api/admin/media', { method: 'POST', body: form })) }
   assert.equal((await upload(new File(['<script>alert(1)</script>'], 'x.html', { type: 'text/html' }))).status, 400)
   assert.equal((await upload(new File(['fake pdf'], 'x.pdf', { type: 'application/pdf' }))).status, 400)
@@ -112,13 +169,14 @@ async function run() {
   global.window = dom.window; global.self = dom.window; global.document = dom.window.document; global.IS_REACT_ACT_ENVIRONMENT = true
   const originalFormData = global.FormData
   global.FormData = dom.window.FormData
-  let accountCreated = 0, uiDeletes = 0, submitted
+  let accountCreated = 0, uiDeletes = 0, submitted, failBatch = false
   global.fetch = async (url, options) => {
     if (url === '/api/admin/users') { submitted = JSON.parse(options.body); return { ok: true, json: async () => ({ user: { id: 3801, email: submitted.email }, message: 'Đã tạo.' }) } }
-    if (options?.method === 'DELETE') {
+    if (url === '/api/admin/media/batch') {
+      if (failBatch) throw new DOMException('Slow request', 'TimeoutError')
       const body = JSON.parse(options.body)
       if (body.execute) uiDeletes++
-      return { ok: true, json: async () => body.execute ? { success: true } : { dryRun: true, references: [], unchecked: [], note: 'Test' } }
+      return { ok: true, json: async () => body.execute ? { deleted: body.paths, blocked: [], failed: [] } : { dryRun: true, items: body.paths.map(path => ({ path, references: [], unchecked: [], missingTables: [], note: 'Test' })) } }
     }
     return { ok: true, json: async () => ({ items: [{ path: 'old.pdf', filename: 'old.pdf', url: 'https://test.supabase.co/old.pdf', mime: 'application/pdf', size: 10, folder: false }], hasMore: false }) }
   }
@@ -137,6 +195,11 @@ async function run() {
   assert.ok(container.querySelector('[aria-label="Xác nhận xóa media"]'))
   await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Xác nhận xóa file đủ điều kiện').click())
   assert.equal(uiDeletes, 1)
+  failBatch = true
+  await tick(() => container.querySelector('input[type="checkbox"]').click())
+  await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Kiểm tra & xóa đã chọn').click())
+  assert.ok(container.textContent.includes('Đã hết thời gian chờ'))
+  assert.equal([...container.querySelectorAll('button')].find(button => button.textContent === 'Kiểm tra & xóa đã chọn').disabled, false, 'Timeout releases the busy state')
   await tick(() => uiRoot.unmount()); dom.window.close(); global.FormData = originalFormData
   console.log('Passed: Client account creation and media selection/preview/explicit deletion confirmation.')
   console.log('Passed: Admin-only access, domain isolation, account validation/hash/duplicates, legacy media pagination, metadata, upload limits/type inspection, deletion preview/guards/failure/confirmation, server-only storage key.')
