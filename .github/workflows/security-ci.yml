@@ -71,6 +71,7 @@ jobs:
           node scripts/test-unified-management-navigation.cjs
           node scripts/test-admin-accounts-media.cjs
           node scripts/test-legacy-templates.cjs
+          node scripts/test-course-history.cjs
           node scripts/test-my-requests-ui.cjs
           node scripts/test-notification-pagination.cjs
           node scripts/test-notification-feed-ui.cjs

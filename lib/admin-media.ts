@@ -27,7 +27,7 @@ const storageTables: Record<string, string> = { CoursePage: 'course_pages', Cour
 function reference(table: string, row: { id: string; title?: string; parentId?: string; scope?: MediaReference['scope'] }): MediaReference {
   const id = encodeURIComponent(row.id), parent = row.parentId ? encodeURIComponent(row.parentId) : ''
   const links: Record<string, string> = { Course: `/tools/courses/new?id=${id}`, Post: `/tools/posts?edit=${id}`, SiteProfile: `/tools/site-profiles/${id}/edit`, LandingPage: `/tools/landings/${id}/edit`, CoursePage: `/tools/courses/pages/${id}`, CoursePageTemplate: `/tools/courses/templates/legacy?template=${id}` }
-  const href = links[table] || (table === 'Lesson' && parent ? `/tools/courses/new?id=${parent}` : ['CourseSection', 'CoursePageVersion'].includes(table) && parent ? `/tools/courses/pages/${parent}` : undefined)
+  const href = table === 'CoursePageVersion' ? `/tools/courses/templates/history?version=${id}` : links[table] || (table === 'Lesson' && parent ? `/tools/courses/new?id=${parent}` : table === 'CourseSection' && parent ? `/tools/courses/pages/${parent}` : undefined)
   return { type: table === 'User' ? 'Ảnh đại diện' : table, id: row.id, scope: row.scope || (table === 'CoursePageVersion' ? 'history' : table === 'CoursePageTemplate' ? 'legacy' : 'current'), ...(row.title ? { title: row.title } : {}), ...(href ? { href } : {}) }
 }
 

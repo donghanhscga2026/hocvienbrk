@@ -211,6 +211,7 @@ async function run() {
     await pg.query('INSERT INTO course_page_templates VALUES ($1,$2,$3)', ['old-template', 'Hiểu thuế', paths[9]])
     const classified = await helper.mediaUsageBatch(paths.map(path => ({ path, url: storage.getPublicUrl(path).data.publicUrl })))
     assert.equal(classified[6].references[0].scope, 'history', 'An older published snapshot is historical')
+    assert.equal(classified[6].references[0].href, '/tools/courses/templates/history?version=older')
     assert.equal(classified[7].references[0].scope, 'published', 'Latest published snapshot serves the live page')
     assert.equal(classified[8].references[0].scope, 'history', 'A newer manual checkpoint is not the live snapshot')
     assert.equal(classified[9].references[0].scope, 'legacy')

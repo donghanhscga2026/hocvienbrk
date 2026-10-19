@@ -8,14 +8,20 @@ import { createCoursePageFromTemplate, COURSE_TEMPLATE_LIBRARY } from '@/lib/cou
 import TemplateRenderedPreview from '@/components/course/TemplateRenderedPreview'
 import type { CoursePage } from '@/lib/course-page/types'
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ system?: string; id?: string; page?: string; token?: string }> }) {
+export default async function Page({ searchParams }: { searchParams: Promise<{ system?: string; id?: string; page?: string; token?: string; version?: string }> }) {
   if (await domainContext()) notFound()
   let actor
   try { actor = await courseEditorActor() } catch { return <p className="p-4 text-sm">Đăng nhập tài khoản có quyền giảng dạy để xem mẫu.</p> }
   const params = await searchParams
   const system = COURSE_TEMPLATE_LIBRARY.find(item => item.key === params.system)
   let page: CoursePage
-  if (params.page) {
+  if (params.version) {
+    if (actor.role !== 'ADMIN') notFound()
+    const version = await prisma.coursePageVersion.findUnique({ where: { id: params.version }, select: { snapshot: true } })
+    if (!version) notFound()
+    const snapshot = version.snapshot as any
+    page = { ...snapshot, id: 'preview', slug: 'history-preview', status: 'draft', useTemplate: true, sections: (snapshot.sections || []).map((section: any, index: number) => ({ ...section, id: `preview-${index}`, type: section.sectionType || section.type })) }
+  } else if (params.page) {
     try { await assertCourseEditor(prisma, actor, { pageId: params.page }) } catch { notFound() }
     const saved = await prisma.coursePage.findUnique({ where: { id: params.page }, include: { sections: { where: { enabled: true }, orderBy: { sortOrder: 'asc' } } } })
     if (!saved) notFound()
@@ -35,5 +41,5 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
       page = { ...snapshot, id: 'preview', slug: 'template-preview', status: 'draft', sections: (snapshot.sections || []).map((section: any, index: number) => ({ ...section, id: `preview-${index}`, type: section.sectionType })) }
     }
   } else notFound()
-  return <TemplateRenderedPreview page={page} exportable={Boolean((system || params.page && !page.sections.some(section => section.variant === 'zip-source-v1')) && params.token)} token={params.token || ''} />
+  return <TemplateRenderedPreview page={page} exportable={Boolean(!params.version && (system || params.page && !page.sections.some(section => section.variant === 'zip-source-v1')) && params.token)} token={params.token || ''} />
 }
