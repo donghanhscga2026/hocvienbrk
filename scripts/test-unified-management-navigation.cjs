@@ -41,6 +41,7 @@ for (const role of ['guest', 'STUDENT', 'TEACHER', 'ADMIN', 'DEVELOPER']) {
   assert.equal(links.includes('/tools/crm'), ['ADMIN', 'TEACHER'].includes(role))
   assert.equal(links.includes('/tools/settings'), role === 'ADMIN')
   assert.equal(links.includes('/tools/dev-flow'), role === 'DEVELOPER')
+  assert.equal(links.includes('/tools/media'), role === 'ADMIN', 'Media management is Admin-only')
   assert.equal(links.filter(href => href === '/tools/crm').length, ['ADMIN', 'TEACHER'].includes(role) ? 1 : 0)
   assert.ok(!links.some(href => href.startsWith('javascript:')))
 }
@@ -51,7 +52,7 @@ assert.deepEqual(groups, load('lib/wi300/personal-space.ts').spaceNavigation('AD
 assert.deepEqual(groups.map(group => group.label), ['Tổng quan', 'Học tập', 'Giảng dạy', 'Cộng tác viên', 'Quản lý & kinh doanh', 'Quản trị website', 'Công cụ & tiện ích', 'Tài khoản & tài chính', 'Quản trị hệ thống'])
 assert.ok(groups.find(group => group.id === 'admin').items.some(item => item.href === '/tools/reserved-ids'))
 assert.ok(groups.find(group => group.id === 'website-admin').items.some(item => item.href === '/tools/wi-appearance'))
-assert.deepEqual(groups.find(group => group.id === 'website-admin').items.map(item => item.label), ['Cấu hình chung', 'Trang', 'Bài viết'])
+assert.deepEqual(groups.find(group => group.id === 'website-admin').items.map(item => item.label), ['Cấu hình chung', 'Trang', 'Bài viết', 'Thư viện media'])
 assert.ok(groups.find(group => group.id === 'business').items.some(item => item.href === '/tools/pages'))
 assert.equal(groups.some(group => group.id === 'pages'), false)
 assert.equal(model.managementLocation('/tools/wi-appearance', new URLSearchParams('page=courses'), groups).back.href, '/tools/wi-appearance')
