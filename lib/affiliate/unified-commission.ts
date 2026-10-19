@@ -13,6 +13,9 @@
  *      vào hệ thống (`buyer.referrerId`), tỷ lệ = SystemAffiliateConfig.gratitudeRate
  *      (mặc định 2%), BẤT KỂ đơn mua có qua link ai hay khách tự mua.
  * - Nếu affiliateId trùng referrerId → nhận cả 2 khoản.
+ * - LOẠI TRỪ (quyết định 2026-10-20): giảng viên KHÔNG nhận hoa hồng (cả trực tiếp
+ *   lẫn tri ân) cho chính khóa học của mình — tiền khóa học vốn đã là của họ.
+ *   Quảng bá khóa của người khác thì vẫn nhận bình thường.
  * - Idempotent theo orderId (cờ commissionProcessed + kiểm tra conversion).
  */
 
@@ -157,6 +160,19 @@ export async function hasPurchasedProduct(userId: number, productType: string, p
   return !!o
 }
 
+/**
+ * Kiểm tra một user có phải giảng viên của khóa học không.
+ * (Quyết định 2026-10-20: giảng viên không nhận hoa hồng cho chính khóa của mình.)
+ */
+export async function isTeacherOfCourse(userId: number, productType: string, productId: number): Promise<boolean> {
+  if (productType !== 'COURSE') return false
+  const course = await prisma.course.findUnique({
+    where: { id: productId },
+    select: { teacherId: true }
+  })
+  return !!course?.teacherId && course.teacherId === userId
+}
+
 interface CommissionLine {
   kind: CommissionKind
   affiliateId: number
@@ -230,6 +246,12 @@ export async function processOrderCommission(orderId: number): Promise<UnifiedCo
           continue
         }
 
+        // LOẠI TRỪ (2026-10-20): CTV là giảng viên của chính khóa này → không nhận hoa hồng trực tiếp
+        if (await isTeacherOfCourse(order.affiliateId, item.productType, item.productId)) {
+          console.log(`[AffiliateV2] Skip direct: affiliate ${order.affiliateId} is teacher of course ${item.productId}`)
+          continue
+        }
+
         let rate = config.directRate
         // Quy tắc giảm 50%: CTV chưa từng mua sản phẩm này
         const purchased = await hasPurchasedProduct(order.affiliateId, item.productType, item.productId)
@@ -258,22 +280,35 @@ export async function processOrderCommission(orderId: number): Promise<UnifiedCo
 
     // ── 2. HOA HỒNG GIÁN TIẾP (tri ân) ──────────────────────────
     // Luôn trả cho người đầu tiên đưa khách vào hệ thống, bất kể đơn mua qua link ai.
+    // LOẠI TRỪ (2026-10-20): không tính tri ân trên các khóa mà chính người được tri ân là giảng viên.
     const referrerId = order.buyer?.referrerId
     if (referrerId && referrerId !== 0) {
-      const grossAmount = Math.floor(order.totalAmount * (gratitudeRate / 100)) // GIÁ NIÊM YẾT
-      const taxAmount = grossAmount * (taxRate / 100)
-      const feeAmount = FEE_AMOUNT_DEFAULT
-      const netAmount = grossAmount - taxAmount - feeAmount
-      if (netAmount > 0) {
-        lines.push({
-          kind: CommissionKind.GRATITUDE,
-          affiliateId: referrerId,
-          percentage: gratitudeRate,
-          grossAmount,
-          taxAmount,
-          feeAmount,
-          netAmount
-        })
+      let gratitudeBase = 0 // GIÁ NIÊM YẾT của các item đủ điều kiện
+      for (const item of order.items) {
+        if (await isTeacherOfCourse(referrerId, item.productType, item.productId)) {
+          console.log(`[AffiliateV2] Skip gratitude base: referrer ${referrerId} is teacher of course ${item.productId}`)
+          continue
+        }
+        gratitudeBase += item.unitPrice * item.quantity
+      }
+      if (gratitudeBase <= 0) {
+        console.log(`[AffiliateV2] No gratitude base for order #${orderId} — gratitude skipped`)
+      } else {
+        const grossAmount = Math.floor(gratitudeBase * (gratitudeRate / 100)) // GIÁ NIÊM YẾT
+        const taxAmount = grossAmount * (taxRate / 100)
+        const feeAmount = FEE_AMOUNT_DEFAULT
+        const netAmount = grossAmount - taxAmount - feeAmount
+        if (netAmount > 0) {
+          lines.push({
+            kind: CommissionKind.GRATITUDE,
+            affiliateId: referrerId,
+            percentage: gratitudeRate,
+            grossAmount,
+            taxAmount,
+            feeAmount,
+            netAmount
+          })
+        }
       }
     }
 
