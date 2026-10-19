@@ -153,7 +153,9 @@ async function run() {
   assert.equal((await WebsitePage(pageArgs('menu'))).props.initialTab, 'menu')
   await assert.rejects(() => WebsitePage(pageArgs('unknown')), /404/)
   const cardsHTML = require('react-dom/server').renderToStaticMarkup(await WebsitePage(pageArgs()))
-  assert.equal((cardsHTML.match(/<h2/g) || []).length, 3)
+  assert.equal((cardsHTML.match(/<h2/g) || []).length, 4)
+  assert.ok(cardsHTML.includes('href="/tools/media"'))
+  assert.ok(cardsHTML.includes('Thư viện media'))
   assert.ok(cardsHTML.includes('<svg')); assert.ok(!cardsHTML.includes('SEO website →'))
   const Pages = load('app/tools/wi-appearance/page.tsx', {
     'next/link': { __esModule: true, default: props => React.createElement('a', props) },

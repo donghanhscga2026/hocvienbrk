@@ -12,6 +12,7 @@ import MainHeader from '@/components/layout/MainHeader'
 import DeleteByUserSection from '@/components/admin/students/DeleteByUserSection'
 import BulkEnrollModal from '@/components/admin/students/BulkEnrollModal'
 import ActivityTimeline from '@/components/admin/ActivityTimeline'
+import CreateAccountForm from '@/components/admin/students/CreateAccountForm'
 
 interface EnrollmentData {
   courseId: number
@@ -298,6 +299,7 @@ export default function ToolsStudentsPage() {
 
       <div className="shrink-0 bg-white border-b shadow-sm">
         <div className="p-4 space-y-3">
+          {isAdmin && <CreateAccountForm onCreated={() => { void fetchStudents(0) }} />}
           {isAdmin ? (
             <>
               <div className="flex gap-2">
