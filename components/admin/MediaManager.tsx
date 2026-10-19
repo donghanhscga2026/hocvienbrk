@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 
 type Media = { path: string; filename: string; folder: boolean; url: string; size: number; mime: string; createdAt?: string; name?: string; description?: string; uploaderName?: string; trashedAt?: string }
-type Usage = { references: { type: string; id: string }[]; unchecked: string[]; missingTables?: string[]; note: string }
+type Usage = { references: { type: string; id: string; title?: string; href?: string }[]; unchecked: string[]; missingTables?: string[]; note: string }
 type Preview = Usage & { path: string }
 const button = 'inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm disabled:opacity-50'
 const input = 'min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-slate-900'
@@ -22,6 +22,10 @@ async function api(url: string, options?: RequestInit) {
   }
 }
 const json = (method: string, body: unknown) => ({ method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+function fileDate(value?: string) {
+  return value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'Chưa có thông tin'
+}
+const sourceNames: Record<string, string> = { Course: 'Khóa học', Lesson: 'Bài học', Post: 'Bài viết', SiteProfile: 'Website', LandingPage: 'Trang giới thiệu', CoursePage: 'Trang khóa học', CourseSection: 'Nội dung trang khóa học', CoursePageVersion: 'Lịch sử trang khóa học', CoursePageTemplate: 'Mẫu trang', LessonComment: 'Bình luận bài học', Payment: 'Thanh toán', SystemConfig: 'Cấu hình hệ thống' }
 
 export default function MediaManager() {
   const [path, setPath] = useState(''), [page, setPage] = useState(0), [query, setQuery] = useState(''), [search, setSearch] = useState('')
@@ -33,8 +37,10 @@ export default function MediaManager() {
   const [trash, setTrash] = useState(false)
   const [action, setAction] = useState<'trash' | 'restore' | 'purge'>('trash')
   const previewRef = useRef<HTMLElement>(null)
+  const detailRef = useRef<HTMLElement>(null)
   const requestId = useRef(0)
   useEffect(() => { if (preview) previewRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) }, [preview])
+  useEffect(() => { if (detail) detailRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) }, [detail])
   const prepareLoad = useCallback(() => { setLoading(true); setItems([]); setSelected([]) }, [])
   const reload = useCallback(() => { prepareLoad(); setRevision(value => value + 1) }, [prepareLoad])
   useEffect(() => {
@@ -94,17 +100,20 @@ export default function MediaManager() {
         <button disabled={busy} className={'min-w-0 text-left ' + (view === 'grid' ? 'mt-2 block w-full' : 'flex flex-1 items-center gap-3')} onClick={() => item.folder ? navigate(item.path) : void openDetail(item)}>
           <span className={'relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-3xl ' + (view === 'grid' ? 'aspect-square w-full' : 'h-14 w-14')}>
             {item.folder ? '📁' : item.mime.startsWith('image/') ? <Image src={item.url} alt="" fill unoptimized className="object-contain" loading="lazy" /> : '📄'}
-          </span><span className="block min-w-0"><span className="mt-2 block break-words text-sm font-semibold">{item.name || item.filename}</span><span className="mt-1 block break-all text-xs text-slate-500">{item.folder ? 'Mở thư mục' : (item.size / 1024 / 1024).toFixed(2) + ' MB · ' + item.filename}</span>{item.trashedAt && <span className="mt-1 block text-xs text-slate-500">Vào thùng rác: {new Date(item.trashedAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</span>}</span>
+          </span><span className="block min-w-0"><span className="mt-2 block break-words text-sm font-semibold">{item.name || item.filename}</span><span className="mt-1 block break-all text-xs text-slate-500">{item.folder ? 'Mở thư mục' : (item.size / 1024 / 1024).toFixed(2) + ' MB · ' + item.filename}</span>{!item.folder && <span className="mt-1 block text-xs text-slate-600">Tải lên: {fileDate(item.createdAt)}</span>}{item.trashedAt && <span className="mt-1 block text-xs text-slate-500">Vào thùng rác: {fileDate(item.trashedAt)}</span>}</span>
         </button>
+        {!item.folder && <button disabled={busy} className={button + ' mt-2 w-full text-emerald-800'} onClick={() => void openDetail(item)}>Xem trước / Nơi sử dụng</button>}
       </article>)}</div>
       {!visible.length && <p className="py-8 text-center text-slate-500">Không có file phù hợp trong trang của thư mục này.</p>}
       <div className="flex items-center justify-center gap-3"><button className={button} disabled={page === 0 || busy} onClick={() => { prepareLoad(); setPage(page - 1) }}>Trước</button><span>Trang {page + 1}</span><button className={button} disabled={!hasMore || busy} onClick={() => { prepareLoad(); setPage(page + 1) }}>Sau</button></div>
       <p className="text-xs text-slate-500">60 mục mỗi trang. Tìm theo tên file gốc trong thư mục; bộ lọc loại file áp dụng cho trang đang xem.</p>
     </>}
-    {detail && <section aria-label="Chi tiết media" className="space-y-3 rounded-xl border border-slate-300 bg-white p-4">
+    {detail && <section ref={detailRef} aria-label="Chi tiết media" className="scroll-mt-6 space-y-3 rounded-xl border border-slate-300 bg-white p-4">
       <div className="flex justify-between gap-3"><h2 className="text-lg font-bold">Chi tiết ảnh / file</h2><button className={button} onClick={() => { ++requestId.current; setDetail(null) }}>Đóng</button></div>
       <p className="break-all text-sm">{detail.filename} · {detail.mime} · {(detail.size / 1024 / 1024).toFixed(2)} MB</p>
-      <p className="text-sm">Ngày tải: {detail.createdAt ? new Date(detail.createdAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'Chưa có thông tin'} · Người tải: {detail.uploaderName || 'Chưa có thông tin'}</p>
+      <p className="text-sm">Ngày tải (giờ Việt Nam): {fileDate(detail.createdAt)} · Người tải: {detail.uploaderName || 'Chưa có thông tin'}</p>
+      {detail.mime.startsWith('image/') ? <div className="relative h-80 w-full rounded-lg bg-slate-100"><Image src={detail.url} alt={detail.name || detail.filename} fill unoptimized className="object-contain" /></div> : /\.html?$/i.test(detail.filename) || detail.mime === 'application/pdf' ? <div className="space-y-2"><iframe key={detail.path} title={'Xem trước ' + detail.filename} src={/\.html?$/i.test(detail.filename) ? '/api/admin/media?' + new URLSearchParams({ path: detail.path, preview: '1' }) : detail.url} sandbox="" referrerPolicy="no-referrer" loading="lazy" className="h-[32rem] w-full rounded-lg border bg-white" /><p className="text-xs text-slate-500">Bản xem trước chặn script và biểu mẫu. Nếu trình duyệt không hiển thị file, dùng nút Mở file hoặc tải về.</p></div> : <p className="rounded-lg bg-slate-50 p-3 text-sm">{detail.mime.includes('zip') || /\.zip$/i.test(detail.filename) ? 'File ZIP: tải về và giải nén để xem nội dung.' : 'File này chưa hỗ trợ xem trước trực tiếp. Bạn có thể mở hoặc tải về để kiểm tra.'}</p>}
+      <div aria-label="Nơi sử dụng" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3"><h3 className="font-semibold">Đang dùng tại</h3>{checking ? <p role="status">Đang kiểm tra nơi sử dụng…</p> : usage ? <UsageView usage={usage} /> : <p className="text-sm">Chưa kiểm tra được nơi sử dụng. Hãy mở lại chi tiết để thử lại.</p>}</div>
       <form key={detail.path} className="space-y-3" onSubmit={async event => {
         event.preventDefault(); const values = new FormData(event.currentTarget); setBusy(true)
         try { await api('/api/admin/media', json('PATCH', { path: detail.path, name: values.get('name'), description: values.get('description') })); reload(); setMessage('Đã lưu tên hiển thị và mô tả; đường dẫn file giữ nguyên.') }
@@ -112,8 +121,7 @@ export default function MediaManager() {
         finally { setBusy(false) }
       }}><label className="block text-sm">Tên hiển thị<input className={input + ' mt-1'} name="name" defaultValue={detail.name || detail.filename} required maxLength={200} /></label><label className="block text-sm">Mô tả<textarea className={input + ' mt-1 py-2'} rows={3} name="description" defaultValue={detail.description || ''} maxLength={1000} /></label><button disabled={busy} className={button}>Lưu thông tin</button></form>
       <label className="block text-sm">Đường dẫn<input readOnly value={detail.url} className={input + ' mt-1'} onFocus={event => event.target.select()} /></label>
-      <div className="flex flex-wrap gap-2"><button className={button} onClick={async () => { try { await navigator.clipboard.writeText(detail.url); setMessage('Đã sao chép đường dẫn.') } catch { setMessage('Chọn và sao chép đường dẫn trong ô bên trên.') } }}>Sao chép đường dẫn</button><a href={detail.url} target="_blank" rel="noopener noreferrer" className={button}>Mở file</a>{trash && <button disabled={busy} className={button} onClick={() => void previewDelete([detail.path], 'restore')}>Khôi phục file</button>}<button disabled={busy || checking} className={button + ' text-red-700'} onClick={() => void previewDelete([detail.path], trash ? 'purge' : 'trash')}>{trash ? 'Xóa vĩnh viễn file' : 'Chuyển file vào thùng rác'}</button></div>
-      {checking ? <p role="status">Đang kiểm tra nơi sử dụng…</p> : usage && <UsageView usage={usage} />}
+      <div className="flex flex-wrap gap-2"><button className={button} onClick={async () => { try { await navigator.clipboard.writeText(detail.url); setMessage('Đã sao chép đường dẫn.') } catch { setMessage('Chọn và sao chép đường dẫn trong ô bên trên.') } }}>Sao chép đường dẫn</button><a href={detail.url} target="_blank" rel="noopener noreferrer" className={button}>Mở file</a><a href={detail.url + '?download=' + encodeURIComponent(detail.name || detail.filename)} download={detail.name || detail.filename} target="_blank" rel="noopener noreferrer" className={button}>Tải về</a>{trash && <button disabled={busy} className={button} onClick={() => void previewDelete([detail.path], 'restore')}>Khôi phục file</button>}<button disabled={busy || checking} className={button + ' text-red-700'} onClick={() => void previewDelete([detail.path], trash ? 'purge' : 'trash')}>{trash ? 'Xóa vĩnh viễn file' : 'Chuyển file vào thùng rác'}</button></div>
       <p className="text-xs text-slate-500">Mô tả này dùng để quản lý thư viện. Để thay ảnh đang dùng, tải ảnh mới và cập nhật tại trang/khóa học tương ứng.</p>
     </section>}
     {preview && <section ref={previewRef} aria-label="Xác nhận xóa media" className="space-y-3 rounded-xl border border-red-300 bg-red-50 p-4"><h2 className="text-lg font-bold">{action === 'trash' ? 'Chuyển vào thùng rác' : action === 'restore' ? 'Khôi phục file' : 'Xóa vĩnh viễn'}</h2>
@@ -135,5 +143,5 @@ export default function MediaManager() {
 }
 
 function UsageView({ usage }: { usage: Usage }) {
-  return <div className="mt-2 space-y-2 text-sm"><p>{usage.references.length ? 'Đang được tham chiếu (cần gỡ trước khi xóa):' : 'Chưa tìm thấy tham chiếu trong các nguồn đã kiểm tra.'}</p>{usage.references.map((ref, index) => <p key={index} className="break-all">• {ref.type} #{ref.id}</p>)}{usage.unchecked.length > 0 && <p className="text-red-700">Chưa kiểm tra được: {usage.unchecked.join(', ')}. Tạm chặn xóa.</p>}{!!usage.missingTables?.length && <p className="text-xs text-slate-500">Bảng tùy chọn chưa tồn tại, không có dữ liệu để kiểm tra: {usage.missingTables.join(', ')}.</p>}<p className="text-xs leading-5 text-slate-500">{usage.note}</p></div>
+  return <div className="mt-2 space-y-2 text-sm"><p>{usage.references.length ? 'File đang gắn với các nội dung sau (cần gỡ trước khi xóa):' : 'Chưa tìm thấy nơi sử dụng trong các nguồn đã kiểm tra.'}</p>{usage.references.map((ref, index) => <p key={index} className="break-words">{ref.href ? <Link href={ref.href} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-emerald-800 underline">{sourceNames[ref.type] || ref.type}: {ref.title || '#' + ref.id} ↗</Link> : <span>{sourceNames[ref.type] || ref.type}: {ref.title || '#' + ref.id}</span>}</p>)}{usage.references.length >= 21 && <p className="text-xs">Chỉ hiển thị tối đa 21 tham chiếu mỗi nguồn.</p>}{usage.unchecked.length > 0 && <p className="text-red-700">Chưa kiểm tra được: {usage.unchecked.map(source => sourceNames[source] || source).join(', ')}. Tạm chặn xóa.</p>}{!!usage.missingTables?.length && <p className="text-xs text-slate-500">Nguồn tùy chọn chưa tồn tại: {usage.missingTables.map(source => sourceNames[source] || source).join(', ')}.</p>}<p className="text-xs leading-5 text-slate-500">{usage.note}</p></div>
 }

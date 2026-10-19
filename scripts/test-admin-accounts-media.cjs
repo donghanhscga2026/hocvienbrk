@@ -24,7 +24,7 @@ const db = {
   $queryRaw: async query => {
     usageQueries++
     if (usageError) throw Error('DB unavailable')
-    if ((missingSources || deniedSources) && /FROM public\."(?:CoursePage|CourseSection|CoursePageVersion|CoursePageTemplate)"/.test(query.sql)) throw new Prisma.PrismaClientKnownRequestError('Source unavailable', { code: 'P2010', clientVersion: '5.22.0', meta: { code: deniedSources ? '42501' : '42P01' } })
+    if ((missingSources || deniedSources) && /FROM public\."(?:course_pages|course_sections|course_page_versions|course_page_templates)"/.test(query.sql)) throw new Prisma.PrismaClientKnownRequestError('Source unavailable', { code: 'P2010', clientVersion: '5.22.0', meta: { code: deniedSources ? '42501' : '42P01' } })
     return usageRows
   },
   $transaction: async fn => { transactionCalls++; return fn(db) },
@@ -91,6 +91,23 @@ async function run() {
   const listing = await (await media.GET(req('GET', null, '?path=avatars&page=1'))).json()
   assert.equal(listing.items.length, 60); assert.equal(listing.hasMore, true); assert.equal(listing.items[0].folder, true)
   assert.equal(listOptions.offset, 60); assert.equal(listOptions.limit, 61)
+  const originalFetch = global.fetch
+  try {
+    let previewFetches = 0
+    global.fetch = async (url, options) => {
+      previewFetches++; assert.equal(url.origin, 'https://test.supabase.co'); assert.equal(options.redirect, 'error')
+      return new Response('<html><body><h1>Tài chính</h1><script>alert(1)</script></body></html>')
+    }
+    assert.equal((await media.GET(req('GET', null, '?path=file.zip&preview=1'))).status, 400)
+    assert.equal(previewFetches, 0)
+    const htmlPreview = await media.GET(req('GET', null, '?path=course-template-sources/finance.html&preview=1'))
+    assert.equal(htmlPreview.headers.get('Content-Type'), 'text/html; charset=utf-8')
+    assert.ok(htmlPreview.headers.get('Content-Security-Policy').includes("script-src 'none'"))
+    assert.ok(htmlPreview.headers.get('Content-Security-Policy').startsWith('sandbox;'))
+    assert.ok((await htmlPreview.text()).includes('<h1>Tài chính</h1>'))
+    global.fetch = async () => new Response(new Uint8Array(8 * 1024 * 1024 + 1))
+    assert.equal((await media.GET(req('GET', null, '?path=finance.html&preview=1'))).status, 413)
+  } finally { global.fetch = originalFetch }
   assert.equal((await media.PATCH(req('PATCH', { path: 'avatars/x.png', name: 'Ảnh của tôi', description: 'Mô tả' }))).status, 200)
   assert.equal(metadata.get(helper.mediaKey('avatars/x.png')).name, 'Ảnh của tôi')
   const preview = await media.DELETE(req('DELETE', { path: 'avatars/x.png' }))
@@ -172,6 +189,20 @@ async function run() {
     assert.equal(sqlResults[3].references[0].type, 'SystemConfig')
     assert.deepEqual(sqlResults[0].unchecked, [])
     assert.equal(sqlResults[0].missingTables.length, 4)
+    // Prisma maps these models to snake_case tables on the actual database.
+    await pg.exec('CREATE TABLE course_pages (id text, name text, body text); CREATE TABLE course_sections (id text, course_page_id text, section_key text, body text); ALTER TABLE "Course" ADD COLUMN name_lop text; ALTER TABLE "Post" ADD COLUMN title text')
+    await pg.query('UPDATE "Course" SET name_lop=$1', ['Tài chính căn bản'])
+    await pg.query('INSERT INTO "Post" VALUES (8,$1,$2)', [paths[0], 'Quản lý dòng tiền'])
+    await pg.query('INSERT INTO course_pages VALUES ($1,$2,$3)', ['page-1', 'Trang tài chính', paths[4]])
+    await pg.query('INSERT INTO course_sections VALUES ($1,$2,$3,$4)', ['section-1', 'page-1', 'hero', paths[5]])
+    const mapped = await helper.mediaUsageBatch(paths.map(path => ({ path, url: storage.getPublicUrl(path).data.publicUrl })))
+    assert.equal(mapped[0].references.find(ref => ref.type === 'Course').title, 'Tài chính căn bản')
+    assert.equal(mapped[0].references.find(ref => ref.type === 'Post').href, '/tools/posts?edit=8')
+    assert.equal(mapped[4].references[0].title, 'Trang tài chính')
+    assert.equal(mapped[4].references[0].href, '/tools/courses/pages/page-1')
+    assert.equal(mapped[5].references[0].href, '/tools/courses/pages/page-1')
+    assert.deepEqual(mapped[4].missingTables, ['CoursePageVersion', 'CoursePageTemplate'])
+    assert.deepEqual(mapped[4].unchecked, [])
   } finally { db.$transaction = originalTransaction; await pg.close() }
   const upload = async file => { const form = new FormData(); form.set('file', file); return media.POST(new Request('https://wi300.vn/api/admin/media', { method: 'POST', body: form })) }
   assert.equal((await upload(new File(['<script>alert(1)</script>'], 'x.html', { type: 'text/html' }))).status, 400)
@@ -201,7 +232,8 @@ async function run() {
       return { ok: true, json: async () => body.execute ? { processed: body.paths, deleted: body.paths, blocked: [], failed: [] } : { dryRun: true, items: body.paths.map(path => ({ path, references: [], unchecked: [], missingTables: [], note: 'Test' })) } }
     }
     const inTrash = String(url).includes('trash=1')
-    return { ok: true, json: async () => ({ items: inTrash === uiTrashed ? [{ path: 'old.pdf', filename: 'old.pdf', url: 'https://test.supabase.co/old.pdf', mime: 'application/pdf', size: 10, folder: false, ...(inTrash ? { trashedAt: '2026-10-19T00:00:00Z' } : {}) }] : [], hasMore: false }) }
+    if (String(url).includes('usage=1')) return { ok: true, json: async () => ({ references: [{ type: 'Post', id: '8', title: 'Quản lý dòng tiền', href: '/tools/posts?edit=8' }], unchecked: [], note: 'Test' }) }
+    return { ok: true, json: async () => ({ items: inTrash === uiTrashed ? [{ path: 'old.pdf', filename: 'old.pdf', url: 'https://test.supabase.co/old.pdf', mime: 'application/pdf', size: 10, folder: false, createdAt: '2026-10-19T00:00:00Z', ...(inTrash ? { trashedAt: '2026-10-19T00:00:00Z' } : {}) }] : [], hasMore: false }) }
   }
   const container = document.getElementById('root'), uiRoot = createRoot(container)
   const tick = async action => React.act(async () => { action(); await new Promise(resolve => setTimeout(resolve, 10)) })
@@ -212,6 +244,12 @@ async function run() {
   assert.equal(accountCreated, 1); assert.equal(submitted.role, 'TEACHER'); assert.ok(container.textContent.includes('3801'))
   await tick(() => uiRoot.render(React.createElement(load('components/admin/MediaManager.tsx').default)))
   assert.ok(container.textContent.includes('old.pdf'))
+  assert.ok(container.textContent.includes('Tải lên: 07:00:00'), 'Upload time is visible on the card in Vietnam time')
+  await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Xem trước / Nơi sử dụng').click())
+  assert.equal(container.querySelector('iframe').getAttribute('sandbox'), '', 'Preview cannot execute uploaded scripts')
+  assert.equal(container.querySelector('[aria-label="Nơi sử dụng"] a').getAttribute('href'), '/tools/posts?edit=8')
+  assert.ok(container.textContent.includes('Quản lý dòng tiền'))
+  await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Đóng').click())
   await tick(() => container.querySelector('input[type="checkbox"]').click())
   await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Chuyển vào thùng rác').click())
   assert.equal(uiDeletes, 0, 'Preview must not delete a file')
