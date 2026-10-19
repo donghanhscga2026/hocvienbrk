@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 
-type Media = { path: string; filename: string; folder: boolean; url: string; size: number; mime: string; createdAt?: string; name?: string; description?: string; uploaderName?: string }
+type Media = { path: string; filename: string; folder: boolean; url: string; size: number; mime: string; createdAt?: string; name?: string; description?: string; uploaderName?: string; trashedAt?: string }
 type Usage = { references: { type: string; id: string }[]; unchecked: string[]; missingTables?: string[]; note: string }
 type Preview = Usage & { path: string }
 const button = 'inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm disabled:opacity-50'
@@ -30,6 +30,8 @@ export default function MediaManager() {
   const [selected, setSelected] = useState<string[]>([]), [detail, setDetail] = useState<Media | null>(null), [usage, setUsage] = useState<Usage | null>(null), [checking, setChecking] = useState(false)
   const [preview, setPreview] = useState<Preview[] | null>(null), [revision, setRevision] = useState(0)
   const [progress, setProgress] = useState('')
+  const [trash, setTrash] = useState(false)
+  const [action, setAction] = useState<'trash' | 'restore' | 'purge'>('trash')
   const previewRef = useRef<HTMLElement>(null)
   const requestId = useRef(0)
   useEffect(() => { if (preview) previewRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) }, [preview])
@@ -37,12 +39,12 @@ export default function MediaManager() {
   const reload = useCallback(() => { prepareLoad(); setRevision(value => value + 1) }, [prepareLoad])
   useEffect(() => {
     const controller = new AbortController()
-    api('/api/admin/media?' + new URLSearchParams({ path, page: String(page), q: search }), { signal: controller.signal })
+    api('/api/admin/media?' + new URLSearchParams({ path, page: String(page), q: search, trash: trash ? '1' : '0' }), { signal: controller.signal })
       .then(data => { if (!controller.signal.aborted) { setItems(data.items); setHasMore(data.hasMore) } })
       .catch(error => { if (!controller.signal.aborted) setMessage(error.message) })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [path, page, search, revision])
+  }, [path, page, search, revision, trash])
   function navigate(next: string) { prepareLoad(); setMessage(''); setPath(next); setPage(0); setSearch(''); setQuery(''); setDetail(null); setPreview(null); setRevision(value => value + 1) }
   async function openDetail(item: Media) {
     const id = ++requestId.current
@@ -53,10 +55,11 @@ export default function MediaManager() {
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Không thể kiểm tra file.') }
     finally { if (id === requestId.current) setChecking(false) }
   }
-  async function previewDelete(paths: string[]) {
+  async function previewDelete(paths: string[], nextAction: 'trash' | 'restore' | 'purge' = 'trash') {
+    setAction(nextAction)
     setBusy(true); setMessage(''); setPreview(null); setProgress(`Đang kiểm tra ${paths.length} file…`)
     try {
-      const result = await api('/api/admin/media/batch', json('POST', { paths }))
+      const result = await api('/api/admin/media/batch', json('POST', { paths, action: nextAction }))
       setPreview(result.items)
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Không thể kiểm tra.') }
     finally { setBusy(false); setProgress('') }
@@ -69,12 +72,14 @@ export default function MediaManager() {
         const file = event.target.files?.[0]; event.target.value = ''; if (!file) return
         if (file.size > 4 * 1024 * 1024) { setMessage('File tối đa 4 MB.'); return }
         setBusy(true); setMessage('')
-        try { const form = new FormData(); form.set('file', file); await api('/api/admin/media', { method: 'POST', body: form }); navigate('media'); reload() }
+        try { const form = new FormData(); form.set('file', file); await api('/api/admin/media', { method: 'POST', body: form }); setTrash(false); navigate('media'); reload() }
         catch (error) { setMessage(error instanceof Error ? error.message : 'Tải lên thất bại.') }
         finally { setBusy(false) }
       }} /></label></div>
     <p className="text-xs leading-5 text-slate-500">Ảnh JPG/PNG/WebP/GIF được tối ưu sang WebP; hỗ trợ PDF, ZIP, TXT; tối đa 4 MB/file. File cũ có thể chưa có thông tin người tải lên.</p>
-    <nav aria-label="Thư mục media" className="flex flex-wrap items-center gap-2 text-sm"><button disabled={busy} className={button} onClick={() => navigate('')}>Kho uploads</button>{path.split('/').filter(Boolean).map((part, index) => <button disabled={busy} key={index} className={button} onClick={() => navigate(path.split('/').slice(0, index + 1).join('/'))}>{part}</button>)}</nav>
+    <div className="flex gap-2" role="group" aria-label="Kho media"><button disabled={busy} aria-pressed={!trash} className={button} onClick={() => { setTrash(false); navigate('') }}>Đang sử dụng</button><button disabled={busy} aria-pressed={trash} className={button} onClick={() => { setTrash(true); navigate('') }}>Thùng rác</button></div>
+    <p className="text-xs leading-5 text-slate-500">Chuyển vào thùng rác giữ lại file để khôi phục, không tự động xóa. File vẫn chiếm dung lượng và liên kết cũ vẫn có thể truy cập. Chỉ Xóa vĩnh viễn mới loại bỏ file khỏi Storage.</p>
+    {!trash && <nav aria-label="Thư mục media" className="flex flex-wrap items-center gap-2 text-sm"><button disabled={busy} className={button} onClick={() => navigate('')}>Kho uploads</button>{path.split('/').filter(Boolean).map((part, index) => <button disabled={busy} key={index} className={button} onClick={() => navigate(path.split('/').slice(0, index + 1).join('/'))}>{part}</button>)}</nav>}
     <div className="flex flex-wrap gap-2"><form className="flex min-w-0 flex-1 gap-2" onSubmit={event => { event.preventDefault(); prepareLoad(); setPage(0); setSearch(query); setRevision(value => value + 1) }}><input aria-label="Tìm tên file trong thư mục" placeholder="Tìm tên file trong thư mục này…" className={input} value={query} onChange={event => setQuery(event.target.value)} /><button className={button}>Tìm</button></form>
       <select aria-label="Loại file" className={button} value={type} onChange={event => setType(event.target.value)}><option value="all">Tất cả loại file</option><option value="images">Ảnh</option><option value="files">Tài liệu / file</option></select>
       <select aria-label="Cách hiển thị" className={button} value={view} onChange={event => setView(event.target.value)}><option value="grid">Dạng lưới</option><option value="list">Danh sách</option></select>
@@ -83,13 +88,13 @@ export default function MediaManager() {
     {message && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">{message}</p>}
     {busy && <p role="status">{progress || 'Đang xử lý…'}</p>}
     {loading ? <p role="status">Đang tải media…</p> : <>
-      <div className="flex flex-wrap items-center gap-3 text-sm"><span>Đã chọn {selected.length}/20 file</span><button disabled={!selected.length || busy} className={button + ' text-red-700'} onClick={() => void previewDelete(selected)}>Kiểm tra & xóa đã chọn</button><button disabled={!selected.length || busy} className={button} onClick={() => setSelected([])}>Bỏ chọn</button></div>
+      <div className="flex flex-wrap items-center gap-3 text-sm"><span>Đã chọn {selected.length}/20 file</span>{trash ? <><button disabled={!selected.length || busy} className={button} onClick={() => void previewDelete(selected, 'restore')}>Khôi phục đã chọn</button><button disabled={!selected.length || busy} className={button + ' text-red-700'} onClick={() => void previewDelete(selected, 'purge')}>Xóa vĩnh viễn đã chọn</button></> : <button disabled={!selected.length || busy} className={button + ' text-red-700'} onClick={() => void previewDelete(selected)}>Chuyển vào thùng rác</button>}<button disabled={!selected.length || busy} className={button} onClick={() => setSelected([])}>Bỏ chọn</button></div>
       <div className={view === 'grid' ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5' : 'space-y-2'}>{visible.map(item => <article key={item.path} className={'min-w-0 rounded-xl border border-slate-200 bg-white p-3 ' + (view === 'list' ? 'flex flex-wrap items-center gap-3' : '')}>
         {!item.folder && <input type="checkbox" disabled={busy || (!selected.includes(item.path) && selected.length >= 20)} aria-label={'Chọn ' + item.filename} checked={selected.includes(item.path)} onChange={event => setSelected(event.target.checked ? [...selected, item.path] : selected.filter(value => value !== item.path))} className="h-5 w-5" />}
         <button disabled={busy} className={'min-w-0 text-left ' + (view === 'grid' ? 'mt-2 block w-full' : 'flex flex-1 items-center gap-3')} onClick={() => item.folder ? navigate(item.path) : void openDetail(item)}>
           <span className={'relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-3xl ' + (view === 'grid' ? 'aspect-square w-full' : 'h-14 w-14')}>
             {item.folder ? '📁' : item.mime.startsWith('image/') ? <Image src={item.url} alt="" fill unoptimized className="object-contain" loading="lazy" /> : '📄'}
-          </span><span className="block min-w-0"><span className="mt-2 block break-words text-sm font-semibold">{item.name || item.filename}</span><span className="mt-1 block break-all text-xs text-slate-500">{item.folder ? 'Mở thư mục' : (item.size / 1024 / 1024).toFixed(2) + ' MB · ' + item.filename}</span></span>
+          </span><span className="block min-w-0"><span className="mt-2 block break-words text-sm font-semibold">{item.name || item.filename}</span><span className="mt-1 block break-all text-xs text-slate-500">{item.folder ? 'Mở thư mục' : (item.size / 1024 / 1024).toFixed(2) + ' MB · ' + item.filename}</span>{item.trashedAt && <span className="mt-1 block text-xs text-slate-500">Vào thùng rác: {new Date(item.trashedAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</span>}</span>
         </button>
       </article>)}</div>
       {!visible.length && <p className="py-8 text-center text-slate-500">Không có file phù hợp trong trang của thư mục này.</p>}
@@ -107,24 +112,24 @@ export default function MediaManager() {
         finally { setBusy(false) }
       }}><label className="block text-sm">Tên hiển thị<input className={input + ' mt-1'} name="name" defaultValue={detail.name || detail.filename} required maxLength={200} /></label><label className="block text-sm">Mô tả<textarea className={input + ' mt-1 py-2'} rows={3} name="description" defaultValue={detail.description || ''} maxLength={1000} /></label><button disabled={busy} className={button}>Lưu thông tin</button></form>
       <label className="block text-sm">Đường dẫn<input readOnly value={detail.url} className={input + ' mt-1'} onFocus={event => event.target.select()} /></label>
-      <div className="flex flex-wrap gap-2"><button className={button} onClick={async () => { try { await navigator.clipboard.writeText(detail.url); setMessage('Đã sao chép đường dẫn.') } catch { setMessage('Chọn và sao chép đường dẫn trong ô bên trên.') } }}>Sao chép đường dẫn</button><a href={detail.url} target="_blank" rel="noopener noreferrer" className={button}>Mở file</a><button disabled={busy || checking} className={button + ' text-red-700'} onClick={() => void previewDelete([detail.path])}>Kiểm tra & xóa file</button></div>
+      <div className="flex flex-wrap gap-2"><button className={button} onClick={async () => { try { await navigator.clipboard.writeText(detail.url); setMessage('Đã sao chép đường dẫn.') } catch { setMessage('Chọn và sao chép đường dẫn trong ô bên trên.') } }}>Sao chép đường dẫn</button><a href={detail.url} target="_blank" rel="noopener noreferrer" className={button}>Mở file</a>{trash && <button disabled={busy} className={button} onClick={() => void previewDelete([detail.path], 'restore')}>Khôi phục file</button>}<button disabled={busy || checking} className={button + ' text-red-700'} onClick={() => void previewDelete([detail.path], trash ? 'purge' : 'trash')}>{trash ? 'Xóa vĩnh viễn file' : 'Chuyển file vào thùng rác'}</button></div>
       {checking ? <p role="status">Đang kiểm tra nơi sử dụng…</p> : usage && <UsageView usage={usage} />}
       <p className="text-xs text-slate-500">Mô tả này dùng để quản lý thư viện. Để thay ảnh đang dùng, tải ảnh mới và cập nhật tại trang/khóa học tương ứng.</p>
     </section>}
-    {preview && <section ref={previewRef} aria-label="Xác nhận xóa media" className="space-y-3 rounded-xl border border-red-300 bg-red-50 p-4"><h2 className="text-lg font-bold">Kiểm tra trước khi xóa</h2>
-      <p className="text-sm">{preview.filter(item => !item.references.length && !item.unchecked.length).length}/{preview.length} file đủ điều kiện xóa. Bấm xác nhận bên dưới để xóa thật.</p>
+    {preview && <section ref={previewRef} aria-label="Xác nhận xóa media" className="space-y-3 rounded-xl border border-red-300 bg-red-50 p-4"><h2 className="text-lg font-bold">{action === 'trash' ? 'Chuyển vào thùng rác' : action === 'restore' ? 'Khôi phục file' : 'Xóa vĩnh viễn'}</h2>
+      <p className="text-sm">{preview.filter(item => !item.references.length && !item.unchecked.length).length}/{preview.length} file đủ điều kiện. Bấm xác nhận bên dưới để thực hiện.</p>
       <div className="max-h-80 space-y-2 overflow-y-auto">{preview.map(item => <div key={item.path} className="rounded-lg bg-white p-3"><p className="break-all font-semibold">{item.path}</p><UsageView usage={item} /></div>)}</div>
-      <p className="text-sm">Xóa vĩnh viễn file trong Storage. Chỉ xóa file không tìm thấy liên kết và đã kiểm tra đủ các nguồn nêu trên. Liên kết bên ngoài có thể bị hỏng.</p>
+      <p className="text-sm">{action === 'trash' ? 'File được giữ lại trong thùng rác và có thể khôi phục về đúng đường dẫn cũ.' : action === 'restore' ? 'Đưa file trở lại danh sách đang sử dụng, giữ nguyên nội dung và đường dẫn.' : 'File sẽ bị xóa vĩnh viễn khỏi Storage, không thể khôi phục qua thùng rác. Liên kết bên ngoài có thể bị hỏng.'}</p>
       <div className="flex flex-wrap gap-2"><button disabled={busy} className={button} onClick={() => setPreview(null)}>Hủy</button><button disabled={busy || !preview.some(item => !item.references.length && !item.unchecked.length)} className={button + ' text-red-700'} onClick={async () => {
         const paths = preview.filter(value => !value.references.length && !value.unchecked.length).map(item => item.path)
-        setBusy(true); setProgress(`Đang kiểm tra lại và xóa ${paths.length} file…`)
+        setBusy(true); setProgress(`Đang ${action === 'trash' ? 'chuyển vào thùng rác' : action === 'restore' ? 'khôi phục' : 'kiểm tra lại và xóa vĩnh viễn'} ${paths.length} file…`)
         try {
-          const result = await api('/api/admin/media/batch', json('POST', { paths, execute: true, confirm: 'DELETE' }))
+          const result = await api('/api/admin/media/batch', json('POST', { paths, action, execute: true, confirm: action === 'trash' ? 'TRASH' : action === 'restore' ? 'RESTORE' : 'DELETE' }))
           setPreview(result.blocked.length ? result.blocked : null); setDetail(null); reload()
-          setMessage(`Đã xóa ${result.deleted.length}/${paths.length} file.` + (result.blocked.length ? ` ${result.blocked.length} file bị chặn vì đang được dùng hoặc chưa kiểm tra được.` : '') + (result.failed.length ? ` ${result.failed.length} file chưa được Storage xác nhận xóa; hãy kiểm tra lại danh sách.` : ''))
+          setMessage(`${action === 'trash' ? 'Đã chuyển vào thùng rác' : action === 'restore' ? 'Đã khôi phục' : 'Đã xóa vĩnh viễn'} ${result.processed.length}/${paths.length} file.` + (result.blocked.length ? ` ${result.blocked.length} file bị chặn vì đang được dùng hoặc chưa kiểm tra được.` : '') + (result.failed.length ? ` ${result.failed.length} file chưa hoàn tất: ${result.failed.map((item: { error: string }) => item.error).join(' ')}` : ''))
         } catch (error) { setMessage(error instanceof Error ? error.message : 'Xóa thất bại.'); reload() }
         finally { setBusy(false); setProgress('') }
-      }}>Xác nhận xóa file đủ điều kiện</button></div>
+      }}>{action === 'trash' ? 'Xác nhận chuyển vào thùng rác' : action === 'restore' ? 'Xác nhận khôi phục' : 'Xác nhận xóa vĩnh viễn'}</button></div>
     </section>}
   </main>
 }

@@ -8,8 +8,9 @@ const { Prisma } = require('@prisma/client')
 const root = path.resolve(__dirname, '..'), cache = new Map()
 let role = 'ADMIN', customDomain = false, duplicate = false, usageRows = [], usageError = false
 let created, uploads = [], removals = [], transactionCalls = 0, metadata = new Map(), listOptions
-let usageQueries = 0, missingSources = false, deniedSources = false, emptyRemoval = false
+let usageQueries = 0, missingSources = false, deniedSources = false, emptyRemoval = false, missingFile = false
 const storage = {
+  info: async p => missingFile ? { data: null, error: new Error('Not found') } : { data: { id: p, name: p, size: 500, contentType: 'application/pdf', createdAt: '2026-10-19T00:00:00.000Z' }, error: null },
   getPublicUrl: p => ({ data: { publicUrl: 'https://test.supabase.co/storage/v1/object/public/uploads/' + p } }),
   list: async (folder, options) => {
     listOptions = options
@@ -30,10 +31,10 @@ const db = {
   user: { findFirst: async () => duplicate ? { id: 1 } : null, findMany: async () => [] },
   userClosure: { create: async () => ({}) },
   systemConfig: {
-    findMany: async () => [], findUnique: async ({ where }) => metadata.has(where.key) ? { value: metadata.get(where.key) } : null,
+    findMany: async ({ where }) => [...metadata].filter(([key]) => where.key.in ? where.key.in.includes(key) : key.startsWith(where.key.startsWith)).map(([key,value]) => ({ key,value })), findUnique: async ({ where }) => metadata.has(where.key) ? { value: metadata.get(where.key) } : null,
     create: async ({ data }) => { metadata.set(data.key, data.value) },
     upsert: async ({ where, create, update }) => { metadata.set(where.key, metadata.has(where.key) ? update.value : create.value) },
-    deleteMany: async () => ({}),
+    deleteMany: async ({ where }) => { for (const key of metadata.keys()) if (typeof where.key === 'string' ? key === where.key : where.key.in.includes(key)) metadata.delete(key); return {} },
   },
 }
 function load(rel) {
@@ -50,6 +51,7 @@ function load(rel) {
     if (name === '@/lib/id-helper') return { createUserWithAvailableIdInTransaction: async (tx, data) => { assert.equal(tx, db); created = data; return { ...data, id: 3800 } } }
     if (name === '@supabase/supabase-js') return { createClient: (url, key) => { assert.equal(key, 'server-test-secret'); return { storage: { from: bucket => { assert.equal(bucket, 'uploads'); return storage } } } } }
     if (name.startsWith('@/')) return load(name.slice(2))
+    if (name.startsWith('.')) return load(path.relative(root, path.resolve(path.dirname(file), name)))
     return require(name)
   }, mod.exports, mod)
   return mod.exports
@@ -58,7 +60,7 @@ const req = (method, body, suffix = '') => new Request('https://wi300.vn/api/adm
 async function run() {
   process.env.SUPABASE_URL = 'https://test.supabase.co'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'server-test-secret'
-  const accounts = load('app/api/admin/users/route'), media = load('app/api/admin/media/route'), batch = load('app/api/admin/media/batch/route'), helper = load('lib/admin-media')
+  const accounts = load('app/api/admin/users/route'), media = load('app/api/admin/media/route'), batch = load('app/api/admin/media/batch/route'), helper = load('lib/admin-media'), trashHelper = load('lib/media-trash')
   for (const deniedRole of [null, 'STUDENT', 'TEACHER', 'DEVELOPER']) {
     role = deniedRole
     assert.equal((await accounts.POST(req('POST', {}))).status, 403)
@@ -101,7 +103,8 @@ async function run() {
   usageError = false
   assert.equal(removals.length, 0)
   assert.equal((await media.DELETE(req('DELETE', { path: 'avatars/x.png', execute: true, confirm: 'DELETE' }))).status, 200)
-  assert.deepEqual(removals, ['avatars/x.png'])
+  assert.deepEqual(removals, [], 'Legacy delete must preserve file bytes in trash')
+  assert.ok(metadata.has(trashHelper.trashKey('avatars/x.png')))
   const paths = Array.from({ length: 20 }, (_, i) => `media/file${i}.png`)
   const beforeQueries = usageQueries, beforeRemovals = removals.length
   missingSources = true
@@ -122,9 +125,28 @@ async function run() {
   assert.equal(mixed.deleted.length, 19); assert.equal(mixed.blocked.length, 1)
   assert.ok(!mixed.deleted.includes(paths[0]), 'References are rechecked before executing')
   usageRows = []; missingSources = false; emptyRemoval = true
-  const empty = await (await batch.POST(req('POST', { paths: ['empty.png'], execute: true, confirm: 'DELETE' }))).json()
+  const empty = await (await batch.POST(req('POST', { paths: [paths[1]], action: 'purge', execute: true, confirm: 'DELETE' }))).json()
   assert.deepEqual(empty.deleted, []); assert.equal(empty.failed.length, 1, 'Empty Storage results must not report success')
   emptyRemoval = false
+  assert.ok(metadata.has(trashHelper.trashKey(paths[1])), 'Unconfirmed deletion retains the trash record')
+  const restored = await (await batch.POST(req('POST', { paths: [paths[2]], action: 'restore', execute: true, confirm: 'RESTORE' }))).json()
+  assert.deepEqual(restored.processed, [paths[2]])
+  assert.equal(metadata.has(trashHelper.trashKey(paths[2])), false)
+  const purged = await (await batch.POST(req('POST', { paths: [paths[1]], action: 'purge', execute: true, confirm: 'DELETE' }))).json()
+  assert.deepEqual(purged.processed, [paths[1]]); assert.equal(metadata.has(trashHelper.trashKey(paths[1])), false)
+  const activePurge = await (await batch.POST(req('POST', { paths: ['active.png'], action: 'purge', execute: true, confirm: 'DELETE' }))).json()
+  assert.equal(activePurge.processed.length, 0, 'Only items already in trash can be purged')
+  assert.equal((await batch.POST(req('POST', { paths: [paths[3]], action: 'restore', execute: true, confirm: 'DELETE' }))).status, 400)
+  const trashListing = await (await media.GET(req('GET', null, '?trash=1'))).json()
+  assert.ok(trashListing.items.some(item => item.path === paths[3]))
+  const activeListing = await (await media.GET(req('GET', null, '?path=media'))).json()
+  assert.ok(!activeListing.items.some(item => item.path === paths[3]), 'Trashed files are hidden from the active listing')
+  assert.ok(activeListing.items.some(item => item.path === paths[2]), 'Restoring returns the original path to the active listing')
+  missingFile = true
+  const missingRestore = await (await batch.POST(req('POST', { paths: [paths[4]], action: 'restore', execute: true, confirm: 'RESTORE' }))).json()
+  assert.equal(missingRestore.processed.length, 0); assert.equal(missingRestore.failed.length, 1)
+  assert.ok(metadata.has(trashHelper.trashKey(paths[4])), 'Missing bytes must not be falsely reported restored')
+  missingFile = false
   assert.equal((await batch.POST(req('POST', { paths: [...paths, 'overflow.png'] }))).status, 400)
   // Execute the real generated SQL against isolated PostgreSQL, including the legacy schema.
   const { PGlite } = require('@electric-sql/pglite'), pg = new PGlite()
@@ -169,16 +191,17 @@ async function run() {
   global.window = dom.window; global.self = dom.window; global.document = dom.window.document; global.IS_REACT_ACT_ENVIRONMENT = true
   const originalFormData = global.FormData
   global.FormData = dom.window.FormData
-  let accountCreated = 0, uiDeletes = 0, submitted, failBatch = false
+  let accountCreated = 0, uiDeletes = 0, submitted, failBatch = false, uiTrashed = false
   global.fetch = async (url, options) => {
     if (url === '/api/admin/users') { submitted = JSON.parse(options.body); return { ok: true, json: async () => ({ user: { id: 3801, email: submitted.email }, message: 'Đã tạo.' }) } }
     if (url === '/api/admin/media/batch') {
       if (failBatch) throw new DOMException('Slow request', 'TimeoutError')
       const body = JSON.parse(options.body)
-      if (body.execute) uiDeletes++
-      return { ok: true, json: async () => body.execute ? { deleted: body.paths, blocked: [], failed: [] } : { dryRun: true, items: body.paths.map(path => ({ path, references: [], unchecked: [], missingTables: [], note: 'Test' })) } }
+      if (body.execute) { uiDeletes++; uiTrashed = body.action === 'trash' }
+      return { ok: true, json: async () => body.execute ? { processed: body.paths, deleted: body.paths, blocked: [], failed: [] } : { dryRun: true, items: body.paths.map(path => ({ path, references: [], unchecked: [], missingTables: [], note: 'Test' })) } }
     }
-    return { ok: true, json: async () => ({ items: [{ path: 'old.pdf', filename: 'old.pdf', url: 'https://test.supabase.co/old.pdf', mime: 'application/pdf', size: 10, folder: false }], hasMore: false }) }
+    const inTrash = String(url).includes('trash=1')
+    return { ok: true, json: async () => ({ items: inTrash === uiTrashed ? [{ path: 'old.pdf', filename: 'old.pdf', url: 'https://test.supabase.co/old.pdf', mime: 'application/pdf', size: 10, folder: false, ...(inTrash ? { trashedAt: '2026-10-19T00:00:00Z' } : {}) }] : [], hasMore: false }) }
   }
   const container = document.getElementById('root'), uiRoot = createRoot(container)
   const tick = async action => React.act(async () => { action(); await new Promise(resolve => setTimeout(resolve, 10)) })
@@ -190,18 +213,26 @@ async function run() {
   await tick(() => uiRoot.render(React.createElement(load('components/admin/MediaManager.tsx').default)))
   assert.ok(container.textContent.includes('old.pdf'))
   await tick(() => container.querySelector('input[type="checkbox"]').click())
-  await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Kiểm tra & xóa đã chọn').click())
+  await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Chuyển vào thùng rác').click())
   assert.equal(uiDeletes, 0, 'Preview must not delete a file')
   assert.ok(container.querySelector('[aria-label="Xác nhận xóa media"]'))
-  await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Xác nhận xóa file đủ điều kiện').click())
+  await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Xác nhận chuyển vào thùng rác').click())
   assert.equal(uiDeletes, 1)
+  assert.ok(container.textContent.includes('Đã chuyển vào thùng rác 1/1'))
+  await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Thùng rác').click())
+  await tick(() => container.querySelector('input[type="checkbox"]').click())
+  await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Khôi phục đã chọn').click())
+  await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Xác nhận khôi phục').click())
+  assert.ok(container.textContent.includes('Đã khôi phục 1/1'))
+  await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Đang sử dụng').click())
   failBatch = true
   await tick(() => container.querySelector('input[type="checkbox"]').click())
-  await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Kiểm tra & xóa đã chọn').click())
+  await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Chuyển vào thùng rác').click())
   assert.ok(container.textContent.includes('Đã hết thời gian chờ'))
-  assert.equal([...container.querySelectorAll('button')].find(button => button.textContent === 'Kiểm tra & xóa đã chọn').disabled, false, 'Timeout releases the busy state')
+  assert.equal([...container.querySelectorAll('button')].find(button => button.textContent === 'Chuyển vào thùng rác').disabled, false, 'Timeout releases the busy state')
   await tick(() => uiRoot.unmount()); dom.window.close(); global.FormData = originalFormData
-  console.log('Passed: Client account creation and media selection/preview/explicit deletion confirmation.')
+  console.log('Passed: Client account creation, trash preview/confirmation, trash tab, restore UI, and timeout recovery.')
+  console.log('Passed: Legacy delete preserves bytes; active/trash listings, same-path restore, missing bytes, explicit purge only from trash, references, partial Storage responses and concurrent-operation lock.')
   console.log('Passed: Admin-only access, domain isolation, account validation/hash/duplicates, legacy media pagination, metadata, upload limits/type inspection, deletion preview/guards/failure/confirmation, server-only storage key.')
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })
