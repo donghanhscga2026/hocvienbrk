@@ -5,15 +5,21 @@ import Link from 'next/link'
 import Image from 'next/image'
 
 type Media = { path: string; filename: string; folder: boolean; url: string; size: number; mime: string; createdAt?: string; name?: string; description?: string; uploaderName?: string }
-type Usage = { references: { type: string; id: string }[]; unchecked: string[]; note: string }
+type Usage = { references: { type: string; id: string }[]; unchecked: string[]; missingTables?: string[]; note: string }
 type Preview = Usage & { path: string }
 const button = 'inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm disabled:opacity-50'
 const input = 'min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-slate-900'
 async function api(url: string, options?: RequestInit) {
-  const response = await fetch(url, options)
-  const body = await response.json()
-  if (!response.ok) throw new Error(body.error || 'Không thể xử lý yêu cầu.')
-  return body
+  try {
+    const timeout = AbortSignal.timeout(40000)
+    const response = await fetch(url, { ...options, cache: 'no-store', signal: options?.signal ? AbortSignal.any([options.signal, timeout]) : timeout })
+    const body = await response.json().catch(() => null)
+    if (!response.ok || !body) throw new Error(body?.error || 'Máy chủ chưa hoàn tất xử lý. Hãy tải lại danh sách trước khi thử lại.')
+    return body
+  } catch (error) {
+    if (error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name)) throw new Error('Đã hết thời gian chờ. Hãy tải lại danh sách để kiểm tra kết quả trước khi thử lại.')
+    throw error
+  }
 }
 const json = (method: string, body: unknown) => ({ method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 
@@ -23,7 +29,10 @@ export default function MediaManager() {
   const [message, setMessage] = useState(''), [type, setType] = useState('all'), [view, setView] = useState('grid')
   const [selected, setSelected] = useState<string[]>([]), [detail, setDetail] = useState<Media | null>(null), [usage, setUsage] = useState<Usage | null>(null), [checking, setChecking] = useState(false)
   const [preview, setPreview] = useState<Preview[] | null>(null), [revision, setRevision] = useState(0)
+  const [progress, setProgress] = useState('')
+  const previewRef = useRef<HTMLElement>(null)
   const requestId = useRef(0)
+  useEffect(() => { if (preview) previewRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) }, [preview])
   const prepareLoad = useCallback(() => { setLoading(true); setItems([]); setSelected([]) }, [])
   const reload = useCallback(() => { prepareLoad(); setRevision(value => value + 1) }, [prepareLoad])
   useEffect(() => {
@@ -45,13 +54,12 @@ export default function MediaManager() {
     finally { if (id === requestId.current) setChecking(false) }
   }
   async function previewDelete(paths: string[]) {
-    setBusy(true); setMessage(''); setPreview(null)
+    setBusy(true); setMessage(''); setPreview(null); setProgress(`Đang kiểm tra ${paths.length} file…`)
     try {
-      const results: Preview[] = []
-      for (const filePath of paths) results.push({ path: filePath, ...await api('/api/admin/media', json('DELETE', { path: filePath })) })
-      setPreview(results)
+      const result = await api('/api/admin/media/batch', json('POST', { paths }))
+      setPreview(result.items)
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Không thể kiểm tra.') }
-    finally { setBusy(false) }
+    finally { setBusy(false); setProgress('') }
   }
   const visible = items.filter(item => item.folder || type === 'all' || (type === 'images' ? item.mime.startsWith('image/') : !item.mime.startsWith('image/')))
   return <main className="mx-auto max-w-7xl space-y-5 p-4 text-slate-900 sm:p-6">
@@ -73,7 +81,7 @@ export default function MediaManager() {
       <button disabled={loading || busy} className={button} onClick={reload}>Tải lại</button>
     </div>
     {message && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">{message}</p>}
-    {busy && <p role="status">Đang xử lý…</p>}
+    {busy && <p role="status">{progress || 'Đang xử lý…'}</p>}
     {loading ? <p role="status">Đang tải media…</p> : <>
       <div className="flex flex-wrap items-center gap-3 text-sm"><span>Đã chọn {selected.length}/20 file</span><button disabled={!selected.length || busy} className={button + ' text-red-700'} onClick={() => void previewDelete(selected)}>Kiểm tra & xóa đã chọn</button><button disabled={!selected.length || busy} className={button} onClick={() => setSelected([])}>Bỏ chọn</button></div>
       <div className={view === 'grid' ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5' : 'space-y-2'}>{visible.map(item => <article key={item.path} className={'min-w-0 rounded-xl border border-slate-200 bg-white p-3 ' + (view === 'list' ? 'flex flex-wrap items-center gap-3' : '')}>
@@ -103,22 +111,24 @@ export default function MediaManager() {
       {checking ? <p role="status">Đang kiểm tra nơi sử dụng…</p> : usage && <UsageView usage={usage} />}
       <p className="text-xs text-slate-500">Mô tả này dùng để quản lý thư viện. Để thay ảnh đang dùng, tải ảnh mới và cập nhật tại trang/khóa học tương ứng.</p>
     </section>}
-    {preview && <section aria-label="Xác nhận xóa media" className="space-y-3 rounded-xl border border-red-300 bg-red-50 p-4"><h2 className="text-lg font-bold">Kiểm tra trước khi xóa</h2>
-      {preview.map(item => <div key={item.path} className="rounded-lg bg-white p-3"><p className="break-all font-semibold">{item.path}</p><UsageView usage={item} /></div>)}
+    {preview && <section ref={previewRef} aria-label="Xác nhận xóa media" className="space-y-3 rounded-xl border border-red-300 bg-red-50 p-4"><h2 className="text-lg font-bold">Kiểm tra trước khi xóa</h2>
+      <p className="text-sm">{preview.filter(item => !item.references.length && !item.unchecked.length).length}/{preview.length} file đủ điều kiện xóa. Bấm xác nhận bên dưới để xóa thật.</p>
+      <div className="max-h-80 space-y-2 overflow-y-auto">{preview.map(item => <div key={item.path} className="rounded-lg bg-white p-3"><p className="break-all font-semibold">{item.path}</p><UsageView usage={item} /></div>)}</div>
       <p className="text-sm">Xóa vĩnh viễn file trong Storage. Chỉ xóa file không tìm thấy liên kết và đã kiểm tra đủ các nguồn nêu trên. Liên kết bên ngoài có thể bị hỏng.</p>
       <div className="flex flex-wrap gap-2"><button disabled={busy} className={button} onClick={() => setPreview(null)}>Hủy</button><button disabled={busy || !preview.some(item => !item.references.length && !item.unchecked.length)} className={button + ' text-red-700'} onClick={async () => {
-        setBusy(true)
-        const results: string[] = []
-        for (const item of preview.filter(value => !value.references.length && !value.unchecked.length)) {
-          try { await api('/api/admin/media', json('DELETE', { path: item.path, execute: true, confirm: 'DELETE' })); results.push('Đã xóa: ' + item.path) }
-          catch (error) { results.push(item.path + ': ' + (error instanceof Error ? error.message : 'Xóa thất bại.')) }
-        }
-        setBusy(false); setPreview(null); setDetail(null); reload(); setMessage(results.join('\n'))
+        const paths = preview.filter(value => !value.references.length && !value.unchecked.length).map(item => item.path)
+        setBusy(true); setProgress(`Đang kiểm tra lại và xóa ${paths.length} file…`)
+        try {
+          const result = await api('/api/admin/media/batch', json('POST', { paths, execute: true, confirm: 'DELETE' }))
+          setPreview(result.blocked.length ? result.blocked : null); setDetail(null); reload()
+          setMessage(`Đã xóa ${result.deleted.length}/${paths.length} file.` + (result.blocked.length ? ` ${result.blocked.length} file bị chặn vì đang được dùng hoặc chưa kiểm tra được.` : '') + (result.failed.length ? ` ${result.failed.length} file chưa được Storage xác nhận xóa; hãy kiểm tra lại danh sách.` : ''))
+        } catch (error) { setMessage(error instanceof Error ? error.message : 'Xóa thất bại.'); reload() }
+        finally { setBusy(false); setProgress('') }
       }}>Xác nhận xóa file đủ điều kiện</button></div>
     </section>}
   </main>
 }
 
 function UsageView({ usage }: { usage: Usage }) {
-  return <div className="mt-2 space-y-2 text-sm"><p>{usage.references.length ? 'Đang được tham chiếu (cần gỡ trước khi xóa):' : 'Chưa tìm thấy tham chiếu trong các nguồn đã kiểm tra.'}</p>{usage.references.map((ref, index) => <p key={index} className="break-all">• {ref.type} #{ref.id}</p>)}{usage.unchecked.length > 0 && <p className="text-red-700">Chưa kiểm tra được: {usage.unchecked.join(', ')}. Tạm chặn xóa.</p>}<p className="text-xs leading-5 text-slate-500">{usage.note}</p></div>
+  return <div className="mt-2 space-y-2 text-sm"><p>{usage.references.length ? 'Đang được tham chiếu (cần gỡ trước khi xóa):' : 'Chưa tìm thấy tham chiếu trong các nguồn đã kiểm tra.'}</p>{usage.references.map((ref, index) => <p key={index} className="break-all">• {ref.type} #{ref.id}</p>)}{usage.unchecked.length > 0 && <p className="text-red-700">Chưa kiểm tra được: {usage.unchecked.join(', ')}. Tạm chặn xóa.</p>}{!!usage.missingTables?.length && <p className="text-xs text-slate-500">Bảng tùy chọn chưa tồn tại, không có dữ liệu để kiểm tra: {usage.missingTables.join(', ')}.</p>}<p className="text-xs leading-5 text-slate-500">{usage.note}</p></div>
 }
