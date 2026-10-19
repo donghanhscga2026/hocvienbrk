@@ -211,8 +211,17 @@ export async function POST(request: NextRequest) {
 }
 
 // GET: Lấy thống kê click cho một link
+// (Affiliate v2 — GĐ5 bảo mật: yêu cầu đăng nhập; chỉ xem link của chính mình, trừ ADMIN)
 export async function GET(request: NextRequest) {
   try {
+    const { auth } = await import("@/auth")
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    const viewerId = Number(session.user.id)
+    const isAdmin = session.user.role === 'ADMIN'
+
     const { searchParams } = new URL(request.url)
     const code = searchParams.get("code")
     const landing = searchParams.get("landing")
@@ -237,6 +246,10 @@ export async function GET(request: NextRequest) {
 
     if (!link) {
       return NextResponse.json({ error: "Invalid code" }, { status: 404 })
+    }
+
+    if (!isAdmin && link.userId !== viewerId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     // Thống kê theo ngày (7 ngày gần nhất)

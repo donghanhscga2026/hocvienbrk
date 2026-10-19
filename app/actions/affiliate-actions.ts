@@ -109,27 +109,47 @@ export async function requestPayout(
         const taxAmount = amount > 2000000 ? amount * taxRate : 0
         const netAmount = amount - taxAmount - feeAmount
 
-        // 4. Tạo payout request
-        const payout = await prisma.affiliatePayout.create({
-            data: {
-                userId,
-                amount,
-                taxAmount,
-                feeAmount,
-                netAmount,
-                bankName: bankInfo.bankName,
-                bankAccount: bankInfo.bankAccount,
-                accountHolder: bankInfo.accountHolder,
-                status: PayoutStatus.PENDING
+        // 4-6. Tạo payout + trừ số dư + ghi log TRONG 1 transaction.
+        // Điều kiện `balance >= amount` nằm trong cùng câu update để chống
+        // 2 yêu cầu rút đồng thời vượt số dư (race condition).
+        const payout = await prisma.$transaction(async (tx) => {
+            const updated = await tx.affiliateWallet.updateMany({
+                where: { userId, balance: { gte: amount } },
+                data: { balance: { decrement: amount } }
+            })
+            if (updated.count === 0) {
+                throw new Error('Số dư không đủ')
             }
-        })
 
-        // 5. Trừ số dư
-        await prisma.affiliateWallet.update({
-            where: { userId },
-            data: {
-                balance: { decrement: amount }
-            }
+            const created = await tx.affiliatePayout.create({
+                data: {
+                    userId,
+                    amount,
+                    taxAmount,
+                    feeAmount,
+                    netAmount,
+                    bankName: bankInfo.bankName,
+                    bankAccount: bankInfo.bankAccount,
+                    accountHolder: bankInfo.accountHolder,
+                    status: PayoutStatus.PENDING
+                }
+            })
+
+            const freshWallet = await tx.affiliateWallet.findUnique({ where: { userId } })
+
+            await tx.affiliateTransaction.create({
+                data: {
+                    walletId: wallet.id,
+                    amount: -amount,
+                    type: 'WITHDRAWAL',
+                    description: `Yêu cầu rút tiền #${created.id}`,
+                    refId: String(created.id),
+                    balanceBefore: (freshWallet?.balance ?? 0) + amount,
+                    balanceAfter: freshWallet?.balance ?? 0
+                }
+            })
+
+            return created
         })
 
         try {
@@ -141,19 +161,6 @@ export async function requestPayout(
                 metadata: { amount, balanceType: 'AFFILIATE', type: 'WITHDRAWAL' }
             })
         } catch {}
-
-        // 6. Ghi transaction log
-        await prisma.affiliateTransaction.create({
-            data: {
-                walletId: wallet.id,
-                amount: -amount,
-                type: 'WITHDRAWAL',
-                description: `Yêu cầu rút tiền #${payout.id}`,
-                refId: String(payout.id),
-                balanceBefore: wallet.balance,
-                balanceAfter: wallet.balance - amount
-            }
-        })
 
         revalidatePath('/affiliate')
         revalidatePath('/affiliate/wallet')

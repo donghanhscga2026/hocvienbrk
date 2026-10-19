@@ -19,6 +19,7 @@ model User {
   phone                        String?               @unique
   role                         Role                  @default(STUDENT)
   referrerId                   Int?
+  showOnLeaderboard            Boolean             @default(true)
   createdAt                    DateTime              @default(now())
   updatedAt                    DateTime              @updatedAt
   passwordChanged              Boolean               @default(false)
@@ -1333,6 +1334,7 @@ model AffiliateCommission {
   feeAmount    Float               @default(0)
   netAmount    Float
   status       CommissionStatus    @default(PENDING)
+  kind         CommissionKind      @default(DIRECT)
   availableAt  DateTime?
   paidAt       DateTime?
   createdAt    DateTime            @default(now())
@@ -1427,10 +1429,12 @@ model OrderItem {
   productName String
   unitPrice   Float
   quantity    Int         @default(1)
+  enrollmentId Int?
   order       Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([productType, productId])
+  @@index([enrollmentId])
 }
 
 model ProductAffiliateConfig {
@@ -1477,8 +1481,10 @@ model Badge {
   code         String      @unique
   name         String
   description  String?
+  icon         String?
   tier         Int         @default(1)
   thresholdGmv Float       @default(0)
+  isActive     Boolean     @default(true)
   userBadges   UserBadge[]
 
   @@index([tier])
@@ -2263,6 +2269,11 @@ enum CommissionStatus {
   AVAILABLE
   WITHDRAWN
   CANCELLED
+}
+
+enum CommissionKind {
+  DIRECT
+  GRATITUDE
 }
 
 enum PointStatus {
