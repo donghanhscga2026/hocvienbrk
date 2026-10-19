@@ -20,7 +20,9 @@ export async function processMediaBatch(input: z.infer<typeof mediaBatchInput>, 
   const storage = mediaStorage()
   const items = action === 'restore' ? paths.map(path => ({ path, references: [], unchecked: [], missingTables: [], note: '' })) : await mediaUsageBatch(paths.map(path => ({ path, url: storage.getPublicUrl(path).data.publicUrl })))
   if (!execute) return { dryRun: true, action, items }
-  const eligible = items.filter(item => !item.references.length && !item.unchecked.length).map(item => item.path)
+  // Thùng rác chỉ ẩn khỏi danh sách, giữ nguyên bytes/URL. Tham chiếu chỉ chặn purge.
+  const isBlocked = (item: typeof items[number]) => item.unchecked.length > 0 || action === 'purge' && item.references.length > 0
+  const eligible = items.filter(item => !isBlocked(item)).map(item => item.path)
   const processed: string[] = [], failed: { path: string; error: string }[] = []
   const infos = new Map<string, z.infer<typeof trashRecordSchema>>()
   let cursor = 0
@@ -61,5 +63,5 @@ export async function processMediaBatch(input: z.infer<typeof mediaBatchInput>, 
       }
     }
   }, { maxWait: 3000, timeout: 15000 })
-  return { action, processed, deleted: processed, failed, blocked: items.filter(item => item.references.length || item.unchecked.length) }
+  return { action, processed, deleted: processed, failed, blocked: items.filter(isBlocked) }
 }

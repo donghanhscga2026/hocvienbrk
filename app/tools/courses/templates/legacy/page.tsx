@@ -1,9 +1,12 @@
-import { redirect } from 'next/navigation'
+import { auth } from '@/auth'
+import { notFound, redirect } from 'next/navigation'
+import { courseEditorActor } from '@/lib/course-page/permissions'
+import LegacyTemplateManager from '@/components/admin/LegacyTemplateManager'
 
-// Giữ liên kết cũ mở được, nhưng chỉ có một màn hình chọn giao diện.
-export default async function Page({ searchParams }: { searchParams: Promise<{ course?: string; name?: string; courseId?: string }> }) {
+export const metadata = { title: 'Mẫu cũ', robots: { index: false, follow: false } }
+export default async function Page({ searchParams }: { searchParams: Promise<{ template?: string }> }) {
+  if (!(await auth())?.user) redirect('/login?callbackUrl=%2Ftools%2Fcourses%2Ftemplates%2Flegacy')
+  try { if ((await courseEditorActor()).role !== 'ADMIN') notFound() } catch { notFound() }
   const params = await searchParams
-  const query = new URLSearchParams()
-  for (const key of ['course', 'name', 'courseId'] as const) if (params[key]) query.set(key, params[key])
-  redirect('/tools/courses/templates' + (query.size ? '?' + query : ''))
+  return <LegacyTemplateManager initialId={params.template || ''} />
 }
