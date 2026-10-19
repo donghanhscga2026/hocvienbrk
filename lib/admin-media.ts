@@ -19,16 +19,16 @@ export function mediaStorage() {
   }).storage.from('uploads')
 }
 
-export type MediaReference = { type: string; id: string; title?: string; href?: string }
+export type MediaReference = { type: string; id: string; title?: string; href?: string; scope: 'current' | 'published' | 'history' | 'legacy' }
 export type MediaUsage = { path: string; references: MediaReference[]; unchecked: string[]; missingTables: string[]; note: string }
 const sources = ['Course', 'Lesson', 'Post', 'SiteProfile', 'LandingPage', 'CoursePage', 'CourseSection', 'CoursePageVersion', 'CoursePageTemplate', 'LessonComment', 'Payment', 'SystemConfig', 'User']
 const optionalSources = new Set(['CoursePage', 'CourseSection', 'CoursePageVersion', 'CoursePageTemplate'])
 const storageTables: Record<string, string> = { CoursePage: 'course_pages', CourseSection: 'course_sections', CoursePageVersion: 'course_page_versions', CoursePageTemplate: 'course_page_templates' }
-function reference(table: string, row: { id: string; title?: string; parentId?: string }): MediaReference {
+function reference(table: string, row: { id: string; title?: string; parentId?: string; scope?: MediaReference['scope'] }): MediaReference {
   const id = encodeURIComponent(row.id), parent = row.parentId ? encodeURIComponent(row.parentId) : ''
-  const links: Record<string, string> = { Course: `/tools/courses/new?id=${id}`, Post: `/tools/posts?edit=${id}`, SiteProfile: `/tools/site-profiles/${id}/edit`, LandingPage: `/tools/landings/${id}/edit`, CoursePage: `/tools/courses/pages/${id}`, CoursePageTemplate: '/tools/courses/templates' }
+  const links: Record<string, string> = { Course: `/tools/courses/new?id=${id}`, Post: `/tools/posts?edit=${id}`, SiteProfile: `/tools/site-profiles/${id}/edit`, LandingPage: `/tools/landings/${id}/edit`, CoursePage: `/tools/courses/pages/${id}`, CoursePageTemplate: `/tools/courses/templates/legacy?template=${id}` }
   const href = links[table] || (table === 'Lesson' && parent ? `/tools/courses/new?id=${parent}` : ['CourseSection', 'CoursePageVersion'].includes(table) && parent ? `/tools/courses/pages/${parent}` : undefined)
-  return { type: table === 'User' ? 'Ảnh đại diện' : table, id: row.id, ...(row.title ? { title: row.title } : {}), ...(href ? { href } : {}) }
+  return { type: table === 'User' ? 'Ảnh đại diện' : table, id: row.id, scope: row.scope || (table === 'CoursePageVersion' ? 'history' : table === 'CoursePageTemplate' ? 'legacy' : 'current'), ...(row.title ? { title: row.title } : {}), ...(href ? { href } : {}) }
 }
 
 /** One bounded scan per source for the entire selection, not per file. */
@@ -43,20 +43,28 @@ export async function mediaUsageBatch(files: { path: string; url: string }[]): P
     try {
       // Only User.image is inspected; passwords and tokens never enter this scan.
       const documents = table === 'User'
-        ? Prisma.sql`SELECT id::text AS id, NULL::text AS title, NULL::text AS "parentId", image AS content FROM public."User" WHERE image IS NOT NULL`
+        ? Prisma.sql`SELECT id::text AS id, NULL::text AS title, NULL::text AS "parentId", 'current'::text AS scope, image AS content FROM public."User" WHERE image IS NOT NULL`
+        : table === 'CoursePageVersion'
+        // Chỉ snapshot published mới nhất của trang đang bật là nội dung công khai hiện tại.
+        ? Prisma.sql`SELECT v.id::text AS id, COALESCE(p.name,v.snapshot->>'name') AS title, v.course_page_id AS "parentId",
+            CASE WHEN p.status='published' AND p.use_template AND v.snapshot->>'kind'='published'
+              AND NOT EXISTS (SELECT 1 FROM public."course_page_versions" newer WHERE newer.course_page_id=v.course_page_id AND newer.snapshot->>'kind'='published' AND newer.version_number>v.version_number)
+              THEN 'published' ELSE 'history' END AS scope,
+            to_jsonb(v)::text AS content FROM public."course_page_versions" v JOIN public."course_pages" p ON p.id=v.course_page_id`
         : Prisma.sql`SELECT COALESCE(to_jsonb(t)->>'id',to_jsonb(t)->>'key','') AS id,
             COALESCE(NULLIF(to_jsonb(t)->>'title',''), NULLIF(to_jsonb(t)->>'name_lop',''), NULLIF(to_jsonb(t)->>'name',''), NULLIF(to_jsonb(t)->>'section_key','')) AS title,
             COALESCE(to_jsonb(t)->>'courseId',to_jsonb(t)->>'course_page_id') AS "parentId",
+            ${table === 'CoursePageTemplate' ? 'legacy' : 'current'}::text AS scope,
             to_jsonb(t)::text AS content FROM public.${Prisma.raw('"' + (storageTables[table] || table) + '"')} t WHERE COALESCE(to_jsonb(t)->>'key','') NOT LIKE 'admin-media:%'`
       const rows = await prisma.$transaction(async tx => {
         // Each source has its own transaction so a missing legacy table cannot abort all checks.
         await tx.$executeRaw(Prisma.sql`SELECT set_config('statement_timeout','1500',true)`)
-        return tx.$queryRaw<{ path: string; id: string; title?: string; parentId?: string }[]>(Prisma.sql`
+        return tx.$queryRaw<{ path: string; id: string; title?: string; parentId?: string; scope: MediaReference['scope'] }[]>(Prisma.sql`
           WITH targets(path,url) AS (VALUES ${targets}), documents AS MATERIALIZED (${documents}),
           matches AS (
-            SELECT targets.path, documents.id, documents.title, documents."parentId", row_number() OVER (PARTITION BY targets.path ORDER BY documents.id) AS n
+            SELECT targets.path, documents.id, documents.title, documents."parentId", documents.scope, row_number() OVER (PARTITION BY targets.path ORDER BY documents.id) AS n
             FROM documents JOIN targets ON position(targets.path in documents.content)>0 OR position(targets.url in documents.content)>0
-          ) SELECT path,id,title,"parentId" FROM matches WHERE n<=21`)
+          ) SELECT path,id,title,"parentId",scope FROM matches WHERE n<=21`)
       }, { maxWait: 1000, timeout: 2500 })
       for (const row of rows) results.find(item => item.path === row.path)?.references.push(reference(table, row))
     } catch (error) {

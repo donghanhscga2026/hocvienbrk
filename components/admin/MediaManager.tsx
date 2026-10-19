@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 
 type Media = { path: string; filename: string; folder: boolean; url: string; size: number; mime: string; createdAt?: string; name?: string; description?: string; uploaderName?: string; trashedAt?: string }
-type Usage = { references: { type: string; id: string; title?: string; href?: string }[]; unchecked: string[]; missingTables?: string[]; note: string }
+type Usage = { references: { type: string; id: string; title?: string; href?: string; scope?: 'current' | 'published' | 'history' | 'legacy' }[]; unchecked: string[]; missingTables?: string[]; note: string }
 type Preview = Usage & { path: string }
 const button = 'inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm disabled:opacity-50'
 const input = 'min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-slate-900'
@@ -25,7 +25,8 @@ const json = (method: string, body: unknown) => ({ method, headers: { 'Content-T
 function fileDate(value?: string) {
   return value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'Chưa có thông tin'
 }
-const sourceNames: Record<string, string> = { Course: 'Khóa học', Lesson: 'Bài học', Post: 'Bài viết', SiteProfile: 'Website', LandingPage: 'Trang giới thiệu', CoursePage: 'Trang khóa học', CourseSection: 'Nội dung trang khóa học', CoursePageVersion: 'Lịch sử trang khóa học', CoursePageTemplate: 'Mẫu trang', LessonComment: 'Bình luận bài học', Payment: 'Thanh toán', SystemConfig: 'Cấu hình hệ thống' }
+const sourceNames: Record<string, string> = { Course: 'Khóa học', Lesson: 'Bài học', Post: 'Bài viết', SiteProfile: 'Website', LandingPage: 'Trang giới thiệu', CoursePage: 'Trang khóa học', CourseSection: 'Nội dung trang khóa học', CoursePageVersion: 'Phiên bản trang khóa học', CoursePageTemplate: 'Mẫu cũ', LessonComment: 'Bình luận bài học', Payment: 'Thanh toán', SystemConfig: 'Cấu hình hệ thống' }
+const scopeNames = { published: 'Trang đang công khai', current: 'Nội dung hiện tại / bản đang chỉnh', history: 'Lịch sử phiên bản', legacy: 'Mẫu cũ đã lưu' }
 
 export default function MediaManager() {
   const [path, setPath] = useState(''), [page, setPage] = useState(0), [query, setQuery] = useState(''), [search, setSearch] = useState('')
@@ -71,8 +72,9 @@ export default function MediaManager() {
     finally { setBusy(false); setProgress('') }
   }
   const visible = items.filter(item => item.folder || type === 'all' || (type === 'images' ? item.mime.startsWith('image/') : !item.mime.startsWith('image/')))
+  const canProcess = (item: Usage) => !item.unchecked.length && (action !== 'purge' || !item.references.length)
   return <main className="mx-auto max-w-7xl space-y-5 p-4 text-slate-900 sm:p-6">
-    <Link href="/tools/wi-website" className="text-sm text-emerald-800">← Quản trị website</Link>
+    <nav className="flex flex-wrap gap-4 text-sm text-emerald-800"><Link href="/tools/wi-website">← Quản trị website</Link><Link href="/tools/courses/templates/legacy" className="underline">Mẫu cũ</Link></nav>
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold">Thư viện media</h1><p className="mt-2 text-sm text-slate-600">Ảnh và file trong kho uploads dùng chung của hệ thống. Chỉ Admin được quản lý.</p></div>
       <label className={button + ' relative cursor-pointer bg-emerald-700 text-white'}>Thêm ảnh / file<input aria-label="Thêm ảnh hoặc file" disabled={busy} className="absolute inset-0 w-full cursor-pointer opacity-0" type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,application/zip,.zip,text/plain" onChange={async event => {
         const file = event.target.files?.[0]; event.target.value = ''; if (!file) return
@@ -125,11 +127,11 @@ export default function MediaManager() {
       <p className="text-xs text-slate-500">Mô tả này dùng để quản lý thư viện. Để thay ảnh đang dùng, tải ảnh mới và cập nhật tại trang/khóa học tương ứng.</p>
     </section>}
     {preview && <section ref={previewRef} aria-label="Xác nhận xóa media" className="space-y-3 rounded-xl border border-red-300 bg-red-50 p-4"><h2 className="text-lg font-bold">{action === 'trash' ? 'Chuyển vào thùng rác' : action === 'restore' ? 'Khôi phục file' : 'Xóa vĩnh viễn'}</h2>
-      <p className="text-sm">{preview.filter(item => !item.references.length && !item.unchecked.length).length}/{preview.length} file đủ điều kiện. Bấm xác nhận bên dưới để thực hiện.</p>
+      <p className="text-sm">{preview.filter(canProcess).length}/{preview.length} file đủ điều kiện. Bấm xác nhận bên dưới để thực hiện.</p>
       <div className="max-h-80 space-y-2 overflow-y-auto">{preview.map(item => <div key={item.path} className="rounded-lg bg-white p-3"><p className="break-all font-semibold">{item.path}</p><UsageView usage={item} /></div>)}</div>
-      <p className="text-sm">{action === 'trash' ? 'File được giữ lại trong thùng rác và có thể khôi phục về đúng đường dẫn cũ.' : action === 'restore' ? 'Đưa file trở lại danh sách đang sử dụng, giữ nguyên nội dung và đường dẫn.' : 'File sẽ bị xóa vĩnh viễn khỏi Storage, không thể khôi phục qua thùng rác. Liên kết bên ngoài có thể bị hỏng.'}</p>
-      <div className="flex flex-wrap gap-2"><button disabled={busy} className={button} onClick={() => setPreview(null)}>Hủy</button><button disabled={busy || !preview.some(item => !item.references.length && !item.unchecked.length)} className={button + ' text-red-700'} onClick={async () => {
-        const paths = preview.filter(value => !value.references.length && !value.unchecked.length).map(item => item.path)
+      <p className="text-sm">{action === 'trash' ? 'File còn liên kết vẫn có thể chuyển vào thùng rác: nội dung và đường dẫn được giữ nguyên nên trang vẫn hoạt động. Chỉ xóa vĩnh viễn mới cần gỡ các liên kết.' : action === 'restore' ? 'Đưa file trở lại danh sách đang sử dụng, giữ nguyên nội dung và đường dẫn.' : 'File sẽ bị xóa vĩnh viễn khỏi Storage, không thể khôi phục qua thùng rác. Liên kết bên ngoài có thể bị hỏng.'}</p>
+      <div className="flex flex-wrap gap-2"><button disabled={busy} className={button} onClick={() => setPreview(null)}>Hủy</button><button disabled={busy || !preview.some(canProcess)} className={button + ' text-red-700'} onClick={async () => {
+        const paths = preview.filter(canProcess).map(item => item.path)
         setBusy(true); setProgress(`Đang ${action === 'trash' ? 'chuyển vào thùng rác' : action === 'restore' ? 'khôi phục' : 'kiểm tra lại và xóa vĩnh viễn'} ${paths.length} file…`)
         try {
           const result = await api('/api/admin/media/batch', json('POST', { paths, action, execute: true, confirm: action === 'trash' ? 'TRASH' : action === 'restore' ? 'RESTORE' : 'DELETE' }))
@@ -143,5 +145,8 @@ export default function MediaManager() {
 }
 
 function UsageView({ usage }: { usage: Usage }) {
-  return <div className="mt-2 space-y-2 text-sm"><p>{usage.references.length ? 'File đang gắn với các nội dung sau (cần gỡ trước khi xóa):' : 'Chưa tìm thấy nơi sử dụng trong các nguồn đã kiểm tra.'}</p>{usage.references.map((ref, index) => <p key={index} className="break-words">{ref.href ? <Link href={ref.href} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-emerald-800 underline">{sourceNames[ref.type] || ref.type}: {ref.title || '#' + ref.id} ↗</Link> : <span>{sourceNames[ref.type] || ref.type}: {ref.title || '#' + ref.id}</span>}</p>)}{usage.references.length >= 21 && <p className="text-xs">Chỉ hiển thị tối đa 21 tham chiếu mỗi nguồn.</p>}{usage.unchecked.length > 0 && <p className="text-red-700">Chưa kiểm tra được: {usage.unchecked.map(source => sourceNames[source] || source).join(', ')}. Tạm chặn xóa.</p>}{!!usage.missingTables?.length && <p className="text-xs text-slate-500">Nguồn tùy chọn chưa tồn tại: {usage.missingTables.map(source => sourceNames[source] || source).join(', ')}.</p>}<p className="text-xs leading-5 text-slate-500">{usage.note}</p></div>
+  return <div className="mt-2 space-y-2 text-sm"><p>{usage.references.length ? 'Các nơi còn liên kết tới file (cần gỡ trước khi xóa vĩnh viễn):' : 'Chưa tìm thấy nơi sử dụng trong các nguồn đã kiểm tra.'}</p>{(Object.keys(scopeNames) as (keyof typeof scopeNames)[]).map(scope => {
+    const refs = usage.references.filter(ref => (ref.scope || 'current') === scope)
+    return refs.length ? <section key={scope} className="rounded-lg border border-slate-200 bg-white p-2"><h4 className="font-semibold">{scopeNames[scope]}</h4>{refs.map((ref, index) => <p key={index} className="break-words">{ref.href ? <Link href={ref.href} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-emerald-800 underline">{sourceNames[ref.type] || ref.type}: {ref.title || '#' + ref.id} ↗</Link> : <span>{sourceNames[ref.type] || ref.type}: {ref.title || '#' + ref.id}</span>}</p>)}</section> : null
+  })}{usage.references.length >= 21 && <p className="text-xs">Chỉ hiển thị tối đa 21 tham chiếu mỗi nguồn.</p>}{usage.unchecked.length > 0 && <p className="text-red-700">Chưa kiểm tra được: {usage.unchecked.map(source => sourceNames[source] || source).join(', ')}. Tạm chặn thao tác.</p>}{!!usage.missingTables?.length && <p className="text-xs text-slate-500">Nguồn tùy chọn chưa tồn tại: {usage.missingTables.map(source => sourceNames[source] || source).join(', ')}.</p>}<p className="text-xs leading-5 text-slate-500">{usage.note}</p></div>
 }

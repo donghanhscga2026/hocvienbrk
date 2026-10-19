@@ -114,7 +114,7 @@ async function run() {
   assert.equal((await preview.json()).dryRun, true); assert.equal(removals.length, 0)
   assert.equal((await media.DELETE(req('DELETE', { path: 'avatars/x.png', execute: true }))).status, 400)
   usageRows = [{ path: 'avatars/x.png', id: '42' }]
-  assert.equal((await media.DELETE(req('DELETE', { path: 'avatars/x.png', execute: true, confirm: 'DELETE' }))).status, 409)
+  assert.equal((await media.DELETE(req('DELETE', { path: 'avatars/x.png', execute: true, confirm: 'DELETE' }))).status, 200, 'References do not block reversible trash')
   usageRows = []; usageError = true
   assert.equal((await media.DELETE(req('DELETE', { path: 'avatars/x.png', execute: true, confirm: 'DELETE' }))).status, 409)
   usageError = false
@@ -139,8 +139,11 @@ async function run() {
   deniedSources = false
   usageRows = [{ path: paths[0], id: '42' }]
   const mixed = await (await batch.POST(req('POST', { paths, execute: true, confirm: 'DELETE' }))).json()
-  assert.equal(mixed.deleted.length, 19); assert.equal(mixed.blocked.length, 1)
-  assert.ok(!mixed.deleted.includes(paths[0]), 'References are rechecked before executing')
+  assert.equal(mixed.deleted.length, 20); assert.equal(mixed.blocked.length, 0)
+  assert.ok(mixed.deleted.includes(paths[0]), 'Referenced files keep bytes and URLs when trashed')
+  const guardedPurge = await (await batch.POST(req('POST', { paths: [paths[0]], action: 'purge', execute: true, confirm: 'DELETE' }))).json()
+  assert.equal(guardedPurge.processed.length, 0); assert.equal(guardedPurge.blocked.length, 1)
+  assert.equal(removals.length, beforeRemovals, 'Referenced files must never be physically removed')
   usageRows = []; missingSources = false; emptyRemoval = true
   const empty = await (await batch.POST(req('POST', { paths: [paths[1]], action: 'purge', execute: true, confirm: 'DELETE' }))).json()
   assert.deepEqual(empty.deleted, []); assert.equal(empty.failed.length, 1, 'Empty Storage results must not report success')
@@ -203,6 +206,18 @@ async function run() {
     assert.equal(mapped[5].references[0].href, '/tools/courses/pages/page-1')
     assert.deepEqual(mapped[4].missingTables, ['CoursePageVersion', 'CoursePageTemplate'])
     assert.deepEqual(mapped[4].unchecked, [])
+    await pg.exec("ALTER TABLE course_pages ADD COLUMN status text DEFAULT 'published'; ALTER TABLE course_pages ADD COLUMN use_template boolean DEFAULT true; CREATE TABLE course_page_versions (id text, course_page_id text, version_number int, snapshot jsonb); CREATE TABLE course_page_templates (id text, name text, body text)")
+    for (const [id, number, kind, path] of [['older', 1, 'published', paths[6]], ['live', 2, 'published', paths[7]], ['manual', 3, 'manual', paths[8]]]) await pg.query('INSERT INTO course_page_versions VALUES ($1,$2,$3,$4)', [id, 'page-1', number, JSON.stringify({ kind, url: path })])
+    await pg.query('INSERT INTO course_page_templates VALUES ($1,$2,$3)', ['old-template', 'Hiểu thuế', paths[9]])
+    const classified = await helper.mediaUsageBatch(paths.map(path => ({ path, url: storage.getPublicUrl(path).data.publicUrl })))
+    assert.equal(classified[6].references[0].scope, 'history', 'An older published snapshot is historical')
+    assert.equal(classified[7].references[0].scope, 'published', 'Latest published snapshot serves the live page')
+    assert.equal(classified[8].references[0].scope, 'history', 'A newer manual checkpoint is not the live snapshot')
+    assert.equal(classified[9].references[0].scope, 'legacy')
+    assert.equal(classified[9].references[0].href, '/tools/courses/templates/legacy?template=old-template')
+    await pg.exec('UPDATE course_pages SET use_template=false')
+    const disabled = await helper.mediaUsageBatch([{ path: paths[7], url: storage.getPublicUrl(paths[7]).data.publicUrl }])
+    assert.equal(disabled[0].references[0].scope, 'history', 'Disabled pages do not have a live template')
   } finally { db.$transaction = originalTransaction; await pg.close() }
   const upload = async file => { const form = new FormData(); form.set('file', file); return media.POST(new Request('https://wi300.vn/api/admin/media', { method: 'POST', body: form })) }
   assert.equal((await upload(new File(['<script>alert(1)</script>'], 'x.html', { type: 'text/html' }))).status, 400)
@@ -229,7 +244,7 @@ async function run() {
       if (failBatch) throw new DOMException('Slow request', 'TimeoutError')
       const body = JSON.parse(options.body)
       if (body.execute) { uiDeletes++; uiTrashed = body.action === 'trash' }
-      return { ok: true, json: async () => body.execute ? { processed: body.paths, deleted: body.paths, blocked: [], failed: [] } : { dryRun: true, items: body.paths.map(path => ({ path, references: [], unchecked: [], missingTables: [], note: 'Test' })) } }
+      return { ok: true, json: async () => body.execute ? { processed: body.paths, deleted: body.paths, blocked: [], failed: [] } : { dryRun: true, items: body.paths.map(path => ({ path, references: body.action === 'restore' ? [] : [{ type: 'CoursePageTemplate', id: 'legacy', title: 'Hiểu thuế', scope: 'legacy', href: '/tools/courses/templates/legacy?template=legacy' }], unchecked: [], missingTables: [], note: 'Test' })) } }
     }
     const inTrash = String(url).includes('trash=1')
     if (String(url).includes('usage=1')) return { ok: true, json: async () => ({ references: [{ type: 'Post', id: '8', title: 'Quản lý dòng tiền', href: '/tools/posts?edit=8' }], unchecked: [], note: 'Test' }) }
@@ -254,11 +269,16 @@ async function run() {
   await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Chuyển vào thùng rác').click())
   assert.equal(uiDeletes, 0, 'Preview must not delete a file')
   assert.ok(container.querySelector('[aria-label="Xác nhận xóa media"]'))
+  assert.ok(container.textContent.includes('Mẫu cũ đã lưu'))
+  assert.equal([...container.querySelectorAll('button')].find(button => button.textContent === 'Xác nhận chuyển vào thùng rác').disabled, false)
   await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Xác nhận chuyển vào thùng rác').click())
   assert.equal(uiDeletes, 1)
   assert.ok(container.textContent.includes('Đã chuyển vào thùng rác 1/1'))
   await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Thùng rác').click())
   await tick(() => container.querySelector('input[type="checkbox"]').click())
+  await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Xóa vĩnh viễn đã chọn').click())
+  assert.equal([...container.querySelectorAll('button')].find(button => button.textContent === 'Xác nhận xóa vĩnh viễn').disabled, true, 'References block permanent deletion in the UI')
+  await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Hủy').click())
   await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Khôi phục đã chọn').click())
   await tick(() => [...container.querySelectorAll('button')].find(button => button.textContent === 'Xác nhận khôi phục').click())
   assert.ok(container.textContent.includes('Đã khôi phục 1/1'))
