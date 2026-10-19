@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 
-type Media = { path: string; filename: string; folder: boolean; url: string; size: number; mime: string; createdAt?: string; name?: string; description?: string; uploaderName?: string }
-type Usage = { references: { type: string; id: string }[]; unchecked: string[]; missingTables?: string[]; note: string }
+type Media = { path: string; filename: string; folder: boolean; url: string; size: number; mime: string; createdAt?: string; name?: string; description?: string; uploaderName?: string; trashedAt?: string }
+type Usage = { references: { type: string; id: string; title?: string; href?: string }[]; unchecked: string[]; missingTables?: string[]; note: string }
 type Preview = Usage & { path: string }
 const button = 'inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm disabled:opacity-50'
 const input = 'min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-slate-900'
@@ -22,6 +22,10 @@ async function api(url: string, options?: RequestInit) {
   }
 }
 const json = (method: string, body: unknown) => ({ method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+function fileDate(value?: string) {
+  return value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'Chưa có thông tin'
+}
+const sourceNames: Record<string, string> = { Course: 'Khóa học', Lesson: 'Bài học', Post: 'Bài viết', SiteProfile: 'Website', LandingPage: 'Trang giới thiệu', CoursePage: 'Trang khóa học', CourseSection: 'Nội dung trang khóa học', CoursePageVersion: 'Lịch sử trang khóa học', CoursePageTemplate: 'Mẫu trang', LessonComment: 'Bình luận bài học', Payment: 'Thanh toán', SystemConfig: 'Cấu hình hệ thống' }
 
 export default function MediaManager() {
   const [path, setPath] = useState(''), [page, setPage] = useState(0), [query, setQuery] = useState(''), [search, setSearch] = useState('')
@@ -30,19 +34,23 @@ export default function MediaManager() {
   const [selected, setSelected] = useState<string[]>([]), [detail, setDetail] = useState<Media | null>(null), [usage, setUsage] = useState<Usage | null>(null), [checking, setChecking] = useState(false)
   const [preview, setPreview] = useState<Preview[] | null>(null), [revision, setRevision] = useState(0)
   const [progress, setProgress] = useState('')
+  const [trash, setTrash] = useState(false)
+  const [action, setAction] = useState<'trash' | 'restore' | 'purge'>('trash')
   const previewRef = useRef<HTMLElement>(null)
+  const detailRef = useRef<HTMLElement>(null)
   const requestId = useRef(0)
   useEffect(() => { if (preview) previewRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) }, [preview])
+  useEffect(() => { if (detail) detailRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) }, [detail])
   const prepareLoad = useCallback(() => { setLoading(true); setItems([]); setSelected([]) }, [])
   const reload = useCallback(() => { prepareLoad(); setRevision(value => value + 1) }, [prepareLoad])
   useEffect(() => {
     const controller = new AbortController()
-    api('/api/admin/media?' + new URLSearchParams({ path, page: String(page), q: search }), { signal: controller.signal })
+    api('/api/admin/media?' + new URLSearchParams({ path, page: String(page), q: search, trash: trash ? '1' : '0' }), { signal: controller.signal })
       .then(data => { if (!controller.signal.aborted) { setItems(data.items); setHasMore(data.hasMore) } })
       .catch(error => { if (!controller.signal.aborted) setMessage(error.message) })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [path, page, search, revision])
+  }, [path, page, search, revision, trash])
   function navigate(next: string) { prepareLoad(); setMessage(''); setPath(next); setPage(0); setSearch(''); setQuery(''); setDetail(null); setPreview(null); setRevision(value => value + 1) }
   async function openDetail(item: Media) {
     const id = ++requestId.current
@@ -53,10 +61,11 @@ export default function MediaManager() {
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Không thể kiểm tra file.') }
     finally { if (id === requestId.current) setChecking(false) }
   }
-  async function previewDelete(paths: string[]) {
+  async function previewDelete(paths: string[], nextAction: 'trash' | 'restore' | 'purge' = 'trash') {
+    setAction(nextAction)
     setBusy(true); setMessage(''); setPreview(null); setProgress(`Đang kiểm tra ${paths.length} file…`)
     try {
-      const result = await api('/api/admin/media/batch', json('POST', { paths }))
+      const result = await api('/api/admin/media/batch', json('POST', { paths, action: nextAction }))
       setPreview(result.items)
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Không thể kiểm tra.') }
     finally { setBusy(false); setProgress('') }
@@ -69,12 +78,14 @@ export default function MediaManager() {
         const file = event.target.files?.[0]; event.target.value = ''; if (!file) return
         if (file.size > 4 * 1024 * 1024) { setMessage('File tối đa 4 MB.'); return }
         setBusy(true); setMessage('')
-        try { const form = new FormData(); form.set('file', file); await api('/api/admin/media', { method: 'POST', body: form }); navigate('media'); reload() }
+        try { const form = new FormData(); form.set('file', file); await api('/api/admin/media', { method: 'POST', body: form }); setTrash(false); navigate('media'); reload() }
         catch (error) { setMessage(error instanceof Error ? error.message : 'Tải lên thất bại.') }
         finally { setBusy(false) }
       }} /></label></div>
     <p className="text-xs leading-5 text-slate-500">Ảnh JPG/PNG/WebP/GIF được tối ưu sang WebP; hỗ trợ PDF, ZIP, TXT; tối đa 4 MB/file. File cũ có thể chưa có thông tin người tải lên.</p>
-    <nav aria-label="Thư mục media" className="flex flex-wrap items-center gap-2 text-sm"><button disabled={busy} className={button} onClick={() => navigate('')}>Kho uploads</button>{path.split('/').filter(Boolean).map((part, index) => <button disabled={busy} key={index} className={button} onClick={() => navigate(path.split('/').slice(0, index + 1).join('/'))}>{part}</button>)}</nav>
+    <div className="flex gap-2" role="group" aria-label="Kho media"><button disabled={busy} aria-pressed={!trash} className={button} onClick={() => { setTrash(false); navigate('') }}>Đang sử dụng</button><button disabled={busy} aria-pressed={trash} className={button} onClick={() => { setTrash(true); navigate('') }}>Thùng rác</button></div>
+    <p className="text-xs leading-5 text-slate-500">Chuyển vào thùng rác giữ lại file để khôi phục, không tự động xóa. File vẫn chiếm dung lượng và liên kết cũ vẫn có thể truy cập. Chỉ Xóa vĩnh viễn mới loại bỏ file khỏi Storage.</p>
+    {!trash && <nav aria-label="Thư mục media" className="flex flex-wrap items-center gap-2 text-sm"><button disabled={busy} className={button} onClick={() => navigate('')}>Kho uploads</button>{path.split('/').filter(Boolean).map((part, index) => <button disabled={busy} key={index} className={button} onClick={() => navigate(path.split('/').slice(0, index + 1).join('/'))}>{part}</button>)}</nav>}
     <div className="flex flex-wrap gap-2"><form className="flex min-w-0 flex-1 gap-2" onSubmit={event => { event.preventDefault(); prepareLoad(); setPage(0); setSearch(query); setRevision(value => value + 1) }}><input aria-label="Tìm tên file trong thư mục" placeholder="Tìm tên file trong thư mục này…" className={input} value={query} onChange={event => setQuery(event.target.value)} /><button className={button}>Tìm</button></form>
       <select aria-label="Loại file" className={button} value={type} onChange={event => setType(event.target.value)}><option value="all">Tất cả loại file</option><option value="images">Ảnh</option><option value="files">Tài liệu / file</option></select>
       <select aria-label="Cách hiển thị" className={button} value={view} onChange={event => setView(event.target.value)}><option value="grid">Dạng lưới</option><option value="list">Danh sách</option></select>
@@ -83,23 +94,26 @@ export default function MediaManager() {
     {message && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">{message}</p>}
     {busy && <p role="status">{progress || 'Đang xử lý…'}</p>}
     {loading ? <p role="status">Đang tải media…</p> : <>
-      <div className="flex flex-wrap items-center gap-3 text-sm"><span>Đã chọn {selected.length}/20 file</span><button disabled={!selected.length || busy} className={button + ' text-red-700'} onClick={() => void previewDelete(selected)}>Kiểm tra & xóa đã chọn</button><button disabled={!selected.length || busy} className={button} onClick={() => setSelected([])}>Bỏ chọn</button></div>
+      <div className="flex flex-wrap items-center gap-3 text-sm"><span>Đã chọn {selected.length}/20 file</span>{trash ? <><button disabled={!selected.length || busy} className={button} onClick={() => void previewDelete(selected, 'restore')}>Khôi phục đã chọn</button><button disabled={!selected.length || busy} className={button + ' text-red-700'} onClick={() => void previewDelete(selected, 'purge')}>Xóa vĩnh viễn đã chọn</button></> : <button disabled={!selected.length || busy} className={button + ' text-red-700'} onClick={() => void previewDelete(selected)}>Chuyển vào thùng rác</button>}<button disabled={!selected.length || busy} className={button} onClick={() => setSelected([])}>Bỏ chọn</button></div>
       <div className={view === 'grid' ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5' : 'space-y-2'}>{visible.map(item => <article key={item.path} className={'min-w-0 rounded-xl border border-slate-200 bg-white p-3 ' + (view === 'list' ? 'flex flex-wrap items-center gap-3' : '')}>
         {!item.folder && <input type="checkbox" disabled={busy || (!selected.includes(item.path) && selected.length >= 20)} aria-label={'Chọn ' + item.filename} checked={selected.includes(item.path)} onChange={event => setSelected(event.target.checked ? [...selected, item.path] : selected.filter(value => value !== item.path))} className="h-5 w-5" />}
         <button disabled={busy} className={'min-w-0 text-left ' + (view === 'grid' ? 'mt-2 block w-full' : 'flex flex-1 items-center gap-3')} onClick={() => item.folder ? navigate(item.path) : void openDetail(item)}>
           <span className={'relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-3xl ' + (view === 'grid' ? 'aspect-square w-full' : 'h-14 w-14')}>
             {item.folder ? '📁' : item.mime.startsWith('image/') ? <Image src={item.url} alt="" fill unoptimized className="object-contain" loading="lazy" /> : '📄'}
-          </span><span className="block min-w-0"><span className="mt-2 block break-words text-sm font-semibold">{item.name || item.filename}</span><span className="mt-1 block break-all text-xs text-slate-500">{item.folder ? 'Mở thư mục' : (item.size / 1024 / 1024).toFixed(2) + ' MB · ' + item.filename}</span></span>
+          </span><span className="block min-w-0"><span className="mt-2 block break-words text-sm font-semibold">{item.name || item.filename}</span><span className="mt-1 block break-all text-xs text-slate-500">{item.folder ? 'Mở thư mục' : (item.size / 1024 / 1024).toFixed(2) + ' MB · ' + item.filename}</span>{!item.folder && <span className="mt-1 block text-xs text-slate-600">Tải lên: {fileDate(item.createdAt)}</span>}{item.trashedAt && <span className="mt-1 block text-xs text-slate-500">Vào thùng rác: {fileDate(item.trashedAt)}</span>}</span>
         </button>
+        {!item.folder && <button disabled={busy} className={button + ' mt-2 w-full text-emerald-800'} onClick={() => void openDetail(item)}>Xem trước / Nơi sử dụng</button>}
       </article>)}</div>
       {!visible.length && <p className="py-8 text-center text-slate-500">Không có file phù hợp trong trang của thư mục này.</p>}
       <div className="flex items-center justify-center gap-3"><button className={button} disabled={page === 0 || busy} onClick={() => { prepareLoad(); setPage(page - 1) }}>Trước</button><span>Trang {page + 1}</span><button className={button} disabled={!hasMore || busy} onClick={() => { prepareLoad(); setPage(page + 1) }}>Sau</button></div>
       <p className="text-xs text-slate-500">60 mục mỗi trang. Tìm theo tên file gốc trong thư mục; bộ lọc loại file áp dụng cho trang đang xem.</p>
     </>}
-    {detail && <section aria-label="Chi tiết media" className="space-y-3 rounded-xl border border-slate-300 bg-white p-4">
+    {detail && <section ref={detailRef} aria-label="Chi tiết media" className="scroll-mt-6 space-y-3 rounded-xl border border-slate-300 bg-white p-4">
       <div className="flex justify-between gap-3"><h2 className="text-lg font-bold">Chi tiết ảnh / file</h2><button className={button} onClick={() => { ++requestId.current; setDetail(null) }}>Đóng</button></div>
       <p className="break-all text-sm">{detail.filename} · {detail.mime} · {(detail.size / 1024 / 1024).toFixed(2)} MB</p>
-      <p className="text-sm">Ngày tải: {detail.createdAt ? new Date(detail.createdAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'Chưa có thông tin'} · Người tải: {detail.uploaderName || 'Chưa có thông tin'}</p>
+      <p className="text-sm">Ngày tải (giờ Việt Nam): {fileDate(detail.createdAt)} · Người tải: {detail.uploaderName || 'Chưa có thông tin'}</p>
+      {detail.mime.startsWith('image/') ? <div className="relative h-80 w-full rounded-lg bg-slate-100"><Image src={detail.url} alt={detail.name || detail.filename} fill unoptimized className="object-contain" /></div> : /\.html?$/i.test(detail.filename) || detail.mime === 'application/pdf' ? <div className="space-y-2"><iframe key={detail.path} title={'Xem trước ' + detail.filename} src={/\.html?$/i.test(detail.filename) ? '/api/admin/media?' + new URLSearchParams({ path: detail.path, preview: '1' }) : detail.url} sandbox="" referrerPolicy="no-referrer" loading="lazy" className="h-[32rem] w-full rounded-lg border bg-white" /><p className="text-xs text-slate-500">Bản xem trước chặn script và biểu mẫu. Nếu trình duyệt không hiển thị file, dùng nút Mở file hoặc tải về.</p></div> : <p className="rounded-lg bg-slate-50 p-3 text-sm">{detail.mime.includes('zip') || /\.zip$/i.test(detail.filename) ? 'File ZIP: tải về và giải nén để xem nội dung.' : 'File này chưa hỗ trợ xem trước trực tiếp. Bạn có thể mở hoặc tải về để kiểm tra.'}</p>}
+      <div aria-label="Nơi sử dụng" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3"><h3 className="font-semibold">Đang dùng tại</h3>{checking ? <p role="status">Đang kiểm tra nơi sử dụng…</p> : usage ? <UsageView usage={usage} /> : <p className="text-sm">Chưa kiểm tra được nơi sử dụng. Hãy mở lại chi tiết để thử lại.</p>}</div>
       <form key={detail.path} className="space-y-3" onSubmit={async event => {
         event.preventDefault(); const values = new FormData(event.currentTarget); setBusy(true)
         try { await api('/api/admin/media', json('PATCH', { path: detail.path, name: values.get('name'), description: values.get('description') })); reload(); setMessage('Đã lưu tên hiển thị và mô tả; đường dẫn file giữ nguyên.') }
@@ -107,28 +121,27 @@ export default function MediaManager() {
         finally { setBusy(false) }
       }}><label className="block text-sm">Tên hiển thị<input className={input + ' mt-1'} name="name" defaultValue={detail.name || detail.filename} required maxLength={200} /></label><label className="block text-sm">Mô tả<textarea className={input + ' mt-1 py-2'} rows={3} name="description" defaultValue={detail.description || ''} maxLength={1000} /></label><button disabled={busy} className={button}>Lưu thông tin</button></form>
       <label className="block text-sm">Đường dẫn<input readOnly value={detail.url} className={input + ' mt-1'} onFocus={event => event.target.select()} /></label>
-      <div className="flex flex-wrap gap-2"><button className={button} onClick={async () => { try { await navigator.clipboard.writeText(detail.url); setMessage('Đã sao chép đường dẫn.') } catch { setMessage('Chọn và sao chép đường dẫn trong ô bên trên.') } }}>Sao chép đường dẫn</button><a href={detail.url} target="_blank" rel="noopener noreferrer" className={button}>Mở file</a><button disabled={busy || checking} className={button + ' text-red-700'} onClick={() => void previewDelete([detail.path])}>Kiểm tra & xóa file</button></div>
-      {checking ? <p role="status">Đang kiểm tra nơi sử dụng…</p> : usage && <UsageView usage={usage} />}
+      <div className="flex flex-wrap gap-2"><button className={button} onClick={async () => { try { await navigator.clipboard.writeText(detail.url); setMessage('Đã sao chép đường dẫn.') } catch { setMessage('Chọn và sao chép đường dẫn trong ô bên trên.') } }}>Sao chép đường dẫn</button><a href={detail.url} target="_blank" rel="noopener noreferrer" className={button}>Mở file</a><a href={detail.url + '?download=' + encodeURIComponent(detail.name || detail.filename)} download={detail.name || detail.filename} target="_blank" rel="noopener noreferrer" className={button}>Tải về</a>{trash && <button disabled={busy} className={button} onClick={() => void previewDelete([detail.path], 'restore')}>Khôi phục file</button>}<button disabled={busy || checking} className={button + ' text-red-700'} onClick={() => void previewDelete([detail.path], trash ? 'purge' : 'trash')}>{trash ? 'Xóa vĩnh viễn file' : 'Chuyển file vào thùng rác'}</button></div>
       <p className="text-xs text-slate-500">Mô tả này dùng để quản lý thư viện. Để thay ảnh đang dùng, tải ảnh mới và cập nhật tại trang/khóa học tương ứng.</p>
     </section>}
-    {preview && <section ref={previewRef} aria-label="Xác nhận xóa media" className="space-y-3 rounded-xl border border-red-300 bg-red-50 p-4"><h2 className="text-lg font-bold">Kiểm tra trước khi xóa</h2>
-      <p className="text-sm">{preview.filter(item => !item.references.length && !item.unchecked.length).length}/{preview.length} file đủ điều kiện xóa. Bấm xác nhận bên dưới để xóa thật.</p>
+    {preview && <section ref={previewRef} aria-label="Xác nhận xóa media" className="space-y-3 rounded-xl border border-red-300 bg-red-50 p-4"><h2 className="text-lg font-bold">{action === 'trash' ? 'Chuyển vào thùng rác' : action === 'restore' ? 'Khôi phục file' : 'Xóa vĩnh viễn'}</h2>
+      <p className="text-sm">{preview.filter(item => !item.references.length && !item.unchecked.length).length}/{preview.length} file đủ điều kiện. Bấm xác nhận bên dưới để thực hiện.</p>
       <div className="max-h-80 space-y-2 overflow-y-auto">{preview.map(item => <div key={item.path} className="rounded-lg bg-white p-3"><p className="break-all font-semibold">{item.path}</p><UsageView usage={item} /></div>)}</div>
-      <p className="text-sm">Xóa vĩnh viễn file trong Storage. Chỉ xóa file không tìm thấy liên kết và đã kiểm tra đủ các nguồn nêu trên. Liên kết bên ngoài có thể bị hỏng.</p>
+      <p className="text-sm">{action === 'trash' ? 'File được giữ lại trong thùng rác và có thể khôi phục về đúng đường dẫn cũ.' : action === 'restore' ? 'Đưa file trở lại danh sách đang sử dụng, giữ nguyên nội dung và đường dẫn.' : 'File sẽ bị xóa vĩnh viễn khỏi Storage, không thể khôi phục qua thùng rác. Liên kết bên ngoài có thể bị hỏng.'}</p>
       <div className="flex flex-wrap gap-2"><button disabled={busy} className={button} onClick={() => setPreview(null)}>Hủy</button><button disabled={busy || !preview.some(item => !item.references.length && !item.unchecked.length)} className={button + ' text-red-700'} onClick={async () => {
         const paths = preview.filter(value => !value.references.length && !value.unchecked.length).map(item => item.path)
-        setBusy(true); setProgress(`Đang kiểm tra lại và xóa ${paths.length} file…`)
+        setBusy(true); setProgress(`Đang ${action === 'trash' ? 'chuyển vào thùng rác' : action === 'restore' ? 'khôi phục' : 'kiểm tra lại và xóa vĩnh viễn'} ${paths.length} file…`)
         try {
-          const result = await api('/api/admin/media/batch', json('POST', { paths, execute: true, confirm: 'DELETE' }))
+          const result = await api('/api/admin/media/batch', json('POST', { paths, action, execute: true, confirm: action === 'trash' ? 'TRASH' : action === 'restore' ? 'RESTORE' : 'DELETE' }))
           setPreview(result.blocked.length ? result.blocked : null); setDetail(null); reload()
-          setMessage(`Đã xóa ${result.deleted.length}/${paths.length} file.` + (result.blocked.length ? ` ${result.blocked.length} file bị chặn vì đang được dùng hoặc chưa kiểm tra được.` : '') + (result.failed.length ? ` ${result.failed.length} file chưa được Storage xác nhận xóa; hãy kiểm tra lại danh sách.` : ''))
+          setMessage(`${action === 'trash' ? 'Đã chuyển vào thùng rác' : action === 'restore' ? 'Đã khôi phục' : 'Đã xóa vĩnh viễn'} ${result.processed.length}/${paths.length} file.` + (result.blocked.length ? ` ${result.blocked.length} file bị chặn vì đang được dùng hoặc chưa kiểm tra được.` : '') + (result.failed.length ? ` ${result.failed.length} file chưa hoàn tất: ${result.failed.map((item: { error: string }) => item.error).join(' ')}` : ''))
         } catch (error) { setMessage(error instanceof Error ? error.message : 'Xóa thất bại.'); reload() }
         finally { setBusy(false); setProgress('') }
-      }}>Xác nhận xóa file đủ điều kiện</button></div>
+      }}>{action === 'trash' ? 'Xác nhận chuyển vào thùng rác' : action === 'restore' ? 'Xác nhận khôi phục' : 'Xác nhận xóa vĩnh viễn'}</button></div>
     </section>}
   </main>
 }
 
 function UsageView({ usage }: { usage: Usage }) {
-  return <div className="mt-2 space-y-2 text-sm"><p>{usage.references.length ? 'Đang được tham chiếu (cần gỡ trước khi xóa):' : 'Chưa tìm thấy tham chiếu trong các nguồn đã kiểm tra.'}</p>{usage.references.map((ref, index) => <p key={index} className="break-all">• {ref.type} #{ref.id}</p>)}{usage.unchecked.length > 0 && <p className="text-red-700">Chưa kiểm tra được: {usage.unchecked.join(', ')}. Tạm chặn xóa.</p>}{!!usage.missingTables?.length && <p className="text-xs text-slate-500">Bảng tùy chọn chưa tồn tại, không có dữ liệu để kiểm tra: {usage.missingTables.join(', ')}.</p>}<p className="text-xs leading-5 text-slate-500">{usage.note}</p></div>
+  return <div className="mt-2 space-y-2 text-sm"><p>{usage.references.length ? 'File đang gắn với các nội dung sau (cần gỡ trước khi xóa):' : 'Chưa tìm thấy nơi sử dụng trong các nguồn đã kiểm tra.'}</p>{usage.references.map((ref, index) => <p key={index} className="break-words">{ref.href ? <Link href={ref.href} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-emerald-800 underline">{sourceNames[ref.type] || ref.type}: {ref.title || '#' + ref.id} ↗</Link> : <span>{sourceNames[ref.type] || ref.type}: {ref.title || '#' + ref.id}</span>}</p>)}{usage.references.length >= 21 && <p className="text-xs">Chỉ hiển thị tối đa 21 tham chiếu mỗi nguồn.</p>}{usage.unchecked.length > 0 && <p className="text-red-700">Chưa kiểm tra được: {usage.unchecked.map(source => sourceNames[source] || source).join(', ')}. Tạm chặn xóa.</p>}{!!usage.missingTables?.length && <p className="text-xs text-slate-500">Nguồn tùy chọn chưa tồn tại: {usage.missingTables.map(source => sourceNames[source] || source).join(', ')}.</p>}<p className="text-xs leading-5 text-slate-500">{usage.note}</p></div>
 }
