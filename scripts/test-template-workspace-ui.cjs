@@ -13,10 +13,10 @@ const mocks = {
   '@/lib/course-page/templates': { COURSE_TEMPLATE_LIBRARY: [{ key: 'system', name: 'Built-in', description: 'True template preview' }] },
   '@/lib/course-page/template-workspace-client': { templateWorkspaceRequest: async (url, input) => {
     if (!input && url.includes('?page=')) return { template: { name: 'Current page copy', description: '', sourceType: 'html' }, source: { entryPath: 'index.html', files: [{ path: 'index.html', kind: 'html', content: '<section id="current"><h1>Applied page source</h1></section>' }] } }
-    if (!input) return { templates: [], admin: false }
+    if (!input) return { templates: [], admin: false, revision: { id: 'page-1', updatedAt: '2026-10-17T00:00:00.000Z' } }
     if (input.action === 'apply') { applied.push([input.slug, input.name, input.id]); return { success: true } }
     if (failSave) throw new Error('Storage failed; code retained')
-    saved.push(input); return { template: { id: 'saved', name: input.name, description: input.description, sourceType: input.sourceType, updatedAt: '2026-10-14T00:00:00.000Z' } }
+    saved.push(input); return { revision: { id: 'page-1', updatedAt: '2026-10-17T00:01:00.000Z' }, template: { id: 'saved', name: input.name, description: input.description, sourceType: input.sourceType, updatedAt: '2026-10-14T00:00:00.000Z' } }
   } },
   '@/app/actions/course-page-actions': { applyCoursePageTemplate: async (...args) => { applied.push(args); return { success: true } } },
   '@/app/actions/course-page-template-actions': { applyStoredCoursePageTemplate: async (...args) => { applied.push(args); return { success: true } }, deleteStoredCoursePageTemplate: async () => ({ success: true }) },
@@ -41,22 +41,22 @@ async function tick() { await React.act(async () => new Promise(resolve => setTi
 async function run() {
   try {
     await React.act(async () => root.render(React.createElement(load('components/course/CourseTemplateWorkspace.tsx').default)))
-    assert.ok(document.querySelector('iframe[src*="preview?system=system"]'), 'Cards render their actual template route')
+    assert.equal(document.querySelectorAll('input[type="file"]').length, 0); assert.ok(!document.body.textContent.includes('Mẫu của tôi')); assert.equal(document.querySelectorAll('iframe').length, 0, 'Listing presets does not fetch heavy preview pages')
     snapshot('template-library')
     window.confirm = () => false; await click('Dùng mẫu'); assert.equal(applied.length, 0)
     window.confirm = () => true; await click('Dùng mẫu'); assert.deepEqual(applied[0], ['AI', 'AI', 'system'])
-    await click('Tạo bản sao để sửa')
+    await click('Sửa code từ mẫu')
     const frame = document.querySelector('dialog iframe'), token = new URL(frame.src).searchParams.get('token')
     await React.act(async () => window.dispatchEvent(new window.MessageEvent('message', { origin: 'https://evil.invalid', source: frame.contentWindow, data: { source: 'course-template-builtin', token, html: '<section>Wrong</section>' } })))
     assert.ok(document.querySelector('dialog[open]'), 'Untrusted copy message is ignored')
     await React.act(async () => window.dispatchEvent(new window.MessageEvent('message', { origin: location.origin, source: frame.contentWindow, data: { source: 'course-template-builtin', token, html: '<section id="hero"><h1>Captured actual template</h1></section>' } })))
-    await click('Sửa code'); assert.match(document.querySelector('textarea[aria-label="Code"]').value, /Captured actual template/)
+    assert.match(document.querySelector('textarea[aria-label="Code"]').value, /Captured actual template/)
     await code('<section id="hero"><h1>Edited immediately</h1></section>'); await tick()
     assert.match(document.querySelector('iframe[srcdoc]').srcdoc, /Edited immediately/)
     snapshot('template-editor')
     assert.equal(applied.length, 1, 'Preview never applies a template')
-    await click('Lưu mẫu'); assert.equal(saved.length, 1); assert.match(saved[0].source.files[0].content, /Edited immediately/); assert.equal(applied.length, 1, 'Saving code never changes the live course')
-    failSave = true; await code('<section id="hero">Keep unsaved edits</section>'); await tick(); await click('Lưu mẫu')
+    await click('Lưu bản nháp cho khóa học'); assert.equal(saved.length, 1); assert.equal(saved[0].action, 'save-course-code'); assert.equal(saved[0].slug, 'AI'); assert.ok(!('scope' in saved[0]), 'No private library record is created'); assert.match(saved[0].html, /Edited immediately/); assert.equal(applied.length, 1, 'Saving code never changes the live course')
+    failSave = true; await code('<section id="hero">Keep unsaved edits</section>'); await tick(); await click('Lưu bản nháp cho khóa học')
     assert.match(document.querySelector('textarea[aria-label="Code"]').value, /Keep unsaved edits/); assert.match(document.body.textContent, /Storage failed/)
     const previewBefore = document.querySelector('iframe[srcdoc]').srcdoc
     await code('<section><img src="ftp://invalid.test/missing.png"></section>'); await tick()
@@ -68,7 +68,7 @@ async function run() {
     await code('<section id="current"><h1>Inline edited source</h1></section>'); await tick()
     assert.match(document.querySelector('iframe[srcdoc]').srcdoc, /Inline edited source/)
     snapshot('course-inline-code')
-    console.log('PASS template workspace UI: true previews, course context, confirmed apply, trusted HTML copies, live preview, source-only saves and retained drafts on failure')
+    console.log('PASS template workspace UI: true previews, course context, confirmed apply, trusted HTML copies, live preview, direct course drafts without a private library, no eager previews/uploads and retained edits on failure')
   } finally { await React.act(async () => root.unmount()); dom.window.close() }
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })

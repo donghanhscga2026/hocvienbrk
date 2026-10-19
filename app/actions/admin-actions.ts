@@ -1,7 +1,7 @@
 'use server'
 
 import { auth } from "@/auth"
-import { normalizeRole, isHighestAdmin } from '@/lib/auth/roles'
+import { normalizeRole } from '@/lib/auth/roles'
 import { isTeachingRole } from '@/lib/auth/roles'
 import { changeMemberRole } from '@/lib/auth/change-member-role'
 import { learningProfileActor } from '@/lib/learning-profile/server'
@@ -632,11 +632,11 @@ export async function getUserSystemsAction() {
 
 export async function updateUserRoleAction(userId: number, role: Role) {
     try {
-        await checkAdmin()
-        if (await domainContext()) throw new Error('Đổi vai trò tại hệ thống chính.')
+                if (await domainContext()) throw new Error('Đổi vai trò tại hệ thống chính.')
         const session = await auth()
-        const actor = await prisma.user.findUnique({ where: { id: Number(session!.user!.id) }, select: { id: true, role: true } })
-        if (!actor || !isHighestAdmin(actor.id, actor.role)) throw new Error('Chỉ admin cao nhất được phân quyền thành viên.')
+        if (!session?.user?.id) throw new Error("Chưa đăng nhập")
+        const actor = await prisma.user.findUnique({ where: { id: Number(session.user.id) }, select: { id: true, role: true } })
+        if (!actor) throw new Error("Không tìm thấy tài khoản thực hiện")
         role = normalizeRole(role)
         if (!Number.isInteger(userId)) throw new Error("Mã thành viên không hợp lệ")
         if (!Object.values(Role).includes(role)) throw new Error("Quyền không hợp lệ")

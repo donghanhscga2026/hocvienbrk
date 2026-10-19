@@ -44,8 +44,8 @@ export function toolWorkspace(tool: PersonalTool) {
   if (['roadmap', 'my-learning'].includes(slug)) return 'learning'
   if (['affiliate', 'genealogy'].includes(slug)) return 'affiliate'
   if (['bank-accounts', 'brk', 'ho-tro', 'account-assistant', 'assistant-guide'].includes(slug)) return 'account'
-  if (['crm', 'email-mkt', 'payments'].includes(slug)) return 'business'
-  if (['courses', 'students'].includes(slug)) return 'teaching'
+  if (['crm', 'email-mkt', 'payments', 'students'].includes(slug)) return 'business'
+  if (slug === 'courses') return 'teaching'
   if (toolGroup(tool) === 'system') return 'admin'
   return 'tools'
 }
@@ -97,6 +97,7 @@ export function spaceNavigation(role: string, tools: PersonalTool[]): SpaceNavGr
       { label: 'Cấu hình chung', href: '/tools/wi-website?section=common', icon: 'Settings' },
       { label: 'Trang', href: '/tools/wi-appearance', icon: 'PanelsTopLeft' },
       { label: 'Bài viết', href: '/tools/posts', icon: 'FileText' },
+      { label: 'Thư viện media', href: '/tools/media', icon: 'Image' },
     ] }] : []),
     { id: 'tools', label: 'Công cụ & tiện ích', href: '/my-space?tab=tools', icon: 'LayoutGrid', items: [] },
     { id: 'account', label: 'Tài khoản & tài chính', href: '/my-space?tab=account', icon: 'UserRound', items: [
@@ -104,7 +105,7 @@ export function spaceNavigation(role: string, tools: PersonalTool[]): SpaceNavGr
       { label: 'Hỗ trợ & phản hồi', href: '/support', icon: 'LifeBuoy' },
       { label: 'Đăng ký đối tác', href: '/doi-tac', icon: 'Handshake' },
     ] },
-    ...(['ADMIN', 'DEVELOPER'].includes(role) ? [{ id: 'admin', label: 'Quản trị hệ thống', href: '/my-space?tab=admin', icon: 'ShieldCheck', items: [] }] : []),
+    ...(['ADMIN', 'DEVELOPER'].includes(role) ? [{ id: 'admin', label: 'Quản trị hệ thống', href: '/my-space?tab=admin', icon: 'ShieldCheck', items: role === 'ADMIN' ? [{ label: 'Thư viện media', href: '/tools/media', icon: 'Image' }] : [] }] : []),
   ]
   for (const tool of tools) {
     if (tool && isProfileTool(tool) && !canCreateProfile(role)) continue

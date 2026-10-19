@@ -22,7 +22,7 @@ export default async function ProfileHome({profile,customDomain=false,modules}:{
     const session=await getSession()
     const teachers=[profile.userId,...(profile.members || []).map((m:{userId:number})=>m.userId)].filter((v):v is number=>typeof v==='number')
     const [
-        courses,
+        catalogCourses,
         survey,
         message,
         userRecord,
@@ -90,7 +90,9 @@ export default async function ProfileHome({profile,customDomain=false,modules}:{
         }
     })
 
-    const myCourses = courses.filter((c: any) => myCourseIds.has(c.id))
+    // Page sections share the public catalog, even for an enrolled viewer.
+    // Hidden enrolled courses remain available in the separate personal space.
+    const myCourses = catalogCourses.filter((c: any) => myCourseIds.has(c.id))
 
     // Tách active vs completed
     const myActiveCourses = myCourses
@@ -103,7 +105,7 @@ export default async function ProfileHome({profile,customDomain=false,modules}:{
     const myCompletedCourses = myCourses
         .filter((c: any) => enrollmentsMap[c.id]?.status === 'COMPLETED')
 
-    const otherCourses = courses.filter((c: any) => !myCourseIds.has(c.id))
+    const otherCourses = catalogCourses.filter((c: any) => !myCourseIds.has(c.id))
 
     const groupedOtherCourses = otherCourses.reduce((acc: any[], course: any) => {
         const category = course.courseCategory?.name || course.category || "Khác"
@@ -163,7 +165,7 @@ export default async function ProfileHome({profile,customDomain=false,modules}:{
 
             <HomePageClient
                 profile={profile}
-                courses={courses}
+                courses={catalogCourses}
                 myActiveCourses={myActiveCourses}
                 myCompletedCourses={myCompletedCourses}
                 groupedOtherCourses={groupedOtherCourses}
