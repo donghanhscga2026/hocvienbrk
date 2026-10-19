@@ -1,1 +1,7 @@
-LS0gQWZmaWxpYXRlIHYyIOKAlCBHxJA0IChoxrDhu5tuZyBBLCBxdXnhur90IMSR4buLbmggMTkvMTAvMjAyNik6IG3hu58gcuG7mW5nIGLhuqNuZyBCYWRnZQotLSBUaMOqbTogY+G7mXQgaWNvbiAoZW1vamkvYmnhu4N1IHTGsOG7o25nIGhp4buDbiB0aOG7iyksIGPhu5l0IGlzQWN0aXZlIChi4bqtdC904bqvdCBodXkgaGnhu4d1KS4KLS0gTmfGsOG7oW5nIEdNViBkw7luZyBj4buZdCB0aHJlc2hvbGRHbXYgxJHDoyBjw7MuIEtow7RuZyB4w7NhL3Phu61hIGfDrCBoaeG7h24gY8OzLgoKLS0gQWx0ZXJUYWJsZQpBTFRFUiBUQUJMRSAiQmFkZ2UiIEFERCBDT0xVTU4gImljb24iIFRFWFQ7CkFMVEVSIFRBQkxFICJCYWRnZSIgQUREIENPTFVNTiAiaXNBY3RpdmUiIEJPT0xFQU4gTk9UIE5VTEwgREVGQVVMVCB0cnVlOwo=
+-- Affiliate v2 — GĐ4 (hướng A, quyết định 19/10/2026): mở rộng bảng Badge
+-- Thêm: cột icon (emoji/biểu tượng hiển thị), cột isActive (bật/tắt huy hiệu).
+-- Ngưỡng GMV dùng cột thresholdGmv đã có. Không xóa/sửa gì hiện có.
+
+-- AlterTable
+ALTER TABLE "Badge" ADD COLUMN "icon" TEXT;
+ALTER TABLE "Badge" ADD COLUMN "isActive" BOOLEAN NOT NULL DEFAULT true;
