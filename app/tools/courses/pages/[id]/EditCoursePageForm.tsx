@@ -1,11 +1,12 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useImperativeHandle, useState, type Ref } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import CourseDraftPreview from '@/components/course/CourseDraftPreview'
 import { COURSE_TEMPLATE_LIBRARY } from '@/lib/course-page/templates'
 import type { CoursePage } from '@/lib/course-page/types'
+import type { CourseEditorControls } from '@/lib/course-page/editor-controls'
 import { Save, Plus, Trash2, ArrowUp, ArrowDown, Settings, FileText, Palette, Copy, ExternalLink, ChevronDown, ChevronUp, Monitor, Smartphone, GripVertical, RefreshCw } from 'lucide-react'
 import { updateCoursePage, saveCourseSections, publishCoursePage, getCoursePageVersions, restoreCoursePageVersion, createCoursePageCheckpoint } from '@/app/actions/course-page-actions'
 
@@ -13,6 +14,10 @@ import { updateCoursePage, saveCourseSections, publishCoursePage, getCoursePageV
 function newEditorId() { return globalThis.crypto.randomUUID() }
 
 interface EditCoursePageFormProps {
+  disabled?: boolean
+  workflow?: boolean
+  controls?: Ref<CourseEditorControls>
+  onBusyChange?: (busy: boolean) => void
   embedded?: boolean
   panel?: 'sections' | 'theme' | 'info'
   onDirtyChange?: (dirty: boolean) => void
@@ -33,7 +38,7 @@ interface EditCoursePageFormProps {
   }
 }
 
-export default function EditCoursePageForm({ initialPage, embedded = false, onDirtyChange, onEditCode, onSaved, panel, onShowPreview }: EditCoursePageFormProps) {
+export default function EditCoursePageForm({ initialPage, embedded = false, workflow = false, disabled = false, controls, onBusyChange, onDirtyChange, onEditCode, onSaved, panel, onShowPreview }: EditCoursePageFormProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'info' | 'theme' | 'sections'>('sections')
   const effectiveTab = panel || activeTab
@@ -68,6 +73,7 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
+  useEffect(() => { onBusyChange?.(saving || publishing) }, [saving, publishing, onBusyChange])
 
   useEffect(() => {
     if (!dirty) return
@@ -77,6 +83,8 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
   }, [dirty])
 
   const handleSavePage = async () => {
+    if (saving || publishing) return false
+    if (!dirty) return true
     setSaving(true)
     setMessage(null)
     try {
@@ -100,6 +108,7 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
           setPreviewKey(k => k + 1)
           router.refresh()
           onSaved?.()
+          return true
         } else {
           setMessage({ type: 'error', text: secRes.error || 'Lỗi khi lưu các phần giao diện' })
         }
@@ -111,6 +120,7 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
     } finally {
       setSaving(false)
     }
+    return false
   }
 
   const handlePublish = async () => {
@@ -145,6 +155,8 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
     if (res.success) window.location.reload()
     else setMessage({ type: 'error', text: res.error || 'Không thể khôi phục phiên bản' })
   }
+
+  useImperativeHandle(controls, () => ({ save: handleSavePage, history: handleLoadVersions }))
 
   // Section manipulation
   const handleAddSection = (type: string) => {
@@ -468,7 +480,7 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
   const draftPage = { ...initialPage, name, status, seo, theme, navigation, checkoutConfig, useTemplate, sections: sections.map((section, index) => ({ ...section, id: section.id || section.sectionKey, type: section.sectionType || section.type, sortOrder: index + 1 })) } as CoursePage
 
   return (
-    <fieldset disabled={saving || publishing} className="min-w-0 space-y-5">
+    <fieldset disabled={disabled || saving || publishing} className="min-w-0 space-y-5">
       {showVersions && (
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
           <div className="flex items-center justify-between mb-3"><h3 className="font-black text-sm">Lịch sử phiên bản</h3><button onClick={() => setShowVersions(false)} className="text-xs text-gray-500">Đóng</button></div>
@@ -539,6 +551,7 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
               <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Trạng thái trang</label>
               <select
                 value={status}
+                disabled={workflow}
                 onChange={(e) => { setStatus(e.target.value as any); setDirty(true) }}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-black text-sm bg-white"
               >
@@ -658,7 +671,7 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
       )}
 
       {effectiveTab === 'sections' && <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brk-outline bg-white p-3">
+        <div hidden={workflow} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brk-outline bg-white p-3">
           <div className="text-sm"><span className="text-brk-muted">Mẫu hiện tại:</span> <strong>{templateName}</strong></div>
           <div className="flex flex-wrap gap-2">{embedded ? <button type="button" onClick={onEditCode} className="min-h-11 rounded-lg border border-brk-outline px-3 text-sm text-brk-primary">Sửa code</button> : <Link href={`/tools/courses/templates?course=${encodeURIComponent(initialPage.slug)}&name=${encodeURIComponent(name)}`} onClick={event => { if (dirty && !confirm('Bạn có thay đổi chưa lưu. Rời trang để đổi mẫu?')) event.preventDefault() }} className="inline-flex min-h-11 items-center rounded-lg border border-brk-outline px-3 text-sm font-semibold text-brk-primary">Đổi mẫu / Sửa code</Link>}<a href={`/khoa-hoc/${initialPage.slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-brk-outline px-3 text-sm">Xem trang công khai <ExternalLink size={15} /></a></div>
         </div>
@@ -696,7 +709,7 @@ export default function EditCoursePageForm({ initialPage, embedded = false, onDi
         </div>
       </div>}
 
-      <div className="sticky bottom-0 z-40 flex flex-wrap items-center gap-3 rounded-2xl border bg-white/95 backdrop-blur px-4 py-3 shadow-sm">
+      <div hidden={workflow} className="sticky bottom-0 z-40 flex flex-wrap items-center gap-3 rounded-2xl border bg-white/95 backdrop-blur px-4 py-3 shadow-sm">
         <div className="flex-1 min-w-0">
           <div className="font-black text-sm text-gray-900 truncate">{name}</div>
           <div className={`text-xs ${dirty?'text-amber-600':'text-green-600'}`}>{dirty?'Có thay đổi chưa lưu':'Mọi thay đổi đã được lưu'}</div>

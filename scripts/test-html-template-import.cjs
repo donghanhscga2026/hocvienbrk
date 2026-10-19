@@ -5,7 +5,7 @@ const ts = require('typescript')
 const { JSDOM } = require('jsdom')
 const root = path.resolve(__dirname, '..')
 const cache = new Map()
-let uploadedHtml = ''
+let storageCalls = 0, savedTemplate
 let denied = null
 function load(file) {
   if (cache.has(file)) return cache.get(file)
@@ -16,11 +16,11 @@ function load(file) {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true,
   } }).outputText
   new Function('require', 'exports', 'module', code)(name => {
-    if (name === '@/lib/api-auth') return { requireAdmin: async () => denied }
-    if (name === '@/lib/image-utils') return { saveUploadedFile: async buffer => { uploadedHtml = buffer.toString(); return 'https://project.supabase.co/storage/v1/object/public/uploads/course-template-sources/test.html' } }
-    if (name === '@/lib/prisma') return {}
-    if (name === 'next/cache') return {}
-    if (name === '@/lib/course-page/importer/image-mirror') return { mirrorAnalysisImages: async value => value }
+    if (name === '@/lib/api-auth') return { requireAdmin: async () => denied, requireAdminAction: async () => denied ? { error: 'denied' } : null }
+    if (name === '@/lib/image-utils') return { saveUploadedFile: async () => { storageCalls++; throw Error('Storage restricted; Vercel filesystem unavailable') } }
+    if (name === '@/lib/prisma') return { __esModule: true, default: { coursePageTemplate: { create: async ({ data }) => { savedTemplate = { id: 'inline-template', ...data }; return savedTemplate } } } }
+    if (name === 'next/cache') return { revalidatePath() {} }
+    if (name === '@/lib/course-page/importer/image-mirror') return { mirrorAnalysisImages: async () => { storageCalls++; throw Error('Image storage unavailable') } }
     if (name.startsWith('@/')) return load(name.slice(2) + '.ts')
     if (name.startsWith('.')) return load(path.posix.join(path.posix.dirname(file), name) + '.ts')
     return require(name)
@@ -96,14 +96,14 @@ async function run() {
   const url = 'https://app.invalid/api/admin/course-page-templates/analyze'
   const body = require('node:zlib').gzipSync(fixture)
   const response = await POST(new NextRequest(url, { method: 'POST', headers: { 'Content-Type': 'application/gzip' }, body }))
-  const result = await response.json()
-  assert.equal(response.status, 200)
-  assert.ok(result.analysis.exactSource.url)
-  assert.ok(uploadedHtml.includes('data-mfc-compiled-tailwind'))
+  assert.equal(response.status, 410, 'Old HTML/ZIP import route is closed')
+  const actions = load('app/actions/course-page-template-actions.ts')
+  assert.equal((await actions.createStoredCoursePageTemplate({ name: 'Blocked', analysis, selectedSectionIds: [] })).success, false)
+  assert.equal(savedTemplate, undefined)
+  assert.equal(storageCalls, 0)
   const multipart = new FormData()
   multipart.append('file', new File([fixture], 'sample.html', { type: 'text/html' }))
-  assert.equal((await POST(new NextRequest(url, { method: 'POST', body: multipart }))).status, 200)
-  assert.equal((await POST(new NextRequest(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({html:fixture}) }))).status, 200)
+  assert.equal((await POST(new NextRequest(url, { method: 'POST', body: multipart }))).status, 410)
   denied = NextResponse.json({ error: 'denied' }, {status:403})
   assert.equal((await POST(new NextRequest(url, {method:'POST',body}))).status, 403)
   dom.window.close()
@@ -119,6 +119,6 @@ async function run() {
     if (process.argv[3]) fs.writeFileSync(process.argv[3], actual.html)
     console.log('The Top 1: original content, images, sections and brand CSS passed.')
   }
-  console.log('HTML import: CSS compilation, layout, checkout bridge, mobile menu, missing assets, config safety, snapshots and API transports passed.')
+  console.log('PASS legacy HTML compatibility: CSS compilation, layout, checkout bridge, mobile menu, config safety and snapshots; new imports and template writes are disabled.')
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })

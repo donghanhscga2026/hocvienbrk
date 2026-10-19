@@ -1,6 +1,9 @@
 'use server'
 
 import prisma from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
+import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
+import { wi300CoursePreferences, wi300CourseWhere } from '@/lib/wi300/course-visibility'
 import { managedProfile, websiteActor, WEBSITE_MANAGER_ROLE } from '@/lib/website/management'
 import { FALLBACK_PROFILE, FALLBACK_COURSES, FALLBACK_POSTS, FALLBACK_SURVEY } from '@/lib/db-fallback'
 import { auth } from '@/auth'
@@ -214,9 +217,9 @@ function stripVolatileProfileFields(profile: any) {
  * getDefaultProfile/updateSiteProfile nên tự làm mới khi admin sửa profile.
  */
 const getCoursesForProfileCached = unstable_cache(
-  async (profile: any) => {
+  async (where: Prisma.CourseWhereInput) => {
     const courses = await prisma.course.findMany({
-      where: getCourseWhereForProfile(profile as any),
+      where,
       include: {
         courseCategory: true,
         teacherBankAccount: true,
@@ -227,16 +230,21 @@ const getCoursesForProfileCached = unstable_cache(
     })
     return courses.map(course => ({ ...course, activeStudentCount: course._count?.enrollments ?? 0 }))
   },
-  ['courses-for-profile-with-teacher'],
+  ['courses-for-profile-visibility-v2'],
   { tags: ['site-profile'], revalidate: 600 }
 )
 
 export async function getCoursesForProfile(profile: any) {
+  let wi300 = false
   try {
-    return await getCoursesForProfileCached(stripVolatileProfileFields(profile))
+    // Read request branding outside unstable_cache; the resolved scope is its cache key.
+    wi300 = Boolean(await getCurrentDeploymentBrand())
+    const base = getCourseWhereForProfile(profile)
+    const where = wi300 ? wi300CourseWhere(base, await wi300CoursePreferences(prisma)) : base
+    return await getCoursesForProfileCached(where)
   } catch (error) {
     console.error("[DB ERROR] getCoursesForProfile:", error)
-    return FALLBACK_COURSES as any[]
+    return wi300 ? [] : FALLBACK_COURSES as any[]
   }
 }
 

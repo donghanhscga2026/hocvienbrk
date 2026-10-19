@@ -25,33 +25,7 @@ function PagesPageContent() {
     <div className="min-h-screen bg-gray-50">
       <MainHeader title="PAGE" toolSlug="pages" />
 
-      <div className="flex items-center gap-1 px-4 py-3 bg-white border-b border-gray-100 overflow-x-auto">
-        <button
-          onClick={() => setTab('my-site')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-            tab === 'my-site' ? 'bg-black text-yellow-400 shadow-sm' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
-          }`}
-        >
-          🏠 Trang của tôi
-        </button>
-        {isAdmin && <><button
-          onClick={() => setTab('landings')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-            tab === 'landings' ? 'bg-black text-yellow-400 shadow-sm' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
-          }`}
-        >
-          🚀 Landing Page
-        </button>
-        <button
-          onClick={() => setTab('site-profiles')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-            tab === 'site-profiles' ? 'bg-black text-yellow-400 shadow-sm' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
-          }`}
-        >
-          📄 Site Profile
-        </button></>}
-      </div>
-
+      {isAdmin && <details className="mx-4 my-3 rounded-xl border bg-white p-3" open={tab!=='my-site'}><summary className="cursor-pointer text-sm font-medium text-slate-600">Quản trị hệ thống</summary><div className="mt-3 flex flex-wrap gap-2">{[['my-site','Website của tôi'],['landings','Landing Page'],['site-profiles','Site Profile']].map(([id,label])=><button key={id} aria-pressed={tab===id} onClick={()=>setTab(id)} className={'rounded-xl px-4 py-2 text-sm '+(tab===id?'bg-violet-700 text-white':'border text-slate-600')}>{label}</button>)}</div></details>}
       {(tab === 'my-site' || !isAdmin) && <MySiteTab />}
       {isAdmin && tab === 'landings' && <LandingsTab />}
       {isAdmin && tab === 'site-profiles' && <SiteProfilesTab />}
