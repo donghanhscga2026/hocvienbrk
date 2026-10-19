@@ -8,6 +8,7 @@ let actor = { id: 26, role: 'ADMIN' }, writes = 0, created, profile = null, doma
 const db = {
   $transaction: async fn => fn(db),
   course: { count: async () => 0 },
+  enrollment: { findFirst: async () => ({ id: 1 }) },
   user: { findUnique: async ({ where }) => where.id === actor.id ? actor : { id: where.id, role: 'STUDENT' }, update: async args => { writes++; return args.data } },
   siteProfile: {
     findUnique: async ({ where }) => where.userId != null ? profile : null,
@@ -40,9 +41,16 @@ async function run() {
     assert.equal((await members.updateUserRoleAction(888, 'INSTRUCTOR')).role, 'TEACHER')
   }
   let before = writes
-  actor = { id: 99, role: 'ADMIN' }; assert.ok((await members.updateUserRoleAction(888, 'TEACHER')).error)
+  actor = { id: 99, role: 'ADMIN' }
+  // Ma trận phân quyền mới: admin thường được gán tới Giáo viên nhưng không được gán Quản trị
+  assert.equal((await members.updateUserRoleAction(888, 'TEACHER')).role, 'TEACHER')
+  assert.ok((await members.updateUserRoleAction(888, 'ADMIN')).error)
   actor = { id: 26, role: 'STUDENT' }; assert.ok((await members.updateUserRoleAction(888, 'ADMIN')).error)
-  assert.equal(writes, before)
+  assert.equal(writes, before + 1)
+  // Giáo viên được phân quyền cộng sự (Đối tác) trong lớp mình, không gán được vai trò cao hơn
+  actor = { id: 71, role: 'TEACHER' }
+  assert.equal((await members.updateUserRoleAction(888, 'AFFILIATE')).role, 'AFFILIATE')
+  assert.ok((await members.updateUserRoleAction(888, 'TEACHER')).error)
   const profiles = isolated('app/actions/site-profile-actions.ts')
   for (const role of ['TEACHER', 'INSTRUCTOR']) {
     actor = { id: 71, role }; assert.equal((await profiles.createSiteProfile(null, 'my-profile')).success, true)
@@ -102,6 +110,6 @@ async function run() {
   }
   const report = await convert(migrationDb); assert.equal(migrationWrites, 0); assert.equal(report.before.admin26.next, 'ADMIN'); assert.deepEqual(report.before.tools[0].next, ['TEACHER'])
   await assert.rejects(convert(migrationDb, { execute: true, expectedDigest: 'outdated' }), /Plan changed/)
-  console.log('PASS canonical teaching roles, highest-admin-only assignment, self-owned profiles, ownership, student denial, menu parity and dry-run safety')
+  console.log('PASS canonical teaching roles, tiered role assignment, self-owned profiles, ownership, student denial, menu parity and dry-run safety')
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })
