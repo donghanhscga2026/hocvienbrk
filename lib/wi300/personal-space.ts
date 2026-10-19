@@ -44,8 +44,8 @@ export function toolWorkspace(tool: PersonalTool) {
   if (['roadmap', 'my-learning'].includes(slug)) return 'learning'
   if (['affiliate', 'genealogy'].includes(slug)) return 'affiliate'
   if (['bank-accounts', 'brk', 'ho-tro', 'account-assistant', 'assistant-guide'].includes(slug)) return 'account'
-  if (['crm', 'email-mkt', 'payments'].includes(slug)) return 'business'
-  if (['courses', 'students'].includes(slug)) return 'teaching'
+  if (['crm', 'email-mkt', 'payments', 'students'].includes(slug)) return 'business'
+  if (slug === 'courses') return 'teaching'
   if (toolGroup(tool) === 'system') return 'admin'
   return 'tools'
 }
