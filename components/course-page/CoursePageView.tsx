@@ -28,6 +28,7 @@ interface CoursePageViewProps {
   totalHours?: number
   activeStudentCount?: number
   wi300Breadcrumb?: React.ReactNode
+  projectLabels?: React.ReactNode
 }
 
 export default function CoursePageView({
@@ -42,6 +43,7 @@ export default function CoursePageView({
   totalHours = 0,
   activeStudentCount = 0,
   wi300Breadcrumb,
+  projectLabels,
 }: CoursePageViewProps) {
   const router = useRouter()
   const brand=useDomainBrand()
@@ -183,6 +185,7 @@ export default function CoursePageView({
       {/* Page sections */}
       <div className={importedLayout || wi300Breadcrumb ? '' : 'pt-[calc(80px_+_env(safe-area-inset-top))]'}>
         <SectionRenderer
+          projectLabels={projectLabels}
           sections={coursePage.sections}
           isEnrolled={isEnrolled}
           lessons={lessons}

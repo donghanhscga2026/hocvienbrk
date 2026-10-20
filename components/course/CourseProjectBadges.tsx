@@ -16,11 +16,11 @@ function ProjectLogo({ logo }: { logo: string }) {
 }
 
 /** Nhãn dưới ảnh bìa; mở rộng tại chỗ để dùng được cả cảm ứng và bàn phím. */
-export default function CourseProjectBadges({ projects }: { projects: CourseProjectBadge[] }) {
+export default function CourseProjectBadges({ projects, showAll = false }: { projects: CourseProjectBadge[]; showAll?: boolean }) {
   const [expanded, setExpanded] = useState(false)
   const listId = useId()
   if (!projects.length) return null
-  const shown = expanded ? projects : projects.slice(0, 2)
+  const shown = showAll || expanded ? projects : projects.slice(0, 2)
   return <div data-course-projects className="mb-3 flex min-w-0 items-start gap-2 border-b border-brk-outline pb-3">
     <span className="shrink-0 pt-3 text-xs text-brk-muted">Dự án</span>
     <div className="min-w-0 flex-1">
@@ -30,7 +30,7 @@ export default function CourseProjectBadges({ projects }: { projects: CourseProj
             <ProjectLogo logo={project.logo} /><span className="min-w-0 break-words [overflow-wrap:anywhere]">{project.name}</span>
           </Link>
         </li>)}
-        {projects.length > 2 && <li><button type="button" aria-controls={listId} aria-expanded={expanded} aria-label={expanded ? 'Thu gọn danh sách dự án' : `Xem thêm ${projects.length - 2} dự án`} onClick={() => setExpanded(value => !value)} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-brk-outline bg-brk-surface px-2 text-xs font-semibold text-brk-primary hover:bg-brk-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brk-primary">{expanded ? 'Thu gọn' : `+${projects.length - 2}`}</button></li>}
+        {!showAll && projects.length > 2 && <li><button type="button" aria-controls={listId} aria-expanded={expanded} aria-label={expanded ? 'Thu gọn danh sách dự án' : `Xem thêm ${projects.length - 2} dự án`} onClick={() => setExpanded(value => !value)} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-brk-outline bg-brk-surface px-2 text-xs font-semibold text-brk-primary hover:bg-brk-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brk-primary">{expanded ? 'Thu gọn' : `+${projects.length - 2}`}</button></li>}
       </ul>
     </div>
   </div>
