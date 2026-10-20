@@ -8,6 +8,7 @@ import dynamic from 'next/dynamic'
 import { enrollInCourseAction, getBrkMbvBalanceAction, toggleHiddenFromGifts } from '@/app/actions/course-actions'
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
 import { isValidImageUrl } from '@/lib/image-validation'
+import CourseProjectBadges, { type CourseProjectBadge } from './CourseProjectBadges'
 
 import { Share2, BookOpen, Users, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react'
 
@@ -71,9 +72,10 @@ interface CourseCardProps {
     profileSlug?: string | null
     showSharing?: boolean
     shareSiteName?: string
+    projectBadges?: CourseProjectBadge[]
 }
 
-export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollment, userPhone = null, userId = null, priority = false, darkMode = false, profileSlug = null, showSharing = true, shareSiteName }: CourseCardProps) {
+export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollment, userPhone = null, userId = null, priority = false, darkMode = false, profileSlug = null, showSharing = true, shareSiteName, projectBadges }: CourseCardProps) {
     const router = useRouter()
     const [showPayment, setShowPayment] = useState(false)
     const [showRegistrationModal, setShowRegistrationModal] = useState(false)
@@ -238,6 +240,8 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
 
                 {/* Nội dung - Giữ nguyên 100% */}
                 <div className="p-3 flex flex-col flex-grow">
+                    {/* Wi300 truyền nhãn dự án công khai; các nơi khác giữ cách hiển thị cũ. */}
+                    {projectBadges?.length ? <CourseProjectBadges projects={projectBadges} /> : null}
                     {/* Title */}
                     <div className="mb-3 flex items-center gap-2.5">
                         <span className={`text-2xl leading-none drop-shadow-sm select-none shrink-0 ${feeTypeDisplay.color}`}>{feeTypeDisplay.icon}</span>
