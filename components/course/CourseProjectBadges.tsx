@@ -16,12 +16,12 @@ function ProjectLogo({ logo }: { logo: string }) {
 }
 
 /** Nhãn dưới ảnh bìa; mở rộng tại chỗ để dùng được cả cảm ứng và bàn phím. */
-export default function CourseProjectBadges({ projects, showAll = false }: { projects: CourseProjectBadge[]; showAll?: boolean }) {
+export default function CourseProjectBadges({ projects, showAll = false, compact = false }: { projects: CourseProjectBadge[]; showAll?: boolean; compact?: boolean }) {
   const [expanded, setExpanded] = useState(false)
   const listId = useId()
   if (!projects.length) return null
   const shown = showAll || expanded ? projects : projects.slice(0, 2)
-  return <div data-course-projects className="mb-3 flex min-w-0 items-start gap-2 border-b border-brk-outline pb-3">
+  return <div data-course-projects className={`flex min-w-0 items-start gap-2${compact ? '' : ' mb-3 border-b border-brk-outline pb-3'}`}>
     <span className="shrink-0 pt-3 text-xs text-brk-muted">Dự án</span>
     <div className="min-w-0 flex-1">
       <ul id={listId} aria-label="Dự án liên kết với khóa học" className="flex min-w-0 flex-wrap gap-1.5">
