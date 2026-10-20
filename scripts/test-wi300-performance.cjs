@@ -19,6 +19,7 @@ async function run() {
   const reset = () => Object.keys(calls).forEach(key => delete calls[key])
   const publicationMocks = { getPublishedCoursePageBySlug: async () => { (calls.published ||= []).push({}); return publishedPage } }
   const mocks = {
+    '@/lib/wi300/project-service': { readPublicProjects: async () => [] },
     react: { ...React, cache: fn => fn },
     '@/lib/get-session': { getSession: async () => ({ user: { id: '31' } }) },
     '@/lib/prisma': { __esModule: true, default: {

@@ -13,6 +13,8 @@ import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime
 import Wi300Header from '@/components/wi300/Wi300Header'
 import Wi300Breadcrumb from '@/components/wi300/Wi300Breadcrumb'
 import { courseLoadingPlan } from '@/lib/course-page/loading-plan'
+import { readPublicProjects } from '@/lib/wi300/project-service'
+import CourseProjectBadges from '@/components/course/CourseProjectBadges'
 
 // Dùng chung kiểm tra phạm vi trong metadata và nội dung của cùng request.
 const getPageProfile = cache(getCurrentSiteProfile)
@@ -122,7 +124,8 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
         activeStudentCount,
         reflectionsLP,
         lessonComments,
-        coursePage
+        coursePage,
+        projectBadges
     ] = await Promise.all([
         userId
             ? prisma.user.findUnique({ where: { id: userId }, select: { phone: true } })
@@ -164,7 +167,12 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
             orderBy: { createdAt: 'desc' },
             take: 10
         }) : Promise.resolve([]),
-        Promise.resolve(publishedPage)
+        Promise.resolve(publishedPage),
+        // Chỉ lấy dự án công khai sau khi đã kiểm tra phạm vi khóa học.
+        deploymentBrand ? readPublicProjects(prisma)
+            .then(projects => projects.filter(project => project.courseIds.includes(courseId)).map(({ slug, name, logo }) => ({ slug, name, logo })))
+            .catch(error => { console.error('[Course projects]', error instanceof Error ? error.name : 'Unknown'); return [] })
+            : Promise.resolve([])
     ])
 
     const userPhone = userRow?.phone || null
@@ -207,6 +215,7 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
     // Course page hiển thị hoàn toàn theo dữ liệu đã publish trong DB.
     const effectiveCoursePage = coursePage
     const breadcrumb = deploymentBrand ? <Wi300Breadcrumb title={course.name_lop} /> : undefined
+    const projectLabels = projectBadges.length ? <div className="my-4 rounded-xl bg-white p-3 text-slate-900"><CourseProjectBadges projects={projectBadges} showAll /></div> : undefined
 
     // Giữ dữ liệu đã publish; chỉ bỏ phần thống kê mà mẫu ZIP không dùng.
     if (effectiveCoursePage && (effectiveCoursePage as any).useTemplate !== false) {
@@ -215,6 +224,7 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
                 {notificationEntry}
                 <CoursePageView
                     wi300Breadcrumb={breadcrumb}
+                    projectLabels={projectLabels}
                     coursePage={effectiveCoursePage as any}
                     course={course}
                     enrollment={enrollment}
@@ -236,6 +246,7 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
             {deploymentBrand && <Wi300Header />}
             {breadcrumb}
             <CourseLandingClient
+                projectLabels={projectLabels}
                 course={course}
                 lessons={lessons}
                 testimonials={testimonials}
