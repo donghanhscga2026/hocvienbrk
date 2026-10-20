@@ -1,17 +1,7 @@
-const fs = require('node:fs')
-const path = require('node:path')
 const assert = require('node:assert/strict')
-const ts = require('typescript')
 const React = require('react')
 const { JSDOM } = require('jsdom')
-function load(file, mocks = {}) {
-  const module = { exports: {} }
-  const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: {
-    module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true
-  } }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : require(name), module, module.exports)
-  return module.exports
-}
+const load = require('./helpers/load-ts.cjs')
 async function run() {
   const { courseLoadingPlan } = load('lib/course-page/loading-plan.ts')
   const zip = { useTemplate: true, theme: { importedLayout: true }, sections: [{ enabled: true, variant: 'zip-source-v1' }] }

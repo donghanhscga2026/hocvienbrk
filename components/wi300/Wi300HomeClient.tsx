@@ -1,13 +1,14 @@
 'use client'
 
 import { defaultAppearance, gridColumns, type WiAppearance } from '@/lib/wi300/appearance'
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
 import { ArrowRight, BookOpen, Search, Sparkles, BriefcaseBusiness, Package, UsersRound, Sprout, Handshake } from 'lucide-react'
 import CourseCard from '@/components/course/CourseCard'
+import type { CourseProjectBadge } from '@/components/course/CourseProjectBadges'
 import { checkEnrollmentStatusAction } from '@/app/actions/course-actions'
 import { categoryName, filterCourses, sortCourses, type CourseSort } from '@/lib/wi300/catalog'
 import type { DeploymentBrand } from '@/lib/site-profile/deployment-brand'
@@ -54,6 +55,21 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
   const paymentId = searchParams.get('paymentCourseId')
   const paymentCourse = loggedIn && paymentId !== dismissedPayment ? courses.find(course => String(course.id) === paymentId) : undefined
   const enrollmentMap = new Map(enrollments.map(enrollment => [enrollment.courseId, enrollment]))
+  // Gom liên kết một lần, không gọi API hoặc quét toàn bộ dự án cho từng card.
+  const courseProjects = useMemo(() => {
+    const byCourse = new Map<number, CourseProjectBadge[]>()
+    if (projectsError) return byCourse
+    for (const project of projects || []) {
+      if (!project.published) continue
+      const badge = { slug: project.slug, name: project.name, logo: project.logo }
+      for (const courseId of project.courseIds) {
+        const badges = byCourse.get(courseId) || []
+        badges.push(badge)
+        byCourse.set(courseId, badges)
+      }
+    }
+    return byCourse
+  }, [projects, projectsError])
   const categories = Array.from(new Set(courses.map(categoryName)))
   const filtered = sortCourses(filterCourses(courses.filter(course => !searchParams.get('teacher') || String(course.teacherId) === searchParams.get('teacher')), query, page.showCategories ? category : '', page.showFee ? fee : 'all'), sort)
   // Lấy giảng viên từ danh mục hiện có, gom theo mã tài khoản thay vì danh sách tên.
@@ -94,7 +110,7 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
     window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
   }
   const clearFilters = () => { setQuery(''); setCategory(''); setFee('all'); setSort('recommended'); setLimit(9) }
-  const card = (course: Wi300Course, index: number) => <CourseCard key={course.id} course={course} isLoggedIn={loggedIn} enrollment={enrollmentMap.get(course.id)} userId={userId} userPhone={userPhone} priority={index < 3} showSharing shareSiteName={brand.name} />
+  const card = (course: Wi300Course, index: number) => <CourseCard key={course.id} course={course} projectBadges={courseProjects.get(course.id)} isLoggedIn={loggedIn} enrollment={enrollmentMap.get(course.id)} userId={userId} userPhone={userPhone} priority={index < 3} showSharing shareSiteName={brand.name} />
 
   // Render theo thứ tự thật để bàn phím và trình đọc màn hình cùng thứ tự hiển thị.
   const homeSections = {
