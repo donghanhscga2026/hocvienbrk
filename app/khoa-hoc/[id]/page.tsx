@@ -215,7 +215,7 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
     // Course page hiển thị hoàn toàn theo dữ liệu đã publish trong DB.
     const effectiveCoursePage = coursePage
     const breadcrumb = deploymentBrand ? <Wi300Breadcrumb title={course.name_lop} /> : undefined
-    const projectLabels = projectBadges.length ? <div className="my-4 rounded-xl bg-white p-3 text-slate-900"><CourseProjectBadges projects={projectBadges} showAll /></div> : undefined
+    const projectLabels = projectBadges.length ? <CourseProjectBadges projects={projectBadges} showAll compact /> : undefined
 
     // Giữ dữ liệu đã publish; chỉ bỏ phần thống kê mà mẫu ZIP không dùng.
     if (effectiveCoursePage && (effectiveCoursePage as any).useTemplate !== false) {

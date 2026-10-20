@@ -262,7 +262,7 @@ export default function CourseLandingTemplate({
                                     </span>
                                     {course.name_lop}
                                 </h1>
-                                {projectLabels}
+                                {projectLabels && <div className="my-4 rounded-xl bg-white p-3 text-slate-900">{projectLabels}</div>}
                                 {/* Tên khóa học + Phí/Giá tiền chỉ hiện khi CHƯA kích hoạt - học viên đã kích hoạt không cần xem lại giá */}
                                 {!isEnrolled && course.name_khoa && (
                                     <p className="text-sm text-brk-muted">{course.name_khoa}</p>

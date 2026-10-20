@@ -102,7 +102,7 @@ export default function HeroSection({
           )}
         </h1>
 
-        {projectLabels}
+        {projectLabels && <div className="my-4 rounded-xl bg-white p-3 text-slate-900">{projectLabels}</div>}
 
         <p style={{
           fontFamily: 'Inter, sans-serif',

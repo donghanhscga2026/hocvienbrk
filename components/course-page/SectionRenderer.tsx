@@ -84,7 +84,7 @@ export default function SectionRenderer({
 
   return (
     <>
-      {projectLabels && !projectHero && <aside aria-label="Thông tin dự án của khóa học" className="bg-white text-slate-900"><div className="mx-auto max-w-7xl px-4 py-3 sm:px-6"><div className="break-words text-base font-semibold">{course?.name_lop}</div>{projectLabels}</div></aside>}
+      {projectLabels && !projectHero && <aside aria-label="Thông tin dự án của khóa học" className="bg-white text-slate-900"><div className="mx-auto max-w-7xl px-4 py-2 sm:px-6">{projectLabels}</div></aside>}
       {visibleSections.map((section) => {
         const type = (section as any).sectionType || (section as any).type
         if (section.variant?.startsWith('wi300-gift')) return <GiftTemplateSection key={section.id || section.sectionKey} section={section} onAction={onAction} testimonials={testimonials} isEnrolled={isEnrolled} projectLabels={section === projectHero ? projectLabels : undefined} />
