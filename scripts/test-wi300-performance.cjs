@@ -12,14 +12,16 @@ async function run() {
   assert.equal(courseLoadingPlan(zip, false).statistics, true, 'Other deployments keep all current data')
   const calls = {}
   const count = (name, value) => async args => { (calls[name] ||= []).push(args); return value }
-  let publishedPage = zip, brand = { name: 'WI300' }, allowed = true
+  let publishedPage = zip, brand = { name: 'WI300' }, allowed = true, projects = []
   const course = { id: 17, id_khoa: 'ZIP', name_lop: 'Course', phi_coc: 100, teacherBankAccount: { bankName: 'TCB', accountNumber: 'test', accountHolder: 'Test' } }
   const enrollment = { status: 'PENDING', userId: 31, courseId: 17 }
-  const View = () => null, Landing = () => null, Notification = () => null
+  const View = () => null, Landing = () => null, Notification = () => null, Header = () => null
+  const children = page => React.Children.toArray(page.props.children)
+  const viewOf = page => children(page).find(child => child.type === View)
   const reset = () => Object.keys(calls).forEach(key => delete calls[key])
   const publicationMocks = { getPublishedCoursePageBySlug: async () => { (calls.published ||= []).push({}); return publishedPage } }
   const mocks = {
-    '@/lib/wi300/project-service': { readPublicProjects: async () => [] },
+    '@/lib/wi300/project-service': { readPublicProjects: async () => projects },
     react: { ...React, cache: fn => fn },
     '@/lib/get-session': { getSession: async () => ({ user: { id: '31' } }) },
     '@/lib/prisma': { __esModule: true, default: {
@@ -37,7 +39,7 @@ async function run() {
     '@/lib/website/domain-context': { requireDomainCourse: async () => {} },
     '@/lib/site-profile/runtime': { getCurrentSiteProfile: async () => ({ id: 1 }), canProfileAccessCourse: async () => allowed },
     '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => brand },
-    '@/components/wi300/Wi300Header': { __esModule: true, default: () => null },
+    '@/components/wi300/Wi300Header': { __esModule: true, default: Header },
     '@/components/wi300/Wi300Breadcrumb': { __esModule: true, default: () => null },
     '@/lib/course-page/loading-plan': { courseLoadingPlan }
   }
@@ -46,8 +48,9 @@ async function run() {
   for (const name of ['lessons', 'duration', 'students', 'reflections', 'comments']) assert.equal(calls[name], undefined, name + ' not queried for ZIP-only landing')
   assert.equal(calls.published.length, 1)
   assert.deepEqual(calls.enrollment[0].where, { userId: 31, courseId: 17 })
-  assert.equal(result.props.children[1].props.enrollment, enrollment, 'Enrollment is still private per request')
-  assert.deepEqual(result.props.children[1].props.course.teacherBankAccount, course.teacherBankAccount)
+  assert.equal(viewOf(result).props.enrollment, enrollment, 'Enrollment is still private per request')
+  assert.deepEqual(viewOf(result).props.course.teacherBankAccount, course.teacherBankAccount)
+  assert.equal(children(result).filter(child => child.type === Header).length, 1, 'Custom HTML detail restores one WI300 header even without project labels')
   reset()
   result = await render({ params: Promise.resolve({ id: 'ZIP' }), searchParams: Promise.resolve({ notificationLesson: 'lesson-1' }) })
   assert.equal(calls.lessons.length, 1); assert.equal(result.props.children[0].type, Notification)
@@ -59,8 +62,23 @@ async function run() {
   for (const name of ['lessons', 'duration', 'students', 'reflections', 'comments']) assert.equal(calls[name].length, 1)
   assert.equal(result.props.children[3].type, Landing)
   assert.equal(result.props.children[3].props.totalHours, 2)
+  reset(); publishedPage = zip
+  projects = [{ slug: 'wi-finance', name: 'Wi.Finance', logo: '', courseIds: [17] }]
+  result = await render({ params: Promise.resolve({ id: 'ZIP' }) })
+  let view = viewOf(result)
+  assert.equal(children(result).filter(child => child.type === Header).length, 1)
+  assert.equal(view.props.projectLabels, undefined, 'Custom HTML must not receive a separate project strip')
+  assert.equal(view.props.wi300Breadcrumb.props.projectLabels.props.projects[0].slug, 'wi-finance', 'Project labels share the existing breadcrumb')
+  publishedPage = { ...zip, theme: { importedLayout: false } }
+  result = await render({ params: Promise.resolve({ id: 'ZIP' }) })
+  view = viewOf(result)
+  assert.equal(children(result).filter(child => child.type === Header).length, 0, 'Native templates keep ownership of their own navigation')
+  assert.ok(view.props.projectLabels)
+  assert.equal(view.props.wi300Breadcrumb.props.projectLabels, undefined)
   reset(); publishedPage = zip; brand = null
-  await render({ params: Promise.resolve({ id: 'ZIP' }) })
+  result = await render({ params: Promise.resolve({ id: 'ZIP' }) })
+  assert.equal(children(result).filter(child => child.type === Header).length, 0, 'Other deployments do not receive a WI300 header')
+  assert.equal(viewOf(result).props.projectLabels, undefined)
   assert.equal(calls.duration.length, 1)
   reset(); allowed = false
   await assert.rejects(() => render({ params: Promise.resolve({ id: 'ZIP' }) }), /Not found/)

@@ -214,17 +214,22 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
 
     // Course page hiển thị hoàn toàn theo dữ liệu đã publish trong DB.
     const effectiveCoursePage = coursePage
-    const breadcrumb = deploymentBrand ? <Wi300Breadcrumb title={course.name_lop} /> : undefined
     const projectLabels = projectBadges.length ? <CourseProjectBadges projects={projectBadges} showAll compact /> : undefined
+    const customWi300Page = !!deploymentBrand && effectiveCoursePage?.useTemplate !== false
+        && (effectiveCoursePage?.theme as { importedLayout?: boolean } | undefined)?.importedLayout === true
+    // Mẫu HTML sở hữu giao diện bên trong, nhưng trang hệ thống vẫn cần header.
+    // Gộp dự án vào breadcrumb để không chèn thêm một dải trước landing page.
+    const breadcrumb = deploymentBrand ? <Wi300Breadcrumb title={course.name_lop} projectLabels={customWi300Page ? projectLabels : undefined} /> : undefined
 
     // Giữ dữ liệu đã publish; chỉ bỏ phần thống kê mà mẫu ZIP không dùng.
     if (effectiveCoursePage && (effectiveCoursePage as any).useTemplate !== false) {
         return (
             <>
                 {notificationEntry}
+                {customWi300Page && <Wi300Header />}
                 <CoursePageView
                     wi300Breadcrumb={breadcrumb}
-                    projectLabels={projectLabels}
+                    projectLabels={customWi300Page ? undefined : projectLabels}
                     coursePage={effectiveCoursePage as any}
                     course={course}
                     enrollment={enrollment}
