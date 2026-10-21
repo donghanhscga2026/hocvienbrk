@@ -131,6 +131,9 @@ async function run() {
   assert.ok(!invalidations.some(args => args[1] === 'layout'), 'Draft does not invalidate public layout')
   assert.equal((await api.PUT(request({ action: 'publish', revision: 1, settings }))).status, 200)
   assert.ok(invalidations.some(args => args[0] === '/' && args[1] === 'layout'))
+  invalidations.length = 0
+  assert.equal((await api.PUT(request({ action: 'restore', revision: 2 }))).status, 200)
+  assert.ok(invalidations.some(args => args[0] === '/' && args[1] === 'layout'), 'Restore refreshes cached published appearance')
   assert.equal((await api.PUT(request({ action: 'draft', revision: 0, settings }))).status, 409)
   const WebsitePage = load('app/tools/wi-website/page.tsx', {
     'next/link': { __esModule: true, default: props => React.createElement('a', props) },

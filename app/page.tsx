@@ -65,11 +65,14 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-export default async function Home() {
-  const session = await getSession()
-  const brand = await getCurrentDeploymentBrand()
+export default async function Home({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> } = {}) {
+  const [session, brand] = await Promise.all([getSession(), getCurrentDeploymentBrand()])
   if (brand?.appearance?.hiddenPages.includes('home')) notFound()
-  if (brand) return <Wi300Home brand={brand} session={session} />
+  if (brand) {
+    const params = await searchParams
+    // Preserve payment deep links while normal homepage visits skip course data.
+    return <Wi300Home brand={brand} session={session} loadHomeCourses={!!params?.paymentCourseId} />
+  }
   
   // Resolve Site Profile theo hostname; localhost/host chưa khai báo fallback profile mặc định.
   const profile = await getCurrentSiteProfile()

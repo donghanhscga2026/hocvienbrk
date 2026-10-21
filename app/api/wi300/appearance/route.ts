@@ -28,10 +28,10 @@ export async function PUT(request: Request) {
     await appearanceAdmin(prisma, id)
     const body = await crmBody(request, 2000000)
     const state = await saveAppearance(prisma, id, body)
-    // Draft/restore không thay đổi nội dung công khai hoặc cache website.
+    // Draft stays private; publish and restore both update the public settings.
     revalidatePath('/tools/wi-appearance')
     revalidatePath('/tools/wi-website')
-    if ((body as { action: string }).action === 'publish') revalidatePath('/', 'layout')
+    if ((body as { action: string }).action !== 'draft') revalidatePath('/', 'layout')
     return crmResponse(state)
   } catch (error) { return failure(error) }
 }
