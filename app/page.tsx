@@ -65,7 +65,7 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-export default async function Home({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> } = {}) {
+export default async function Home({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const [session, brand] = await Promise.all([getSession(), getCurrentDeploymentBrand()])
   if (brand?.appearance?.hiddenPages.includes('home')) notFound()
   if (brand) {
