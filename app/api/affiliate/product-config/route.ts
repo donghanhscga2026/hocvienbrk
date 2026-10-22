@@ -2,11 +2,22 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
 import { requireDomainModule } from '@/lib/website/domain-context'
+import {
+  MIN_DIRECT_RATE,
+  parseStartDate,
+  isCourseLocked,
+  formatDateVN
+} from "@/lib/affiliate/config-rules"
 
 /**
  * Cấu hình hoa hồng affiliate theo từng khóa học/sản phẩm (Affiliate v2).
  * - ADMIN: xem/sửa tất cả.
  * - TEACHER: chỉ xem/sửa khóa học của mình (course.teacherId).
+ *
+ * Quy tắc (lib/affiliate/config-rules.ts, chốt 2026-10-22):
+ * - Hoa hồng trực tiếp tối thiểu 10% (cả ADMIN và TEACHER).
+ * - Hoa hồng gián tiếp (tri ân) cố định 2% ở cấp hệ thống — không theo khóa.
+ * - TEACHER bị khóa chỉnh sửa khi khóa học đã khai giảng.
  */
 async function checkAccess() {
   await requireDomainModule('affiliate')
@@ -30,7 +41,7 @@ export async function GET() {
 
   const courses = await prisma.course.findMany({
     where: courseWhere,
-    select: { id: true, id_khoa: true, name_lop: true, name_khoa: true, phi_coc: true, teacherId: true },
+    select: { id: true, id_khoa: true, name_lop: true, name_khoa: true, phi_coc: true, teacherId: true, date_join: true },
     orderBy: { id: 'desc' },
     take: 300
   })
@@ -42,12 +53,15 @@ export async function GET() {
 
   return NextResponse.json({
     role,
+    minDirectRate: MIN_DIRECT_RATE,
     courses: courses.map(c => ({
       id: c.id,
       id_khoa: c.id_khoa,
       name: c.name_khoa || c.name_lop,
       listedPrice: c.phi_coc,
       teacherId: c.teacherId,
+      startDate: parseStartDate(c.date_join),
+      locked: role === 'TEACHER' && isCourseLocked(c.date_join),
       config: configMap.get(c.id) || null
     }))
   })
@@ -70,8 +84,11 @@ export async function POST(request: NextRequest) {
   const directRate = Number(body.directRate)
   const isActive = body.isActive !== false
 
-  if (!productId || !Number.isFinite(directRate) || directRate < 0 || directRate > 100) {
-    return NextResponse.json({ error: 'Dữ liệu không hợp lệ (tỷ lệ 0–100%)' }, { status: 400 })
+  if (!productId || !Number.isFinite(directRate) || directRate < MIN_DIRECT_RATE || directRate > 100) {
+    return NextResponse.json(
+      { error: `Dữ liệu không hợp lệ (tỷ lệ hoa hồng trực tiếp phải từ ${MIN_DIRECT_RATE}% đến 100%)` },
+      { status: 400 }
+    )
   }
   if (!['COURSE', 'PRODUCT', 'SERVICE'].includes(productType)) {
     return NextResponse.json({ error: 'Loại sản phẩm không hợp lệ' }, { status: 400 })
@@ -82,9 +99,20 @@ export async function POST(request: NextRequest) {
     if (productType !== 'COURSE') {
       return NextResponse.json({ error: 'Bạn chỉ được cấu hình khóa học của mình' }, { status: 403 })
     }
-    const course = await prisma.course.findUnique({ where: { id: productId }, select: { teacherId: true } })
+    const course = await prisma.course.findUnique({
+      where: { id: productId },
+      select: { teacherId: true, date_join: true }
+    })
     if (!course || course.teacherId !== userId) {
       return NextResponse.json({ error: 'Bạn chỉ được cấu hình khóa học của mình' }, { status: 403 })
+    }
+    // Khóa chỉnh sửa khi khóa học đã khai giảng
+    if (isCourseLocked(course.date_join)) {
+      const start = parseStartDate(course.date_join)
+      return NextResponse.json(
+        { error: `Khóa học đã khai giảng${start ? ` ngày ${formatDateVN(start)}` : ''} — cấu hình hoa hồng đã bị khóa, không thể điều chỉnh` },
+        { status: 403 }
+      )
     }
   }
 
