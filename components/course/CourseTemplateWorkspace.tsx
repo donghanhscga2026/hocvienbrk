@@ -49,11 +49,13 @@ export default function CourseTemplateWorkspace({ embedded = false, workflow = f
   useEffect(() => {
     if (!courseSlug) return
     const controller = new AbortController()
-    setLoading(true); setError('')
+    setLoading(true); setError(''); setRevision(null)
     // Chỉ đọc mã khi mở Sửa code; chọn mẫu không tải nguồn mọi mẫu.
-    const current = templateWorkspaceRequest(`${endpoint}?course=${encodeURIComponent(courseSlug)}`, undefined, controller.signal)
-    const code = startPageId ? templateWorkspaceRequest(`${endpoint}?page=${encodeURIComponent(startPageId)}`, undefined, controller.signal) : Promise.resolve(null)
-    Promise.all([current, code]).then(([data, source]) => {
+    templateWorkspaceRequest(`${endpoint}?course=${encodeURIComponent(courseSlug)}`, undefined, controller.signal).then(async data => {
+      if (controller.signal.aborted) return
+      // Giữ revision ngay cả khi tải mã cũ lỗi, để người dùng chủ động dán mã thay thế.
+      setRevision(data.revision)
+      const source = startPageId ? await templateWorkspaceRequest(`${endpoint}?page=${encodeURIComponent(startPageId)}`, undefined, controller.signal) : null
       if (controller.signal.aborted) return
       setRevision(source?.revision || data.revision)
       if (source?.sourceMissing) { openCode('', true); setSourceMissing(true) }
@@ -66,10 +68,10 @@ export default function CourseTemplateWorkspace({ embedded = false, workflow = f
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retry])
   const renderPreview = useCallback(() => {
-    if (html === null || sourceMissing && !html.trim()) return
+    if (html === null || !html.trim()) return
     try { const result = compileCourseCode(html); setRendered(result.html); setCompileError(''); setWarnings(result.warnings) }
     catch (error) { setCompileError(error instanceof Error ? error.message : 'Không tạo được bản xem trước.') }
-  }, [html, sourceMissing])
+  }, [html])
   useEffect(() => { if (!auto || html === null) return; const timer = setTimeout(renderPreview, 650); return () => clearTimeout(timer) }, [auto, html, renderPreview])
   const copyBuiltin = useCallback((code: string) => { if (preview?.copying) openCode(code, true) }, [preview])
   async function apply(id: string, name: string) {
@@ -114,7 +116,7 @@ export default function CourseTemplateWorkspace({ embedded = false, workflow = f
     {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}{notice && <p role="status" className="rounded-xl bg-green-50 p-4 text-sm text-green-800">{notice}</p>}
     {sourceMissing && <p role="status" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">Mẫu cũ không còn tồn tại. Bạn có thể dán mã HTML mới bên dưới rồi bấm Lưu nháp.</p>}
     {loading && <p role="status" className="text-sm">Đang tải giao diện khóa học…</p>}
-    {html === null && workflow ? <>{!loading && !preview && <button type="button" disabled={disabled} onClick={() => setRetry(value => value + 1)} className={button}>Tải lại mã trang</button>}</> : html === null ? <>
+    {html === null && workflow ? <>{!loading && !preview && <div className="flex flex-wrap gap-3"><button type="button" disabled={disabled || busy} onClick={() => setRetry(value => value + 1)} className={button}>Tải lại mã trang</button><button type="button" disabled={disabled || busy || !revision} onClick={() => { openCode('', true); setNotice('Dán mã HTML mới bên dưới. Mã cũ chỉ được thay khi bạn bấm Lưu nháp. Trang công khai chỉ đổi khi Xuất bản.') }} className={button}><Code2 size={17} />Dán mã HTML mới</button></div>}</> : html === null ? <>
       <p className="text-sm text-brk-muted">Chọn mẫu có sẵn hoặc dán code riêng cho khóa học. Thay đổi được lưu nháp trước khi xuất bản.</p>
       {!courseSlug && <p className="rounded-xl bg-brk-background p-4 text-sm">Mở một khóa học → Trang bán khóa học để chọn hoặc sửa giao diện.</p>}
       <div className="grid gap-4 md:grid-cols-2">{COURSE_TEMPLATE_LIBRARY.map(item => <article key={item.key} className="min-w-0 rounded-2xl border border-brk-outline bg-white p-4">
