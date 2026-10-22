@@ -157,8 +157,12 @@ export default async function RootLayout({
     const theme=websiteTheme(brand.color,brand.background,brand.palette)
     return <html lang="vi" data-website-theme={theme.dark ? 'dark' : 'light'} style={theme.style}><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website attentionHighlight={{config:DEFAULT_ATTENTION_CONFIG,items:[]}}><DomainShell brand={brand} navigation={doc.navigation} pages={doc?.pages.map(p=>({title:p.title,slug:p.slug}))} path={path} importedHome={importedHome}>{children}{domain.affiliate && <AffiliateTracker />}</DomainShell></Providers></body></html>
   }
-  const [brand, session] = await Promise.all([getCurrentDeploymentBrand(), getSession()])
+  const brand = await getCurrentDeploymentBrand()
   if (brand) {
+    // The proxy overwrites this header. Only public entry pages defer account UI;
+    // protected/personal pages retain the existing server-provided session.
+    const path = (await headers()).get('x-wi300-pathname')
+    const session = path === '/' || path === '/khoa-hoc' ? undefined : await getSession()
     const theme = websiteTheme(brand.palette.primary, brand.palette.background, brand.palette)
     // Bảng màu riêng lấy từ server, không dùng lựa chọn theme đã lưu của web cũ.
     return <html lang="vi" data-website-theme="light" data-site-variant="wi300" style={{ ...theme.style, ...appearanceStyle(brand.appearance || defaultAppearance) }}><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website accountAssistant={false} assistantToast={false} attentionHighlight={{ config: DEFAULT_ATTENTION_CONFIG, items: [] }}><Wi300BrandProvider brand={brand}><PwaInstallProvider><Wi300Shell>{children}</Wi300Shell></PwaInstallProvider></Wi300BrandProvider></Providers></body></html>
@@ -175,6 +179,7 @@ export default async function RootLayout({
   )
   const profilePalette = compactThemePalette(usePlatformDefault ? getDefaultThemeColors() : siteProfile?.theme?.colors)
   if (usePlatformDefault) palettes.default = profilePalette
+  const session = await getSession()
   const attentionHighlight = await getAttentionHighlightSettings()
 
   const INITIAL_SCRIPT = `

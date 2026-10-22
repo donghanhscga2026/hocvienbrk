@@ -21,7 +21,7 @@ const WalletPopup = dynamic(() => import('@/components/mbw/MbwDashboardPopup'), 
 
 export default function Wi300Header() {
   const brand = useWi300Brand()
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const path = usePathname()
   const [showShare, setShowShare] = useState(false)
   const { open: openWallet, isOpen: walletOpen } = useMbwDashboard()
@@ -50,7 +50,10 @@ export default function Wi300Header() {
   return <><header className={`${brand.appearance?.common.stickyHeader !== false ? "sticky top-0" : "relative"} z-50 shrink-0 border-b border-brk-outline bg-white/95 backdrop-blur-xl`}>
     <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-2 sm:px-4 lg:flex lg:justify-between lg:px-6">
       <Link href="/" aria-label={`${brand.name} — Trang chủ`} className="flex shrink-0 items-center gap-2">
-        <Image src={brand.logoUrl} alt={`${brand.name} — Liên minh 300 doanh nghiệp số, WIPA cố vấn`} width={2089} height={753} priority unoptimized className="h-auto w-24 object-contain min-[360px]:w-32 sm:w-44" />
+        <picture>
+          {brand.logoUrl === '/wi300/300dns-logo.webp' && <source type="image/webp" srcSet="/wi300/logo-256.webp 256w, /wi300/logo-512.webp 512w" sizes="(max-width: 359px) 96px, (max-width: 639px) 128px, 176px" />}
+          <Image src={brand.logoUrl} alt={`${brand.name} — Liên minh 300 doanh nghiệp số, WIPA cố vấn`} width={2089} height={753} loading="eager" fetchPriority="high" unoptimized className="h-auto w-24 object-contain min-[360px]:w-32 sm:w-44" />
+        </picture>
       </Link>
       <nav aria-label="Điều hướng chính" className="col-span-2 row-start-2 flex w-full min-w-0 items-center gap-1 overflow-x-auto py-1 lg:w-auto lg:justify-start">
         {links.filter(item => websiteLinkVisible(item.href, brand.appearance)).map(({ href, label, icon: Icon }) => {
@@ -59,10 +62,10 @@ export default function Wi300Header() {
         })}
       </nav>
       <div className="flex shrink-0 items-center justify-end gap-0.5 sm:gap-2">
-        <Wi300SpaceMenu role={session?.user?.role || 'guest'} actorKey={userId} route={path} onOpen={closeAccount} />
+        {status !== 'loading' && <Wi300SpaceMenu role={session?.user?.role || 'guest'} actorKey={userId} route={path} onOpen={closeAccount} />}
         {/* Cụm hành động nhanh cạnh avatar; không gọi API chia sẻ cho tới khi mở. */}
         {userId != null && <><button type="button" aria-label="Chia sẻ link affiliate" title="Chia sẻ link affiliate" onClick={() => setShowShare(true)} className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl hover:bg-brk-background"><Image src="/Share_Link_3d.png" alt="" width={32} height={32} /></button><NotificationBell /></>}
-        {session?.user ? <details ref={accountRef} className="relative" onKeyDown={event => {
+        {status === 'loading' ? <span role="status" aria-label="Đang tải tài khoản" className="inline-block h-11 w-20 rounded-xl bg-brk-background motion-safe:animate-pulse" /> : session?.user ? <details ref={accountRef} className="relative" onKeyDown={event => {
           if (event.key === 'Escape') { closeAccount(); accountRef.current?.querySelector('summary')?.focus() }
         }}>
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-xl px-1 text-xs font-semibold hover:bg-brk-background focus-visible:outline-brk-primary sm:px-2 sm:text-sm [&::-webkit-details-marker]:hidden" aria-label="Menu tài khoản">{session.user.image ? <Image src={session.user.image} alt="" width={36} height={36} unoptimized className="h-9 w-9 shrink-0 rounded-full border-2 border-brk-primary object-cover" /> : <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brk-primary text-white">{(session.user.name || 'Tài khoản').trim().split(/\s+/).map(word => word[0]).slice(-2).join('')}</span>}<span className="hidden max-w-24 truncate xl:block">{session.user.name || 'Tài khoản'}</span><ChevronDown className="hidden h-4 w-4 shrink-0 sm:block" aria-hidden="true" /></summary>

@@ -59,7 +59,10 @@ function handlePlatformRequest(request: NextRequest, session: { user?: { role?: 
         }
     }
 
-    const response = NextResponse.next()
+    // Always overwrite the client value; the layout uses this only to defer UI.
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.set('x-wi300-pathname', nextUrl.pathname)
+    const response = NextResponse.next({ request: { headers: requestHeaders } })
     
     const refCode = request.nextUrl.searchParams.get('ref')
     const pathParts = request.nextUrl.pathname.split('/').filter(Boolean)
