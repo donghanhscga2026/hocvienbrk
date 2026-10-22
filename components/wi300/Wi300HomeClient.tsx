@@ -93,12 +93,13 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
   useEffect(() => {
     if (paymentCourseId == null || paymentEnrollmentStatus === 'ACTIVE') return
     let cancelled = false
+    // [Tối ưu Vercel] Kiểm tra mỗi 20 giây thay vì 10 giây: giảm một nửa số lần gọi server action khi chờ kích hoạt.
     const interval = window.setInterval(async () => {
       try {
         const result = await checkEnrollmentStatusAction(paymentCourseId)
         if (!cancelled && result.status === 'ACTIVE') window.location.reload()
       } catch { /* Thử lại ở lần kiểm tra sau, giữ nguyên thông tin thanh toán. */ }
-    }, 10_000)
+    }, 20_000)
     const timeout = window.setTimeout(() => window.clearInterval(interval), 20 * 60_000)
     return () => { cancelled = true; window.clearInterval(interval); window.clearTimeout(timeout) }
   }, [paymentCourseId, paymentEnrollmentStatus])
