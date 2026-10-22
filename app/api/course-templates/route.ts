@@ -12,6 +12,7 @@ import { checkRateLimit } from '@/lib/rate-limit'
 import { zipSelectedBlockKeys } from '@/lib/course-page/importer/source-url'
 import { CrmError } from '@/lib/crm/service'
 import { compileCourseCode, CourseCodeError } from '@/lib/course-page/course-code'
+import { isMissingTemplateSource } from '@/lib/course-page/missing-template-source'
 
 const json = (value: unknown, status = 200) => NextResponse.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } })
 function failure(error: unknown) { return json({ error: error instanceof z.ZodError ? error.issues[0]?.message : error instanceof CrmError || error instanceof CourseCodeError ? error.message : 'Không xử lý được giao diện. Nội dung đang sửa được giữ lại.' }, error instanceof CrmError || error instanceof CourseCodeError ? error.status : 400) }
@@ -37,6 +38,7 @@ export async function GET(request: Request) {
         const url = new URL(content.exactSource.url), storage = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || '')
         if (url.origin !== storage.origin || url.search || url.hash || !/^\/storage\/v1\/object\/public\/uploads\/course-template-sources\/[a-z0-9_-]+\.html$/i.test(url.pathname)) throw new CrmError('Nguồn mẫu cũ không hợp lệ.')
         const response = await fetch(url, { signal: AbortSignal.timeout(15000), redirect: 'error', credentials: 'omit', cache: 'no-store' })
+        if (await isMissingTemplateSource(response)) return json({ revision, sourceMissing: true })
         if (!response.ok || !response.body) throw new CrmError('Không đọc được nguồn mẫu cũ.', 502)
         const chunks: Uint8Array[] = []; let bytes = 0; const reader = response.body.getReader()
         while (true) { const next = await reader.read(); if (next.done) break; bytes += next.value.length; if (bytes > 8 * 1024 * 1024) { await reader.cancel(); throw new CrmError('Nguồn mẫu cũ vượt 8 MB.') }; chunks.push(next.value) }
@@ -45,6 +47,7 @@ export async function GET(request: Request) {
       // Tương thích nguồn mẫu cũ, chỉ admin được truy cập công cụ nhập cũ.
       if (section && actor.role === 'ADMIN') {
         const response = await (await import('@/app/api/admin/course-page-templates/workspace/route')).GET(request)
+        if (response.status === 410) return json({ revision, sourceMissing: true })
         if (!response.ok) return response
         return json({ ...await response.json(), revision })
       }

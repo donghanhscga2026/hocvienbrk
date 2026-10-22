@@ -8,7 +8,7 @@ Object.defineProperty(global, 'navigator', { configurable: true, value: dom.wind
 dom.window.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
 dom.window.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open') }
 let stored = null, failSave = false, failPublish = false, applied = 0, publishes = 0, draftWrites = 0, allowConfirm = true
-let failRead = false, failCodeRead = false
+let failRead = false, failCodeRead = false, missingCodeSource = false
 window.confirm = () => allowConfirm
 global.confirm = () => allowConfirm
 const sourceHtml = '<section id="hero"><h1>Current HTML</h1><a href="#dang-ky">Register</a></section>'
@@ -36,6 +36,7 @@ const mocks = {
     if (!input) {
       if (failCodeRead && url.includes('?page=')) throw Error('Code load failed')
       const revision = { id: stored?.id ?? null, updatedAt: stored?.updatedAt.toISOString() ?? null }
+      if (missingCodeSource && url.includes('?page=')) return { revision, sourceMissing: true }
       if (url.includes('?page=')) return { revision, source: { entryPath: 'index.html', files: [{ path: 'index.html', kind: 'html', content: stored.sections[0].content.exactSource.html }] } }
       return { revision }
     }
@@ -111,6 +112,22 @@ async function run() {
     assert.ok(!buttons().some(node => node.textContent.trim() === 'Dùng mẫu'), 'Failed code load never opens a second template chooser')
     failCodeRead = false; await click('Tải lại mã trang')
     assert.match(document.querySelector('textarea[aria-label="Code"]').value, /Current HTML/)
+    missingCodeSource = true; await render('missing-code-source')
+    assert.equal(document.querySelector('textarea[aria-label="Code"]').value, '', 'Deleted source opens an empty editor automatically')
+    assert.match(document.body.textContent, /Mẫu cũ không còn tồn tại/)
+    assert.ok(!buttons().some(node => node.textContent.trim() === 'Tải lại mã trang'))
+    const beforeRecovery = draftWrites
+    assert.equal(buttons().find(node => node.textContent.trim() === 'Lưu nháp').disabled, true, 'An empty replacement cannot overwrite the old page')
+    await input(document.querySelector('textarea[aria-label="Code"]'), '<section><h1>Replacement HTML</h1><a href="#dang-ky">Join</a></section>')
+    failSave = true; await click('Lưu nháp')
+    assert.match(document.querySelector('textarea[aria-label="Code"]').value, /Replacement HTML/, 'Failed recovery save retains pasted code')
+    failSave = false; await click('Lưu nháp')
+    assert.equal(draftWrites, beforeRecovery + 1)
+    assert.match(stored.sections[0].content.exactSource.html, /Replacement HTML/)
+    assert.ok(!document.body.textContent.includes('Mẫu cũ không còn tồn tại'), 'Recovery notice clears after saving')
+    assert.equal(publishes, 1, 'Recovering a draft does not publish it')
+    missingCodeSource = false; await render('recovered-code-source')
+    assert.match(document.querySelector('textarea[aria-label="Code"]').value, /Replacement HTML/, 'Reopening loads saved replacement HTML')
     failRead = true; await render('page-load-failure')
     assert.match(document.body.textContent, /Page load failed/)
     failRead = false; await click('Tải lại trang bán'); assert.match(current(), /Chỉnh sửa trang/)
