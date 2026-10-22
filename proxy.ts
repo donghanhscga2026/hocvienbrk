@@ -38,8 +38,14 @@ const ADMIN_ONLY_PREFIXES = ['/api/admin', '/api/sync-tca', '/api/system-tree']
 /**
  * proxy.ts (Next.js 16+)
  * Thay thế cho middleware.ts để xử lý routing, auth và affiliate.
+ *
+ * [Tối ưu Vercel] Trước đây MỌI request trên host nền tảng đều đi qua lớp
+ * `auth()` (giải mã JWT) dù chỉ các đường quản trị mới cần biết vai trò.
+ * Nay phần xử lý chung tách riêng: chỉ `/admin`, `/dashboard` và các tiền
+ * tố API quản trị mới qua lớp auth; còn lại chạy thẳng, giữ nguyên logic
+ * cookie affiliate và kết quả trả về.
  */
-const proxyHandler = auth(async function proxy(request: NextRequest & { auth: any }) {
+function handlePlatformRequest(request: NextRequest, session: { user?: { role?: string } } | null) {
     const { nextUrl } = request
 
     if (nextUrl.pathname.startsWith('/api/auth')) {
@@ -47,7 +53,7 @@ const proxyHandler = auth(async function proxy(request: NextRequest & { auth: an
     }
 
     if (nextUrl.pathname.startsWith('/admin') || ADMIN_ONLY_PREFIXES.some((p) => nextUrl.pathname.startsWith(p))) {
-        const role = (request.auth as { user?: { role?: string } } | null)?.user?.role
+        const role = session?.user?.role
         if (role !== 'ADMIN') {
             return NextResponse.json({ error: 'Unauthorized. Admin only.' }, { status: 403 })
         }
@@ -74,9 +80,18 @@ const proxyHandler = auth(async function proxy(request: NextRequest & { auth: an
     if (refCode) {
         saveRefCookie(response, refCode, slug, slug, null, resourceType)
     }
-    
+
     return response
+}
+
+const proxyHandler = auth(async function proxy(request: NextRequest & { auth: any }) {
+    return handlePlatformRequest(request, request.auth as { user?: { role?: string } } | null)
 })
+
+/** Chỉ các đường này mới cần lớp auth (kiểm tra vai trò/đăng nhập) ở proxy. */
+function needsAuthLayer(pathname: string) {
+    return pathname.startsWith('/admin') || pathname.startsWith('/dashboard') || ADMIN_ONLY_PREFIXES.some((p) => pathname.startsWith(p))
+}
 
 /** Domain riêng: chỉ mở các route đã cấp, giữ domain trong thanh địa chỉ. */
 export default async function proxy(request: NextRequest, event: NextFetchEvent) {
@@ -85,7 +100,8 @@ export default async function proxy(request: NextRequest, event: NextFetchEvent)
     if(isPlatformHost(hostname)) {
         if(path.startsWith('/site-domain/')) return new NextResponse('Not found',{status:404})
         if(path.startsWith('/api/') && !ADMIN_ONLY_PREFIXES.some(p=>path.startsWith(p))) return NextResponse.next()
-        return (proxyHandler as unknown as NextMiddleware)(request,event)
+        if(needsAuthLayer(path)) return (proxyHandler as unknown as NextMiddleware)(request,event)
+        return handlePlatformRequest(request, null)
     }
     if(path.startsWith('/.well-known/giautoandien-domain/')) return NextResponse.next()
     const domainStarted=performance.now()

@@ -101,6 +101,7 @@ function HomePageContent({
     if (enrollment?.status === 'ACTIVE') return
 
     let activated = false
+    // [Tối ưu Vercel] Kiểm tra mỗi 20 giây thay vì 10 giây: giảm một nửa số lần gọi server action khi chờ kích hoạt.
     const interval = setInterval(async () => {
       if (activated) return
       try {
@@ -112,7 +113,7 @@ function HomePageContent({
           setTimeout(() => window.location.reload(), 1500)
         }
       } catch { }
-    }, 10_000)
+    }, 20_000)
     const timeout = setTimeout(() => clearInterval(interval), 20 * 60 * 1000)
     return () => { clearInterval(interval); clearTimeout(timeout) }
   }, [courseToPay, enrollmentsMap])
