@@ -43,6 +43,7 @@ const mocks = {
     if (failSave) throw Error('Code save failed')
     if (input.action === 'apply') { applied++; stored = makePage(); return { success: true } }
     assert.equal(input.action, 'save-course-code')
+    assert.deepEqual(input.revision, { id: stored?.id ?? null, updatedAt: stored?.updatedAt.toISOString() ?? null }, 'Replacement saves retain the current page revision')
     draftWrites++; stored = { ...makePage(true), sections: [{ ...makePage(true).sections[0], content: { exactSource: { html: input.html } } }] }
     return { success: true, revision: { id: stored.id, updatedAt: stored.updatedAt.toISOString() }, warnings: [] }
   } },
@@ -112,6 +113,21 @@ async function run() {
     assert.ok(!buttons().some(node => node.textContent.trim() === 'Dùng mẫu'), 'Failed code load never opens a second template chooser')
     failCodeRead = false; await click('Tải lại mã trang')
     assert.match(document.querySelector('textarea[aria-label="Code"]').value, /Current HTML/)
+    failCodeRead = true; await render('manual-replacement-after-load-failure')
+    assert.equal(document.querySelector('textarea[aria-label="Code"]'), null, 'Unknown load failures do not automatically clear source')
+    const beforeManualReplacement = draftWrites
+    await click('Dán mã HTML mới')
+    assert.equal(document.querySelector('textarea[aria-label="Code"]').value, '')
+    assert.equal(draftWrites, beforeManualReplacement, 'Opening a replacement editor makes no writes')
+    assert.ok(!document.body.textContent.includes('Mẫu cũ không còn tồn tại'), 'Unknown failures are not presented as confirmed deletions')
+    await input(document.querySelector('textarea[aria-label="Code"]'), '<section><h1>Manual replacement</h1></section>')
+    failSave = true; await click('Lưu nháp')
+    assert.match(document.querySelector('textarea[aria-label="Code"]').value, /Manual replacement/)
+    failSave = false; await click('Lưu nháp')
+    assert.equal(draftWrites, beforeManualReplacement + 1)
+    assert.match(stored.sections[0].content.exactSource.html, /Manual replacement/)
+    assert.equal(publishes, 1, 'Manual replacement only changes the draft')
+    failCodeRead = false; stored = makePage(true)
     missingCodeSource = true; await render('missing-code-source')
     assert.equal(document.querySelector('textarea[aria-label="Code"]').value, '', 'Deleted source opens an empty editor automatically')
     assert.match(document.body.textContent, /Mẫu cũ không còn tồn tại/)
