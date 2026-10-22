@@ -15,8 +15,8 @@ function date(value:Date|string|null):Date|null {
   return new Date(/(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? value : value+'Z')
 }
 
-/** Truy vấn snapshot DB gốc; bản xuất khẩu `domainSnapshot` ở cuối file bọc thêm bộ nhớ đệm ngắn hạn. */
-const resolveDomainSnapshot=cache(async(hostname:string):Promise<{domain:Domain|null;access:{value:Prisma.JsonValue}|null}|null>=>{
+/** Một snapshot DB cho mỗi request; không giữ quyền giữa các request. */
+export const domainSnapshot=cache(async(hostname:string):Promise<{domain:Domain|null;access:{value:Prisma.JsonValue}|null}|null>=>{
   if(isPlatformHost(hostname))return {domain:null,access:null}
   // Cho phép bộ phân giải cũ hoạt động trên các DB chưa có đủ bảng.
   if(typeof prisma.$queryRaw!=='function')return null
@@ -56,31 +56,4 @@ const resolveDomainSnapshot=cache(async(hostname:string):Promise<{domain:Domain|
   return {domain:{...managed,profile,createdAt:date(managed.createdAt)!,updatedAt:date(managed.updatedAt)!,token:'',enabled:managed.isActive,
     courses:config.modules.courses,crm:false,affiliate:config.modules.affiliate,verifiedAt:date(managed.createdAt),checkedAt:null,message:'Tên miền được quản trị viên cấp'},access}
 })
-
-/**
- * [Tối ưu Vercel] Trước đây mỗi request tới tên miền riêng đều chạy lại câu
- * SQL nối 6 bảng ở trên (proxy, layout và callback phiên gọi chồng nhau ở các
- * pha khác nhau của cùng/chuỗi request) — đây là một nguồn ngốn Fluid Active
- * CPU lớn trên wi300.vn. Giờ kết quả được giữ trong bộ nhớ của instance
- * tối đa 30 giây: đổi lại, việc sửa/tắt tên miền hoặc gói quyền có độ trễ
- * hiệu lực tối đa 30 giây trên mỗi instance thay vì tức thì. Lỗi truy vấn
- * không được lưu đệm để request sau thử lại ngay.
- */
-const SNAPSHOT_TTL_MS = 30_000
-const SNAPSHOT_MAX_ENTRIES = 256
-type SnapshotResult = Awaited<ReturnType<typeof resolveDomainSnapshot>>
-const snapshotCache = new Map<string, { expiresAt: number; value: SnapshotResult }>()
-
-export async function domainSnapshot(hostname: string): Promise<SnapshotResult> {
-  const now = Date.now()
-  const hit = snapshotCache.get(hostname)
-  if (hit && hit.expiresAt > now) return hit.value
-  const value = await resolveDomainSnapshot(hostname)
-  if (snapshotCache.size >= SNAPSHOT_MAX_ENTRIES) {
-    const oldest = snapshotCache.keys().next().value
-    if (oldest !== undefined) snapshotCache.delete(oldest)
-  }
-  snapshotCache.set(hostname, { expiresAt: now + SNAPSHOT_TTL_MS, value })
-  return value
-}
 
