@@ -75,6 +75,7 @@ model User {
   learnerBaselines             LearnerBaseline[]
   attendanceRecords            AttendanceRecord[]
   salesLedgerEntries           MemberSalesLedger[]
+  connectedAccounts            ConnectedAccount[]
 
   @@index([email])
   @@index([phone])
@@ -489,6 +490,64 @@ model Enrollment {
 /// nhận số liệu (đúng mô hình vận hành affiliate đã chốt). GĐ2A — kế
 /// hoạch nâng cấp từ WIPA OS (23/10/2026). Đồng bộ idempotent bằng
 /// dedupeKey duy nhất; xem lib/sales-ledger/.
+/// Tài khoản mạng xã hội thành viên liên kết 1 lần (OAuth) để hệ thống
+/// tự đồng bộ số liệu — tầng Bạc của kiến trúc đo lường. Token lưu để
+/// đồng bộ nền; ngắt liên kết sẽ xóa token. GĐ2A (23/10/2026).
+model ConnectedAccount {
+  id             Int                  @id @default(autoincrement())
+  userId         Int
+  provider       String
+  externalId     String
+  displayName    String?
+  handle         String?
+  accessToken    String?
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  status         ConnectedAccountStatus @default(ACTIVE)
+  lastSyncAt     DateTime?
+  lastError      String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapshots      SocialSnapshot[]
+  contentItems   ExternalContentItem[]
+
+  @@unique([userId, provider])
+  @@index([provider, externalId])
+}
+
+/// Ảnh chụp chỉ số kênh tại một thời điểm (followers, tổng view, số
+/// video). Chênh lệch giữa hai ảnh chụp liên tiếp = tăng trưởng thật.
+model SocialSnapshot {
+  id         Int              @id @default(autoincrement())
+  accountId  Int
+  capturedAt DateTime         @default(now())
+  followers  Int              @default(0)
+  totalViews Float            @default(0)
+  videoCount Int              @default(0)
+  account    ConnectedAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, capturedAt])
+}
+
+/// Video/bài đăng phát hiện trên kênh đã liên kết — định danh duy nhất
+/// theo externalId nên đếm "video mới trong kỳ" không bao giờ trùng.
+model ExternalContentItem {
+  id          Int              @id @default(autoincrement())
+  accountId   Int
+  externalId  String
+  url         String
+  title       String
+  publishedAt DateTime?
+  viewCount   Float            @default(0)
+  likeCount   Int              @default(0)
+  lastSeenAt  DateTime         @default(now())
+  account     ConnectedAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, externalId])
+  @@index([accountId, publishedAt])
+}
+
 model MemberSalesLedger {
   id         Int               @id @default(autoincrement())
   userId     Int
@@ -2303,6 +2362,12 @@ enum EnrollmentMode {
 enum EnrollmentMemberRole {
   TV
   PS
+}
+
+enum ConnectedAccountStatus {
+  ACTIVE
+  ERROR
+  REVOKED
 }
 
 enum SalesLedgerRole {
