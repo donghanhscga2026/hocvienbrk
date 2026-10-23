@@ -12,8 +12,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Eye, EyeOff, AlertTriangle } from "lucide-react"
 import { validatePasswordStrength, PASSWORD_POLICY_MESSAGE } from "@/lib/password-policy"
 import { safeReturnPath } from '@/lib/website/domain-shared'
-// import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons"  // DISABLED: Google Auth
-// import { useEmailPrefill } from "@/hooks/useEmailPrefill"  // DISABLED: Google Auth
+import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons"
+import { useEmailPrefill } from "@/hooks/useEmailPrefill"
 
 function LoginForm() {
     const wi300 = useWi300Brand()
@@ -58,7 +58,7 @@ function LoginForm() {
         }
     })
 
-    // const { email: prefillEmail } = useEmailPrefill()  // DISABLED: Google Auth
+    const { email: prefillEmail } = useEmailPrefill()
 
     // Kiểm tra nếu cần đổi mật khẩu sau khi đăng nhập
     useEffect(() => {
@@ -67,11 +67,11 @@ function LoginForm() {
         }
     }, [session])
 
-    // useEffect(() => {
-    //     if (prefillEmail) {
-    //         setValue("identifier", prefillEmail)
-    //     }
-    // }, [prefillEmail, setValue])  // DISABLED: Google Auth
+    useEffect(() => {
+        if (prefillEmail) {
+            setValue("identifier", prefillEmail)
+        }
+    }, [prefillEmail, setValue])
 
     // Xử lý lỗi từ URL (NextAuth CredentialsSignin redirect về kèm ?code=...)
     useEffect(() => {
@@ -290,9 +290,9 @@ function LoginForm() {
         signOut({ callbackUrl: '/login' })
     }
 
-    // const handleGoogleLoading = (loading: boolean) => {
-    //     setIsLoading(loading)
-    // }  // DISABLED: Google Auth
+    const handleGoogleLoading = (loading: boolean) => {
+        setIsLoading(loading)
+    }
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // GIAO DIỆN ĐỔI MẬT KHẨU (KHI DÙNG MẬT KHẨU MẶC ĐỊNH)
@@ -396,7 +396,6 @@ function LoginForm() {
                 </div>
 
                 <div className="bg-brk-background/5 backdrop-blur-sm border border-brk-outline/10 rounded-2xl p-6 space-y-5 shadow-2xl">
-                    {/* DISABLED: Google Auth
                     <SocialAuthButtons
                         callbackUrl={safeReturnPath(searchParams.get('callbackUrl')) ? '/complete-profile?callbackUrl=' + encodeURIComponent(safeReturnPath(searchParams.get('callbackUrl'))!) : redirectSlug ? `/complete-profile?redirect=${encodeURIComponent(redirectSlug)}` : '/complete-profile'}
                         isLoading={isLoading}
@@ -407,7 +406,6 @@ function LoginForm() {
                         <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-brk-outline" /></div>
                         <div className="relative flex justify-center text-xs"><span className="bg-transparent px-2 text-brk-accent">hoặc dùng tài khoản</span></div>
                     </div>
-                    */}
 
                     <div className="space-y-4">
                         {warning && <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/30 p-3 text-sm text-brk-on-surface">{warning}</div>}

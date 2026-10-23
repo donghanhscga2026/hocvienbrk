@@ -70,12 +70,11 @@ export const authOptions: NextAuthConfig = {
         }
     },
     providers: [
-        // DISABLED: Google Auth
-        // Google({
-        //     clientId: process.env.GOOGLE_CLIENT_ID,
-        //     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        //     allowDangerousEmailAccountLinking: true,
-        // }),
+        Google({
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+            allowDangerousEmailAccountLinking: true,
+        }),
         Credentials({
             credentials: {
                 identifier: { label: "Student ID / Email / Phone", type: "text" },
