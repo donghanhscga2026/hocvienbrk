@@ -7,6 +7,7 @@ import { crmResponse } from '@/lib/crm/http'
 import { templateSourceSchema, sourceFromHtml } from '@/lib/course-page/template-source'
 import { isImportedRegistrationSection } from '@/lib/course-page/importer/registration'
 import { zipSelectedBlockKeys } from '@/lib/course-page/importer/source-url'
+import { isMissingTemplateSource } from '@/lib/course-page/missing-template-source'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -31,6 +32,7 @@ async function readSource(url: string, extension: 'json' | 'html') {
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 15000)
   try {
     const response = await fetch(parsed, { signal: controller.signal, redirect: 'error', cache: 'no-store', credentials: 'omit' })
+    if (await isMissingTemplateSource(response)) throw new CrmError('Mã nguồn mẫu cũ không còn tồn tại.', 410)
     if (!response.ok || !response.body) throw new CrmError('Không tải được mã mẫu đã lưu.', 502)
     const reader = response.body.getReader(), chunks: Uint8Array[] = []; let size = 0
     while (true) { const next = await reader.read(); if (next.done) break; size += next.value.length; if (size > 9 * 1024 * 1024) { await reader.cancel(); throw new CrmError('Nguồn mẫu quá lớn.') }; chunks.push(next.value) }

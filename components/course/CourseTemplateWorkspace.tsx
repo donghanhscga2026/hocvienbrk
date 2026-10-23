@@ -31,6 +31,7 @@ export default function CourseTemplateWorkspace({ embedded = false, workflow = f
   const [device, setDevice] = useState(1280), [mobilePanel, setMobilePanel] = useState<'code' | 'preview'>('code'), [auto, setAuto] = useState(true), [rendered, setRendered] = useState(''), [compileError, setCompileError] = useState(''), [warnings, setWarnings] = useState<string[]>([])
   const [preview, setPreview] = useState<Preview | null>(null)
   const [retry, setRetry] = useState(0)
+  const [sourceMissing, setSourceMissing] = useState(false)
   const dialog = useRef<HTMLDialogElement>(null), request = useRef<AbortController | null>(null)
   const dirty = html !== null && html !== baseline
   useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
@@ -42,19 +43,23 @@ export default function CourseTemplateWorkspace({ embedded = false, workflow = f
     window.addEventListener('beforeunload', prevent); return () => window.removeEventListener('beforeunload', prevent)
   }, [dirty])
   function openCode(code: string, changed = false) {
+    setSourceMissing(false)
     setHtml(code); setBaseline(changed ? '' : code); setPreview(null); setError(''); setNotice(''); setRendered(''); setCompileError(''); setMobilePanel('code')
   }
   useEffect(() => {
     if (!courseSlug) return
     const controller = new AbortController()
-    setLoading(true); setError('')
+    setLoading(true); setError(''); setRevision(null)
     // Chỉ đọc mã khi mở Sửa code; chọn mẫu không tải nguồn mọi mẫu.
-    const current = templateWorkspaceRequest(`${endpoint}?course=${encodeURIComponent(courseSlug)}`, undefined, controller.signal)
-    const code = startPageId ? templateWorkspaceRequest(`${endpoint}?page=${encodeURIComponent(startPageId)}`, undefined, controller.signal) : Promise.resolve(null)
-    Promise.all([current, code]).then(([data, source]) => {
+    templateWorkspaceRequest(`${endpoint}?course=${encodeURIComponent(courseSlug)}`, undefined, controller.signal).then(async data => {
+      if (controller.signal.aborted) return
+      // Giữ revision ngay cả khi tải mã cũ lỗi, để người dùng chủ động dán mã thay thế.
+      setRevision(data.revision)
+      const source = startPageId ? await templateWorkspaceRequest(`${endpoint}?page=${encodeURIComponent(startPageId)}`, undefined, controller.signal) : null
       if (controller.signal.aborted) return
       setRevision(source?.revision || data.revision)
-      if (source?.renderPage) setPreview({ id: startPageId!, name: source.name, page: true, copying: true, token: crypto.randomUUID() })
+      if (source?.sourceMissing) { openCode('', true); setSourceMissing(true) }
+      else if (source?.renderPage) setPreview({ id: startPageId!, name: source.name, page: true, copying: true, token: crypto.randomUUID() })
       else if (source?.source) openCode(compileTemplateSource(source.source as TemplateSource).analysisHtml)
       else if (startCode) openCode(starter, true)
     }).catch(error => { if (!controller.signal.aborted) setError(error instanceof Error ? error.message : 'Không tải được giao diện khóa học.') }).finally(() => { if (!controller.signal.aborted) setLoading(false) })
@@ -63,7 +68,7 @@ export default function CourseTemplateWorkspace({ embedded = false, workflow = f
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retry])
   const renderPreview = useCallback(() => {
-    if (html === null) return
+    if (html === null || !html.trim()) return
     try { const result = compileCourseCode(html); setRendered(result.html); setCompileError(''); setWarnings(result.warnings) }
     catch (error) { setCompileError(error instanceof Error ? error.message : 'Không tạo được bản xem trước.') }
   }, [html])
@@ -86,6 +91,7 @@ export default function CourseTemplateWorkspace({ embedded = false, workflow = f
     try {
       compileCourseCode(html)
       const result = await templateWorkspaceRequest(endpoint, { action: 'save-course-code', slug: courseSlug, name: courseName, html, revision }, controller.signal)
+      setSourceMissing(false)
       setBaseline(html); setRevision(result.revision); setWarnings(result.warnings || []); setNotice('Đã lưu bản nháp vào khóa học. Bấm Xuất bản để cập nhật trang công khai.'); onApplied?.()
       return true
     } catch (error) { setError(error instanceof Error ? error.message : 'Không lưu được code. Mã đang sửa được giữ lại.') }
@@ -108,8 +114,9 @@ export default function CourseTemplateWorkspace({ embedded = false, workflow = f
     <h1 className="text-2xl font-bold text-brk-primary">{html === null ? 'Giao diện trang bán khóa học' : 'Giao diện bằng code'}</h1>
     {courseSlug && <p className="text-sm text-brk-muted">Khóa học: <strong>{courseName}</strong></p>}</>}
     {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}{notice && <p role="status" className="rounded-xl bg-green-50 p-4 text-sm text-green-800">{notice}</p>}
+    {sourceMissing && <p role="status" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">Mẫu cũ không còn tồn tại. Bạn có thể dán mã HTML mới bên dưới rồi bấm Lưu nháp.</p>}
     {loading && <p role="status" className="text-sm">Đang tải giao diện khóa học…</p>}
-    {html === null && workflow ? <>{!loading && !preview && <button type="button" disabled={disabled} onClick={() => setRetry(value => value + 1)} className={button}>Tải lại mã trang</button>}</> : html === null ? <>
+    {html === null && workflow ? <>{!loading && !preview && <div className="flex flex-wrap gap-3"><button type="button" disabled={disabled || busy} onClick={() => setRetry(value => value + 1)} className={button}>Tải lại mã trang</button><button type="button" disabled={disabled || busy || !revision} onClick={() => { openCode('', true); setNotice('Dán mã HTML mới bên dưới. Mã cũ chỉ được thay khi bạn bấm Lưu nháp. Trang công khai chỉ đổi khi Xuất bản.') }} className={button}><Code2 size={17} />Dán mã HTML mới</button></div>}</> : html === null ? <>
       <p className="text-sm text-brk-muted">Chọn mẫu có sẵn hoặc dán code riêng cho khóa học. Thay đổi được lưu nháp trước khi xuất bản.</p>
       {!courseSlug && <p className="rounded-xl bg-brk-background p-4 text-sm">Mở một khóa học → Trang bán khóa học để chọn hoặc sửa giao diện.</p>}
       <div className="grid gap-4 md:grid-cols-2">{COURSE_TEMPLATE_LIBRARY.map(item => <article key={item.key} className="min-w-0 rounded-2xl border border-brk-outline bg-white p-4">
