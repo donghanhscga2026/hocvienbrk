@@ -29,7 +29,7 @@ export async function readCrm(db: PrismaClient, actor: CrmActor, query: z.infer<
   if (query.view === 'owners') {
     const owners = await db.user.findMany({
       where: actor.role === 'ADMIN' ? { role: { in: ['ADMIN', 'TEACHER', 'INSTRUCTOR'] } } : { id: actor.id },
-      select: ownerSelect, orderBy: { id: 'asc' },
+      select: { ...ownerSelect, role: true }, orderBy: { id: 'asc' },
     })
     return { owners, actor: { id: actor.id, isAdmin: actor.role === 'ADMIN' } }
   }

@@ -157,20 +157,36 @@ export async function processEnrollmentActivation(options: ActivationOptions): P
   }
 
   // ════════════════════════════════════════════════════════════
-  // STEP 4: Affiliate commission (non-SYS courses)
+  // STEP 4: Affiliate v2 — tạo Order + tính hoa hồng 2 thành phần (non-SYS courses)
+  // Hoa hồng tính trên GIÁ NIÊM YẾT (quyết định nghiệp vụ 2026-10-15):
+  // các phần trừ (MBV/ví/quà tặng) là quyền lợi, giảng viên chấp nhận bù.
   // ════════════════════════════════════════════════════════════
   let commissionResult: any = null
   if (enrollment.course.type !== 'SYS') {
     try {
-      const amount = transferData?.amount || enrollment.payment?.amount || 0
-      commissionResult = await processEnrollmentCommission(
-        enrollment.userId,
-        enrollmentId,
-        amount
-      )
+      const {
+        createOrderForEnrollment,
+        processOrderCommission,
+        resolveAffiliateIdFromCookie
+      } = await import('@/lib/affiliate/unified-commission')
+      const { affiliateId, refCode } = await resolveAffiliateIdFromCookie()
+      const orderRes: any = await createOrderForEnrollment(enrollmentId, { affiliateId, refCode })
+      if (orderRes.success && orderRes.orderId) {
+        commissionResult = await processOrderCommission(orderRes.orderId)
+      } else {
+        commissionResult = orderRes
+      }
     } catch (err) {
       console.error(`[Activation] Commission processing failed for enrollment#${enrollmentId}:`, err)
     }
+  }
+
+  // Tự động kích hoạt quyền lợi voucher (quà tặng các khóa B, C, D...)
+  try {
+    const { grantVoucherBenefits } = await import('@/lib/voucher/voucher-service')
+    await grantVoucherBenefits(enrollment.userId)
+  } catch (err) {
+    console.error(`[Activation] grantVoucherBenefits failed for enrollment#${enrollmentId}:`, err)
   }
 
   // ════════════════════════════════════════════════════════════

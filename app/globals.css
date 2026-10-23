@@ -219,3 +219,238 @@ body {
 .today-ring-pulse-done {
   animation: today-ring-pulse-done 1.2s ease-in-out infinite;
 }
+
+/* Thẻ Wi lấy màu từ nhận diện triển khai; họa tiết CSS không tải thêm ảnh. */
+.wi300-discovery-card,
+.wi300-solution-card,
+.wi300-partner-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.wi300-discovery-card {
+  --wi-card-color: var(--color-primary);
+  background: linear-gradient(135deg, var(--color-surface) 0%, color-mix(in srgb, var(--wi-card-color) 10%, var(--color-surface)) 100%);
+  border-color: color-mix(in srgb, var(--wi-card-color) 20%, var(--color-surface));
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--color-primary) 5%, transparent);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+.wi300-discovery-card[data-tone="1"] { --wi-card-color: var(--color-accent); }
+.wi300-discovery-card[data-tone="2"] { --wi-card-color: var(--color-primary); background: linear-gradient(135deg, var(--color-background), var(--color-surface)); }
+.wi300-discovery-card::before,
+.wi300-solution-card::before,
+.wi300-partner-card::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 14rem;
+  height: 14rem;
+  right: -6rem;
+  top: -6rem;
+  border: 1.5rem solid color-mix(in srgb, var(--wi-card-color, var(--color-primary)) 8%, transparent);
+  border-radius: 50%;
+}
+.wi300-discovery-card > div > span {
+  background: var(--color-surface);
+  color: var(--wi-card-color);
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--wi-card-color) 10%, transparent);
+}
+.wi300-solution-card {
+  background: linear-gradient(135deg, var(--color-surface), var(--color-background));
+  border-color: color-mix(in srgb, var(--color-primary) 20%, var(--color-surface));
+}
+.wi300-partner-card {
+  background: linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 80%, black));
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+.wi300-partner-card::before {
+  width: 20rem;
+  height: 20rem;
+  right: -8rem;
+  top: -8rem;
+  border-color: #ffffff12;
+}
+.wi300-partner-card::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 10rem;
+  height: 16rem;
+  right: -5rem;
+  top: 3rem;
+  border-radius: 3rem;
+  border: 1px solid #ffffff30;
+  background: linear-gradient(145deg, #ffffff12, transparent);
+  transform: rotate(-12deg);
+}
+@media (hover: hover) {
+  .wi300-discovery-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--wi-card-color);
+    box-shadow: 0 12px 28px color-mix(in srgb, var(--wi-card-color) 14%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wi300-discovery-card { transition: none; }
+  .wi300-discovery-card:hover { transform: none; }
+}
+
+/* Hero và dự án chỉ dùng biến nhận diện của deployment Wi300 hiện tại. */
+.wi300-hero {
+  background: radial-gradient(ellipse at 82% 45%, color-mix(in srgb, var(--color-primary) 9%, transparent), transparent 58%),
+    linear-gradient(155deg, var(--color-surface), var(--color-background));
+}
+.wi300-hero-title,
+.wi300-hero-secondary,
+.wi300-project-action { color: var(--color-primary); }
+.wi300-hero-primary { background: var(--color-accent); color: var(--color-on-primary); }
+.wi300-hero-secondary { border-color: var(--color-primary); background: var(--color-surface); }
+.wi300-ecosystem-art {
+  position: relative;
+  aspect-ratio: 600 / 540;
+  overflow: hidden;
+  background: radial-gradient(ellipse, #fff5aa90, transparent 72%);
+}
+/* Di chuyển cả vòng cùng nhau để chữ luôn ngay ngắn, không quay hoặc biến dạng. */
+@media (prefers-reduced-motion: no-preference) {
+  .wi300-ecosystem-art { animation: wi300-ecosystem-float 7s ease-in-out infinite; }
+}
+.wi300-ecosystem-art:hover,
+.wi300-ecosystem-art:focus-visible { animation-play-state: paused; }
+@keyframes wi300-ecosystem-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+/* Ảnh 1280×720: vùng vòng tròn tại (575, 25), kích thước 600×540. */
+.wi300-ecosystem-source {
+  position: absolute;
+  width: 213.333333%;
+  max-width: none;
+  height: auto;
+  left: -95.833333%;
+  top: -4.62963%;
+  -webkit-mask-image: url('/wi300/ecosystem-mask.svg');
+  mask-image: url('/wi300/ecosystem-mask.svg');
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+.wi300-project-card {
+  box-shadow: 0 3px 16px color-mix(in srgb, var(--color-primary) 4%, transparent);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+/* Thẻ ngang xanh–kem Wi300, khung logo không cắt ảnh. */
+.wi300-project-horizontal { grid-template-columns: minmax(0, 40%) minmax(0, 1fr); }
+.wi300-project-media {
+  min-height: 10.5rem;
+  isolation: isolate;
+  background: linear-gradient(140deg, var(--color-background), var(--color-surface) 45%, color-mix(in srgb, var(--color-primary) 12%, var(--color-background)));
+}
+.wi300-project-media::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 1rem;
+  height: 2.75rem;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--color-primary);
+}
+.wi300-project-media::after {
+  content: "";
+  position: absolute;
+  width: 17rem;
+  height: 17rem;
+  left: -7rem;
+  bottom: -13rem;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 22%, transparent);
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-primary) 3%, transparent),
+    0 0 0 16px color-mix(in srgb, var(--color-primary) 3%, transparent),
+    0 0 0 24px color-mix(in srgb, var(--color-primary) 3%, transparent),
+    0 0 0 32px color-mix(in srgb, var(--color-primary) 3%, transparent);
+}
+@media (hover: hover) {
+  .wi300-project-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--color-primary);
+    box-shadow: 0 12px 28px color-mix(in srgb, var(--color-primary) 10%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wi300-project-card { transition: none; }
+  .wi300-project-card:hover { transform: none; }
+}
+
+/* Thẻ giảng viên cố định, dùng ảnh gốc và màu deployment Wi300. */
+.wi300-teacher-card {
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--color-primary) 6%, transparent);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+.wi300-teacher-portrait::before,
+.wi300-teacher-portrait::after {
+  content: "";
+  position: absolute;
+  width: 8rem;
+  height: 6rem;
+  background: var(--color-background);
+  border-radius: 70% 30% 65% 35%;
+}
+.wi300-teacher-portrait::before { left: -1rem; top: 0.5rem; transform: rotate(-20deg); }
+.wi300-teacher-portrait::after { right: -1rem; bottom: 0; transform: rotate(25deg); }
+.wi300-teacher-link { color: var(--color-primary); border-color: var(--color-primary); }
+.wi300-teacher-register { color: var(--color-accent); }
+@media (hover: hover) {
+  .wi300-teacher-card:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 12px 30px color-mix(in srgb, var(--color-primary) 12%, transparent);
+  }
+  .wi300-teacher-register:hover { background: var(--color-background); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wi300-teacher-card { transition: none; }
+}
+
+/* Các mẫu đã duyệt: chỉ dùng màu deployment, không thay logo/ảnh người. */
+.wi300-knowledge-art, .wi300-network-node { color: var(--color-primary); }
+.wi300-network-hub { background: var(--color-primary); color: var(--color-on-primary); }
+.wi300-pill { color: var(--color-on-surface); border-color: var(--color-outline); background: var(--color-surface); }
+.wi300-pill-active { color: var(--color-on-primary); border-color: var(--color-primary); background: var(--color-primary); }
+.wi300-project-tile-media, .wi300-teacher-media {
+  background: radial-gradient(ellipse at 90% 15%, color-mix(in srgb, var(--color-primary) 9%, transparent), transparent 65%), var(--color-background);
+}
+.wi300-teacher-visual { background: color-mix(in srgb, var(--color-background) 65%, var(--color-surface)); }
+.wi300-teacher-visual .wi300-teacher-portrait { width: 100%; max-width: 13rem; }
+.wi300-teacher-visual .wi300-teacher-portrait::before,
+.wi300-teacher-visual .wi300-teacher-portrait::after { display: none; }
+.wi300-teacher-track { scrollbar-width: none; -ms-overflow-style: none; }
+.wi300-teacher-track::-webkit-scrollbar { display: none; }
+.wi300-slider-arrow { color: var(--color-primary); border-color: var(--color-primary); }
+.wi300-branded-cta, .wi300-teacher-cta {
+  position: relative; isolation: isolate; overflow: hidden;
+  background: var(--color-primary); color: var(--color-on-primary);
+}
+.wi300-branded-cta::after {
+  content: ''; position: absolute; z-index: -1; width: 28rem; height: 28rem; right: -8rem; top: -14rem;
+  border: 1px solid color-mix(in srgb, var(--color-background) 30%, transparent); border-radius: 50%;
+  box-shadow: 0 0 0 26px color-mix(in srgb, var(--color-background) 5%, transparent), 0 0 0 52px color-mix(in srgb, var(--color-background) 5%, transparent), 0 0 0 80px color-mix(in srgb, var(--color-background) 3%, transparent);
+}
+.wi300-teacher-cta .wi300-knowledge-art { color: var(--color-background); }
+.wi300-teacher-cta .wi300-network-node { color: var(--color-primary); }
+
+/* Cài đặt chung chỉ tác động website Wi, không thay theme các domain chuyên gia. */
+html[data-site-variant="wi300"] body { font-family: var(--wi300-font, var(--font-be-vietnam-pro)), ui-sans-serif, system-ui, sans-serif; }
+html[data-site-variant="wi300"] .max-w-7xl { max-width: var(--wi300-content-width, 1280px); }
+html[data-site-variant="wi300"] [hidden] { display: none; }
+/* Khung quản lý dùng màu chính cho điều hướng và tiêu đề như mẫu duyệt. */
+html[data-site-variant="wi300"] [data-management-workspace] .text-brk-primary {
+  color: var(--color-primary);
+}
+html[data-site-variant="wi300"] .wi300-project-card,
+html[data-site-variant="wi300"] .wi300-teacher-card,
+html[data-site-variant="wi300"] .wi300-branded-cta,
+html[data-site-variant="wi300"] .wi300-teacher-cta,
+html[data-site-variant="wi300"] .wi300-discovery-card,
+html[data-site-variant="wi300"] .wi300-hero-primary,
+html[data-site-variant="wi300"] .wi300-hero-secondary { border-radius: var(--wi300-radius, 1rem); }

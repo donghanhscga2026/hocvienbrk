@@ -8,8 +8,11 @@ import {
 } from 'lucide-react'
 import {
     createVoucher, deleteVoucher, getVouchersWithCourses,
-    awardVoucherToCourse, acceptVoucherToCourse, removeVoucherFromCourse, getAdminCoursesAction
+    awardVoucherToCourse, acceptVoucherToCourse, removeVoucherFromCourse, getAdminCoursesAction,
 } from '@/app/actions/admin-actions'
+import {
+    getVoucherBenefits, setVoucherBenefits
+} from '@/app/actions/voucher-mbv-admin'
 import MainHeader from '@/components/layout/MainHeader'
 
 interface VoucherData {
@@ -158,7 +161,7 @@ export default function VouchersPage() {
                         <p className="text-sm text-gray-500 mt-1">{isAdmin ? 'Tất cả voucher trong hệ thống' : 'Voucher của các khóa bạn quản lý'}</p>
                     </div>
                     {isAdmin && (
-                        <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-brk-accent text-white rounded-xl hover:bg-brk-accent/90 transition-all font-bold text-sm shadow-lg">
+                        <button data-help-id="btn-create-voucher" onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-brk-accent text-white rounded-xl hover:bg-brk-accent/90 transition-all font-bold text-sm shadow-lg">
                             <Plus className="h-4 w-4" /> Tạo Voucher mới
                         </button>
                     )}
@@ -349,6 +352,7 @@ function ManageCoursesModal({ voucher, coursesList, onClose, onAwardSelect, onAc
                         </select>
                     </div>
                 </div>
+                <VoucherBenefitsSection voucherId={voucher.id} coursesList={coursesList} loading={loading} onSaved={() => {}} />
                 <div className="mb-6">
                     <h3 className="text-sm font-black text-blue-700 uppercase mb-2">✅ Accepted (người dùng nhấn nhận)</h3>
                     {voucher.acceptedCourses.slice(0, 5).map((ac, i) => (
@@ -365,6 +369,104 @@ function ManageCoursesModal({ voucher, coursesList, onClose, onAwardSelect, onAc
                         </select>
                     </div>
                 </div>
+            </div>
+        </div>
+    )
+}
+
+// ---------------------------------------------------------------------------
+// QUYỀN LỢI KHÓA HỌC (bundle/quà tặng):
+// Voucher này cho hưởng những khóa nào — FREE_100 (kích hoạt luôn)
+// hoặc PARTIAL (học viên trả thêm extraAmount).
+// Khi học viên kích hoạt khóa nguồn (award), các khóa này tự động kích hoạt.
+// ---------------------------------------------------------------------------
+function VoucherBenefitsSection({ voucherId, coursesList, loading, onSaved }: {
+    voucherId: number
+    coursesList: { id: number; id_khoa: string; name_lop: string }[]
+    loading: boolean
+    onSaved: () => void
+}) {
+    const [benefits, setBenefits] = useState<{ id: number; courseId: number; benefitType: string; extraAmount: number; course: { id: number; id_khoa: string; name_lop: string } }[]>([])
+    const [fetching, setFetching] = useState(true)
+    const [saving, setSaving] = useState(false)
+    const [addCourseId, setAddCourseId] = useState('')
+    const [addType, setAddType] = useState<'FREE_100' | 'PARTIAL'>('FREE_100')
+    const [addAmount, setAddAmount] = useState('')
+
+    const load = useCallback(async () => {
+        setFetching(true)
+        const res = await getVoucherBenefits(voucherId)
+        if (res.success && res.benefits) setBenefits(res.benefits as any)
+        setFetching(false)
+    }, [voucherId])
+
+    useEffect(() => { load() }, [load])
+
+    const handleAdd = async () => {
+        const courseId = Number(addCourseId)
+        if (!courseId) return
+        if (benefits.some(b => b.courseId === courseId)) { alert('Khóa này đã có trong quyền lợi'); return }
+        const next = [...benefits.map(b => ({ courseId: b.courseId, benefitType: b.benefitType as 'FREE_100' | 'PARTIAL', extraAmount: b.extraAmount })), {
+            courseId,
+            benefitType: addType,
+            extraAmount: addType === 'PARTIAL' ? Math.max(0, Number(addAmount) || 0) : 0
+        }]
+        setSaving(true)
+        const res = await setVoucherBenefits({ voucherId, benefits: next })
+        setSaving(false)
+        if (res.success) { setAddCourseId(''); setAddAmount(''); setAddType('FREE_100'); await load(); onSaved() }
+        else alert('Lưu thất bại: ' + (res.error || ''))
+    }
+
+    const handleRemove = async (courseId: number) => {
+        const next = benefits.filter(b => b.courseId !== courseId).map(b => ({ courseId: b.courseId, benefitType: b.benefitType as 'FREE_100' | 'PARTIAL', extraAmount: b.extraAmount }))
+        setSaving(true)
+        const res = await setVoucherBenefits({ voucherId, benefits: next })
+        setSaving(false)
+        if (res.success) { await load(); onSaved() }
+        else alert('Xóa thất bại: ' + (res.error || ''))
+    }
+
+    const busy = loading || saving || fetching
+
+    return (
+        <div className="mb-6">
+            <h3 className="text-sm font-black text-green-700 uppercase mb-2">🎁 Quyền lợi khóa học (tự động kích hoạt)</h3>
+            <p className="text-[11px] text-gray-500 mb-2">Học viên kích hoạt khóa nguồn → các khóa dưới đây được tự động kích hoạt theo quyền lợi.</p>
+            {fetching ? (
+                <p className="text-xs text-gray-400 italic">Đang tải...</p>
+            ) : benefits.length === 0 ? (
+                <p className="text-xs text-gray-400 italic">Chưa cấu hình quyền lợi nào</p>
+            ) : benefits.map(b => (
+                <div key={b.courseId} className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2 mb-1.5">
+                    <span className="text-xs font-bold text-green-800">
+                        {b.course.name_lop} ({b.course.id_khoa})
+                        <span className="ml-2 text-green-600">{b.benefitType === 'FREE_100' ? '— Miễn phí 100%' : `— Trả thêm ${(b.extraAmount || 0).toLocaleString('vi-VN')}đ`}</span>
+                    </span>
+                    <button onClick={() => handleRemove(b.courseId)} className="text-red-500 hover:text-red-700 text-xs font-bold" disabled={busy}>✕</button>
+                </div>
+            ))}
+            <div className="mt-2 grid grid-cols-12 gap-2">
+                <select value={addCourseId} onChange={e => setAddCourseId(e.target.value)}
+                    className="col-span-5 px-2 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-green-400">
+                    <option value="">+ Thêm khóa...</option>
+                    {coursesList.filter(c => !benefits.some(b => b.courseId === c.id)).map(c => (
+                        <option key={c.id} value={c.id}>{c.name_lop} ({c.id_khoa})</option>
+                    ))}
+                </select>
+                <select value={addType} onChange={e => setAddType(e.target.value as any)}
+                    className="col-span-3 px-2 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-green-400">
+                    <option value="FREE_100">Miễn phí 100%</option>
+                    <option value="PARTIAL">Trả thêm</option>
+                </select>
+                {addType === 'PARTIAL' ? (
+                    <input type="number" min={0} value={addAmount} onChange={e => setAddAmount(e.target.value)}
+                        placeholder="Số tiền (đ)" className="col-span-3 px-2 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-green-400" />
+                ) : <div className="col-span-3" />}
+                <button onClick={handleAdd} disabled={busy || !addCourseId}
+                    className="col-span-1 px-2 py-1.5 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 disabled:opacity-40">
+                    {saving ? <Loader2 className="h-3 w-3 animate-spin mx-auto" /> : '+'}
+                </button>
             </div>
         </div>
     )

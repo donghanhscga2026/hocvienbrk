@@ -1,4 +1,5 @@
 import NextAuth, { AuthError, CredentialsSignin, type NextAuthConfig } from "next-auth"
+import { normalizeRole } from '@/lib/auth/roles'
 import Credentials from "next-auth/providers/credentials"
 import Google from "next-auth/providers/google"
 import { z } from "zod"
@@ -40,20 +41,15 @@ const customAdapter = {
     ...baseAdapter,
     createUser: async (data: any) => {
         try {
-            const { getNextAvailableId } = await import("@/lib/id-helper")
-            const newId = await getNextAvailableId()
-            console.log(`✨ [Auth] Tạo user mới qua OAuth với ID tùy chỉnh: #${newId} (${data.email})`)
-            return prisma.user.create({
-                data: {
-                    ...data,
-                    id: newId,
-                    referrerId: 0, // Default to root admin
-                },
+            const { createUserWithAvailableId } = await import("@/lib/id-helper")
+            return await createUserWithAvailableId({
+                ...data,
+                referrerId: 0, // Default to root admin
             })
         } catch (error) {
             console.error("❌ [Auth] Lỗi khi tạo user với ID tùy chỉnh:", error)
-            // Fallback: để database tự quyết định nếu có lỗi (tránh block sign-in)
-            return baseAdapter.createUser!(data)
+            // Không cấp lại bằng sequence mặc định: sequence có thể đang ở số đẹp.
+            throw error
         }
     }
 }
@@ -74,12 +70,11 @@ export const authOptions: NextAuthConfig = {
         }
     },
     providers: [
-        // DISABLED: Google Auth
-        // Google({
-        //     clientId: process.env.GOOGLE_CLIENT_ID,
-        //     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        //     allowDangerousEmailAccountLinking: true,
-        // }),
+        Google({
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+            allowDangerousEmailAccountLinking: true,
+        }),
         Credentials({
             credentials: {
                 identifier: { label: "Student ID / Email / Phone", type: "text" },
@@ -117,6 +112,13 @@ export const authOptions: NextAuthConfig = {
                 }
 
                 let user = loginOtp ? await lookupLoginPhone(identifier) : null;
+                // OTP đăng nhập bằng mã thành viên: tra thêm theo ID (lookupLoginPhone chỉ xử lý SĐT)
+                if (loginOtp && !user && /^\d+$/.test(identifier)) {
+                    const memberId = parseInt(identifier, 10)
+                    if (memberId >= 0 && memberId < 2147483647) {
+                        user = await prisma.user.findUnique({ where: { id: memberId } })
+                    }
+                }
                 let potentialId = NaN;
 
                 // 1. Thử nhận diện ID thành viên (nếu chỉ chứa các ký số)
@@ -195,7 +197,8 @@ export const authOptions: NextAuthConfig = {
                         isLoginFailed = true;
                     } else if (user.role === "ADMIN" && user.mfaEnabled &&
                         (!user.mfaSecret || !otp || !verifyTotp(decryptMfaSecret(user.mfaSecret), otp.trim()))) {
-                        isLoginFailed = true;
+                        // Ném MFA_REQUIRED (thay vì fail chung) để client hiện ô nhập mã Authenticator
+                        throw new CustomLoginError("Cần mã xác thực quản trị viên hợp lệ.", "MFA_REQUIRED");
                     } else if (!(await consumeLoginOtp(user.id, loginOtp))) {
                         isLoginFailed = true;
                     }
@@ -304,7 +307,7 @@ export const authOptions: NextAuthConfig = {
                         select: { role: true, phone: true }
                     });
                     if (dbUser) {
-                        token.role = dbUser.role;
+                        token.role = normalizeRole(dbUser.role);
                         if (dbUser.phone) token.phone = dbUser.phone;
                     } else {
                         // Deleted users must not keep an authenticated identity from a stale JWT.
@@ -326,7 +329,7 @@ export const authOptions: NextAuthConfig = {
         async session({ session, token }) {
             if (token.sub != null && session.user) {
                 session.user.id = token.sub as string;
-                session.user.role = token.role as Role;
+                session.user.role = normalizeRole(token.role as Role);
                 const headerList=await (await import('next/headers')).headers()
                 // Domain riêng dùng phiên học viên; không mang quyền quản trị toàn hệ thống.
                 if(await activeDomain(requestHostname(headerList.get('host') || ''))) session.user.role=Role.STUDENT;

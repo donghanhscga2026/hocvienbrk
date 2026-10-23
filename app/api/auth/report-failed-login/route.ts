@@ -7,7 +7,9 @@ type IdentifierType = 'student_id' | 'email' | 'phone' | 'unknown';
 type ErrorType = 'NOT_FOUND' | 'INVALID_PASSWORD' | 'NO_PASSWORD' | 'UNKNOWN';
 
 function detectIdentifierType(identifier: string): IdentifierType {
-  if (/^\d+$/.test(identifier)) return 'student_id';
+  // Mã thành viên: toàn ký số, dưới 7 ký số — khớp quy tắc ở /api/auth/phone-login và UI đăng nhập bước 1.
+  // Check SĐT (8–15 ký số) phải đứng sau vì input SĐT dạng 0... cũng toàn ký số.
+  if (/^\d{1,6}$/.test(identifier)) return 'student_id';
   if (identifier.includes('@')) return 'email';
   const digitsOnly = identifier.replace(/\D/g, '');
   if (digitsOnly.length >= 8 && digitsOnly.length <= 15) return 'phone';

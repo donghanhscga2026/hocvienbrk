@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import { getAllPayments, verifyPaymentAction, rejectPaymentAction, triggerAutoVerifyManual, getGmailStatus, revertToPendingAction, cancelEnrollmentAction, resetSystemForRebuildAction } from '@/app/actions/payment-actions'
 import { Clock, CheckCircle, XCircle, AlertCircle, QrCode, RotateCcw, Ban, Square, CheckSquare, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import Image from 'next/image'
+import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 import { resolveBankBin } from '@/lib/bank-bin'
 import { isValidImageUrl } from '@/lib/image-validation'
@@ -375,6 +376,15 @@ export default function PaymentsPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <MainHeader title="THANH TOÁN" toolSlug="payments" />
+
+      <div className="px-3 pt-2">
+        <Link data-help-id="link-unmatched" href="/tools/payments/unmatched" className="inline-flex items-center gap-1.5 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5 hover:bg-amber-100">
+          <AlertCircle className="w-4 h-4" /> Giao dịch chưa khớp (đối soát tay)
+        </Link>
+        <Link data-help-id="link-auto-verify" href="/tools/payments/auto-verify" className="inline-flex items-center gap-1.5 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded px-2.5 py-1.5 hover:bg-blue-100 ml-2">
+          <CheckCircle className="w-4 h-4" /> Cấu hình tự động xác minh
+        </Link>
+      </div>
 
       {gmailStatus.penalized && (
         <div className="bg-amber-50 border-b border-amber-200 p-2.5 flex items-center gap-2">

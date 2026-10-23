@@ -64,35 +64,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
+    // QUYẾT ĐỊNH NGHIỆP VỤ (2026-10-15): BỎ tự trừ MBV khi đăng ký.
+    // MBV chỉ được trừ khi chính học viên tick "Dùng điểm MBV" ở bước thanh toán
+    // (xem enrollInCourseAction trong app/actions/course-actions.ts).
     let effectivePhiCoc = course.phi_coc
-    let voucherDeducted = 0
-    let voucherApplied = false
-
-    if (course.type !== 'LIB' && course.type !== 'SYS') {
-      const brkWallet = await prisma.brkWallet.findUnique({ where: { userId: userIdNum } })
-
-      // Chống trừ kép: kiểm tra đã từng trừ ví MBV cho khóa này chưa (theo
-      // refId) trước khi trừ — cùng cơ chế đã áp dụng ở app/actions/course-actions.ts
-      // (enrollInCourseAction). Thiếu bước này từng gây trừ MBV 2 lần cho 1
-      // user khi endpoint này (kích hoạt tự động lúc đăng ký) chạy trước, sau
-      // đó user tự bấm kích hoạt thủ công qua course-actions.ts.
-      const existingMbvTx = brkWallet?.id
-        ? await prisma.brkTransaction.findFirst({ where: { walletId: brkWallet.id, refId: `course_${course.id}` } })
-        : null
-
-      if (existingMbvTx) {
-        effectivePhiCoc = Math.max(0, effectivePhiCoc - Math.abs(Number(existingMbvTx.amount)))
-      } else {
-        const mbvBalance = Number(brkWallet?.mbvBalance || 0)
-        if (mbvBalance > 0 && effectivePhiCoc > 0) {
-          voucherDeducted = Math.min(mbvBalance, effectivePhiCoc)
-          effectivePhiCoc = Math.max(0, effectivePhiCoc - voucherDeducted)
-          voucherApplied = voucherDeducted > 0
-          const { debitMbvWallet } = await import('@/lib/brk/wallet-service')
-          await debitMbvWallet(userIdNum, voucherDeducted, `Thanh toán khóa học ${course.id_khoa}`, `course_${course.id}`, userIdNum)
-        }
-      }
-    }
 
     const isAutoActive = effectivePhiCoc === 0
     let studyMode: EnrollmentMode = course.feeType === 'MIEN_PHI' ? EnrollmentMode.FREE : EnrollmentMode.COMPANION
@@ -159,7 +134,7 @@ export async function POST(request: NextRequest) {
           userId: userIdNum,
           type: 'PURCHASE',
           enrollmentId: newEnrollment.id,
-          orderAmount: effectivePhiCoc
+          orderAmount: course.phi_coc
         })
         console.log(`[EnrollAfterRegister-Track] Tracked conversion for user #${userIdNum} under refCode ${finalRefCode}`)
       } catch (trackErr) {
@@ -175,6 +150,8 @@ export async function POST(request: NextRequest) {
           amount: effectivePhiCoc,
           status: 'PENDING',
           phone: user?.phone,
+          discountAmount: Math.max(0, course.phi_coc - effectivePhiCoc),
+          mbvDeducted: 0
         }
       })
     }
@@ -227,12 +204,29 @@ export async function POST(request: NextRequest) {
         await sendActivationEmail(user.email, user.name || '', user.id, course.name_lop || course.id_khoa, course.noidung_email)
       }
 
-      // Xử lý commission cho enrollment miễn phí
+      // Xử lý commission cho enrollment miễn phí (Affiliate v2: tạo Order + 2 thành phần)
+      // — tính trên GIÁ NIÊM YẾT (quyết định 2026-10-15)
       try {
-        const { processEnrollmentCommission } = await import("@/lib/affiliate/commission-calculator")
-        await processEnrollmentCommission(userIdNum, newEnrollment.id, effectivePhiCoc)
+        const {
+          createOrderForEnrollment,
+          processOrderCommission,
+          resolveAffiliateIdFromCookie
+        } = await import("@/lib/affiliate/unified-commission")
+        const { affiliateId, refCode } = await resolveAffiliateIdFromCookie()
+        const orderRes: any = await createOrderForEnrollment(newEnrollment.id, { affiliateId, refCode })
+        if (orderRes.success && orderRes.orderId) {
+          await processOrderCommission(orderRes.orderId)
+        }
       } catch (e) {
         console.error("[EnrollAfterRegister] Commission error:", e)
+      }
+
+      // Tự động kích hoạt quyền lợi voucher (quà tặng các khóa B, C, D...)
+      try {
+        const { grantVoucherBenefits } = await import("@/lib/voucher/voucher-service")
+        await grantVoucherBenefits(userIdNum)
+      } catch (e) {
+        console.error("[EnrollAfterRegister] grantVoucherBenefits error:", e)
       }
     }
 

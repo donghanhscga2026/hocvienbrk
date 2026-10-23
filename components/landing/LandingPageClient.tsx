@@ -183,7 +183,8 @@ export function CourseLandingClient({
     userId,
     session,
     totalHours,
-    activeStudentCount
+    activeStudentCount,
+    projectLabels
 }: CourseLandingClientProps) {
     return (
         <CourseLandingTemplate
@@ -196,6 +197,7 @@ export function CourseLandingClient({
             session={session}
             totalHours={totalHours}
             activeStudentCount={activeStudentCount}
+            projectLabels={projectLabels}
         />
     )
 }

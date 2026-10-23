@@ -133,6 +133,7 @@ function DashboardTab() {
                             className="flex-1 px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm"
                         />
                         <button
+                            data-help-id="btn-copy-affiliate-link"
                             onClick={copyLink}
                             className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium"
                         >
@@ -757,6 +758,14 @@ export default function AffiliateToolsPage() {
             <MainHeader title="AFFILIATE" toolSlug="affiliate" />
             {session?.user?.role === 'ADMIN' && (
                 <AdminSubNav title="Affiliate" items={affiliateSubNav} />
+            )}
+            {session?.user?.role === 'TEACHER' && (
+                <AdminSubNav
+                    title="Affiliate"
+                    items={affiliateSubNav.filter(
+                        (i) => i.href === '/tools/affiliate' || i.href === '/tools/affiliate/config' || i.href === '/tools/affiliate/settlement'
+                    )}
+                />
             )}
 
             <div className="max-w-4xl mx-auto p-4">

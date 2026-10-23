@@ -77,9 +77,8 @@ export async function registerUser(prevState: any, formData: FormData) {
     const hashedPassword = await bcrypt.hash(password, 10)
 
     try {
-        const { getNextAvailableId } = await import("@/lib/id-helper")
+        const { createUserWithAvailableId } = await import("@/lib/id-helper")
         const { sendTelegram, sendVerificationEmail } = await import("@/lib/notifications")
-        const newId = await getNextAvailableId()
         
         // Parse referrerId: Ưu tiên lấy từ Cookie an toàn ở phía Server
         let refId = 0;
@@ -111,16 +110,13 @@ export async function registerUser(prevState: any, formData: FormData) {
 
         if(websiteDomain && !websiteDomain.affiliate) { refId=0;rawRefCode='' }
         // Tao user
-        const user = await prisma.user.create({
-            data: {
-                id: newId,
-                name: toTitleCase(name),
-                email: normalizedEmail,
-                phone: fullPhone,
-                password: hashedPassword,
-                role: Role.STUDENT,
-                referrerId: refId,
-            },
+        const user = await createUserWithAvailableId({
+            name: toTitleCase(name),
+            email: normalizedEmail,
+            phone: fullPhone,
+            password: hashedPassword,
+            role: Role.STUDENT,
+            referrerId: refId,
         })
 
         // Tao verification token (OTP 6 số - 24h)

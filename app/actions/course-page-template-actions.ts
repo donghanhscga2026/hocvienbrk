@@ -3,7 +3,6 @@
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { requireAdminAction } from '@/lib/api-auth'
-import { mirrorAnalysisImages } from '@/lib/course-page/importer/image-mirror'
 import {
   ImportedSectionCandidate,
   StoredTemplateSnapshot,
@@ -61,6 +60,16 @@ function mapImportedSection(section: ImportedSectionCandidate, sortOrder: number
   }
 }
 
+export async function buildEditableTemplateSnapshot(
+  name: string,
+  analysis: WebsiteTemplateAnalysis,
+  selectedSectionIds: string[],
+): Promise<StoredTemplateSnapshot> {
+  const denied = await requireAdminAction()
+  if (denied) throw new Error(denied.error)
+  return buildSnapshot(name, analysis, selectedSectionIds)
+}
+
 function buildSnapshot(
   name: string,
   analysis: WebsiteTemplateAnalysis,
@@ -74,7 +83,7 @@ function buildSnapshot(
 
   if (!selected.length) throw new Error('Hãy chọn ít nhất một phần nội dung (form đăng ký nguồn luôn được thay bằng quy trình MFC)')
 
-  if ((analysis.sourceType === 'zip' || analysis.sourceType === 'html') && analysis.exactSource?.url) {
+  if ((analysis.sourceType === 'zip' || analysis.sourceType === 'html') && (analysis.exactSource?.url || analysis.exactSource?.html)) {
     return {
       name,
       seo: {
@@ -224,7 +233,7 @@ export async function getStoredCoursePageTemplateOptions() {
   }
 }
 
-export async function createStoredCoursePageTemplate(input: {
+export async function createStoredCoursePageTemplate(_input: {
   name: string
   description?: string
   analysis: WebsiteTemplateAnalysis
@@ -232,71 +241,7 @@ export async function createStoredCoursePageTemplate(input: {
 }) {
   const denied = await requireAdminAction()
   if (denied) return denied
-
-  try {
-    const name = input.name?.trim()
-    if (!name) return { success: false, error: 'Vui lòng đặt tên cho mẫu' }
-    if (!input.analysis?.sections?.length) return { success: false, error: 'Chưa có kết quả phân tích website' }
-
-    const selectedSet = new Set(input.selectedSectionIds)
-    const unresolvedLocalImages = input.analysis.exactSource?.url
-      ? []
-      : input.analysis.sections
-          .filter(section => selectedSet.has(section.id) && !isImportedRegistrationSection(section))
-          .flatMap(section => section.images || [])
-          .filter(image => image.src && !/^(?:https?:\/\/|data:image\/|\/uploads\/)/i.test(image.src))
-
-    if (unresolvedLocalImages.length) {
-      return {
-        success: false,
-        error: `Có ${unresolvedLocalImages.length} ảnh đang trỏ tới thư mục cục bộ (ví dụ *_files/...). Hãy dùng file HTML tự chứa ảnh hoặc nhập URL website gốc để hệ thống có thể lưu ảnh vĩnh viễn.`,
-      }
-    }
-
-    // Mirror external/base64 images into our own storage before persisting the template.
-    // If a remote image cannot be downloaded, resolveImageUrl safely keeps the
-    // original URL so template creation is not blocked.
-    const safeSelectedIds = input.selectedSectionIds.filter(id => {
-      const section = input.analysis.sections.find(item => item.id === id)
-      return section ? !isImportedRegistrationSection(section) : false
-    })
-    const storedAnalysis = input.analysis.exactSource?.url
-      ? jsonSafe(compactExactAnalysis(input.analysis))
-      : await mirrorAnalysisImages(input.analysis, {
-          sectionIds: safeSelectedIds,
-        })
-    const snapshot = buildSnapshot(name, storedAnalysis, safeSelectedIds)
-    const key = `custom-${slugify(name)}-${Date.now().toString(36)}`
-    const firstImage = storedAnalysis.sections
-      .filter(section => safeSelectedIds.includes(section.id))
-      .flatMap(section => section.images || [])
-      .find(image => /^https?:\/\//i.test(image.src))
-
-    const template = await prisma.coursePageTemplate.create({
-      data: {
-        key,
-        name,
-        description: input.description?.trim() || null,
-        sourceUrl: storedAnalysis.exactSource?.url || storedAnalysis.finalUrl || storedAnalysis.sourceUrl || null,
-        sourceType: storedAnalysis.sourceType,
-        thumbnailUrl: firstImage?.src || null,
-        snapshot: jsonSafe(snapshot) as any,
-        analysis: jsonSafe({
-          ...storedAnalysis,
-          sections: storedAnalysis.sections.map(section => ({
-            ...section,
-            enabled: safeSelectedIds.includes(section.id) && !isImportedRegistrationSection(section),
-          })),
-        }) as any,
-      },
-    })
-
-    revalidatePath('/tools/courses/templates')
-    return { success: true, template: { id: template.id, key: template.key, name: template.name } }
-  } catch (error: any) {
-    console.error('[CoursePageTemplate] Create error:', error)
-    return { success: false, error: error.message || 'Không thể tạo mẫu từ website' }
-  }
+  return { success: false as const, error: 'Đã ngừng nhập mẫu vào thư viện. Hãy chỉnh code trực tiếp trong khóa học.', template: undefined }
 }
 
 export async function deleteStoredCoursePageTemplate(templateId: string) {

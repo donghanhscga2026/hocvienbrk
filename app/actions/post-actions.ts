@@ -4,6 +4,7 @@ import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { Role } from "@prisma/client"
+import { appearanceAdmin } from '@/lib/wi300/appearance-service'
 
 /**
  * Lấy danh sách bài viết (CÓ PHÂN TRANG)
@@ -11,6 +12,8 @@ import { Role } from "@prisma/client"
  */
 export async function getPostsAction(page: number = 0, limit: number = 10) {
     try {
+        page = Number.isSafeInteger(page) && page >= 0 ? Math.min(page, 100000) : 0
+        limit = Number.isSafeInteger(limit) ? Math.max(1, Math.min(limit, 50)) : 10
         const skip = page * limit
         
         const [posts, total] = await Promise.all([
@@ -41,8 +44,12 @@ export async function createPostAction(data: { title: string, content: string, i
     if (session?.user?.role !== Role.ADMIN) {
         return { success: false, error: "Chỉ quản trị viên mới có quyền đăng bài." }
     }
+    if (typeof data?.title !== 'string' || !data.title.trim() || data.title.length > 300 || typeof data.content !== 'string' || !data.content.trim() || data.content.length > 100000) {
+        return { success: false, error: 'Vui lòng nhập tiêu đề và nội dung hợp lệ.' }
+    }
 
     try {
+        await appearanceAdmin(prisma, Number(session.user.id))
         const { resolveImageUrl } = await import("@/lib/image-utils")
         // Ảnh bài viết có thể là base64 (upload file) hoặc link dán tay
         // (postimg.cc, imgur...) -> đều được đưa về Supabase Storage để
@@ -81,6 +88,7 @@ export async function getPostDetailAction(postId: string) {
                 }
             }
         })
+        if (post && !post.published) return { success: false, error: 'Không tìm thấy bài viết.' }
         return { success: true, post }
     } catch (error: any) {
         return { success: false, error: error.message }
@@ -97,6 +105,8 @@ export async function commentOnPostAction(postId: string, content: string) {
     }
 
     try {
+        const post = await prisma.post.findUnique({ where: { id: postId }, select: { published: true } })
+        if (!post?.published) return { success: false, error: 'Không tìm thấy bài viết.' }
         const comment = await prisma.postComment.create({
             data: {
                 postId,
@@ -127,8 +137,10 @@ export async function updatePostAction(postId: string, data: { title: string; co
         return { success: false, error: "Ảnh phải là liên kết ảnh hoặc ảnh tải lên hợp lệ." }
     }
     try {
+        await appearanceAdmin(prisma, Number(session.user.id))
         const existing = await prisma.post.findUnique({ where: { id: postId } })
         if (!existing) return { success: false, error: "Không tìm thấy bài viết." }
+        if (existing.published === false) return { success: false, error: 'Vui lòng sửa bản nháp trong công cụ Bài viết.' }
         // Không tải/lưu lại ảnh khi chỉ sửa chữ; bỏ trống ảnh nghĩa là gỡ ảnh.
         let finalImage = existing.image
         if (image !== undefined && image !== (existing.image || '')) {

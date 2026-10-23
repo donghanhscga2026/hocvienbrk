@@ -12,7 +12,7 @@ import {CrmError} from '@/lib/crm/service'
 
 async function owner(request:Request){
   if(!isPlatformHost(requestHostname(request.headers.get('host') || '')))throw new CrmError('Nhập template tại hệ thống chính.',403)
-  const profile=await ownedProfile(),slug=pageSlugSchema.parse(new URL(request.url).searchParams.get('slug'))
+  const profile=await ownedProfile(request),slug=pageSlugSchema.parse(new URL(request.url).searchParams.get('slug'))
   const content=await readWebsitePages(profile.id)
   if(!content.pages.some(p=>p.slug===slug))throw new CrmError('Trang chưa được tạo. Lưu trang trước khi nhập template.',404)
   return {profile,slug}

@@ -92,6 +92,7 @@ function findEntries(buffer: ArrayBuffer) {
     throw new Error('ZIP64 chưa được hỗ trợ. Hãy nén lại file ZIP theo định dạng ZIP thông thường.')
   }
 
+  if (total > 500) throw new Error('ZIP vượt 500 file. Hãy bỏ các thư mục build/node_modules.')
   const entries = new Map<string, ZipEntry>()
   let offset = centralOffset
   for (let index = 0; index < total; index++) {
@@ -110,6 +111,7 @@ function findEntries(buffer: ArrayBuffer) {
     }
     offset += 46 + nameLength + extraLength + commentLength
   }
+  if ([...entries.values()].reduce((sum, entry) => sum + entry.uncompressedSize, 0) > 64 * 1024 * 1024) throw new Error('ZIP sau giải nén vượt 64 MB.')
   return { entries, buffer }
 }
 
@@ -129,7 +131,9 @@ async function readEntry(zip: ReturnType<typeof findEntries>, entry: ZipEntry) {
   }
 
   const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('deflate-raw'))
-  const output = new Uint8Array(await new Response(stream).arrayBuffer())
+  const reader = stream.getReader(), chunks: Uint8Array[] = []; let size = 0
+  while (true) { const part = await reader.read(); if (part.done) break; size += part.value.length; if (size > 16 * 1024 * 1024) { await reader.cancel(); throw new Error('Một file trong ZIP vượt 16 MB.') }; chunks.push(part.value) }
+  const output = new Uint8Array(size); let offset = 0; for (const chunk of chunks) { output.set(chunk, offset); offset += chunk.length }
   if (entry.uncompressedSize && output.byteLength !== entry.uncompressedSize) {
     throw new Error(`Kích thước file sau giải nén không khớp: ${entry.name}`)
   }
@@ -478,4 +482,26 @@ export async function prepareWebsiteZip(file: File): Promise<PreparedZipWebsite>
     inlinedAssetCount,
     warnings: Array.from(new Set(warnings)).slice(0, 20),
   }
+}
+
+// Đọc nguồn gốc để trình sửa mã có thể giữ tên file CSS/JS và ảnh trong ZIP.
+export async function readZipTemplateSource(file: File): Promise<import('../template-source').TemplateSource> {
+  if (file.size > 32 * 1024 * 1024) throw new Error('ZIP vượt 32 MB.')
+  const zip = findEntries(await file.arrayBuffer())
+  const entries = [...zip.entries.values()].filter(entry => !/(^|\/)(?:__MACOSX|node_modules|\.git)(\/|$)/.test(entry.name) && !entry.name.endsWith('/'))
+  const htmls = entries.filter(entry => /\.html?$/i.test(entry.name)).sort((a, b) => scoreHtml(b.name, b.uncompressedSize) - scoreHtml(a.name, a.uncompressedSize))
+  if (!htmls.length) throw new Error('Không tìm thấy HTML trong ZIP.')
+  const files: import('../template-source').TemplateSourceFile[] = []
+  let total = 0
+  for (const entry of entries) {
+    const ext = entry.name.split('.').pop()?.toLowerCase() || ''
+    const kind = /^(html?|css|js|mjs)$/.test(ext) ? (/^html?$/.test(ext) ? 'html' : ext === 'css' ? 'css' : 'js') : 'asset'
+    if (kind === 'asset' && !/^(png|jpe?g|webp|gif|avif|svg|ico|woff2?|ttf|otf)$/.test(ext)) continue
+    const bytes = await readEntry(zip, entry)
+    const content = kind === 'asset' ? `data:${mimeFor(entry.name)};base64,${toBase64(bytes)}` : new TextDecoder('utf-8').decode(bytes)
+    total += new TextEncoder().encode(content).length
+    if (total > 8 * 1024 * 1024 || files.length >= 200) throw new Error('Mã và tài nguyên vượt 8 MB hoặc 200 file. Hãy giảm ảnh/font trong ZIP.')
+    files.push({ path: entry.name, kind, content })
+  }
+  return { entryPath: htmls[0].name, files }
 }

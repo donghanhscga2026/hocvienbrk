@@ -1,12 +1,29 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useImperativeHandle, useState, type Ref } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import CourseDraftPreview from '@/components/course/CourseDraftPreview'
+import { COURSE_TEMPLATE_LIBRARY } from '@/lib/course-page/templates'
+import type { CoursePage } from '@/lib/course-page/types'
+import type { CourseEditorControls } from '@/lib/course-page/editor-controls'
 import { Save, Plus, Trash2, ArrowUp, ArrowDown, Settings, FileText, Palette, Copy, ExternalLink, ChevronDown, ChevronUp, Monitor, Smartphone, GripVertical, RefreshCw } from 'lucide-react'
 import { updateCoursePage, saveCourseSections, publishCoursePage, getCoursePageVersions, restoreCoursePageVersion, createCoursePageCheckpoint } from '@/app/actions/course-page-actions'
 
+// Chỉ gọi trong thao tác thêm/nhân bản; mã định danh không phụ thuộc đồng hồ render.
+function newEditorId() { return globalThis.crypto.randomUUID() }
+
 interface EditCoursePageFormProps {
+  disabled?: boolean
+  workflow?: boolean
+  controls?: Ref<CourseEditorControls>
+  onBusyChange?: (busy: boolean) => void
+  embedded?: boolean
+  panel?: 'sections' | 'theme' | 'info'
+  onDirtyChange?: (dirty: boolean) => void
+  onEditCode?: () => void
+  onSaved?: () => void
+  onShowPreview?: () => void
   initialPage: {
     id: string
     slug: string
@@ -21,15 +38,21 @@ interface EditCoursePageFormProps {
   }
 }
 
-export default function EditCoursePageForm({ initialPage }: EditCoursePageFormProps) {
+export default function EditCoursePageForm({ initialPage, embedded = false, workflow = false, disabled = false, controls, onBusyChange, onDirtyChange, onEditCode, onSaved, panel, onShowPreview }: EditCoursePageFormProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'info' | 'theme' | 'sections'>('sections')
+  const effectiveTab = panel || activeTab
   const [expandedSection, setExpandedSection] = useState<number | null>(0)
   const [advanced, setAdvanced] = useState(false)
-  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('mobile')
+  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop')
   const [previewKey, setPreviewKey] = useState(0)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   
+  const [mobilePane, setMobilePane] = useState<'edit' | 'preview'>('edit')
+  const [showAdd, setShowAdd] = useState(false)
+  const [propertyTab, setPropertyTab] = useState<'content' | 'display'>('content')
+  const [previewRegistered, setPreviewRegistered] = useState(false)
+
   // Page state
   const [name, setName] = useState(initialPage.name)
   const [status, setStatus] = useState(initialPage.status)
@@ -49,7 +72,19 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
   const [showVersions, setShowVersions] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
+  useEffect(() => { onBusyChange?.(saving || publishing) }, [saving, publishing, onBusyChange])
+
+  useEffect(() => {
+    if (!dirty) return
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
+
   const handleSavePage = async () => {
+    if (saving || publishing) return false
+    if (!dirty) return true
     setSaving(true)
     setMessage(null)
     try {
@@ -72,6 +107,8 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
           setDirty(false)
           setPreviewKey(k => k + 1)
           router.refresh()
+          onSaved?.()
+          return true
         } else {
           setMessage({ type: 'error', text: secRes.error || 'Lỗi khi lưu các phần giao diện' })
         }
@@ -83,6 +120,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     } finally {
       setSaving(false)
     }
+    return false
   }
 
   const handlePublish = async () => {
@@ -118,15 +156,18 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     else setMessage({ type: 'error', text: res.error || 'Không thể khôi phục phiên bản' })
   }
 
+  useImperativeHandle(controls, () => ({ save: handleSavePage, history: handleLoadVersions }))
+
   // Section manipulation
   const handleAddSection = (type: string) => {
     const newSec = {
-      sectionKey: `${type}_${Date.now()}`,
+      sectionKey: `${type}_${newEditorId()}`,
       sectionType: type,
       enabled: true,
       sortOrder: sections.length + 1,
       visibility: 'all',
-      content: {}
+      variant: sections.some(section => section.variant?.startsWith('wi300-gift')) && type !== 'testimonials' ? 'wi300-gift' : undefined,
+      content: { title: sectionName(type), description: '', items: [], instructors: [], plans: [], paragraphs: [], primaryCta: { label: 'Đăng ký khóa học', action: 'open_registration' } }
     }
     setDirty(true)
     setSections([...sections, newSec])
@@ -134,12 +175,13 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
   }
 
   const handleDeleteSection = (index: number) => {
-    if (!confirm('Bạn có muốn xóa section này?')) return
+    if (!confirm('Xóa khối nội dung này khỏi bản nháp?')) return
     const newSecs = sections.filter((_, i) => i !== index)
     // Update sort order
     const updated = newSecs.map((sec, i) => ({ ...sec, sortOrder: i + 1 }))
     setDirty(true)
     setSections(updated)
+    setExpandedSection(updated.length ? Math.min(index, updated.length - 1) : null)
   }
 
   const reorderSections = (from: number, to: number) => {
@@ -168,6 +210,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     const updated = newSecs.map((sec, i) => ({ ...sec, sortOrder: i + 1 }))
     setDirty(true)
     setSections(updated)
+    setExpandedSection(targetIndex)
   }
 
   const handleUpdateSectionContent = (index: number, field: string, value: any) => {
@@ -190,7 +233,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
   const duplicateSection = (index: number) => {
     setDirty(true)
     const source = sections[index]
-    const copy = { ...source, id: undefined, sectionKey: `${source.sectionKey}_copy_${Date.now()}`, content: JSON.parse(JSON.stringify(source.content || {})) }
+    const copy = { ...source, id: undefined, sectionKey: `${source.sectionKey}_copy_${newEditorId()}`, content: JSON.parse(JSON.stringify(source.content || {})) }
     const next = [...sections]
     next.splice(index + 1, 0, copy)
     setSections(next.map((sec, i) => ({ ...sec, sortOrder: i + 1 })))
@@ -207,10 +250,11 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
 
   const field = (index: number, key: string, label: string, multiline = false) => {
     const value = sections[index]?.content?.[key] ?? ''
+    const inputId = `course-${initialPage.id}-${index}-${key}`
     return <div>
-      <label className="block text-xs font-bold text-gray-600 mb-1">{label}</label>
-      {multiline ? <textarea value={value} onChange={e => updateContent(index,key,e.target.value)} className="w-full min-h-24 rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-        : <input value={value} onChange={e => updateContent(index,key,e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />}
+      <label htmlFor={inputId} className="block text-xs font-bold text-gray-600 mb-1">{label}</label>
+      {multiline ? <textarea id={inputId} value={value} onChange={e => updateContent(index,key,e.target.value)} className="w-full min-h-24 rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+        : <input id={inputId} value={value} onChange={e => updateContent(index,key,e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />}
     </div>
   }
 
@@ -222,7 +266,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
 
   const addListItem = (sectionIndex: number, key: string) => {
     const items = [...(sections[sectionIndex]?.content?.[key] || [])]
-    items.push({ id: `item_${Date.now()}`, title: '', description: '' })
+    items.push({ id: `item_${newEditorId()}`, title: '', description: '' })
     updateContent(sectionIndex, key, items)
   }
 
@@ -236,7 +280,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     return <div className="space-y-2">
       <div className="flex items-center justify-between">
         <label className="text-xs font-bold text-gray-600">{label}</label>
-        <button type="button" onClick={() => addListItem(index,key)} className="text-xs font-bold text-purple-700">+ Thêm mục</button>
+        <button type="button" onClick={() => addListItem(index,key)} className="text-xs font-bold text-brk-primary">+ Thêm mục</button>
       </div>
       {items.map((item:any,itemIndex:number) => <div key={item.id || itemIndex} className="rounded-xl border border-gray-200 p-3 space-y-2 bg-gray-50">
         <div className="flex gap-2">
@@ -256,7 +300,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
   }
 
   const addNestedItem = (sectionIndex:number, key:string, seed:any) => {
-    updateContent(sectionIndex,key,[...(sections[sectionIndex]?.content?.[key] || []),{id:`item_${Date.now()}`,...seed}])
+    updateContent(sectionIndex,key,[...(sections[sectionIndex]?.content?.[key] || []),{id:`item_${newEditorId()}`,...seed}])
   }
 
   const removeNestedItem = (sectionIndex:number,key:string,itemIndex:number) => {
@@ -264,7 +308,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
   }
 
   const instructorsEditor = (index:number) => <div className="space-y-3">
-    <div className="flex justify-between items-center"><label className="text-xs font-bold text-gray-600">Danh sách chuyên gia</label><button type="button" onClick={()=>addNestedItem(index,'instructors',{name:'',role:'',imageUrl:'',imageAlt:'',bio:[]})} className="text-xs font-bold text-purple-700">+ Thêm chuyên gia</button></div>
+    <div className="flex justify-between items-center"><label className="text-xs font-bold text-gray-600">Danh sách chuyên gia</label><button type="button" onClick={()=>addNestedItem(index,'instructors',{name:'',role:'',imageUrl:'',imageAlt:'',bio:[]})} className="text-xs font-bold text-brk-primary">+ Thêm chuyên gia</button></div>
     {(sections[index]?.content?.instructors || []).map((ins:any,i:number)=><div key={ins.id||i} className="rounded-xl border bg-gray-50 p-3 space-y-2">
       <div className="flex gap-2"><input value={ins.name||''} onChange={e=>updateNestedItem(index,'instructors',i,{name:e.target.value})} placeholder="Tên chuyên gia" className="flex-1 rounded-lg border px-3 py-2 text-sm bg-white"/><button type="button" onClick={()=>removeNestedItem(index,'instructors',i)} className="p-2 text-red-500"><Trash2 className="w-4 h-4"/></button></div>
       <input value={ins.role||''} onChange={e=>updateNestedItem(index,'instructors',i,{role:e.target.value})} placeholder="Vai trò / chức danh" className="w-full rounded-lg border px-3 py-2 text-sm bg-white"/>
@@ -275,7 +319,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
   </div>
 
   const pricingEditor = (index:number) => <div className="space-y-3">
-    <div className="flex justify-between items-center"><label className="text-xs font-bold text-gray-600">Gói giá</label><button type="button" onClick={()=>addNestedItem(index,'plans',{name:'Gói mới',price:0,currency:'VND',ctaText:'Đăng ký ngay',features:[]})} className="text-xs font-bold text-purple-700">+ Thêm gói</button></div>
+    <div className="flex justify-between items-center"><label className="text-xs font-bold text-gray-600">Gói giá</label><button type="button" onClick={()=>addNestedItem(index,'plans',{name:'Gói mới',price:0,currency:'VND',ctaText:'Đăng ký ngay',features:[]})} className="text-xs font-bold text-brk-primary">+ Thêm gói</button></div>
     {(sections[index]?.content?.plans || []).map((plan:any,i:number)=><div key={plan.id||i} className="rounded-xl border bg-gray-50 p-3 space-y-2">
       <div className="flex gap-2"><input value={plan.name||''} onChange={e=>updateNestedItem(index,'plans',i,{name:e.target.value})} placeholder="Tên gói" className="flex-1 rounded-lg border px-3 py-2 text-sm bg-white"/><button type="button" onClick={()=>removeNestedItem(index,'plans',i)} className="p-2 text-red-500"><Trash2 className="w-4 h-4"/></button></div>
       <div className="grid grid-cols-2 gap-2"><input type="number" value={plan.price??0} onChange={e=>updateNestedItem(index,'plans',i,{price:Number(e.target.value)})} placeholder="Giá bán" className="rounded-lg border px-3 py-2 text-sm bg-white"/><input type="number" value={plan.originalPrice??''} onChange={e=>updateNestedItem(index,'plans',i,{originalPrice:e.target.value?Number(e.target.value):undefined})} placeholder="Giá gốc" className="rounded-lg border px-3 py-2 text-sm bg-white"/></div>
@@ -286,7 +330,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
   </div>
 
   const roadmapEditor = (index:number) => <div className="space-y-3">
-    <div className="flex justify-between items-center"><label className="text-xs font-bold text-gray-600">Các chặng / giai đoạn</label><button type="button" onClick={()=>addNestedItem(index,'phases',{period:'',title:'',description:'',details:[]})} className="text-xs font-bold text-purple-700">+ Thêm chặng</button></div>
+    <div className="flex justify-between items-center"><label className="text-xs font-bold text-gray-600">Các chặng / giai đoạn</label><button type="button" onClick={()=>addNestedItem(index,'phases',{period:'',title:'',description:'',details:[]})} className="text-xs font-bold text-brk-primary">+ Thêm chặng</button></div>
     {(sections[index]?.content?.phases || []).map((phase:any,i:number)=><div key={phase.id||i} className="rounded-xl border bg-gray-50 p-3 space-y-2">
       <div className="flex gap-2"><input value={phase.period||''} onChange={e=>updateNestedItem(index,'phases',i,{period:e.target.value})} placeholder="Thời gian / Giai đoạn" className="w-40 rounded-lg border px-3 py-2 text-sm bg-white"/><input value={phase.title||''} onChange={e=>updateNestedItem(index,'phases',i,{title:e.target.value})} placeholder="Tên chặng" className="flex-1 rounded-lg border px-3 py-2 text-sm bg-white"/><button type="button" onClick={()=>removeNestedItem(index,'phases',i)} className="p-2 text-red-500"><Trash2 className="w-4 h-4"/></button></div>
       <textarea value={phase.description||''} onChange={e=>updateNestedItem(index,'phases',i,{description:e.target.value})} placeholder="Mô tả" className="w-full rounded-lg border px-3 py-2 text-sm bg-white min-h-16"/>
@@ -367,7 +411,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     const actions = Array.isArray(source.actions) ? source.actions : []
     return <div className="grid gap-4">
       <div className="rounded-xl border border-purple-100 bg-purple-50 p-3">
-        <div className="text-[10px] font-black uppercase tracking-widest text-purple-600">Nội dung nhập từ website</div>
+        <div className="text-[10px] font-black uppercase tracking-widest text-brk-primary">Nội dung nhập từ website</div>
         <p className="mt-1 text-xs text-purple-800">Sửa trực tiếp các nội dung bên dưới. Không cần chỉnh HTML.</p>
       </div>
       <div>
@@ -431,21 +475,12 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
   }
 
 
+  const currentSection = expandedSection === null ? null : sections[expandedSection]
+  const templateName = COURSE_TEMPLATE_LIBRARY.find(item => item.key === seo.templateKey)?.name || 'Mẫu đã tùy chỉnh'
+  const draftPage = { ...initialPage, name, status, seo, theme, navigation, checkoutConfig, useTemplate, sections: sections.map((section, index) => ({ ...section, id: section.id || section.sectionKey, type: section.sectionType || section.type, sortOrder: index + 1 })) } as CoursePage
+
   return (
-    <div className="space-y-6">
-      <div className="sticky top-2 z-40 flex items-center gap-3 rounded-2xl border bg-white/95 backdrop-blur px-4 py-3 shadow-sm">
-        <div className="flex-1 min-w-0">
-          <div className="font-black text-sm text-gray-900 truncate">{name}</div>
-          <div className={`text-xs ${dirty?'text-amber-600':'text-green-600'}`}>{dirty?'Có thay đổi chưa lưu':'Mọi thay đổi đã được lưu'}</div>
-        </div>
-        <button type="button" onClick={handleLoadVersions} className="rounded-xl border border-gray-200 px-3 py-2.5 text-xs font-bold text-gray-600">Lịch sử</button>
-        <button type="button" onClick={handleSavePage} disabled={saving || !dirty} className="inline-flex items-center gap-2 rounded-xl border border-gray-900 px-4 py-2.5 text-xs font-black text-gray-900 disabled:opacity-40">
-          <Save className="w-4 h-4"/>{saving?'Đang lưu...':'Lưu bản nháp'}
-        </button>
-        <button type="button" onClick={handlePublish} disabled={publishing || dirty} className="rounded-xl bg-black px-4 py-2.5 text-xs font-black text-yellow-400 disabled:opacity-40">
-          {publishing?'Đang xuất bản...':'Xuất bản'}
-        </button>
-      </div>
+    <fieldset disabled={disabled || saving || publishing} className="min-w-0 space-y-5">
       {showVersions && (
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
           <div className="flex items-center justify-between mb-3"><h3 className="font-black text-sm">Lịch sử phiên bản</h3><button onClick={() => setShowVersions(false)} className="text-xs text-gray-500">Đóng</button></div>
@@ -472,35 +507,35 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-100 pb-3 overflow-x-auto">
+      <div hidden={embedded} className="flex gap-2 border-b border-gray-100 pb-3 overflow-x-auto">
         <button
           onClick={() => setActiveTab('info')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-            activeTab === 'info' ? 'bg-black text-yellow-400 shadow-sm' : 'text-gray-400 hover:bg-gray-50'
+            activeTab === 'info' ? 'bg-brk-primary text-white shadow-sm' : 'text-gray-400 hover:bg-gray-50'
           }`}
         >
-          <Settings className="w-4 h-4" /> 📑 Tổng quan & Checkout
+          <Settings className="w-4 h-4" /> Đăng ký & thanh toán
         </button>
         <button
           onClick={() => setActiveTab('theme')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-            activeTab === 'theme' ? 'bg-black text-yellow-400 shadow-sm' : 'text-gray-400 hover:bg-gray-50'
+            activeTab === 'theme' ? 'bg-brk-primary text-white shadow-sm' : 'text-gray-400 hover:bg-gray-50'
           }`}
         >
-          <Palette className="w-4 h-4" /> 🎨 Giao diện & SEO
+          <Palette className="w-4 h-4" /> Giao diện & SEO
         </button>
         <button
           onClick={() => setActiveTab('sections')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-            activeTab === 'sections' ? 'bg-black text-yellow-400 shadow-sm' : 'text-gray-400 hover:bg-gray-50'
+            activeTab === 'sections' ? 'bg-brk-primary text-white shadow-sm' : 'text-gray-400 hover:bg-gray-50'
           }`}
         >
-          <FileText className="w-4 h-4" /> ✏️ Chỉnh nội dung
+          <FileText className="w-4 h-4" /> Chỉnh nội dung
         </button>
       </div>
 
       {/* Tab: Info & Checkout */}
-      {activeTab === 'info' && (
+      {effectiveTab === 'info' && (
         <div className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
             <div>
@@ -516,11 +551,12 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
               <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Trạng thái trang</label>
               <select
                 value={status}
+                disabled={workflow}
                 onChange={(e) => { setStatus(e.target.value as any); setDirty(true) }}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-black text-sm bg-white"
               >
                 <option value="draft">Bản nháp (Draft)</option>
-                <option value="published">Xuất bản công khai (Published)</option>
+                <option value="published" disabled>Đã có bản công khai (dùng nút Xuất bản để cập nhật)</option>
               </select>
             </div>
           </div>
@@ -560,11 +596,33 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
               </div>
             </div>
           </div>
+          <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+            <h3 className="font-bold text-sm text-gray-800 mb-3">SEO Metadata</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Tiêu đề SEO (Meta Title)</label>
+                <input
+                  type="text"
+                  value={seo.title || ''}
+                  onChange={(e) => { setSeo({ ...seo, title: e.target.value }); setDirty(true) }}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Mô tả SEO (Meta Description)</label>
+                <textarea
+                  value={seo.description || ''}
+                  onChange={(e) => { setSeo({ ...seo, description: e.target.value }); setDirty(true) }}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs h-20"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Tab: Theme & SEO */}
-      {activeTab === 'theme' && (
+      {effectiveTab === 'theme' && (
         <div className="space-y-4">
           <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
             <h3 className="font-bold text-sm text-gray-800 mb-3">Màu sắc chủ đạo (Bảng mã HEX)</h3>
@@ -608,107 +666,66 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
             </div>
           </div>
 
-          <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-            <h3 className="font-bold text-sm text-gray-800 mb-3">SEO Metadata</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Tiêu đề SEO (Meta Title)</label>
-                <input
-                  type="text"
-                  value={seo.title || ''}
-                  onChange={(e) => { setSeo({ ...seo, title: e.target.value }); setDirty(true) }}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Mô tả SEO (Meta Description)</label>
-                <textarea
-                  value={seo.description || ''}
-                  onChange={(e) => { setSeo({ ...seo, description: e.target.value }); setDirty(true) }}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs h-20"
-                />
-              </div>
-            </div>
-          </div>
+
         </div>
       )}
 
-      {/* Tab: Sections - simple builder */}
-      {activeTab === 'sections' && (
-        <div className="space-y-4">
-          <div className="rounded-2xl bg-purple-50 border border-purple-100 p-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="font-black text-gray-900">Chỉnh trang thật đơn giản</h3>
-              <p className="text-xs text-gray-600 mt-1">Bấm một khối để sửa chữ hoặc ảnh. Dùng ↑ ↓ để đổi vị trí. Không cần biết mã hay cấu trúc kỹ thuật.</p>
-            </div>
-            <a href={`/khoa-hoc/${initialPage.slug}`} target="_blank" className="inline-flex items-center gap-2 rounded-xl bg-white border border-purple-200 px-3 py-2 text-xs font-bold text-purple-700">
-              Xem trang hiện tại <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          </div>
-
-          <div className="grid xl:grid-cols-[minmax(0,1fr)_minmax(360px,46%)] gap-4 items-start">
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                <span className="text-xs font-bold text-gray-500 self-center">+ Thêm:</span>
-            {['hero','rich_content','benefits','instructor','testimonials','pricing','closing_message'].map(type => (
-              <button key={type} onClick={() => handleAddSection(type)} className="rounded-xl bg-gray-100 hover:bg-purple-50 px-3 py-2 text-xs font-bold text-gray-700">
-                <Plus className="inline w-3 h-3 mr-1" />{sectionName(type)}
-              </button>
-            ))}
-              </div>
-
-              <div className="space-y-3">
-                {sections.map((sec,index) => {
-              const open=expandedSection===index
-              return <div key={sec.sectionKey} onDragOver={e => e.preventDefault()} onDrop={() => { if (dragIndex !== null) reorderSections(dragIndex,index); setDragIndex(null) }} className={`rounded-2xl border bg-white overflow-hidden transition-opacity ${dragIndex===index?'opacity-50':''} ${open?'border-purple-300 shadow-sm':'border-gray-200'}`}>
-                <button type="button" onClick={() => setExpandedSection(open?null:index)} className="w-full p-4 flex items-center gap-3 text-left">
-                  <span draggable onDragStart={e => { e.stopPropagation(); setDragIndex(index) }} onDragEnd={() => setDragIndex(null)} onClick={e => e.stopPropagation()} title="Giữ và kéo để đổi vị trí" className="cursor-grab active:cursor-grabbing p-1 -m-1"><GripVertical className="w-4 h-4 text-gray-400 shrink-0" /></span><span className="w-7 h-7 rounded-full bg-gray-900 text-yellow-400 flex items-center justify-center text-xs font-black">{index+1}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-black text-sm text-gray-900">{sec.variant === 'imported-v1' ? (sec.content?.importedMeta?.label || sectionName(sec.sectionType)) : sectionName(sec.sectionType)}</div>
-                    <div className="text-xs text-gray-400 truncate">{sec.variant === 'imported-v1' ? (sec.content?.importedSource?.heading || 'Nội dung nhập từ website') : (sec.content?.title || sec.content?.description || 'Bấm để thêm nội dung')}</div>
-                  </div>
-                  <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${sec.enabled?'bg-green-50 text-green-700':'bg-gray-100 text-gray-400'}`}>{sec.enabled?'Đang hiện':'Đang ẩn'}</span>
-                  {open?<ChevronUp className="w-4 h-4"/>:<ChevronDown className="w-4 h-4"/>}
-                </button>
-                {open && <div className="border-t border-gray-100 p-4 space-y-4">
-                  {simpleEditor(sec,index)}
-                  <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-100">
-                    <label className="inline-flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={sec.enabled} onChange={e=>handleUpdateSectionContent(index,'enabled',e.target.checked)}/> Hiển thị khối này</label>
-                    <div className="flex-1"/>
-                    <button onClick={()=>handleMoveSection(index,'up')} disabled={index===0} className="p-2 rounded-lg bg-gray-100 disabled:opacity-30" title="Đưa lên"><ArrowUp className="w-4 h-4"/></button>
-                    <button onClick={()=>handleMoveSection(index,'down')} disabled={index===sections.length-1} className="p-2 rounded-lg bg-gray-100 disabled:opacity-30" title="Đưa xuống"><ArrowDown className="w-4 h-4"/></button>
-                    <button onClick={()=>duplicateSection(index)} className="p-2 rounded-lg bg-gray-100" title="Nhân bản"><Copy className="w-4 h-4"/></button>
-                    <button onClick={()=>handleDeleteSection(index)} className="p-2 rounded-lg bg-red-50 text-red-600" title="Xóa"><Trash2 className="w-4 h-4"/></button>
-                  </div>
-                  <button type="button" onClick={()=>setAdvanced(!advanced)} className="text-[11px] font-bold text-gray-400 hover:text-gray-700">⚙️ {advanced?'Ẩn':'Hiện'} cài đặt nâng cao</button>
-                  {advanced && <div className="grid md:grid-cols-2 gap-3 rounded-xl bg-gray-50 p-3">
-                    <div><label className="text-[10px] font-bold text-gray-500">Đối tượng xem</label><select value={sec.visibility||'all'} onChange={e=>handleUpdateSectionContent(index,'visibility',e.target.value)} className="w-full mt-1 rounded-lg border p-2 text-xs"><option value="all">Tất cả</option><option value="unregistered">Chưa đăng ký</option><option value="registered">Đã kích hoạt</option></select></div>
-                    <div><label className="text-[10px] font-bold text-gray-500">Mã khối</label><input value={sec.sectionKey} readOnly className="w-full mt-1 rounded-lg border p-2 text-xs bg-white text-gray-400"/></div>
-                  </div>}
-                </div>}
-              </div>
-                })}
-              </div>
-            </div>
-
-            <aside className="xl:sticky xl:top-4 rounded-2xl border border-gray-200 bg-gray-100 p-3">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="font-black text-xs text-gray-700 flex-1">XEM TRƯỚC TRANG ĐANG XUẤT BẢN</div>
-                <button type="button" onClick={() => setPreviewMode('mobile')} className={`p-2 rounded-lg ${previewMode==='mobile'?'bg-black text-yellow-400':'bg-white text-gray-500'}`} title="Điện thoại"><Smartphone className="w-4 h-4"/></button>
-                <button type="button" onClick={() => setPreviewMode('desktop')} className={`p-2 rounded-lg ${previewMode==='desktop'?'bg-black text-yellow-400':'bg-white text-gray-500'}`} title="Máy tính"><Monitor className="w-4 h-4"/></button>
-                <button type="button" onClick={() => setPreviewKey(k=>k+1)} className="p-2 rounded-lg bg-white text-gray-500" title="Tải lại"><RefreshCw className="w-4 h-4"/></button>
-              </div>
-              <div className="overflow-auto rounded-xl bg-gray-300 p-2 min-h-[650px] flex justify-center">
-                <iframe key={previewKey} title="Xem trước salespage" src={`/khoa-hoc/${initialPage.slug}`} className="bg-white rounded-lg border-0 shadow-sm transition-all duration-300" style={{width: previewMode==='mobile'?390:'100%', height:720}} />
-              </div>
-              <p className="mt-2 text-[10px] leading-4 text-gray-500">Preview hiển thị bản đang xuất bản. Sau khi lưu thay đổi, bấm ↻ để kiểm tra bản mới.</p>
-            </aside>
-          </div>
+      {effectiveTab === 'sections' && <div className="space-y-4">
+        <div hidden={workflow} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brk-outline bg-white p-3">
+          <div className="text-sm"><span className="text-brk-muted">Mẫu hiện tại:</span> <strong>{templateName}</strong></div>
+          <div className="flex flex-wrap gap-2">{embedded ? <button type="button" onClick={onEditCode} className="min-h-11 rounded-lg border border-brk-outline px-3 text-sm text-brk-primary">Sửa code</button> : <Link href={`/tools/courses/templates?course=${encodeURIComponent(initialPage.slug)}&name=${encodeURIComponent(name)}`} onClick={event => { if (dirty && !confirm('Bạn có thay đổi chưa lưu. Rời trang để đổi mẫu?')) event.preventDefault() }} className="inline-flex min-h-11 items-center rounded-lg border border-brk-outline px-3 text-sm font-semibold text-brk-primary">Đổi mẫu / Sửa code</Link>}<a href={`/khoa-hoc/${initialPage.slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-brk-outline px-3 text-sm">Xem trang công khai <ExternalLink size={15} /></a></div>
         </div>
-      )}
+        <div className="flex gap-2 xl:hidden">{(['edit', 'preview'] as const).map(pane => <button type="button" key={pane} aria-pressed={mobilePane === pane} onClick={() => setMobilePane(pane)} className={`min-h-11 flex-1 rounded-lg border border-brk-outline px-3 text-sm ${mobilePane === pane ? 'bg-brk-primary text-white' : 'bg-white'}`}>{pane === 'edit' ? 'Chỉnh sửa' : 'Xem trước'}</button>)}</div>
+        <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(300px,380px)_minmax(0,1fr)]">
+          <aside className={`${mobilePane === 'preview' ? 'hidden xl:block' : ''} min-w-0 rounded-xl border border-brk-outline bg-white p-3`}>
+            <h3 className="mb-3 font-bold">Nội dung trang</h3>
+            <button type="button" aria-expanded={showAdd} onClick={() => setShowAdd(value => !value)} className="mb-3 min-h-11 w-full rounded-lg bg-brk-primary px-3 text-sm font-semibold text-white">+ Thêm nội dung</button>
+            {showAdd && <div className="mb-3 space-y-1 rounded-lg border border-brk-outline p-2">{['hero','rich_content','benefits','instructor','testimonials','pricing','closing_message'].map(type => <button type="button" key={type} onClick={() => { handleAddSection(type); setShowAdd(false) }} className="min-h-10 w-full rounded-lg px-2 text-left text-sm hover:bg-brk-background">{sectionName(type)}</button>)}</div>}
+            <div className="space-y-2">{sections.map((section, index) => <div key={section.sectionKey} onDragOver={event => event.preventDefault()} onDrop={() => { if (dragIndex !== null) reorderSections(dragIndex, index); setDragIndex(null) }} className={`flex items-center gap-1 rounded-lg border p-1 ${expandedSection === index ? 'border-brk-primary bg-brk-background' : 'border-brk-outline'}`}>
+              <span draggable onDragStart={() => setDragIndex(index)} onDragEnd={() => setDragIndex(null)} title="Kéo để sắp xếp" className="cursor-grab p-1"><GripVertical size={15} /></span>
+              <button type="button" aria-pressed={expandedSection === index} onClick={() => setExpandedSection(index)} className="min-h-11 min-w-0 flex-1 text-left text-xs font-semibold"><span className="block">{section.variant === 'imported-v1' ? section.content?.importedMeta?.label || sectionName(section.sectionType) : section.variant === 'wi300-gift-testimonials' ? 'Cảm nhận học viên' : sectionName(section.sectionType || section.type)}</span><span className="block font-normal text-brk-muted">{section.enabled ? 'Đang hiện' : 'Đang ẩn'}</span></button>
+              <input type="checkbox" aria-label={`Hiển thị ${sectionName(section.sectionType || section.type)} ${index + 1}`} checked={section.enabled} onChange={event => handleUpdateSectionContent(index, 'enabled', event.target.checked)} className="h-4 w-4 accent-green-700" />
+            </div>)}</div>
+<div className="mt-5 border-t border-brk-outline pt-5">
+            {currentSection && expandedSection !== null ? <>
+              <h3 className="mb-3 font-bold">{sectionName(currentSection.sectionType || currentSection.type)}</h3>
+              <div className="mb-4 flex gap-2">{(['content', 'display'] as const).map(tab => <button type="button" key={tab} aria-pressed={propertyTab === tab} onClick={() => setPropertyTab(tab)} className={`min-h-10 rounded-lg px-3 text-sm ${propertyTab === tab ? 'bg-brk-background font-semibold text-brk-primary' : 'text-brk-muted'}`}>{tab === 'content' ? 'Nội dung' : 'Hiển thị'}</button>)}</div>
+              {currentSection.variant === 'zip-source-v1' ? <p className="text-sm leading-6 text-brk-muted">Mẫu này giữ nguyên mã nguồn. Dùng “Đổi mẫu / Sửa code” để chỉnh HTML/CSS/JS và xem trước trong kho mẫu.</p> : propertyTab === 'content' ? simpleEditor({ ...currentSection, sectionType: currentSection.sectionType || currentSection.type }, expandedSection) : <div className="space-y-4">
+                <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={currentSection.enabled} onChange={event => handleUpdateSectionContent(expandedSection,'enabled',event.target.checked)} />Hiển thị khối này</label>
+                <label className="block text-sm">Đối tượng xem<select value={currentSection.visibility || 'all'} onChange={event => handleUpdateSectionContent(expandedSection,'visibility',event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border px-2"><option value="all">Tất cả</option><option value="unregistered">Chưa đăng ký</option><option value="registered">Đã đăng ký</option></select></label>
+                <div className="flex flex-wrap gap-2"><button type="button" onClick={() => handleMoveSection(expandedSection,'up')} disabled={expandedSection === 0} title="Đưa lên" className="min-h-11 rounded-lg border p-3 disabled:opacity-30"><ArrowUp size={16} /></button><button type="button" onClick={() => handleMoveSection(expandedSection,'down')} disabled={expandedSection === sections.length - 1} title="Đưa xuống" className="min-h-11 rounded-lg border p-3 disabled:opacity-30"><ArrowDown size={16} /></button><button type="button" onClick={() => duplicateSection(expandedSection)} title="Nhân bản" className="min-h-11 rounded-lg border p-3"><Copy size={16} /></button><button type="button" onClick={() => handleDeleteSection(expandedSection)} title="Xóa khối" className="min-h-11 rounded-lg border border-red-200 p-3 text-red-700"><Trash2 size={16} /></button></div>
+                <button type="button" onClick={() => setAdvanced(value => !value)} className="min-h-11 text-xs text-brk-muted">{advanced ? 'Ẩn' : 'Hiện'} cài đặt nâng cao</button>{advanced && <p className="break-all text-xs text-brk-muted">Mã khối: {currentSection.sectionKey}</p>}
+              </div>}
+              <p className="mt-4 rounded-lg bg-brk-background p-3 text-xs leading-5 text-brk-muted">Thay đổi đang hiển thị trong bản nháp. Bấm Lưu bản nháp trước khi Xuất bản.</p>
+            </> : <p className="text-sm text-brk-muted">Chọn hoặc thêm một khối để chỉnh sửa.</p>}
+          </div>
+          </aside>
+          <div id="course-draft-preview" className={`${mobilePane === 'edit' ? 'hidden xl:block' : ''} min-w-0 rounded-xl border border-brk-outline bg-slate-100 p-3`}>
+            <div className="mb-3 flex flex-wrap items-center gap-2"><strong className="mr-auto text-xs">Xem trước bản nháp</strong><button type="button" aria-pressed={previewMode === 'desktop'} onClick={() => setPreviewMode('desktop')} title="Máy tính" className={`min-h-10 rounded-lg p-2 ${previewMode === 'desktop' ? 'bg-brk-primary text-white' : 'bg-white'}`}><Monitor size={18} /></button><button type="button" aria-pressed={previewMode === 'mobile'} onClick={() => setPreviewMode('mobile')} title="Điện thoại" className={`min-h-10 rounded-lg p-2 ${previewMode === 'mobile' ? 'bg-brk-primary text-white' : 'bg-white'}`}><Smartphone size={18} /></button><select aria-label="Đối tượng xem bản nháp" value={previewRegistered ? 'registered' : 'unregistered'} onChange={event => setPreviewRegistered(event.target.value === 'registered')} className="min-h-10 max-w-full rounded-lg border border-brk-outline bg-white px-2 text-xs"><option value="unregistered">Chưa đăng ký</option><option value="registered">Đã đăng ký</option></select></div>
+            <CourseDraftPreview key={previewKey} page={draftPage} width={previewMode === 'mobile' ? 390 : 1120} selectedKey={currentSection?.sectionKey} onSelect={key => { setExpandedSection(sections.findIndex(section => section.sectionKey === key)); setMobilePane('edit') }} registered={previewRegistered} />
+            <p className="mt-2 text-xs leading-5 text-brk-muted">Bấm vào nội dung trong preview để chọn khối. Thay đổi hiển thị ngay; trang công khai chỉ đổi khi Xuất bản.</p>
+          </div>
+
+        </div>
+      </div>}
+
+      <div hidden={workflow} className="sticky bottom-0 z-40 flex flex-wrap items-center gap-3 rounded-2xl border bg-white/95 backdrop-blur px-4 py-3 shadow-sm">
+        <div className="flex-1 min-w-0">
+          <div className="font-black text-sm text-gray-900 truncate">{name}</div>
+          <div className={`text-xs ${dirty?'text-amber-600':'text-green-600'}`}>{dirty?'Có thay đổi chưa lưu':'Mọi thay đổi đã được lưu'}</div>
+        </div>
+        <button type="button" onClick={handleLoadVersions} className="rounded-xl border border-gray-200 px-3 py-2.5 text-xs font-bold text-gray-600">Lịch sử</button>
+        <button type="button" onClick={handleSavePage} disabled={saving || !dirty} className="inline-flex items-center gap-2 rounded-xl border border-gray-900 px-4 py-2.5 text-xs font-black text-gray-900 disabled:opacity-40">
+          <Save className="w-4 h-4"/>{saving?'Đang lưu...':'Lưu bản nháp'}
+        </button>
+        <button type="button" onClick={() => { onShowPreview?.(); setActiveTab('sections'); setMobilePane('preview'); window.requestAnimationFrame(() => document.getElementById('course-draft-preview')?.scrollIntoView({ block: 'center' })) }} className="min-h-11 rounded-xl border px-4 text-xs font-bold">Xem trước</button>
+        <button type="button" onClick={handlePublish} disabled={publishing || saving || dirty} className="rounded-xl bg-brk-primary px-4 py-2.5 text-xs font-black text-white disabled:opacity-40">
+          {publishing?'Đang xuất bản...':'Xuất bản'}
+        </button>
+      </div>
 
       {/* Save Trigger */}
-      <div className="pt-6 border-t border-gray-100 flex justify-end gap-3">
+      <div hidden={embedded} className="pt-6 border-t border-gray-100 flex justify-end gap-3">
         <Link
           href="/tools/courses"
           className="px-5 py-3 border border-gray-200 rounded-xl text-xs font-bold uppercase text-gray-500 hover:bg-gray-50 transition-all"
@@ -718,11 +735,11 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
         <button
           onClick={handleSavePage}
           disabled={saving}
-          className="px-6 py-3 bg-black text-yellow-400 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-gray-800 transition-all flex items-center gap-2 shadow-lg disabled:opacity-50"
+          className="px-6 py-3 bg-brk-primary text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-gray-800 transition-all flex items-center gap-2 shadow-lg disabled:opacity-50"
         >
           <Save className="w-4 h-4" /> {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
         </button>
       </div>
-    </div>
+    </fieldset>
   )
 }

@@ -18,6 +18,7 @@ interface HeroSectionProps {
   course?: any
   session?: any
   onAction?: (actionType: string, target?: string) => void
+  projectLabels?: React.ReactNode
 }
 
 export default function HeroSection({
@@ -31,6 +32,7 @@ export default function HeroSection({
   course,
   session,
   onAction,
+  projectLabels,
 }: HeroSectionProps) {
 
 
@@ -99,6 +101,8 @@ export default function HeroSection({
             <em style={{ color: 'var(--accent)', fontStyle: 'italic', fontWeight: 400 }}> {content.highlightedText}</em>
           )}
         </h1>
+
+        {projectLabels && <div className="my-4 rounded-xl bg-white p-3 text-slate-900">{projectLabels}</div>}
 
         <p style={{
           fontFamily: 'Inter, sans-serif',

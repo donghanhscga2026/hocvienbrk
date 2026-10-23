@@ -4,12 +4,15 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSession } from 'next-auth/react'
+import { isHighestAdmin, isTeachingRole, getAssignableRoles } from '@/lib/auth/roles'
+import { learningProfileHref } from '@/lib/learning-profile/shared'
 import { getStudentsAction, getAdminCoursesAction, resendVerificationAction, resendAllVerificationAction, adminResetStudentPasswordAction, updateUserRoleAction } from '@/app/actions/admin-actions'
 import { Search, User, Mail, Phone, Loader2, ArrowUpDown, ArrowLeft, Users, Shield, GraduationCap, Handshake, Trophy, ChevronLeft, ChevronRight, X, Upload, ScrollText, KeyRound } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
 import DeleteByUserSection from '@/components/admin/students/DeleteByUserSection'
 import BulkEnrollModal from '@/components/admin/students/BulkEnrollModal'
 import ActivityTimeline from '@/components/admin/ActivityTimeline'
+import CreateAccountForm from '@/components/admin/students/CreateAccountForm'
 
 interface EnrollmentData {
   courseId: number
@@ -34,8 +37,7 @@ const roleConfig: Record<string, { label: string; icon: any; color: string; bgCo
   STUDENT: { label: 'Thành viên', icon: GraduationCap, color: 'text-gray-600', bgColor: 'bg-gray-100', textColor: 'text-gray-700' },
   ADMIN: { label: 'Quản trị', icon: Shield, color: 'text-red-600', bgColor: 'bg-red-100', textColor: 'text-red-700' },
   DEVELOPER: { label: 'Phát triển', icon: Shield, color: 'text-indigo-600', bgColor: 'bg-indigo-100', textColor: 'text-indigo-700' },
-  TEACHER: { label: 'Giáo viên', icon: Users, color: 'text-cyan-600', bgColor: 'bg-cyan-100', textColor: 'text-cyan-700' },
-  INSTRUCTOR: { label: 'Giảng viên', icon: Users, color: 'text-blue-600', bgColor: 'bg-blue-100', textColor: 'text-blue-700' },
+  TEACHER: { label: 'Giảng viên', icon: Users, color: 'text-cyan-600', bgColor: 'bg-cyan-100', textColor: 'text-cyan-700' },
   AFFILIATE: { label: 'Đối tác', icon: Handshake, color: 'text-green-600', bgColor: 'bg-green-100', textColor: 'text-green-700' },
   COURSE_86_DAYS: { label: 'Coach 1:1', icon: Trophy, color: 'text-purple-600', bgColor: 'bg-purple-100', textColor: 'text-purple-700' },
   UNVERIFIED: { label: 'Chưa xác minh', icon: Mail, color: 'text-orange-600', bgColor: 'bg-orange-100', textColor: 'text-orange-700' },
@@ -98,22 +100,22 @@ function ResendVerifyBtn({ studentId }: { studentId: number }) {
 
 const assignableRoles = [
   ['STUDENT', 'Thành viên'],
-  ['TEACHER', 'Giáo viên'],
-  ['INSTRUCTOR', 'Giảng viên'],
+  ['TEACHER', 'Giảng viên'],
   ['AFFILIATE', 'Đối tác'],
   ['DEVELOPER', 'Phát triển'],
   ['ADMIN', 'Quản trị'],
 ] as const
 
-function RoleSelect({ student, onUpdated }: { student: StudentData; onUpdated: () => void }) {
+function RoleSelect({ student, allowedRoles, onUpdated }: { student: StudentData; allowedRoles: readonly string[]; onUpdated: () => void }) {
   const [saving, setSaving] = useState(false)
+  const options = assignableRoles.filter(([value]) => allowedRoles.includes(value))
 
   const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     e.preventDefault()
     e.stopPropagation()
     const nextRole = e.target.value
     if (nextRole === student.role) return
-    const label = assignableRoles.find(([value]) => value === nextRole)?.[1] || nextRole
+    const label = options.find(([value]) => value === nextRole)?.[1] || nextRole
     if (!window.confirm(`Đổi quyền của "${student.name || student.email}" thành "${label}"?`)) {
       e.target.value = student.role
       return
@@ -133,12 +135,13 @@ function RoleSelect({ student, onUpdated }: { student: StudentData; onUpdated: (
     <select
       defaultValue={student.role}
       disabled={saving}
-      onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
+      onClick={(e) => { e.stopPropagation() }}
       onChange={handleChange}
       className="text-[11px] font-bold border border-gray-200 bg-white rounded-lg px-2 py-1.5 disabled:opacity-50"
       title="Phân quyền thành viên"
+      aria-label={`Vai trò của ${student.name || student.email}`}
     >
-      {assignableRoles.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      {options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
     </select>
   )
 }
@@ -186,9 +189,9 @@ function ResetPasswordBtn({ studentId, studentName }: { studentId: number; stude
 export default function ToolsStudentsPage() {
   const { data: session } = useSession()
   const isAdmin = session?.user?.role === 'ADMIN'
-  const isTeacher = session?.user?.role === 'TEACHER'
+  const isTeacher = isTeachingRole(session?.user?.role) // Giáo viên + Giảng viên
   const isRoot = session?.user?.id === '0'
-  const isSuperAdmin = session?.user?.id === '0' || session?.user?.id === '3773'
+  const isSuperAdmin = isHighestAdmin(session?.user?.id, session?.user?.role)
 
   const [students, setStudents] = useState<StudentData[]>([])
   const [loading, setLoading] = useState(true)
@@ -296,6 +299,7 @@ export default function ToolsStudentsPage() {
 
       <div className="shrink-0 bg-white border-b shadow-sm">
         <div className="p-4 space-y-3">
+          {isAdmin && <CreateAccountForm onCreated={() => { void fetchStudents(0) }} />}
           {isAdmin ? (
             <>
               <div className="flex gap-2">
@@ -461,6 +465,9 @@ export default function ToolsStudentsPage() {
           <div className="space-y-3">
             {students.map((student) => {
               const isCoach = student.enrollments?.some((e: any) => e.courseId === 1 && e.status === 'ACTIVE')
+              // Ma trận phân quyền (đồng bộ với changeMemberRole):
+              // root (0/3773): mọi vai trò; admin thường: trừ Quản trị; giáo viên: chỉ Cộng sự/Thành viên
+              const allowedRoles = getAssignableRoles(session?.user?.id, session?.user?.role, student.id, student.role)
               const displayRole = isCoach ? 'COURSE_86_DAYS' : student.role
               const bgColor = roleCardColors[displayRole] || 'bg-gray-100'
               const textColor = roleTextColors[displayRole] || 'text-gray-900'
@@ -468,7 +475,7 @@ export default function ToolsStudentsPage() {
               return (
                 <div key={student.id} className="relative group">
                   <Link
-                    href={`/tools/students/${student.id}`}
+                    href={learningProfileHref(student.id)}
                     prefetch={false}
                     className="block bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-gray-200 transition-all"
                   >
@@ -514,8 +521,8 @@ export default function ToolsStudentsPage() {
                       </div>
                     </div>
                   </Link>
-                  {(isRoot || isSuperAdmin) && (
-                    <div className="absolute top-3 right-3 flex items-center gap-0.5">
+                  {(allowedRoles || isRoot || isSuperAdmin) && (
+                    <div className="flex flex-wrap items-center justify-end gap-2 rounded-b-2xl border border-t-0 border-gray-100 bg-white px-3 py-2">
                       {isRoot && (
                         <button
                           onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActivityLogTarget({ id: student.id, name: student.name || 'Chưa có tên' }) }}
@@ -525,8 +532,8 @@ export default function ToolsStudentsPage() {
                           <ScrollText className="w-4 h-4 text-blue-400 hover:text-blue-600" />
                         </button>
                       )}
-                      {isAdmin && (
-                        <RoleSelect student={student} onUpdated={() => fetchStudents(page)} />
+                      {allowedRoles && (
+                        <RoleSelect student={student} allowedRoles={allowedRoles} onUpdated={() => fetchStudents(page)} />
                       )}
                       {isSuperAdmin && (
                         <ResetPasswordBtn studentId={student.id} studentName={student.name || 'Chưa có tên'} />

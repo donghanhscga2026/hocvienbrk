@@ -8,7 +8,7 @@ const { act } = React
 function load(file, mocks = {}) {
   const module = { exports: {} }
   const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : require(name), module, module.exports)
+  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name === '@/lib/wi300/projects' ? load('lib/wi300/projects.ts') : require(name), module, module.exports)
   return module.exports
 }
 async function run() {
@@ -30,7 +30,7 @@ async function run() {
   const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
   const image = { __esModule: true, default: ({ fill, priority, unoptimized, ...props }) => React.createElement('img', props) }
   const styles = { viewport: 'viewport', track: 'track', group: 'group', copy: 'copy', paused: 'paused' }
-  const Business = load('components/wi300/Wi300Businesses.tsx', { 'next/image': image, './Wi300Businesses.module.css': { __esModule: true, default: styles } }).default
+  const Business = load('components/wi300/Wi300Businesses.tsx', { 'next/link': link, 'next/image': image, './Wi300Businesses.module.css': { __esModule: true, default: styles } }).default
   await act(async () => root.render(React.createElement(Business)))
   assert.equal(document.querySelectorAll('ul[aria-label] li').length, 7)
   assert.equal(document.querySelectorAll('ul[aria-hidden="true"] li').length, 7)

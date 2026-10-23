@@ -50,12 +50,16 @@ jobs:
           npm run test:custom-domains
           node scripts/test-domain-snapshot.cjs
           node scripts/test-page-template-courses.cjs
+          node scripts/test-profile-course-visibility.cjs
           node scripts/test-page-template-assets.cjs
           node scripts/test-website-pages.cjs
+          node scripts/test-website-management-access.cjs
           node scripts/test-page-crm-forms.cjs
 
       - name: CRM requests and personal space regression checks
         run: |
+          node scripts/test-unified-teaching-role.cjs
+          node scripts/test-learning-profiles.cjs
           node scripts/test-crm-request-workflow.cjs
           node scripts/test-crm-request-ui.cjs
           node scripts/test-crm-request-bulk.cjs
@@ -65,6 +69,10 @@ jobs:
           node scripts/test-wi300-personal-space.cjs
           node scripts/test-wi300-navigation.cjs
           node scripts/test-wi300-space-menu.cjs
+          node scripts/test-unified-management-navigation.cjs
+          node scripts/test-admin-accounts-media.cjs
+          node scripts/test-legacy-templates.cjs
+          node scripts/test-course-history.cjs
           node scripts/test-my-requests-ui.cjs
           node scripts/test-notification-pagination.cjs
           node scripts/test-notification-feed-ui.cjs
@@ -72,14 +80,42 @@ jobs:
           node scripts/test-wi300-partners.cjs
           node scripts/test-wi300-catalog-partners.cjs
           node scripts/test-wi300-performance.cjs
+          node scripts/test-wi300-home-ecosystem.cjs
+          node scripts/test-wi300-public-streaming.cjs
+          node scripts/test-wi300-appearance.cjs
+          node scripts/test-content-cms.cjs
 
       - name: Member ID change transaction and font checks
         run: |
           node scripts/test-user-id-change.cjs
+          node scripts/test-normal-user-ids.cjs
+          node scripts/test-normal-id-recovery.cjs
           node scripts/test-local-fonts.cjs
 
       - name: TypeScript check
         run: npx tsc --noEmit
+
+      - name: Course and project management regression checks
+        run: |
+          node scripts/test-wi300-projects.cjs
+          node scripts/test-project-bulk.cjs
+          node scripts/test-wi300-project-content.cjs
+          node scripts/test-course-management-activity.cjs
+          node scripts/test-management-workspace-ui.cjs
+          node scripts/test-course-member-export.cjs
+          node scripts/test-course-roster-workspace.cjs
+          node scripts/test-course-student-ui.cjs
+          node scripts/test-template-workspace.cjs
+          node scripts/test-template-youtube.cjs
+          node scripts/test-course-code.cjs
+          node scripts/test-course-sales-flow.cjs
+          node scripts/test-template-workspace-ui.cjs
+          node scripts/test-course-builder-ui.cjs
+          node scripts/test-course-template-publish.cjs
+          node scripts/test-template-library-access.cjs
+          node scripts/test-wi300-teacher-profile.cjs
+          node scripts/test-wi300-course-hero.cjs
+          node scripts/test-wi300-appearance.cjs
 
       - name: ZIP template source regression checks
         run: node scripts/test-zip-template-source.cjs

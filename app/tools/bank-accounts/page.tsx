@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Loader2, Search, Plus, Edit3, Trash2, X, CheckCircle2, AlertCircle, Banknote } from 'lucide-react'
+import { Loader2, Search, Plus, Edit3, Trash2, X, CheckCircle2, AlertCircle, Banknote, KeyRound, Copy } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
 import { getVietnamBanks, BankInfo } from '@/lib/vietnam-banks'
+import { generateBankWebhookKey, revokeBankWebhookKey } from '@/app/actions/bank-webhook-actions'
 
 const accountTypeLabels: Record<string, string> = { BANK: 'Ngân hàng', MOMO: 'Ví Momo', ZALOPAY: 'Ví ZaloPay', OTHER: 'Khác' }
 const accountTypeOptions = [
@@ -22,6 +23,7 @@ interface BankAccount {
   bankName: string | null
   qrCodeUrl: string | null
   isDefault: boolean
+  webhookApiKeyHint: string | null
   createdAt: string
   user: { id: number; name: string | null; email: string; phone: string | null }
 }
@@ -186,6 +188,35 @@ export default function AdminBankAccountsPage() {
     setSaving(false)
   }
 
+  const [keyModal, setKeyModal] = useState<{ accountLabel: string; apiKey: string } | null>(null)
+  const [keyLoading, setKeyLoading] = useState<number | null>(null)
+
+  async function handleGenerateKey(acc: BankAccount) {
+    if (!window.confirm(`Tạo API key webhook SePay RIÊNG cho TK "${acc.accountHolder} - ${acc.accountNumber}"?\n\nKey cũ (nếu có) sẽ bị vô hiệu ngay.`)) return
+    setKeyLoading(acc.id)
+    const result = await generateBankWebhookKey(acc.id)
+    setKeyLoading(null)
+    if (result.success && result.apiKey) {
+      setKeyModal({ accountLabel: `${acc.accountHolder} - ${acc.accountNumber}`, apiKey: result.apiKey })
+      loadData()
+    } else {
+      setMessage({ type: 'error', text: result.error || 'Tạo key thất bại' })
+    }
+  }
+
+  async function handleRevokeKey(acc: BankAccount) {
+    if (!window.confirm(`Thu hồi key webhook của TK "${acc.accountHolder} - ${acc.accountNumber}"?\n\nWebhook đang dùng key này sẽ bị từ chối ngay lập tức.`)) return
+    setKeyLoading(acc.id)
+    const result = await revokeBankWebhookKey(acc.id)
+    setKeyLoading(null)
+    if (result.success) {
+      setMessage({ type: 'success', text: result.message || 'Đã thu hồi key.' })
+      loadData()
+    } else {
+      setMessage({ type: 'error', text: result.error || 'Thu hồi thất bại' })
+    }
+  }
+
   async function handleDelete(acc: BankAccount) {
     if (!window.confirm(`Xóa tài khoản "${acc.accountHolder} - ${acc.accountNumber}"?`)) return
     try {
@@ -236,6 +267,7 @@ export default function AdminBankAccountsPage() {
             />
           </div>
           <button
+            data-help-id="btn-add-bank-account"
             onClick={openAddModal}
             className="flex items-center gap-2 px-5 py-3 bg-black text-yellow-400 rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-gray-800 transition-all"
           >
@@ -257,6 +289,7 @@ export default function AdminBankAccountsPage() {
                   <th className="text-left px-4 py-3 text-[10px] font-black uppercase text-gray-400">Chủ TK</th>
                   <th className="text-left px-4 py-3 text-[10px] font-black uppercase text-gray-400">Số TK</th>
                   <th className="text-left px-4 py-3 text-[10px] font-black uppercase text-gray-400">Ngân hàng</th>
+                  <th className="text-center px-4 py-3 text-[10px] font-black uppercase text-gray-400">Key webhook</th>
                   <th className="text-center px-4 py-3 text-[10px] font-black uppercase text-gray-400">Mặc định</th>
                   <th className="text-left px-4 py-3 text-[10px] font-black uppercase text-gray-400">Ngày tạo</th>
                   <th className="text-center px-4 py-3 text-[10px] font-black uppercase text-gray-400">Thao tác</th>
@@ -277,6 +310,31 @@ export default function AdminBankAccountsPage() {
                     <td className="px-4 py-3 font-bold text-gray-800">{acc.accountHolder}</td>
                     <td className="px-4 py-3 font-mono text-gray-800">{acc.accountNumber}</td>
                     <td className="px-4 py-3 text-gray-600">{acc.bankName || '-'}</td>
+                    <td className="px-4 py-3 text-center">
+                      {acc.webhookApiKeyHint ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-green-700 bg-green-50 border border-green-200 rounded px-2 py-0.5" title="Đã có key riêng">
+                            <KeyRound className="w-3 h-3" /> ...{acc.webhookApiKeyHint}
+                          </span>
+                          <button
+                            onClick={() => handleRevokeKey(acc)}
+                            disabled={keyLoading === acc.id}
+                            className="text-[11px] text-red-600 hover:underline disabled:opacity-50"
+                          >
+                            Thu hồi
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          data-help-id="btn-gen-key"
+                          onClick={() => handleGenerateKey(acc)}
+                          disabled={keyLoading === acc.id}
+                          className="text-[11px] font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded px-2 py-1 hover:bg-blue-100 disabled:opacity-50"
+                        >
+                          {keyLoading === acc.id ? '...' : '+ Tạo key'}
+                        </button>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-center">{acc.isDefault ? <span className="text-green-500 font-bold">✓</span> : '-'}</td>
                     <td className="px-4 py-3 text-xs text-gray-400">{new Date(acc.createdAt).toLocaleDateString('vi-VN')}</td>
                     <td className="px-4 py-3">
@@ -298,7 +356,7 @@ export default function AdminBankAccountsPage() {
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={8} className="text-center py-8 text-gray-400 text-xs font-black uppercase">Không có tài khoản nào</td></tr>
+                  <tr><td colSpan={9} className="text-center py-8 text-gray-400 text-xs font-black uppercase">Không có tài khoản nào</td></tr>
                 )}
               </tbody>
             </table>
@@ -372,7 +430,7 @@ export default function AdminBankAccountsPage() {
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Số tài khoản *</label>
-                <input type="text" value={formAccountNumber} onChange={(e) => setFormAccountNumber(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
+                <input data-help-id="input-account-number" type="text" value={formAccountNumber} onChange={(e) => setFormAccountNumber(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
               </div>
 
               <div className="space-y-1.5">
@@ -404,6 +462,7 @@ export default function AdminBankAccountsPage() {
               </label>
 
               <button
+                data-help-id="btn-save-bank-account"
                 type="submit"
                 disabled={saving}
                 className="w-full bg-black text-yellow-400 py-3.5 rounded-2xl font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-50"
@@ -412,6 +471,39 @@ export default function AdminBankAccountsPage() {
                 {editingAccount ? 'Cập nhật' : 'Thêm mới'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal hiện key webhook 1 lần duy nhất */}
+      {keyModal && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={() => setKeyModal(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-green-600" />
+              <h3 className="font-black">Key webhook đã tạo</h3>
+            </div>
+            <p className="text-xs text-gray-600">
+              TK: <b>{keyModal.accountLabel}</b><br />
+              <span className="text-red-600 font-bold">Key chỉ hiện 1 lần này.</span> Copy ngay và đưa cho giảng viên
+              dán vào mục Bảo mật (API Key) khi tạo webhook trên SePay của họ.
+            </p>
+            <div className="flex items-center gap-2 bg-gray-50 border rounded-2xl p-3">
+              <code className="flex-1 text-xs font-mono break-all select-all">{keyModal.apiKey}</code>
+              <button
+                onClick={() => { navigator.clipboard.writeText(keyModal.apiKey); setMessage({ type: 'success', text: 'Đã copy key!' }) }}
+                className="shrink-0 w-9 h-9 rounded-xl bg-black text-yellow-400 flex items-center justify-center hover:bg-gray-800"
+                title="Copy"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
+            </div>
+            <button
+              onClick={() => setKeyModal(null)}
+              className="w-full bg-black text-yellow-400 py-3 rounded-2xl font-black uppercase text-sm tracking-wider"
+            >
+              Tôi đã lưu key
+            </button>
           </div>
         </div>
       )}

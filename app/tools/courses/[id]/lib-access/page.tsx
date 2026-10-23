@@ -141,6 +141,7 @@ export default function LibAccessPage({ params }: { params: Promise<{ id: string
                                     required
                                 />
                                 <button
+                                    data-help-id="btn-add-lib-email"
                                     type="submit"
                                     disabled={adding || !newEmail}
                                     className="w-full bg-purple-600 text-white rounded-2xl py-3 font-black uppercase text-xs tracking-widest flex justify-center items-center gap-2 hover:bg-purple-700 transition-all disabled:opacity-50"

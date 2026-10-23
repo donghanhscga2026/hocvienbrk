@@ -7,6 +7,7 @@ import type { DeploymentBrand } from '@/lib/site-profile/deployment-brand'
 import Wi300HomeClient from './Wi300HomeClient'
 import { canTeach } from '@/lib/wi300/personal-space'
 import { wi300CoursePreferences, wi300CourseWhere, wi300HiddenLearning } from '@/lib/wi300/course-visibility'
+import { readPublicProjects } from '@/lib/wi300/project-service'
 
 // Chỉ gửi dữ liệu dùng bởi card, bộ lọc và đăng ký; bỏ nội dung dài/email quản trị.
 const courseSelect = {
@@ -16,7 +17,9 @@ const courseSelect = {
   teacherId: true, categoryId: true, teacherBankAccountId: true, vipExempt: true,
   feeType: true, voucherConfig: true, allowMbvDeduction: true,
   requiresReferralActivation: true, referralActivationThreshold: true,
-  courseCategory: { select: { name: true } }, teacherBankAccount: true,
+  courseCategory: { select: { name: true } },
+  // Chỉ dữ liệu nhận chuyển khoản; không gửi metadata/key webhook tới preview/client.
+  teacherBankAccount: { select: { id: true, accountHolder: true, accountNumber: true, bankName: true, qrCodeUrl: true } },
   teacher: { select: { name: true, image: true } },
   _count: { select: { enrollments: { where: { status: 'ACTIVE' as const } }, lessons: true } },
 } satisfies Prisma.CourseSelect
@@ -36,9 +39,12 @@ export type Wi300Enrollment = {
 // Cùng phạm vi khóa học của SITE_PROFILE_KEY; cache không phụ thuộc nhận diện giao diện.
 const getCatalog = unstable_cache(async (where: Prisma.CourseWhereInput) => prisma.course.findMany({
   where, select: courseSelect, orderBy: [{ pin: 'asc' }, { updatedAt: 'desc' }],
-}), ['wi300-course-catalog-v4'], { tags: ['site-profile'], revalidate: 600 })
+}), ['wi300-course-catalog-v5'], { tags: ['site-profile'], revalidate: 600 })
 
-export default async function Wi300Home({ brand, session, view = 'home' }: { brand: DeploymentBrand; session: Session | null; view?: 'home' | 'catalog' | 'discover' | 'space' }) {
+export default async function Wi300Home({ brand, session, view = 'home', catalogHeroRendered = false, loadHomeCourses = true }: { brand: DeploymentBrand; session: Session | null; view?: 'home' | 'catalog' | 'discover' | 'space' | 'teachers'; catalogHeroRendered?: boolean; loadHomeCourses?: boolean }) {
+  const projectsReady = view === 'home' || view === 'discover' || view === 'catalog'
+    ? readPublicProjects(prisma).then(projects => ({ projects, projectsError: false })).catch(error => { console.error('[WI300 projects]', error instanceof Error ? error.name : 'Unknown'); return { projects: [], projectsError: true } })
+    : Promise.resolve({ projects: [], projectsError: false })
   const userId = session?.user?.id != null ? Number(session.user.id) : null
   let preferences = new Map<number, boolean>()
   let courses: Wi300Course[] = []
@@ -61,20 +67,29 @@ export default async function Wi300Home({ brand, session, view = 'home' }: { bra
     return { teachingCourses: [], teachingError: false }
   })()
 
+  // The homepage has no course/learning section. Keep those queries only for
+  // catalog views or a homepage link that explicitly opens a payment modal.
+  const needsCourses = view !== 'home' || loadHomeCourses
   try {
-    const profile = await getCurrentSiteProfile()
-    preferences = await wi300CoursePreferences(prisma)
-    const enrolledCourseIds = view === 'space' && userId != null && Number.isInteger(userId)
-      ? (await prisma.enrollment.findMany({ where: { userId }, select: { courseId: true } })).map(row => row.courseId) : []
-    // Catalog hiding is independent of existing learning/enrollment access.
-    courses = await getCatalog(wi300CourseWhere(getCourseWhereForProfile(profile || { userId: 0 }), preferences, view !== 'space', enrolledCourseIds))
-    courses = courses.map(course => ({ ...course, status: preferences.get(course.id) ?? false }))
+    if (needsCourses) {
+      const [profile, coursePreferences, enrolledRows] = await Promise.all([
+        getCurrentSiteProfile(),
+        wi300CoursePreferences(prisma),
+        view === 'space' && userId != null && Number.isInteger(userId)
+          ? prisma.enrollment.findMany({ where: { userId }, select: { courseId: true } }) : Promise.resolve([]),
+      ])
+      preferences = coursePreferences
+      const enrolledCourseIds = enrolledRows.map(row => row.courseId)
+      // Catalog hiding is independent of existing learning/enrollment access.
+      courses = await getCatalog(wi300CourseWhere(getCourseWhereForProfile(profile || { userId: 0 }), preferences, view !== 'space', enrolledCourseIds))
+      courses = courses.map(course => ({ ...course, status: preferences.get(course.id) ?? false }))
+    }
   } catch (error) {
     // Không hiển thị khóa học giả hoặc khóa ngoài phạm vi khi database lỗi.
     console.error('[WI300] Không tải được danh mục khóa học', error)
     catalogError = true
   }
-  if (userId != null && Number.isInteger(userId)) {
+  if (needsCourses && userId != null && Number.isInteger(userId)) {
     try {
       const [user, rows, hiddenLearning] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId }, select: { phone: true } }),
@@ -102,5 +117,6 @@ export default async function Wi300Home({ brand, session, view = 'home' }: { bra
     }
   }
   const { teachingCourses, teachingError } = await teachingReady
-  return <Wi300HomeClient brand={brand} courses={courses} enrollments={enrollments} teachingCourses={teachingCourses.map(course => ({ ...course, status: preferences.get(course.id) ?? false }))} teachingError={teachingError} userId={userId} userPhone={userPhone} loggedIn={!!session?.user} catalogError={catalogError} accountError={accountError} view={view} />
+  const { projects, projectsError } = await projectsReady
+  return <Wi300HomeClient catalogHeroRendered={catalogHeroRendered} appearance={brand.appearance} projects={projects} projectsError={projectsError} brand={brand} courses={courses} enrollments={enrollments} teachingCourses={teachingCourses.map(course => ({ ...course, status: preferences.get(course.id) ?? false }))} teachingError={teachingError} userId={userId} userPhone={userPhone} loggedIn={!!session?.user} catalogError={catalogError} accountError={accountError} view={view} />
 }

@@ -24,7 +24,7 @@ const RESERVED_PATHS = new Set([
     'auth', 'dashboard', 'account', 'settings', 'profile',
     'user', 'checkout', 'payment', 'static', 'assets', '_next',
     'landing', 'forgot-password', 'tools', 'account-settings',
-    'tca', 'ktc', 'khoa-hoc', 'land', 'page', 'du-an'
+    'tca', 'ktc', 'khoa-hoc', 'land', 'page', 'du-an', 'ho-so-hoc-tap'
 ])
 
 const RESOURCE_PREFIXES = new Set(['khoa-hoc', 'land', 'page', 'du-an'])
@@ -35,11 +35,31 @@ const RESOURCE_PREFIXES = new Set(['khoa-hoc', 'land', 'page', 'du-an'])
 // tiếp), lớp này chỉ để tránh lọt route mới thêm sau này mà quên gắn check.
 const ADMIN_ONLY_PREFIXES = ['/api/admin', '/api/sync-tca', '/api/system-tree']
 
+// [Bảo mật P0] Chặn cứng 404 các đường dẫn dò quét (dotfile, bản sao lưu,
+// file cấu hình) trước mọi logic định tuyến. Trước đây các đường này rơi
+// vào trang "không tìm thấy" tùy chỉnh và trả HTTP 200 (soft-404), vừa gây
+// hiểu nhầm là file tồn tại, vừa làm sai kết quả của các công cụ quét.
+// Ngoại lệ duy nhất: /.well-known/ là đường chuẩn công khai hợp lệ.
+const PROBE_FILE_EXTENSIONS = /\.(?:env|sql|bak|old|swp|swo|log|ini|conf|config|dist|save|orig|tmp)$/i
+export function isBlockedProbePath(pathname: string) {
+    if (pathname.startsWith('/.well-known/')) return false
+    const segments = pathname.split('/').filter(Boolean)
+    if (segments.some((segment) => segment.startsWith('.') && segment.length > 1)) return true
+    const last = segments[segments.length - 1] || ''
+    return PROBE_FILE_EXTENSIONS.test(last)
+}
+
 /**
  * proxy.ts (Next.js 16+)
  * Thay thế cho middleware.ts để xử lý routing, auth và affiliate.
+ *
+ * [Tối ưu Vercel] Trước đây MỌI request trên host nền tảng đều đi qua lớp
+ * `auth()` (giải mã JWT) dù chỉ các đường quản trị mới cần biết vai trò.
+ * Nay phần xử lý chung tách riêng: chỉ `/admin`, `/dashboard` và các tiền
+ * tố API quản trị mới qua lớp auth; còn lại chạy thẳng, giữ nguyên logic
+ * cookie affiliate và kết quả trả về.
  */
-const proxyHandler = auth(async function proxy(request: NextRequest & { auth: any }) {
+function handlePlatformRequest(request: NextRequest, session: { user?: { role?: string } } | null) {
     const { nextUrl } = request
 
     if (nextUrl.pathname.startsWith('/api/auth')) {
@@ -47,13 +67,16 @@ const proxyHandler = auth(async function proxy(request: NextRequest & { auth: an
     }
 
     if (nextUrl.pathname.startsWith('/admin') || ADMIN_ONLY_PREFIXES.some((p) => nextUrl.pathname.startsWith(p))) {
-        const role = (request.auth as { user?: { role?: string } } | null)?.user?.role
+        const role = session?.user?.role
         if (role !== 'ADMIN') {
             return NextResponse.json({ error: 'Unauthorized. Admin only.' }, { status: 403 })
         }
     }
 
-    const response = NextResponse.next()
+    // Always overwrite the client value; the layout uses this only to defer UI.
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.set('x-wi300-pathname', nextUrl.pathname)
+    const response = NextResponse.next({ request: { headers: requestHeaders } })
     
     const refCode = request.nextUrl.searchParams.get('ref')
     const pathParts = request.nextUrl.pathname.split('/').filter(Boolean)
@@ -74,18 +97,29 @@ const proxyHandler = auth(async function proxy(request: NextRequest & { auth: an
     if (refCode) {
         saveRefCookie(response, refCode, slug, slug, null, resourceType)
     }
-    
+
     return response
+}
+
+const proxyHandler = auth(async function proxy(request: NextRequest & { auth: any }) {
+    return handlePlatformRequest(request, request.auth as { user?: { role?: string } } | null)
 })
+
+/** Chỉ các đường này mới cần lớp auth (kiểm tra vai trò/đăng nhập) ở proxy. */
+function needsAuthLayer(pathname: string) {
+    return pathname.startsWith('/admin') || pathname.startsWith('/dashboard') || ADMIN_ONLY_PREFIXES.some((p) => pathname.startsWith(p))
+}
 
 /** Domain riêng: chỉ mở các route đã cấp, giữ domain trong thanh địa chỉ. */
 export default async function proxy(request: NextRequest, event: NextFetchEvent) {
     const hostname=requestHostname(request.headers.get('host') || '')
     const path=request.nextUrl.pathname
+    if(isBlockedProbePath(path)) return new NextResponse('Not found',{status:404,headers:{'Cache-Control':'no-store','Content-Type':'text/plain; charset=utf-8'}})
     if(isPlatformHost(hostname)) {
         if(path.startsWith('/site-domain/')) return new NextResponse('Not found',{status:404})
         if(path.startsWith('/api/') && !ADMIN_ONLY_PREFIXES.some(p=>path.startsWith(p))) return NextResponse.next()
-        return (proxyHandler as unknown as NextMiddleware)(request,event)
+        if(needsAuthLayer(path)) return (proxyHandler as unknown as NextMiddleware)(request,event)
+        return handlePlatformRequest(request, null)
     }
     if(path.startsWith('/.well-known/giautoandien-domain/')) return NextResponse.next()
     const domainStarted=performance.now()

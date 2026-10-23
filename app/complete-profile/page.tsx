@@ -331,6 +331,7 @@ function CompleteProfileContent() {
                     </div>
 
                     <button
+                        data-help-id="btn-save-profile"
                         type="submit"
                         disabled={isLoading}
                         className="flex w-full items-center justify-center gap-2 rounded-xl bg-brk-primary px-4 py-3 text-sm font-semibold text-white shadow-lg hover:bg-brk-primary-hover focus:outline-none focus:ring-2 focus:ring-brk-primary/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"

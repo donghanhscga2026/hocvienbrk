@@ -260,31 +260,17 @@ export async function confirmBulkEnrollAction(rows: PreviewRow[], courseId: numb
             return { success: false, error: 'Bạn không phụ trách khóa học này.' }
         }
 
-        const { getNextAvailableId } = await import('@/lib/id-helper')
+        const { createUserWithAvailableIdInTransaction } = await import('@/lib/id-helper')
         const summary: BulkImportSummary = { createdUsers: [], createdEnrollments: [], modifiedUsers: [] }
         const errors: string[] = []
         const filteredRows = rows.filter(r => r.status !== 'CONFLICT')
 
-        // Pre-compute IDs và closure data trước transaction
+        // Chỉ thêm tài khoản vào thống kê/closure sau khi giao dịch thành công.
         const pendingClosures: { userId: number; referrerId: number }[] = []
         const pendingAffiliates: { userId: number; referrerId: number }[] = []
 
-        // Lấy reserved IDs + nextId 1 lần duy nhất, pattern giống preview
-        const reservedIds = await prisma.reservedId.findMany({ select: { id: true } })
-        const reservedSet = new Set(reservedIds.map(r => r.id))
-        let nextId = await getNextAvailableId()
-
         for (const row of filteredRows) {
-            if (row.status === 'NEW') {
-                while (reservedSet.has(nextId)) nextId++
-                row.userId = nextId
-                nextId++
-                summary.createdUsers.push({ id: row.userId, name: row.name, email: row.email, phone: row.phone })
-                pendingClosures.push({ userId: row.userId, referrerId: row.referrerId || 0 })
-                if (row.referrerId && row.referrerId > 0) {
-                    pendingAffiliates.push({ userId: row.userId, referrerId: row.referrerId })
-                }
-            } else if (row.status === 'EXISTING' && row.userId) {
+            if (row.status === 'EXISTING' && row.userId) {
                 const existingUser = await prisma.user.findUnique({ where: { id: row.userId } })
                 if (existingUser) {
                     if (existingUser.email?.toLowerCase() !== row.email) {
@@ -307,24 +293,22 @@ export async function confirmBulkEnrollAction(rows: PreviewRow[], courseId: numb
         // danh dù log báo "đang xử lý" hàng trăm dòng).
         for (const row of filteredRows) {
             try {
-                if (isTestAccount(row.userId)) {
+                if (row.status !== 'NEW' && isTestAccount(row.userId)) {
                     errors.push(`Dòng #${row.rowIndex}: Tài khoản test không được phép tham gia khóa học`)
                     continue
                 }
 
                 await prisma.$transaction(async (tx) => {
-                    if (row.status === 'NEW' && row.userId) {
-                        await tx.user.create({
-                            data: {
-                                id: row.userId,
-                                name: toTitleCase(row.name),
-                                email: row.email,
-                                phone: row.phone,
-                                role: 'STUDENT' as Role,
-                                referrerId: row.referrerId || 0,
-                                password: DEFAULT_PASSWORD_HASH
-                            }
+                    if (row.status === 'NEW') {
+                        const createdUser = await createUserWithAvailableIdInTransaction(tx, {
+                            name: toTitleCase(row.name),
+                            email: row.email,
+                            phone: row.phone,
+                            role: 'STUDENT' as Role,
+                            referrerId: row.referrerId || 0,
+                            password: DEFAULT_PASSWORD_HASH
                         })
+                        row.userId = createdUser.id
                     } else if (row.status === 'EXISTING' && row.userId) {
                         const updates: any = {}
                         const mods = summary.modifiedUsers.filter(m => m.userId === row.userId)
@@ -361,7 +345,14 @@ export async function confirmBulkEnrollAction(rows: PreviewRow[], courseId: numb
                     }
                 })
 
-                if (row.userId) summary.createdEnrollments.push({ userId: row.userId, courseId })
+                if (row.userId) {
+                    summary.createdEnrollments.push({ userId: row.userId, courseId })
+                    if (row.status === 'NEW') {
+                        summary.createdUsers.push({ id: row.userId, name: row.name, email: row.email, phone: row.phone })
+                        pendingClosures.push({ userId: row.userId, referrerId: row.referrerId || 0 })
+                        if (row.referrerId && row.referrerId > 0) pendingAffiliates.push({ userId: row.userId, referrerId: row.referrerId })
+                    }
+                }
             } catch (err: any) {
                 errors.push(`Dòng #${row.rowIndex}: ${err.message}`)
             }

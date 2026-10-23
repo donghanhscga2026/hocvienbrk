@@ -148,6 +148,7 @@ function ForgotPasswordContent() {
                         </div>
 
                         <button
+                            data-help-id="btn-send-reset-code"
                             type="submit"
                             disabled={isLoading}
                             className="w-full rounded-xl bg-brk-primary hover:bg-brk-primary px-4 py-3 text-sm font-bold text-brk-on-primary transition-colors disabled:opacity-50 flex items-center justify-center gap-2"

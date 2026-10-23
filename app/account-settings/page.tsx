@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { getUserWithAccounts, updateUserProfile, changePassword, getUserBankAccountsAction, createUserBankAccountAction, updateUserBankAccountAction, deleteUserBankAccountAction } from '@/app/actions/account-actions'
-import { Camera, User, Phone, Mail, Key, Check, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff, Hash, Plus, Pencil, Trash2, Banknote, Building2, CreditCard, Smartphone } from 'lucide-react'
+import { generateOwnBankWebhookKey, revokeOwnBankWebhookKey } from '@/app/actions/bank-webhook-actions'
+import { Camera, User, Phone, Mail, Key, Check, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff, Hash, Plus, Pencil, Trash2, Banknote, Building2, CreditCard, Smartphone, KeyRound, Copy } from 'lucide-react'
 import Link from 'next/link'
 import { getVietnamBanks, BankInfo } from '@/lib/vietnam-banks'
 
@@ -46,6 +47,11 @@ export default function AccountSettingsPage() {
     const [bankForm, setBankForm] = useState({ accountType: 'BANK', accountHolder: '', accountNumber: '', bankName: '', qrCodeUrl: '', isDefault: false })
     const [savingBank, setSavingBank] = useState(false)
     const [bankList, setBankList] = useState<BankInfo[]>([])
+
+    // SePay webhook key states (tự tạo/thu hồi key cho TK của mình)
+    const [keyLoadingId, setKeyLoadingId] = useState<number | null>(null)
+    const [keyModal, setKeyModal] = useState<{ accountLabel: string; apiKey: string } | null>(null)
+    const [copiedKey, setCopiedKey] = useState(false)
 
     useEffect(() => {
         async function fetchUser() {
@@ -314,6 +320,39 @@ export default function AccountSettingsPage() {
         }
     }
 
+    // SePay webhook key handlers — chủ tài khoản tự quản lý key của TK mình
+    async function refreshBankAccounts() {
+        const refresh = await getUserBankAccountsAction()
+        if (refresh.success) setBankAccounts(refresh.accounts || [])
+    }
+
+    async function handleGenerateKey(acc: any) {
+        if (!window.confirm(`Tạo Key webhook SePay cho TK "${acc.accountHolder} - ${acc.accountNumber}"?\n\nKey cũ (nếu có) sẽ bị vô hiệu ngay. Sau khi tạo, hãy copy key và dán vào webhook SePay của bạn.`)) return
+        setKeyLoadingId(acc.id)
+        const res = await generateOwnBankWebhookKey(acc.id)
+        setKeyLoadingId(null)
+        if (res.success && res.apiKey) {
+            setCopiedKey(false)
+            setKeyModal({ accountLabel: `${acc.accountHolder} - ${acc.accountNumber}`, apiKey: res.apiKey })
+            await refreshBankAccounts()
+        } else {
+            setMessage({ type: 'error', text: res.error || 'Tạo key thất bại' })
+        }
+    }
+
+    async function handleRevokeKey(acc: any) {
+        if (!window.confirm(`Thu hồi Key webhook SePay của TK "${acc.accountHolder} - ${acc.accountNumber}"?\n\nWebhook SePay đang dùng key này sẽ bị từ chối (401) ngay lập tức.`)) return
+        setKeyLoadingId(acc.id)
+        const res = await revokeOwnBankWebhookKey(acc.id)
+        setKeyLoadingId(null)
+        if (res.success) {
+            setMessage({ type: 'success', text: res.message || 'Đã thu hồi key.' })
+            await refreshBankAccounts()
+        } else {
+            setMessage({ type: 'error', text: res.error || 'Thu hồi key thất bại' })
+        }
+    }
+
     const accountTypeLabels: Record<string, string> = { BANK: 'Ngân hàng', MOMO: 'Ví Momo', ZALOPAY: 'Ví ZaloPay', OTHER: 'Khác' }
     const accountTypeIcons: Record<string, any> = { BANK: Building2, MOMO: Smartphone, ZALOPAY: Smartphone, OTHER: CreditCard }
 
@@ -507,9 +546,40 @@ export default function AccountSettingsPage() {
                 {/* Change Password */}
                 {/* Bank Accounts */}
                 <div className="bg-brk-background rounded-2xl border border-brk-outline p-6 mb-6">
+                    <details className="mb-4 bg-blue-50/60 border border-blue-200 rounded-xl px-4 py-3">
+                        <summary data-help-id="sepay-3steps" className="cursor-pointer text-sm font-bold text-blue-800">
+                            💡 Muốn học viên chuyển khoản là tự động kích hoạt? Làm 3 bước sau
+                        </summary>
+                        <ol className="mt-2 ml-4 list-decimal text-xs text-blue-900 space-y-1.5 leading-relaxed">
+                            <li>
+                                <b>Thêm tài khoản ngân hàng</b> của bạn ở bên dưới (nút "Thêm"), rồi chọn TK này khi tạo khóa học.
+                                Hệ thống sẽ tự sinh mã QR đúng TK của bạn cho học viên quét.
+                            </li>
+                            <li>
+                                <b>Forward email biến động số dư</b> về Gmail trung tâm của hệ thống:
+                                vào Gmail của bạn → Cài đặt → Bộ lọc → tạo bộ lọc với điều kiện
+                                <span className="font-mono"> From: (địa chỉ email thông báo của ngân hàng bạn)</span> →
+                                chọn <b>Chuyển tiếp tới</b> địa chỉ Gmail trung tâm (hỏi admin để lấy địa chỉ).
+                                <br />Ví dụ Sacombank: From là <span className="font-mono">info@sacombank.com.vn</span>.
+                            </li>
+                            <li>
+                                <b>Báo cho admin</b> sau khi xong 2 bước trên để admin bật "Tự động xác minh"
+                                cho khóa học của bạn. Từ đó học viên chuyển khoản đúng cú pháp
+                                <span className="font-mono"> SDT ... HV ... COC ...</span> là được kích hoạt ngay,
+                                không cần duyệt tay.
+                            </li>
+                            <li>
+                                <b>Hoặc tự cài qua SePay (không cần chờ admin):</b> tại tài khoản ngân hàng
+                                của bạn ở bên dưới, bấm <b>"+ Tạo key"</b> để lấy Key webhook SePay, rồi đăng ký
+                                <span className="font-mono"> my.sepay.vn</span>, liên kết đúng tài khoản ngân hàng này
+                                và tạo webhook với URL <span className="font-mono">https://giautoandien.io.vn/api/webhooks/sepay</span>
+                                (tuyệt đối <b>không có www</b>), dán key vào mục Bảo mật (API Key) của webhook.
+                            </li>
+                        </ol>
+                    </details>
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-semibold text-brk-on-surface">Tài khoản nhận tiền</h2>
-                        <button onClick={() => openBankForm()} className="flex items-center gap-2 px-4 py-2 bg-brk-primary text-brk-on-surface text-sm font-bold rounded-xl hover:bg-brk-primary-hover transition-colors">
+                        <button data-help-id="btn-add-my-bank" onClick={() => openBankForm()} className="flex items-center gap-2 px-4 py-2 bg-brk-primary text-brk-on-surface text-sm font-bold rounded-xl hover:bg-brk-primary-hover transition-colors">
                             <Plus className="h-4 w-4" /> Thêm
                         </button>
                     </div>
@@ -521,7 +591,8 @@ export default function AccountSettingsPage() {
                     {bankAccounts.map((acc: any) => {
                         const Icon = accountTypeIcons[acc.accountType] || Banknote
                         return (
-                            <div key={acc.id} className="flex items-center justify-between p-4 bg-brk-background rounded-xl border border-brk-outline mb-2">
+                            <div key={acc.id} className="p-4 bg-brk-background rounded-xl border border-brk-outline mb-2">
+                              <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 bg-brk-primary/10 rounded-full flex items-center justify-center">
                                         <Icon className="h-5 w-5 text-brk-primary" />
@@ -541,6 +612,29 @@ export default function AccountSettingsPage() {
                                         <Trash2 className="h-4 w-4" />
                                     </button>
                                 </div>
+                              </div>
+                                {acc.accountType === 'BANK' && (
+                                    <div className="mt-3 pt-3 border-t border-brk-outline flex items-center justify-between gap-3 flex-wrap">
+                                        <div className="flex items-center gap-2 text-xs">
+                                            <KeyRound className="h-4 w-4 text-brk-primary shrink-0" />
+                                            <span className="text-brk-muted font-medium">Key webhook SePay:</span>
+                                            {acc.webhookApiKeyHint ? (
+                                                <span className="inline-flex items-center gap-1 font-bold text-green-700 bg-green-50 border border-green-200 rounded px-2 py-0.5" title="Đã có key riêng — dán key này vào mục Bảo mật (API Key) của webhook SePay">...{acc.webhookApiKeyHint}</span>
+                                            ) : (
+                                                <span className="text-brk-muted">Chưa có — tạo key để tự kích hoạt qua SePay</span>
+                                            )}
+                                        </div>
+                                        {acc.webhookApiKeyHint ? (
+                                            <button onClick={() => handleRevokeKey(acc)} disabled={keyLoadingId === acc.id} className="text-xs font-bold text-red-500 hover:text-red-600 disabled:opacity-50 transition-colors">
+                                                {keyLoadingId === acc.id ? 'Đang xử lý...' : 'Thu hồi'}
+                                            </button>
+                                        ) : (
+                                            <button data-help-id="btn-gen-my-sepay-key" onClick={() => handleGenerateKey(acc)} disabled={keyLoadingId === acc.id} className="text-xs font-bold text-brk-primary hover:underline disabled:opacity-50">
+                                                {keyLoadingId === acc.id ? 'Đang tạo...' : '+ Tạo key'}
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )
                     })}
@@ -613,6 +707,38 @@ export default function AccountSettingsPage() {
                         </div>
                     )}
                 </div>
+
+                {/* Modal hiện Key webhook SePay — chỉ hiện 1 lần duy nhất lúc tạo */}
+                {keyModal && (
+                    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setKeyModal(null)}>
+                        <div className="bg-brk-background rounded-2xl p-6 max-w-md w-full border border-brk-outline" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center gap-2 mb-3">
+                                <KeyRound className="h-5 w-5 text-green-600" />
+                                <h3 className="text-lg font-semibold text-brk-on-surface">Key webhook SePay đã tạo</h3>
+                            </div>
+                            <p className="text-sm text-brk-muted mb-4">
+                                TK: <b className="text-brk-on-surface">{keyModal.accountLabel}</b><br />
+                                <span className="text-red-500 font-bold">Key chỉ hiện 1 lần này duy nhất.</span> Copy ngay và dán vào mục <b>Bảo mật (API Key)</b> khi tạo webhook trên SePay (my.sepay.vn), với URL webhook: <span className="font-mono text-xs">https://giautoandien.io.vn/api/webhooks/sepay</span> (không có www). Nếu lỡ mất key, hãy Thu hồi rồi tạo key mới.
+                            </p>
+                            <div className="flex items-center gap-2 bg-brk-surface border border-brk-outline rounded-xl p-3 mb-4">
+                                <code className="flex-1 text-xs font-mono break-all select-all">{keyModal.apiKey}</code>
+                                <button
+                                    onClick={() => { navigator.clipboard.writeText(keyModal.apiKey); setCopiedKey(true) }}
+                                    className="shrink-0 w-9 h-9 rounded-lg bg-brk-primary hover:bg-brk-primary-hover flex items-center justify-center text-brk-on-surface transition-colors"
+                                    title="Copy key"
+                                >
+                                    {copiedKey ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                </button>
+                            </div>
+                            <button
+                                onClick={() => setKeyModal(null)}
+                                className="w-full bg-brk-primary hover:bg-brk-primary-hover text-brk-on-surface font-bold py-3 rounded-xl transition-colors"
+                            >
+                                Tôi đã lưu key
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {hasPassword && (
                     <div className="bg-brk-background rounded-2xl border border-brk-outline p-6">

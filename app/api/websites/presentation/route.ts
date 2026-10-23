@@ -10,7 +10,7 @@ import {CrmError} from '@/lib/crm/service'
 
 async function manager(request:Request) {
   if(!isPlatformHost(requestHostname(request.headers.get('host') || ''))) throw new CrmError('Quản lý giao diện tại hệ thống chính.',403)
-  return ownedProfile()
+  return ownedProfile(request)
 }
 function response(state:Awaited<ReturnType<typeof presentationState>>) {
   return {mode:state.mode,revision:state.revision,customPublished:state.customPublished,homepageType:state.homepageType}

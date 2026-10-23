@@ -1,8 +1,14 @@
 'use server'
 
 import prisma from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
+import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
+import { wi300CoursePreferences, wi300CourseWhere } from '@/lib/wi300/course-visibility'
+import { managedProfile, websiteActor, WEBSITE_MANAGER_ROLE } from '@/lib/website/management'
 import { FALLBACK_PROFILE, FALLBACK_COURSES, FALLBACK_POSTS, FALLBACK_SURVEY } from '@/lib/db-fallback'
 import { auth } from '@/auth'
+import { canCreateProfile } from '@/lib/auth/roles'
+import { domainContext } from '@/lib/website/domain-context'
 import { requireAdminAction } from '@/lib/api-auth'
 import { unstable_cache, revalidateTag } from 'next/cache'
 import {presentationKey,presentationSchema} from '@/lib/website/presentation'
@@ -46,6 +52,7 @@ export async function getSiteProfile(slug: string) {
  * Lấy profile theo slug (không yêu cầu isActive)
  */
 export async function getSiteProfileAdmin(slug: string) {
+  const denied = await requireAdminAction(); if (denied) return null
   try {
     return await prisma.siteProfile.findUnique({
       where: { slug },
@@ -74,6 +81,7 @@ export async function getSiteProfileAdmin(slug: string) {
  */
 export async function getSiteProfileAdminById(id: number) {
   try {
+    await managedProfile(id)
     const profile=await prisma.siteProfile.findUnique({
       where: { id },
       include: {
@@ -105,10 +113,13 @@ export async function getSiteProfileAdminById(id: number) {
 /**
  * Lấy profile của user hiện tại
  */
-export async function getMySiteProfile(userId: number) {
+export async function getMySiteProfile(userId: number, profileId?: number) {
   try {
+    const actor = await websiteActor()
+    if (actor.id !== userId) return null
+    const target = await managedProfile(profileId)
     return await prisma.siteProfile.findUnique({
-      where: { userId },
+      where: { id: target.id },
       include: {
         user: { select: { name: true, image: true, email: true } },
         members: {
@@ -172,6 +183,7 @@ export const getDefaultProfile = unstable_cache(
  * Lấy tất cả profiles (Admin)
  */
 export async function getAllSiteProfiles() {
+  const denied = await requireAdminAction(); if (denied) return []
   try {
     return await prisma.siteProfile.findMany({
       orderBy: [
@@ -205,9 +217,9 @@ function stripVolatileProfileFields(profile: any) {
  * getDefaultProfile/updateSiteProfile nên tự làm mới khi admin sửa profile.
  */
 const getCoursesForProfileCached = unstable_cache(
-  async (profile: any) => {
+  async (where: Prisma.CourseWhereInput) => {
     const courses = await prisma.course.findMany({
-      where: getCourseWhereForProfile(profile as any),
+      where,
       include: {
         courseCategory: true,
         teacherBankAccount: true,
@@ -218,16 +230,21 @@ const getCoursesForProfileCached = unstable_cache(
     })
     return courses.map(course => ({ ...course, activeStudentCount: course._count?.enrollments ?? 0 }))
   },
-  ['courses-for-profile-with-teacher'],
+  ['courses-for-profile-visibility-v2'],
   { tags: ['site-profile'], revalidate: 600 }
 )
 
 export async function getCoursesForProfile(profile: any) {
+  let wi300 = false
   try {
-    return await getCoursesForProfileCached(stripVolatileProfileFields(profile))
+    // Read request branding outside unstable_cache; the resolved scope is its cache key.
+    wi300 = Boolean(await getCurrentDeploymentBrand())
+    const base = getCourseWhereForProfile(profile)
+    const where = wi300 ? wi300CourseWhere(base, await wi300CoursePreferences(prisma)) : base
+    return await getCoursesForProfileCached(where)
   } catch (error) {
     console.error("[DB ERROR] getCoursesForProfile:", error)
-    return FALLBACK_COURSES as any[]
+    return wi300 ? [] : FALLBACK_COURSES as any[]
   }
 }
 
@@ -341,10 +358,18 @@ export async function getPostCategories() {
  * Tạo profile mới cho Teacher (Admin chọn teacher để gán profile)
  */
 export async function createSiteProfile(userId: number | null, slug: string) {
-  const denied = await requireAdminAction()
-  if (denied) return { error: denied.error }
-
   try {
+        if (await domainContext()) return { error: 'Tạo website tại hệ thống chính.' }
+        const session = await auth()
+        if (session?.user?.id == null) return { error: 'Vui lòng đăng nhập.' }
+        const actor = await prisma.user.findUnique({ where: { id: Number(session.user.id) }, select: { id: true, role: true } })
+        if (!actor || !canCreateProfile(actor.role)) return { error: 'Chỉ giảng viên hoặc admin được tạo website.' }
+        if (actor.role !== 'ADMIN') {
+          if (userId != null && userId !== actor.id) return { error: 'Bạn chỉ được tạo website cho chính mình.' }
+          userId = actor.id
+        }
+        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 50) return { error: 'Đường dẫn không hợp lệ.' }
+        if (userId != null && (!Number.isSafeInteger(userId) || userId < 0)) return { error: 'Mã chủ website không hợp lệ.' }
         const existing = await prisma.siteProfile.findUnique({ where: { slug } })
         if (existing) return { error: 'Slug đã được sử dụng' }
 
@@ -371,22 +396,13 @@ export async function createSiteProfile(userId: number | null, slug: string) {
  */
 export async function updateSiteProfile(id: number, data: any) {
   try {
-        const session = await auth()
-        if (!session?.user?.id) return { error: 'Unauthorized' }
-
-        const target = await prisma.siteProfile.findUnique({ where: { id }, select: { userId: true } })
-        if (!target) return { error: 'Không tìm thấy profile' }
-
-        const isAdmin = session.user.role === 'ADMIN'
-        const isOwner = target.userId === parseInt(session.user.id)
-        if (!isAdmin && !isOwner) return { error: 'Unauthorized' }
-
-        // Chỉ Admin mới được đổi profile mặc định của site hoặc đổi chủ sở hữu
-        if (!isAdmin) {
-            delete data.isDefault
-            delete data.userId
-            delete data.siteConfig
-        }
+        const actor = await websiteActor()
+        await managedProfile(id)
+        const isAdmin = actor.role === 'ADMIN'
+        // Không nhận nested Prisma writes; người quản trị cộng tác chỉ sửa nội dung.
+        const editable = ['slug','title','subtitle','heroImage','heroOverlay','messageContent','messageDetail','messageImage','accentColor','backgroundColor','footerText','showCommunity','showAllCourses','coursesTitle','allCoursesTitle','communityTitle','metaTitle','metaDescription','metaImage','selectedSurveyId','communityCategoryId','greetingMessages']
+        if (isAdmin) editable.push('isDefault','userId','siteConfig','isActive')
+        data = Object.fromEntries(Object.entries(data).filter(([key]) => editable.includes(key)))
 
         if (data.slug) {
             const existing = await prisma.siteProfile.findFirst({
@@ -549,18 +565,11 @@ export async function incrementProfileView(slug: string) {
  */
 export async function addProfileMember(profileId: number, userId: number, role: string = 'ASSOCIATE') {
   try {
-    const session = await auth()
-    if (!session?.user?.id) return { error: 'Unauthorized' }
-
-    const profile = await prisma.siteProfile.findUnique({ where: { id: profileId } })
-    if (!profile) return { error: 'Không tìm thấy profile' }
-
-    const isAdmin = session.user.role === 'ADMIN'
-    const isOwner = profile.userId === parseInt(session.user.id)
-    if (!isAdmin && !isOwner) return { error: 'Unauthorized' }
-
+    const profile = await managedProfile(profileId, true)
     if (profile.userId === userId) return { error: 'User này là chủ sở hữu profile' }
 
+    if (![WEBSITE_MANAGER_ROLE, 'ASSOCIATE'].includes(role)) return { error: 'Quyền cộng sự không hợp lệ' }
+    if (!Number.isSafeInteger(userId) || userId < 0 || !await prisma.user.findUnique({where:{id:userId},select:{id:true}})) return { error: 'Không tìm thấy tài khoản cộng sự' }
     const member = await prisma.siteProfileMember.upsert({
       where: { profileId_userId: { profileId, userId } },
       create: { profileId, userId, role },
@@ -589,16 +598,7 @@ export async function addProfileMember(profileId: number, userId: number, role: 
  */
 export async function removeProfileMember(profileId: number, userId: number) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) return { error: 'Unauthorized' }
-
-    const profile = await prisma.siteProfile.findUnique({ where: { id: profileId } })
-    if (!profile) return { error: 'Không tìm thấy profile' }
-
-    const isAdmin = session.user.role === 'ADMIN'
-    const isOwner = profile.userId === parseInt(session.user.id)
-    if (!isAdmin && !isOwner) return { error: 'Unauthorized' }
-
+    const profile = await managedProfile(profileId, true)
     await prisma.siteProfileMember.delete({
       where: { profileId_userId: { profileId, userId } }
     })
