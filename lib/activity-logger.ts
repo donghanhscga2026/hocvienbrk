@@ -13,7 +13,7 @@ export type ActivityAction =
   | 'AFFILIATE_CLICK' | 'AFFILIATE_CONVERSION'
   | 'WALLET_CHANGE'
   | 'SYSTEM_JOIN'
-  | 'SURVEY_COMPLETE'
+  | 'SURVEY_COMPLETE' | 'BASELINE_SAVED'
   | 'EMAIL_SENT' | 'EMAIL_FAILED'
 
 export async function logActivity(data: {
