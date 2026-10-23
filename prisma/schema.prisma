@@ -74,6 +74,11 @@ model User {
   crmStudentProfiles           CrmContact[] @relation("CrmStudentProfile")
   learnerBaselines             LearnerBaseline[]
   attendanceRecords            AttendanceRecord[]
+  salesLedgerEntries           MemberSalesLedger[]
+  connectedAccounts            ConnectedAccount[]
+  metricEvents                 MetricEvent[]
+  raceEnrollments              RaceEnrollment[]
+  raceLeaves                   RaceLeave[]
 
   @@index([email])
   @@index([phone])
@@ -481,6 +486,162 @@ model Enrollment {
 /// Điểm danh buổi học trực tiếp theo khóa học. Buổi học (AttendanceSession)
 /// do quản trị tạo; bản ghi (AttendanceRecord) sinh từ nhập báo cáo Zoom
 /// hoặc đánh dấu tay. GĐ1 — kế hoạch nâng cấp từ WIPA OS (23/10/2026).
+/// Sổ cái doanh số thành viên — sổ ghi BẤT BIẾN (chỉ thêm dòng, không sửa)
+/// ghi nhận GMV tạo ra qua từng thành viên: vai TEACHER (giảng viên của
+/// khóa được bán, theo từng OrderItem) và vai AFFILIATE (người có link
+/// dẫn tới đơn). Đơn hoàn/hủy → dòng REVERSAL đối ứng. Nền tảng chỉ ghi
+/// nhận số liệu (đúng mô hình vận hành affiliate đã chốt). GĐ2A — kế
+/// hoạch nâng cấp từ WIPA OS (23/10/2026). Đồng bộ idempotent bằng
+/// dedupeKey duy nhất; xem lib/sales-ledger/.
+/// Tài khoản mạng xã hội thành viên liên kết 1 lần (OAuth) để hệ thống
+/// tự đồng bộ số liệu — tầng Bạc của kiến trúc đo lường. Token lưu để
+/// đồng bộ nền; ngắt liên kết sẽ xóa token. GĐ2A (23/10/2026).
+/// Cuộc đua tăng tốc — sân chơi thi đua theo kỳ cho một cộng đồng/khóa
+/// học. Điểm tính TỰ ĐỘNG từ các nguồn đã kiểm chứng (sổ cái doanh số,
+/// ghi danh qua ref, kênh đã liên kết); mỗi điểm truy vết về một dòng
+/// MetricEvent. GĐ2B — kế hoạch nâng cấp từ WIPA OS (23/10/2026).
+model Race {
+  id           Int            @id @default(autoincrement())
+  name         String
+  courseId     Int?
+  status       RaceStatus     @default(DRAFT)
+  startsAt     DateTime
+  endsAt       DateTime
+  metricConfig Json?
+  createdById  Int?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  enrollments  RaceEnrollment[]
+  events       MetricEvent[]
+  leaves       RaceLeave[]
+
+  @@index([status, startsAt])
+}
+
+/// Nhật ký đo lường của cuộc đua: một dòng cho mỗi (cuộc đua, thành
+/// viên, chỉ số, kỳ) — kỳ "TOTAL" là tổng lũy kế tới hiện tại, được
+/// tính lại idempotent ở mỗi lượt đồng bộ. quantity là số đo thật,
+/// points là điểm quy đổi theo luật tại thời điểm tính (chi tiết luật
+/// lưu trong detail.rule).
+model MetricEvent {
+  id         Int      @id @default(autoincrement())
+  raceId     Int
+  userId     Int
+  metricKey  String
+  periodKey  String   @default("TOTAL")
+  quantity   Float    @default(0)
+  points     Float    @default(0)
+  source     String
+  detail     Json?
+  computedAt DateTime @default(now())
+  race       Race     @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([raceId, userId, metricKey, periodKey])
+  @@index([raceId, points])
+  @@index([userId])
+}
+
+model RaceEnrollment {
+  id       Int      @id @default(autoincrement())
+  raceId   Int
+  userId   Int
+  team     Int      @default(1)
+  joinedAt DateTime @default(now())
+  race     Race     @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([raceId, userId])
+  @@index([userId])
+}
+
+model RaceLeave {
+  id        Int         @id @default(autoincrement())
+  raceId    Int
+  userId    Int
+  date      DateTime
+  reason    String?
+  status    LeaveStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+  race      Race        @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([raceId, status])
+  @@index([userId])
+}
+
+model ConnectedAccount {
+  id             Int                  @id @default(autoincrement())
+  userId         Int
+  provider       String
+  externalId     String
+  displayName    String?
+  handle         String?
+  accessToken    String?
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  status         ConnectedAccountStatus @default(ACTIVE)
+  lastSyncAt     DateTime?
+  lastError      String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapshots      SocialSnapshot[]
+  contentItems   ExternalContentItem[]
+
+  @@unique([userId, provider])
+  @@index([provider, externalId])
+}
+
+/// Ảnh chụp chỉ số kênh tại một thời điểm (followers, tổng view, số
+/// video). Chênh lệch giữa hai ảnh chụp liên tiếp = tăng trưởng thật.
+model SocialSnapshot {
+  id         Int              @id @default(autoincrement())
+  accountId  Int
+  capturedAt DateTime         @default(now())
+  followers  Int              @default(0)
+  totalViews Float            @default(0)
+  videoCount Int              @default(0)
+  account    ConnectedAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, capturedAt])
+}
+
+/// Video/bài đăng phát hiện trên kênh đã liên kết — định danh duy nhất
+/// theo externalId nên đếm "video mới trong kỳ" không bao giờ trùng.
+model ExternalContentItem {
+  id          Int              @id @default(autoincrement())
+  accountId   Int
+  externalId  String
+  url         String
+  title       String
+  publishedAt DateTime?
+  viewCount   Float            @default(0)
+  likeCount   Int              @default(0)
+  lastSeenAt  DateTime         @default(now())
+  account     ConnectedAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, externalId])
+  @@index([accountId, publishedAt])
+}
+
+model MemberSalesLedger {
+  id         Int               @id @default(autoincrement())
+  userId     Int
+  role       SalesLedgerRole
+  type       SalesLedgerEntryType
+  orderId    Int
+  courseId   Int?
+  amount     Float
+  dedupeKey  String            @unique
+  occurredAt DateTime
+  createdAt  DateTime          @default(now())
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, occurredAt])
+  @@index([orderId])
+}
+
 model AttendanceSession {
   id              Int                @id @default(autoincrement())
   courseId        Int
@@ -1547,6 +1708,12 @@ model Badge {
   tier         Int         @default(1)
   thresholdGmv Float       @default(0)
   isActive     Boolean     @default(true)
+  /// Nhóm huy hiệu: AFFILIATE (khung cũ theo GMV) hoặc LEARNING /
+  /// CONTENT / BUSINESS / RACE cho engine trao tự động ở GĐ3.
+  category     String      @default("AFFILIATE")
+  /// Luật trao tự động dạng JSON: { metric, threshold } — engine ở
+  /// lib/badges/ đọc luật này; null = trao bằng cơ chế khác/tay.
+  rule         Json?
   userBadges   UserBadge[]
 
   @@index([tier])
@@ -2278,6 +2445,34 @@ enum EnrollmentMode {
 enum EnrollmentMemberRole {
   TV
   PS
+}
+
+enum RaceStatus {
+  DRAFT
+  ACTIVE
+  FINISHED
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ConnectedAccountStatus {
+  ACTIVE
+  ERROR
+  REVOKED
+}
+
+enum SalesLedgerRole {
+  TEACHER
+  AFFILIATE
+}
+
+enum SalesLedgerEntryType {
+  ACCRUAL
+  REVERSAL
 }
 
 enum AttendanceStatus {
