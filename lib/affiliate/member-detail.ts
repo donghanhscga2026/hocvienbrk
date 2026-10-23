@@ -223,7 +223,7 @@ export async function getMemberCommissionDetail(opts: {
   }
 
   return {
-    member: { id: member.id, name: member.name, email: member.email, role: member.role },
+    member: { id: member.id, name: member.name ?? member.email, email: member.email, role: member.role },
     wallet: wallet ? { pendingBalance: wallet.pendingBalance, balance: wallet.balance } : null,
     period,
     lines,
