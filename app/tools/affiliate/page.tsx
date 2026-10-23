@@ -759,6 +759,14 @@ export default function AffiliateToolsPage() {
             {session?.user?.role === 'ADMIN' && (
                 <AdminSubNav title="Affiliate" items={affiliateSubNav} />
             )}
+            {session?.user?.role === 'TEACHER' && (
+                <AdminSubNav
+                    title="Affiliate"
+                    items={affiliateSubNav.filter(
+                        (i) => i.href === '/tools/affiliate' || i.href === '/tools/affiliate/config'
+                    )}
+                />
+            )}
 
             <div className="max-w-4xl mx-auto p-4">
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 mb-6 flex">
