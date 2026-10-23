@@ -17,6 +17,7 @@ import { getRoadmapPoints } from './actions/roadmap-actions'
 import { FALLBACK_PROFILE } from '@/lib/db-fallback'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import Wi300Home from '@/components/wi300/Wi300Home'
+import Wi300PublicHome from '@/components/wi300/Wi300PublicHome'
 import { pageMetadata } from '@/lib/wi300/website-config'
 import { notFound } from 'next/navigation'
 
@@ -66,13 +67,15 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Home({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
-  const [session, brand] = await Promise.all([getSession(), getCurrentDeploymentBrand()])
+  const brand = await getCurrentDeploymentBrand()
   if (brand?.appearance?.hiddenPages.includes('home')) notFound()
   if (brand) {
     const params = await searchParams
-    // Preserve payment deep links while normal homepage visits skip course data.
-    return <Wi300Home brand={brand} session={session} loadHomeCourses={!!params?.paymentCourseId} />
+    if (!params?.paymentCourseId) return <Wi300PublicHome brand={brand} />
+    // Payment deep links keep server-verified session and enrollment data.
+    return <Suspense fallback={<Wi300PublicHome brand={brand} />}><PaymentHome brand={brand} /></Suspense>
   }
+  const session = await getSession()
   
   // Resolve Site Profile theo hostname; localhost/host chưa khai báo fallback profile mặc định.
   const profile = await getCurrentSiteProfile()
@@ -271,4 +274,8 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Re
       <FooterSection profile={displayProfile as any} />
     </main>
   )
+}
+
+async function PaymentHome({ brand }: { brand: NonNullable<Awaited<ReturnType<typeof getCurrentDeploymentBrand>>> }) {
+  return <Wi300Home brand={brand} session={await getSession()} loadHomeCourses />
 }
