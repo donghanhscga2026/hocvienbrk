@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import { AdminSubNav } from "@/components/admin/AdminSubNav"
-import { affiliateSubNav } from "../affiliate-nav"
+import { affiliateSubNav } from "../../affiliate-nav"
 import { getMemberCommissionDetail } from "@/lib/affiliate/member-detail"
 import { currentPeriodSaigon } from "@/lib/affiliate/settlement"
 import MemberCommissionActions from "@/components/affiliate/MemberCommissionActions"
