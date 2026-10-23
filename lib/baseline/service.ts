@@ -96,3 +96,43 @@ export async function getCourseGrowth(courseId: number, page = 1, pageSize = 50)
 }
 
 export { emptyMetrics }
+
+/**
+ * Số liệu hệ thống đã tự đo cho một học viên — dùng làm gợi ý điền Điểm B:
+ * followers/views từ snapshot mới nhất của các kênh đã liên kết, doanh
+ * thu ròng tích lũy từ sổ cái, khách riêng biệt qua đơn PAID affiliate.
+ * Trả null khi chưa có nguồn nào đo được.
+ */
+export interface MeasuredTotals {
+    followers: number
+    views: number
+    customers: number
+    revenue: number
+}
+
+export async function getMeasuredTotals(userId: number): Promise<MeasuredTotals | null> {
+    const [accounts, ledger, orders] = await Promise.all([
+        prisma.connectedAccount.findMany({
+            where: { userId, status: { in: ['ACTIVE', 'ERROR'] } },
+            select: { id: true },
+        }),
+        prisma.memberSalesLedger.findMany({ where: { userId }, select: { type: true, amount: true } }),
+        prisma.order.findMany({ where: { affiliateId: userId, status: 'PAID' }, select: { buyerId: true } }),
+    ])
+    let followers = 0
+    let views = 0
+    if (accounts.length > 0) {
+        const latest = await prisma.socialSnapshot.findMany({
+            where: { accountId: { in: accounts.map((a) => a.id) } },
+            orderBy: { capturedAt: 'desc' },
+            distinct: ['accountId'],
+            select: { followers: true, totalViews: true },
+        })
+        followers = latest.reduce((s, x) => s + x.followers, 0)
+        views = Math.round(latest.reduce((s, x) => s + x.totalViews, 0))
+    }
+    const revenue = ledger.reduce((s, e) => s + (e.type === 'ACCRUAL' ? e.amount : -e.amount), 0)
+    const customers = new Set(orders.map((o) => o.buyerId)).size
+    if (accounts.length === 0 && ledger.length === 0 && orders.length === 0) return null
+    return { followers, views, customers, revenue: Math.round(revenue) }
+}
