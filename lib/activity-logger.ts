@@ -15,6 +15,7 @@ export type ActivityAction =
   | 'SYSTEM_JOIN'
   | 'SURVEY_COMPLETE' | 'BASELINE_SAVED' | 'ATTENDANCE_IMPORTED'
   | 'SALES_LEDGER_SYNCED'
+  | 'SOCIAL_ACCOUNT_LINKED' | 'SOCIAL_ACCOUNT_UNLINKED'
   | 'EMAIL_SENT' | 'EMAIL_FAILED'
 
 export async function logActivity(data: {
