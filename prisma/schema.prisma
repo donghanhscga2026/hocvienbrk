@@ -74,6 +74,7 @@ model User {
   crmStudentProfiles           CrmContact[] @relation("CrmStudentProfile")
   learnerBaselines             LearnerBaseline[]
   attendanceRecords            AttendanceRecord[]
+  salesLedgerEntries           MemberSalesLedger[]
 
   @@index([email])
   @@index([phone])
@@ -481,6 +482,30 @@ model Enrollment {
 /// Điểm danh buổi học trực tiếp theo khóa học. Buổi học (AttendanceSession)
 /// do quản trị tạo; bản ghi (AttendanceRecord) sinh từ nhập báo cáo Zoom
 /// hoặc đánh dấu tay. GĐ1 — kế hoạch nâng cấp từ WIPA OS (23/10/2026).
+/// Sổ cái doanh số thành viên — sổ ghi BẤT BIẾN (chỉ thêm dòng, không sửa)
+/// ghi nhận GMV tạo ra qua từng thành viên: vai TEACHER (giảng viên của
+/// khóa được bán, theo từng OrderItem) và vai AFFILIATE (người có link
+/// dẫn tới đơn). Đơn hoàn/hủy → dòng REVERSAL đối ứng. Nền tảng chỉ ghi
+/// nhận số liệu (đúng mô hình vận hành affiliate đã chốt). GĐ2A — kế
+/// hoạch nâng cấp từ WIPA OS (23/10/2026). Đồng bộ idempotent bằng
+/// dedupeKey duy nhất; xem lib/sales-ledger/.
+model MemberSalesLedger {
+  id         Int               @id @default(autoincrement())
+  userId     Int
+  role       SalesLedgerRole
+  type       SalesLedgerEntryType
+  orderId    Int
+  courseId   Int?
+  amount     Float
+  dedupeKey  String            @unique
+  occurredAt DateTime
+  createdAt  DateTime          @default(now())
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, occurredAt])
+  @@index([orderId])
+}
+
 model AttendanceSession {
   id              Int                @id @default(autoincrement())
   courseId        Int
@@ -2278,6 +2303,16 @@ enum EnrollmentMode {
 enum EnrollmentMemberRole {
   TV
   PS
+}
+
+enum SalesLedgerRole {
+  TEACHER
+  AFFILIATE
+}
+
+enum SalesLedgerEntryType {
+  ACCRUAL
+  REVERSAL
 }
 
 enum AttendanceStatus {

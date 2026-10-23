@@ -14,6 +14,7 @@ export type ActivityAction =
   | 'WALLET_CHANGE'
   | 'SYSTEM_JOIN'
   | 'SURVEY_COMPLETE' | 'BASELINE_SAVED' | 'ATTENDANCE_IMPORTED'
+  | 'SALES_LEDGER_SYNCED'
   | 'EMAIL_SENT' | 'EMAIL_FAILED'
 
 export async function logActivity(data: {
