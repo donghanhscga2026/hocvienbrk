@@ -24,7 +24,13 @@ import { CommissionStatus, ConversionStatus, CommissionKind } from "@prisma/clie
 import { ensureWalletAndUpdate, createTransactionLog } from "./wallet-service"
 import { resolveRefToUserId } from "./resolve-ref-helper"
 
-const FEE_AMOUNT_DEFAULT = 3300
+// Quyết định 2026-10-23: KHÔNG trừ bất kỳ khoản phí nào khi ghi nhận hoa hồng.
+// Mô hình vận hành: nền tảng KHÔNG giữ tiền — học phí vào thẳng tài khoản của
+// giảng viên; hệ thống chỉ GHI NHẬN số liệu hoa hồng (% × giá niêm yết) để lập
+// báo cáo cho giảng viên đối chiếu và tự thanh toán cho người giới thiệu.
+// Khoản phí 3.300đ trước đây là tàn dư của engine cũ (AffiliateCampaign.feeAmount),
+// chưa từng được phê duyệt nghiệp vụ — đã loại bỏ.
+const FEE_AMOUNT_DEFAULT = 0
 
 export interface UnifiedCommissionResult {
   success: boolean
