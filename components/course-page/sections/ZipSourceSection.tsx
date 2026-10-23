@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import TemplateVideoOverlays from '@/components/course/TemplateVideoOverlays'
 import { useWi300Brand } from '@/components/wi300/Wi300BrandContext'
 import { zipFrameSource, zipSelectedBlockKeys, zipCourseLinks } from '@/lib/course-page/importer/source-url'
 
@@ -26,6 +27,7 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
   const frameRef = React.useRef<HTMLIFrameElement | null>(null)
   const [height, setHeight] = React.useState(900)
   const sourceUrl = content?.exactSource?.url || content?.importedSource?.exactSource?.url || ''
+  const sourceHtml = typeof content?.exactSource?.html === 'string' ? content.exactSource.html : undefined
   const selectedBlockKeys = zipSelectedBlockKeys(content?.selectedBlockKeys)
   const registrationBlockKeys: string[] = Array.isArray(content?.registrationBlockKeys)
     ? content.registrationBlockKeys.filter((value: unknown): value is string => typeof value === 'string')
@@ -157,9 +159,9 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
       window.removeEventListener('popstate', sendAnchorToFrame)
       window.clearTimeout(timer)
     }
-  }, [onAction, sourceUrl, syncStickyNavigation, selectedBlockKeys?.join('|'), registrationBlockKeys.join('|')])
+  }, [onAction, sourceUrl, sourceHtml, syncStickyNavigation, selectedBlockKeys?.join('|'), registrationBlockKeys.join('|')])
 
-  if (!sourceUrl) {
+  if (!sourceUrl && !sourceHtml) {
     return (
       <section id={id} className="mx-auto max-w-3xl p-8 text-center text-sm text-red-600">
         Không tìm thấy nguồn HTML của mẫu.
@@ -168,11 +170,13 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
   }
 
   return (
+    <div className="relative">
     <iframe
       ref={frameRef}
       id={id}
       title={content?.exactSource?.entryPath || 'Mẫu HTML nguyên trang'}
-      src={zipFrameSource(sourceUrl, process.env.NEXT_PUBLIC_SUPABASE_URL || '')}
+      src={sourceHtml ? undefined : zipFrameSource(sourceUrl, process.env.NEXT_PUBLIC_SUPABASE_URL || '')}
+      srcDoc={sourceHtml}
       sandbox="allow-scripts"
       referrerPolicy="no-referrer"
       scrolling="no"
@@ -202,5 +206,7 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
         } catch {}
       }}
     />
+    <TemplateVideoOverlays frame={frameRef} revision={sourceHtml || sourceUrl} />
+    </div>
   )
 }

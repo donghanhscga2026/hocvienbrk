@@ -124,7 +124,7 @@ async function run(){
   ok((await pg.query("SELECT relrowsecurity FROM pg_class WHERE relname='SiteDomain'")).rows[0].relrowsecurity,'Domain table has RLS')
   await pg.exec('DELETE FROM "SiteProfile" WHERE id=7');ok(!(await pg.query('SELECT * FROM "SiteDomain"')).rows.length,'Profile deletion cascades domain safely');await pg.close()
   sessionId=null;ok((await api.GET(new Request('https://giautoandien.io.vn/api/websites/domains',{headers:{host:'giautoandien.io.vn'}}))).status===401,'Anonymous cannot manage domain tokens');sessionId=1
-  profiles[0].user.role='TEACHER';ok((await post({action:'add',hostname:'brk.io.vn'})).status===403,'Trial domain provisioning requires admin grant');profiles[0].user.role='ADMIN'
+  profiles[0].user.role='TEACHER';role='TEACHER';ok((await post({action:'add',hostname:'brk.io.vn'})).status===403,'Trial domain provisioning requires admin grant');profiles[0].user.role='ADMIN';role='ADMIN'
   ok((await post({action:'add',hostname:'brk.io.vn'},'giautoandien.io.vn','https://evil.invalid')).status===403,'Cross-origin domain write rejected')
   ok((await post({action:'add',hostname:'brk.io.vn'},'brk.io.vn')).status===403,'Domain management only on platform')
   ok((await post({action:'add',hostname:'brk.io.vn',profileId:8})).status===400,'Reject target website injection')
@@ -197,10 +197,10 @@ async function run(){
   const accessPost=async(body,hostname='giautoandien.io.vn',origin='https://'+hostname)=>accessApi.POST(req(body,hostname,origin))
   ok((await accessPost({action:'basic',modules:off},'brk.io.vn')).status===403,'Brand session cannot administer package')
   ok((await accessPost({action:'basic',modules:off},'giautoandien.io.vn','https://evil.invalid')).status===403,'Package rejects cross-origin writes')
-  profiles[0].user.role='TEACHER'
+  profiles[0].user.role='TEACHER';role='TEACHER'
   ok((await accessPost({action:'basic',modules:on})).status===403,'Owner cannot change basic package')
   ok((await accessPost({action:'save',revision:0,enabled:on,extra:on})).status===403,'Owner cannot inject grants')
-  profiles[0].user.role='ADMIN'
+  profiles[0].user.role='ADMIN';role='ADMIN'
   const savedBasic=await accessPost({action:'basic',modules:{...off,courses:true}})
   ok(savedBasic.status===200,'Admin saves basic template: '+await savedBasic.text())
   ok(records[0].crm,'Saving template does not mutate live websites')
@@ -209,10 +209,10 @@ async function run(){
   ok((await accessPost({action:'save',revision:0,enabled:on,extra:on})).status===409,'Stale revision cannot overwrite access')
   await rejects(()=>context.requireDomainModule('crm'),'Server rejects revoked module despite direct access')
   ok((await post({action:'modules',hostname:'brk.io.vn',...on})).status===409,'Old domain form cannot bypass website policy')
-  profiles[0].user.role='TEACHER'
+  profiles[0].user.role='TEACHER';role='TEACHER'
   ok((await accessPost({action:'save',revision:1,enabled:on})).status===403,'Owner cannot activate ungranted module')
   ok((await accessPost({action:'save',revision:1,enabled:off})).status===200,'Owner can disable granted modules')
-  profiles[0].user.role='ADMIN'
+  profiles[0].user.role='ADMIN';role='ADMIN'
   await accessPost({action:'save',revision:2,enabled:on,extra:on})
   const apps=load('lib/website/applications'),appContext=load('lib/website/application-context')
   ok(Object.values(apps.noApplications).every(v=>v===false),'New application flags default closed for old website settings')
@@ -228,10 +228,10 @@ async function run(){
   await rejects(()=>appContext.connectedApplication('backup'),'Unknown application slug cannot launch platform admin')
   ok(shared.domainRoute('/tools/courses',{...on,teaching:true})==='deny','Connector does not expose unscoped native management pages')
   ok((await proxy(routeRequest('/ung-dung/brk'),{})).status===403,'Disconnected application rejected before page renders')
-  profiles[0].user.role='TEACHER'
+  profiles[0].user.role='TEACHER';role='TEACHER'
   ok((await accessPost({action:'save',revision:3,enabled:on,applications:apps.allApplications})).status===403,'Owner cannot connect ungranted application')
   ok((await accessPost({action:'save',revision:3,enabled:on,applicationExtra:apps.allApplications})).status===403,'Owner cannot forge application grants')
-  profiles[0].user.role='ADMIN'
+  profiles[0].user.role='ADMIN';role='ADMIN'
   ok((await accessPost({action:'basic',modules:on,applications:apps.allApplications})).status===200,'Full basic package stores supported application grants')
   ok((await accessPost({action:'save',revision:3,enabled:on,applications:apps.allApplications,applyBasic:true})).status===200,'Apply package and connect available apps')
   const launch=await appContext.connectedApplication('teaching')

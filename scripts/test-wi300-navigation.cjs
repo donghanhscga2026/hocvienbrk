@@ -7,10 +7,7 @@ const { JSDOM } = require('jsdom')
 const { createRoot } = require('react-dom/client')
 const { act } = React
 function load(file, overrides = {}) {
-  const module = { exports: {} }
-  const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in overrides ? overrides[name] : require(name), module, module.exports)
-  return module.exports
+  return require('./helpers/load-ts.cjs')(file, overrides)
 }
 async function run() {
   const config = load('lib/site-profile/deployment-brand.ts')
@@ -56,6 +53,7 @@ async function run() {
     'next/dynamic': { __esModule: true, default: () => props => props.shareType ? React.createElement('div', { 'data-header-share': props.affiliateCode, 'data-site-name': props.siteName }, 'Share') : React.createElement('div', { 'data-wallet': props.title }) },
   }).default
   const Shell = load('components/wi300/Wi300Shell.tsx', { 'next/navigation': { usePathname: () => pathname }, './Wi300Header': { __esModule: true, default: Header },
+    './Wi300ManagementFrame': { __esModule: true, default: ({ children }) => React.createElement('div', { 'data-management-frame': true }, children) },
     './Wi300Footer': load('components/wi300/Wi300Footer.tsx', { 'next/link': link, 'next/image': { __esModule: true, default: ({ unoptimized, ...props }) => React.createElement('img', props) }, './Wi300BrandContext': { useWi300Brand: () => brand } }), 'next/link': link, '@/lib/wi300/default-pages': load('lib/wi300/default-pages.ts', { './external-apps': load('lib/wi300/external-apps.ts') }) }).default
   const root = createRoot(document.getElementById('root'))
   const renderShell = () => root.render(React.createElement(Shell, null, React.createElement('div', null, 'Page')))
@@ -176,7 +174,7 @@ async function run() {
   global.fetch = async () => ({ ok: true, json: async () => ({ tools: [] }) })
   try {
     await act(async () => root.render(React.createElement(SpaceModule.default, { courses: courses.map(c => ({ ...c, name_lop: `Khóa ${c.id}` })), enrollments: rows, userId: 1, userPhone: null, accountError: false })))
-    assert.match(document.querySelector('h1').textContent, /Dành cho học viên/)
+    assert.match(document.querySelector('h1').textContent, /Học tập/)
     assert.equal(document.querySelectorAll('article').length, 4)
     assert.deepEqual([...document.querySelectorAll('[aria-label="Trạng thái học tập"] [role="tab"]')].map(h => h.textContent), ['Đang học (4)', 'Đã hoàn thành (2)', 'Chờ xử lý (1)'])
     await act(async () => document.getElementById('learning-tab-completed').click())
@@ -184,13 +182,18 @@ async function run() {
     await act(async () => document.getElementById('learning-tab-pending').click())
     assert.equal(document.querySelectorAll('article').length, 1)
     assert.equal(document.querySelector('a[href="/my-space?tab=pages"]'), null)
-    assert.equal(document.querySelector('a[href="/my-space?tab=affiliate"]').textContent, 'Dành cho cộng tác viên')
+    assert.equal(document.querySelector('a[href="/my-space?tab=affiliate"]').textContent, 'Cộng tác viên')
   } finally { global.fetch = savedFetch }
   pathname = '/tools/posts'
   await act(async () => renderShell())
-  assert.equal(document.querySelector('h1').textContent, 'Bài viết cộng đồng')
-  assert.ok(document.querySelector('div.max-w-7xl.px-4'), 'Trang mặc định có khung và khoảng lề')
-  assert.match(document.querySelector('[aria-label="Đường dẫn trang"]').textContent, /Không gian của tôi/)
+  assert.ok(document.querySelector('[data-management-frame]'), 'Tool pages delegate layout and breadcrumbs to the shared frame')
+  for (const managementPath of ['/tools/courses', '/tools/courses/new', '/tools/courses/templates', '/tools/courses/templates/legacy', '/du-an/quan-ly']) {
+    pathname = managementPath
+    await act(async () => renderShell())
+    assert.equal(document.querySelector('[aria-label="Đường dẫn trang"]'), null, 'Khung quản lý sở hữu bố cục')
+    assert.equal(document.querySelector('h1'), null, 'Không thêm tiêu đề khóa học trùng lặp')
+    assert.equal(document.querySelectorAll('header').length, 1, 'Giữ menu Wi300 dùng chung')
+  }
   pathname = '/page/custom-template'
   await act(async () => renderShell())
   assert.equal(document.querySelector('[aria-label="Đường dẫn trang"]'), null, 'Không bọc trang template riêng')

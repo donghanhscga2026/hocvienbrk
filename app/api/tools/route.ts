@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { auth } from '@/auth'
+import { canCreateProfile, isProfileTool, normalizeRoles } from '@/lib/auth/roles'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import { managedProjects } from '@/lib/wi300/project-service'
 
@@ -30,7 +31,7 @@ export async function GET() {
       if (Number.isSafeInteger(id) && id >= 0) {
         const managed = await managedProjects(prisma, id)
         if (managed.admin) tools.push({
-          id: -4, slug: 'wi-appearance', name: 'Giao diện website', description: 'Tùy chỉnh giao diện Wi, bản nháp và xem trước', icon: 'Palette',
+          id: -4, slug: 'wi-appearance', name: 'Trang', description: 'Quản lý giao diện và SEO các trang Wi', icon: 'PanelsTopLeft',
           url: '/tools/wi-appearance', roles: ['ADMIN'], order: 103, isActive: true, createdAt: new Date(), updatedAt: new Date(),
         })
         if (managed.admin || managed.projects.length) tools.push({
@@ -39,7 +40,17 @@ export async function GET() {
         })
       }
     }
-    return NextResponse.json({ tools }, { headers: { 'Cache-Control': 'private, no-store' } })
+    const session = await auth()
+    const visibleTools = tools.filter(tool => !isProfileTool(tool) || canCreateProfile(session?.user?.role)).map(tool => ({
+      ...tool,
+      // Công cụ cũ đã được gộp vào tab mặc định của trang Hỗ trợ.
+      url: tool.url.split(/[?#]/)[0] === '/tools/account-assistant' ? '/tools/ho-tro' : tool.url,
+      roles: ['/tools/site-profiles', '/tools/landings'].includes(tool.url.split(/[?#]/)[0]) ? ['ADMIN']
+        : isProfileTool(tool) || tool.url.split('?')[0] === '/tools/courses'
+        ? ['ADMIN', 'TEACHER']
+        : normalizeRoles(tool.roles),
+    }))
+    return NextResponse.json({ tools: visibleTools }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error: unknown) {
     console.error('Tools API Error:', error)
     return NextResponse.json({ error: 'Không thể tải danh sách công cụ.' }, { status: 500 })

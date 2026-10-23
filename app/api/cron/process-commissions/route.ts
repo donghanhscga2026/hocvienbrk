@@ -73,7 +73,9 @@ export async function POST(request: Request) {
                                 walletId: wallet.id,
                                 amount: commission.netAmount,
                                 type: 'COMMISSION',
-                                description: `Hoa hồng từ đơn hàng #${commission.conversionId} (Tầng ${commission.level})`,
+                                description: (commission as any).kind === 'GRATITUDE'
+                                    ? `Hoa hồng tri ân đơn #${commission.conversionId}`
+                                    : `Hoa hồng trực tiếp đơn #${commission.conversionId}`,
                                 refId: String(commission.id),
                                 balanceBefore: wallet.balance,
                                 balanceAfter: wallet.balance + commission.netAmount
@@ -105,9 +107,15 @@ export async function POST(request: Request) {
     }
 }
 
-// GET để kiểm tra status
+// GET để kiểm tra status (Affiliate v2 — GĐ5: yêu cầu CRON_SECRET như bản POST)
 export async function GET(request: Request) {
     try {
+        const authHeader = request.headers.get('Authorization')
+        const cronSecret = process.env.CRON_SECRET
+        if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const now = new Date()
         
         const stats = await prisma.affiliateCommission.groupBy({

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import {
@@ -57,6 +57,7 @@ interface CourseLandingTemplateProps {
     session: any
     totalHours: number
     activeStudentCount: number
+    projectLabels?: ReactNode
 }
 
 
@@ -70,7 +71,8 @@ export default function CourseLandingTemplate({
     userId,
     session,
     totalHours,
-    activeStudentCount
+    activeStudentCount,
+    projectLabels
 }: CourseLandingTemplateProps) {
     const router = useRouter()
     const wi300 = useWi300Brand()
@@ -260,6 +262,7 @@ export default function CourseLandingTemplate({
                                     </span>
                                     {course.name_lop}
                                 </h1>
+                                {projectLabels && <div className="my-4 rounded-xl bg-white p-3 text-slate-900">{projectLabels}</div>}
                                 {/* Tên khóa học + Phí/Giá tiền chỉ hiện khi CHƯA kích hoạt - học viên đã kích hoạt không cần xem lại giá */}
                                 {!isEnrolled && course.name_khoa && (
                                     <p className="text-sm text-brk-muted">{course.name_khoa}</p>

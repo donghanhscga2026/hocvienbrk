@@ -3,24 +3,26 @@
 import {useEffect,useRef,useState} from 'react'
 import type {EditorView} from '@codemirror/view'
 
-type Props={value:string;disabled:boolean;onChange:(value:string)=>void}
+type Props={value:string;disabled:boolean;onChange:(value:string)=>void;language?:'html'|'css'|'js'}
 
-export default function TemplateCodeEditor({value,disabled,onChange}:Props){
+export default function TemplateCodeEditor({value,disabled,onChange,language='html'}:Props){
   const host=useRef<HTMLDivElement>(null),view=useRef<EditorView|null>(null)
-  const latest=useRef({value,disabled,onChange}),syncingValue=useRef(false)
+  const latest=useRef({value,disabled,onChange,language}),syncingValue=useRef(false)
+  const setLanguage=useRef<((language:'html'|'css'|'js')=>void)|null>(null)
   const setReadOnly=useRef<((disabled:boolean)=>void)|null>(null)
   const [failed,setFailed]=useState(false)
-  useEffect(()=>{latest.current={value,disabled,onChange}},[value,disabled,onChange])
+  useEffect(()=>{latest.current={value,disabled,onChange,language}},[value,disabled,onChange,language])
   useEffect(()=>{
     let active=true
     // Chỉ tải trình soạn thảo khi người dùng mở phần sửa mã.
-    void Promise.all([import('@codemirror/view'),import('@codemirror/state'),import('@codemirror/lang-html'),import('@codemirror/commands'),import('@codemirror/language')]).then(([ui,state,language,commands,syntax])=>{
+    void Promise.all([import('@codemirror/view'),import('@codemirror/state'),import('@codemirror/lang-html'),import('@codemirror/commands'),import('@codemirror/language'),import('@codemirror/lang-css'),import('@codemirror/lang-javascript')]).then(([ui,state,html,commands,syntax,css,javascript])=>{
       if(!active || !host.current)return
-      const readOnly=new state.Compartment()
+      const readOnly=new state.Compartment(), mode=new state.Compartment()
+      const syntaxFor=(kind:'html'|'css'|'js')=>kind==='css'?css.css():kind==='js'?javascript.javascript():html.html()
       const access=(locked:boolean)=>[state.EditorState.readOnly.of(locked),ui.EditorView.editable.of(!locked)]
       view.current=new ui.EditorView({parent:host.current,state:state.EditorState.create({doc:latest.current.value,extensions:[
         ui.lineNumbers(),ui.highlightActiveLineGutter(),ui.highlightActiveLine(),ui.EditorView.lineWrapping,
-        language.html(),syntax.syntaxHighlighting(syntax.defaultHighlightStyle),commands.history(),
+        mode.of(syntaxFor(latest.current.language)),syntax.syntaxHighlighting(syntax.defaultHighlightStyle),commands.history(),
         ui.keymap.of([...commands.defaultKeymap,...commands.historyKeymap,commands.indentWithTab]),
         ui.EditorView.contentAttributes.of({'aria-label':'Mã HTML của template'}),
         readOnly.of(access(latest.current.disabled)),
@@ -34,10 +36,12 @@ export default function TemplateCodeEditor({value,disabled,onChange}:Props){
           '&.cm-focused':{outline:'2px solid #8b5cf6'},
         }),
       ]})})
+      setLanguage.current=kind=>view.current?.dispatch({effects:mode.reconfigure(syntaxFor(kind))})
       setReadOnly.current=locked=>view.current?.dispatch({effects:readOnly.reconfigure(access(locked))})
     }).catch(()=>{if(active)setFailed(true)})
     return()=>{active=false;view.current?.destroy();view.current=null;setReadOnly.current=null}
   },[])
+  useEffect(()=>{setLanguage.current?.(language)},[language])
   useEffect(()=>{
     const editor=view.current
     if(editor && editor.state.doc.toString()!==value){

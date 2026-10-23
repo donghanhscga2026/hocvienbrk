@@ -1,0 +1,101 @@
+import { spaceNavigation, type PersonalTool, type SpaceNavGroup } from './personal-space'
+import { defaultPageTitle } from './default-pages'
+
+// Menu chỉ sắp xếp các công cụ đã được cấp quyền; API vẫn kiểm tra quyền riêng.
+export function managementNavigation(role: string, tools: PersonalTool[]): SpaceNavGroup[] {
+  return spaceNavigation(role, tools)
+}
+
+export function isManagementRoute(path: string) {
+  return (path === '/my-space' || path === '/tools' || path.startsWith('/tools/') || /^\/ho-so-hoc-tap\/\d+$/.test(path) || path === '/account-settings' || path === '/my-requests' || path === '/du-an/quan-ly' || path === '/du-an/noi-dung') && path !== '/tools/courses/templates/preview'
+}
+
+export type NavigationLocation = { groupId: string; title: string; crumbs: { label: string; href?: string }[]; back: { label: string; href: string } | null }
+export function isPageManagementRoute(path: string) {
+  return ['/tools/pages', '/tools/my-site', '/tools/site-profiles', '/tools/landings'].some(parent => path === parent || path.startsWith(parent + '/'))
+}
+export function managementLocation(path: string, params: URLSearchParams, groups: SpaceNavGroup[], viewerId?: string | number | null): NavigationLocation {
+  const root = { label: 'Không gian của tôi', href: '/my-space' }
+  const courseList = { label: 'Quản lý khóa học', href: '/tools/courses' }
+  const courseId = params.get('courseId')
+  const courseReturn = courseId && /^\d+$/.test(courseId) && Number.isSafeInteger(Number(courseId)) && Number(courseId) > 0 ? `/tools/courses/new?id=${courseId}&tab=sales` : null
+  const exactTool = groups.flatMap(group => group.items.map(item => ({ ...item, groupId: group.id }))).filter(item => item.href.startsWith('/')).sort((a, b) => b.href.split('?')[0].length - a.href.split('?')[0].length).find(item => {
+    const target = new URL(item.href, 'https://wi300.invalid')
+    return (path === target.pathname || path.startsWith(target.pathname + '/')) && [...target.searchParams].every(([key, value]) => params.get(key) === value)
+  })
+  let groupId = exactTool?.groupId || 'tools'
+  let title = exactTool?.label || defaultPageTitle(path) || 'Không gian quản lý'
+  let crumbs: NavigationLocation['crumbs'] = [root]
+  let back: NavigationLocation['back'] = { label: 'Về Không gian của tôi', href: root.href }
+  if (path === '/my-space') {
+    const tab = params.get('tab') === 'pages' ? 'business' : params.get('tab') || 'home'
+    groupId = groups.some(group => group.id === tab) ? tab : 'home'
+    title = groups.find(group => group.id === groupId)?.label || 'Không gian của tôi'
+    crumbs = tab === 'home' ? [{ label: root.label }] : [root, { label: title }]
+    if (tab === 'home') back = null
+  } else if (/^\/ho-so-hoc-tap\/\d+$/.test(path)) {
+    // Teaching accounts also learn: use the viewed account, not just the role.
+    const profileId = Number(path.split('/').pop())
+    const knownViewer = viewerId != null && String(viewerId).trim() !== '' && Number.isSafeInteger(Number(viewerId))
+    const ownProfile = knownViewer && profileId === Number(viewerId)
+    const teaching = knownViewer && !ownProfile && groups.some(group => group.id === 'teaching')
+    groupId = teaching ? 'teaching' : 'learning'; title = 'Hồ sơ học tập'
+    crumbs.push({ label: title })
+    back = { label: teaching ? 'Về danh sách học viên' : 'Về Học tập', href: teaching ? '/tools/students' : '/my-space?tab=learning' }
+  } else if (isPageManagementRoute(path)) {
+    groupId = 'business'
+    const pageList = { label: 'Website của tôi', href: '/tools/pages?tab=my-site' }
+    const profileId = params.get('profileId')
+    const suffix = profileId && /^\d+$/.test(profileId) && Number.isSafeInteger(Number(profileId)) ? '?profileId=' + profileId : ''
+    const manager = { label: 'Quản lý website', href: '/tools/my-site/manage' + suffix }
+    const section = path.split('/')[3]
+    title = path === '/tools/pages' ? 'Website của tôi'
+      : path === '/tools/site-profiles/new' ? 'Tạo website'
+      : path.startsWith('/tools/site-profiles/') ? 'Chỉnh sửa website'
+      : path.startsWith('/tools/landings') ? 'Landing Page'
+      : ({ edit: 'Chỉnh sửa website', data: 'Khóa học hiển thị', domains: 'Tên miền riêng', pages: 'Trang & menu', template: 'Sửa code', design: 'Giao diện website', forms: 'Form đăng ký' } as Record<string, string>)[section] || 'Quản lý website'
+    crumbs.push(path === '/tools/pages' ? { label: title } : pageList)
+    if (path !== '/tools/pages') {
+      if (path.startsWith('/tools/my-site/') && section !== 'manage') crumbs.push(manager)
+      crumbs.push({ label: title })
+    }
+    back = path === '/tools/pages' ? null : path.startsWith('/tools/my-site/') && section !== 'manage' ? { label: 'Về website đang quản lý', href: manager.href } : { label: 'Về Page', href: pageList.href }
+  } else if (path.startsWith('/tools/courses')) {
+    groupId = 'teaching'; crumbs.push(courseList)
+    if (path === '/tools/courses') { title = courseList.label; crumbs[1] = { label: title } }
+    else {
+      back = { label: 'Về danh sách khóa học', href: courseList.href }
+      if (path === '/tools/courses/new') {
+        title = params.get('id') ? 'Chi tiết khóa học' : 'Tạo khóa học'
+        crumbs.push({ label: title })
+      } else {
+        title = path.includes('/templates/legacy') ? 'Nhập mẫu nâng cao' : path.includes('/templates') ? 'Thư viện mẫu trang bán' : path.includes('/pages/') ? 'Chỉnh sửa trang bán' : 'Cài đặt khóa học'
+        if (courseReturn) { crumbs.push({ label: params.get('name')?.slice(0, 120) || 'Khóa học đang chỉnh sửa', href: courseReturn }); back = { label: 'Về khóa học này', href: courseReturn } }
+        crumbs.push({ label: title })
+        const libraryCourse = path.match(/^\/tools\/courses\/(\d+)\/lib-access$/)?.[1]
+        if (libraryCourse) back = { label: 'Về khóa học này', href: `/tools/courses/new?id=${libraryCourse}` }
+      }
+    }
+  } else if (path.startsWith('/du-an/')) {
+    groupId = 'business'; title = params.get('project') ? 'Quản lý dự án' : path.endsWith('/noi-dung') ? 'Nội dung dự án' : 'Danh sách dự án'
+    crumbs.push({ label: 'Dự án', ...(params.get('project') ? { href: '/du-an/quan-ly' } : {}) })
+    if (params.get('project')) { crumbs.push({ label: 'Dự án đang chỉnh sửa' }); back = { label: 'Về danh sách dự án', href: '/du-an/quan-ly' } }
+    if (path.endsWith('/noi-dung') && params.get('project')) back = { label: 'Về dự án này', href: `/du-an/quan-ly?project=${encodeURIComponent(params.get('project')!)}` }
+  } else {
+    if (path === '/tools/wi-appearance' && params.get('page')) {
+      groupId = 'website-admin'; title = 'Chỉnh sửa trang'
+      crumbs.push({ label: 'Trang', href: '/tools/wi-appearance' })
+    }
+    if (path === '/tools/wi-website') { groupId = 'website-admin'; title = params.get('section') ? 'Cấu hình chung' : 'Quản trị website' }
+    if (path === '/account-settings') { groupId = 'account'; title = 'Cài đặt tài khoản' }
+    if (path === '/my-requests') { groupId = 'learning'; title = 'Yêu cầu của tôi' }
+    const group = groups.find(item => item.id === groupId)
+    if (group) back = { label: `Về ${group.label.toLowerCase()}`, href: group.href }
+    if (path === '/tools/wi-website' && !params.get('section')) back = { label: 'Về Không gian của tôi', href: root.href }
+    if (path === '/tools/wi-appearance' && params.get('page')) back = { label: 'Về danh sách trang', href: '/tools/wi-appearance' }
+    const parent = exactTool?.href.split('?')[0]
+    if (parent && path !== parent) { crumbs.push({ label: exactTool!.label, href: parent }); back = { label: `Về ${exactTool!.label.toLowerCase()}`, href: parent } }
+    crumbs.push({ label: title })
+  }
+  return { groupId, title, crumbs, back }
+}

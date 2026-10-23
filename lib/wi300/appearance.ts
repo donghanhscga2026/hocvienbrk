@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { CSSProperties } from 'react'
 import { safeProjectUrl } from './projects'
+import { managedPageSchema, RESERVED_PAGE_SLUGS } from './managed-pages'
 
 const text = z.string().trim().min(1).max(300)
 const description = z.string().trim().max(1500)
@@ -8,12 +9,51 @@ const url = z.string().trim().max(1000).refine(safeProjectUrl, 'Dùng đường 
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Màu cần có dạng #236c1e.')
 const cta = z.object({ title: text, description, label: text, url: url.refine(Boolean, 'Nhập đường dẫn cho nút.') }).strict()
 const teachingCTA = { title: 'Bạn muốn chia sẻ chuyên môn?', description: 'Đồng hành cùng Wi để lan tỏa kiến thức và tạo giá trị cho cộng đồng', label: 'Đăng ký làm giảng viên', url: '/doi-tac' }
+const optionalText = z.string().trim().max(300)
+const footerLink = z.object({ label: text, url: url.refine(Boolean, 'Nhập đường dẫn liên kết.') }).strict()
+export const defaultFooter = {
+  logoUrl: '', description: 'Kết nối cá nhân và doanh nghiệp với tri thức, các giá trị và cơ hội hợp tác trong hệ sinh thái Wi.',
+  note: '300DNS là dự án của WIPA. Các dự án thuộc 300DNS được WIPA cố vấn.', contact: '',
+  copyright: '', socials: [] as { label: string; url: string }[],
+  groups: [
+    { title: 'Khám phá', links: [{ label: 'Các dự án Wi', url: '/du-an' }, { label: 'Khóa học', url: '/khoa-hoc' }, { label: 'Sản phẩm', url: '/san-pham' }, { label: 'Dịch vụ', url: '/dich-vu' }, { label: 'Giới thiệu WI300', url: '/gioi-thieu' }] },
+    { title: 'Không gian của bạn', links: [{ label: 'Không gian của tôi', url: '/my-space' }, { label: 'Học tập của tôi', url: '/my-space?tab=learning' }, { label: 'Tài khoản', url: '/account-settings' }] },
+  ],
+}
+const footerSchema = z.object({ logoUrl: url, description, note: description, contact: description, copyright: optionalText,
+  socials: z.array(footerLink).max(8), groups: z.array(z.object({ title: text, links: z.array(footerLink).max(12) }).strict()).max(4),
+}).strict()
+export const defaultHeaderMenu = [
+  { label: 'Trang chủ', url: '/', visible: true },
+  { label: 'Khóa học', url: '/khoa-hoc', visible: true },
+  { label: 'Sản phẩm', url: '/san-pham', visible: true },
+  { label: 'Dịch vụ', url: '/dich-vu', visible: true },
+]
+const headerMenuSchema = z.array(z.object({ label: text, url: url.refine(Boolean, 'Nhập đường dẫn menu.'), visible: z.boolean() }).strict()).max(12).refine(items => new Set(items.map(item => item.url)).size === items.length, 'Đường dẫn menu trùng nhau.')
+export const defaultPageSeo = { title: '', description: '', imageUrl: '', keywords: '', inheritRobots: true, index: true, follow: true }
+const pageSeoSchema = z.object({ title: z.string().trim().max(160), description: z.string().trim().max(500), imageUrl: url, keywords: optionalText, inheritRobots: z.boolean(), index: z.boolean(), follow: z.boolean() }).strict().default(() => ({ ...defaultPageSeo }))
+export const COURSE_BENEFIT_ICONS = ['graduation', 'users', 'chart', 'book', 'heart', 'target', 'clock'] as const
+export const defaultCourseBenefits = [
+  { icon: 'graduation', title: 'Chất lượng thực tiễn', description: 'Kiến thức ứng dụng cao', visible: true },
+  { icon: 'users', title: 'Giảng viên tận tâm', description: 'Đồng hành cùng bạn', visible: true },
+  { icon: 'chart', title: 'Học mọi lúc, mọi nơi', description: 'Linh hoạt, hiệu quả', visible: true },
+]
+const courseBenefitItem = z.object({ icon: z.enum(COURSE_BENEFIT_ICONS), title: z.string().trim().min(1).max(80), description: z.string().trim().max(160), visible: z.boolean() }).strict()
+const courseBenefits = z.array(courseBenefitItem).length(3).default(() => structuredClone(defaultCourseBenefits) as z.infer<typeof courseBenefitItem>[])
 export const HOME_SECTIONS = ['hero', 'discovery', 'projects', 'start'] as const
 export const homeSectionLabels = { hero: 'Hero', discovery: 'Bạn đang tìm gì?', projects: 'Khám phá hệ sinh thái Wi', start: 'Bắt đầu cùng Wi' }
 export const appearanceSchema = z.object({
-  common: z.object({ logoUrl: url, iconUrl: url, primary: color, accent: color, background: color, foreground: color, width: z.enum(['1120', '1280', '1440']), radius: z.enum(['small', 'medium', 'round']), font: z.enum(['vietnam', 'system']), stickyHeader: z.boolean(), showFooter: z.boolean() }).strict(),
+  hiddenPages: z.array(z.string().min(1).max(120)).max(100).default([]),
+  pageContent: z.record(z.string().min(1).max(120), managedPageSchema).default({}),
+  customPages: z.array(managedPageSchema).max(50).default([]).refine(pages => pages.every(page => !!page.slug && !RESERVED_PAGE_SLUGS.includes(page.slug)) && new Set(pages.map(page => page.slug)).size === pages.length && new Set(pages.map(page => page.id)).size === pages.length, 'Đường dẫn trang bị trùng hoặc thuộc trang hệ thống.'),
+  common: z.object({ name: optionalText.default(''), tagline: optionalText.default(''), logoUrl: url, iconUrl: url, primary: color, accent: color, background: color, foreground: color, width: z.enum(['1120', '1280', '1440']), radius: z.enum(['small', 'medium', 'round']), font: z.enum(['vietnam', 'system']), stickyHeader: z.boolean(), showFooter: z.boolean() }).strict(),
+  // Giá trị mặc định giúp đọc nguyên vẹn các bản cấu hình cũ đã mã hóa.
+  seo: z.object({ title: z.string().trim().max(160), description: z.string().trim().max(500), imageUrl: url, keywords: optionalText, index: z.boolean(), follow: z.boolean() }).strict().default({ title: '', description: '', imageUrl: '', keywords: '', index: true, follow: true }),
+  footer: footerSchema.default(defaultFooter),
+  headerMenu: headerMenuSchema.default(() => structuredClone(defaultHeaderMenu)),
+  pageSeo: z.object({ home: pageSeoSchema, courses: pageSeoSchema, projects: pageSeoSchema, teachers: pageSeoSchema }).strict().default(() => ({ home: { ...defaultPageSeo }, courses: { ...defaultPageSeo }, projects: { ...defaultPageSeo }, teachers: { ...defaultPageSeo } })),
   home: z.object({ title: text, description, imageUrl: url, primaryLabel: text, primaryUrl: url.refine(Boolean), secondaryLabel: text, secondaryUrl: url.refine(Boolean), sections: z.object({ hero: z.boolean(), discovery: z.boolean(), projects: z.boolean(), start: z.boolean() }).strict(), order: z.array(z.enum(HOME_SECTIONS)).length(4).refine(values => new Set(values).size === 4, 'Mỗi mục chỉ được xuất hiện một lần.'), projectLimit: z.number().int().min(1).max(40) }).strict(),
-  courses: z.object({ title: text, description, columns: z.number().int().min(2).max(4), showSearch: z.boolean(), showCategories: z.boolean(), showFee: z.boolean(), showTeachers: z.boolean(), teacherTotal: z.number().int().min(1).max(50), teacherPerView: z.number().int().min(3).max(5), teacherLayout: z.enum(['grid', 'slide']), autoplay: z.boolean(), interval: z.number().int().min(3).max(20), arrows: z.boolean(), showCTA: z.boolean(), cta }).strict(),
+  courses: z.object({ title: text, description, heroEyebrow: z.string().trim().max(160).default('Tri thức cho hành trình phát triển'), heroBenefits: courseBenefits, showHero: z.boolean().default(true), heroVariant: z.enum(['minimal', 'illustrated', 'bold']).default('illustrated'), heroImageUrl: url.default(''), heroLabel: text.default('Khám phá khóa học'), heroUrl: url.refine(Boolean, 'Nhập đường dẫn nút hero.').default('/khoa-hoc#khoa-hoc'), columns: z.number().int().min(2).max(4), showSearch: z.boolean(), showCategories: z.boolean(), showFee: z.boolean(), showTeachers: z.boolean(), teacherTotal: z.number().int().min(1).max(50), teacherPerView: z.number().int().min(3).max(5), teacherLayout: z.enum(['grid', 'slide']), autoplay: z.boolean(), interval: z.number().int().min(3).max(20), arrows: z.boolean(), showCTA: z.boolean(), cta }).strict(),
   projects: z.object({ title: text, description, imageUrl: url, layout: z.enum(['vertical', 'horizontal']), columns: z.number().int().min(2).max(4), showHero: z.boolean(), showSearch: z.boolean(), showFilter: z.boolean(), showCounts: z.boolean(), showCTA: z.boolean(), cta }).strict(),
   teachers: z.object({ title: text, description, imageUrl: url, columns: z.number().int().min(3).max(5), showHero: z.boolean(), showSearch: z.boolean(), showFields: z.boolean(), showCTA: z.boolean(), cta }).strict(),
 }).strict()

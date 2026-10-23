@@ -25,6 +25,7 @@ import { getCurrentSiteProfile, getSiteRuntimeConfig } from "@/lib/site-profile/
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import { Wi300BrandProvider } from '@/components/wi300/Wi300BrandContext'
 import Wi300Shell from '@/components/wi300/Wi300Shell'
+import { websiteMetadata } from '@/lib/wi300/website-config'
 
 // [OPTIMIZE] font-thin/extralight/light (100/200/300) không có class Tailwind
 // nào trong toàn bộ codebase dùng tới (đã kiểm bằng grep) — bỏ để giảm số file
@@ -63,6 +64,7 @@ export async function generateMetadata(): Promise<Metadata> {
   }
   const brand = await getCurrentDeploymentBrand()
   if (brand) return {
+    ...websiteMetadata(brand),
     metadataBase: new URL(`https://${(await headers()).get('host') || 'wi300.vn'}`),
     title: { default: brand.seoTitle, template: `%s | ${brand.name}` },
     description: brand.description, applicationName: brand.name,
@@ -157,8 +159,11 @@ export default async function RootLayout({
   }
   const brand = await getCurrentDeploymentBrand()
   if (brand) {
+    // The proxy overwrites this header. Only public entry pages defer account UI;
+    // protected/personal pages retain the existing server-provided session.
+    const path = (await headers()).get('x-wi300-pathname')
+    const session = path === '/' || path === '/khoa-hoc' ? undefined : await getSession()
     const theme = websiteTheme(brand.palette.primary, brand.palette.background, brand.palette)
-    const session = await getSession()
     // Bảng màu riêng lấy từ server, không dùng lựa chọn theme đã lưu của web cũ.
     return <html lang="vi" data-website-theme="light" data-site-variant="wi300" style={{ ...theme.style, ...appearanceStyle(brand.appearance || defaultAppearance) }}><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website accountAssistant={false} assistantToast={false} attentionHighlight={{ config: DEFAULT_ATTENTION_CONFIG, items: [] }}><Wi300BrandProvider brand={brand}><PwaInstallProvider><Wi300Shell>{children}</Wi300Shell></PwaInstallProvider></Wi300BrandProvider></Providers></body></html>
   }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
+import { normalizeRole } from '@/lib/auth/roles'
 import { normalizePhone } from '@/lib/phone-utils'
 import { requireAdmin } from '@/lib/api-auth'
 
@@ -115,7 +116,7 @@ export async function POST(request: Request) {
           email: prodUser.email,
           phone: prodUser.phone,
           password: prodUser.password,
-          role: prodUser.role,
+          role: normalizeRole(prodUser.role),
           referrerId: prodUser.referrerId
         })
       }

@@ -3,12 +3,16 @@
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { CourseStatus, CourseSection, SectionVisibility } from '@/lib/course-page/types'
+import { courseEditorActor, assertCourseEditor, coursePageActionAccess } from '@/lib/course-page/permissions'
 import { requireAdminAction } from '@/lib/api-auth'
 import { createCoursePageFromTemplate, CourseTemplateKey } from '@/lib/course-page/templates'
 
 export async function getCoursePages() {
   try {
+    const actor = await courseEditorActor()
+    const owned = actor.role === 'ADMIN' ? null : await prisma.course.findMany({ where: { teacherId: actor.id }, select: { id_khoa: true } })
     const pages = await prisma.coursePage.findMany({
+      ...(owned ? { where: { slug: { in: owned.map(course => course.id_khoa) } } } : {}),
       orderBy: { createdAt: 'desc' }
     });
     return pages;
@@ -20,6 +24,7 @@ export async function getCoursePages() {
 
 export async function getCoursePage(id: string) {
   try {
+    await assertCourseEditor(prisma, await courseEditorActor(), { pageId: id })
     const page = await prisma.coursePage.findUnique({
       where: { id },
       include: {
@@ -98,7 +103,7 @@ export async function createCoursePage(data: {
   checkoutConfig?: Record<string, any>;
   useTemplate?: boolean;
 }) {
-  const denied = await requireAdminAction()
+  const denied = await coursePageActionAccess({ slug: data.slug })
   if (denied) return denied
 
   try {
@@ -160,7 +165,7 @@ export async function updateCoursePage(
     useTemplate?: boolean;
   }
 ) {
-  const denied = await requireAdminAction()
+  const denied = await coursePageActionAccess({ pageId: id })
   if (denied) return denied
 
   try {
@@ -219,7 +224,7 @@ export async function saveCourseSections(
     content: Record<string, any>;
   }>
 ) {
-  const denied = await requireAdminAction()
+  const denied = await coursePageActionAccess({ pageId: coursePageId })
   if (denied) return denied
 
   try {
@@ -313,7 +318,7 @@ async function createCoursePageVersion(coursePageId: string, snapshot: CoursePag
 }
 
 export async function createCoursePageCheckpoint(coursePageId: string) {
-  const denied = await requireAdminAction()
+  const denied = await coursePageActionAccess({ pageId: coursePageId })
   if (denied) return denied
   try {
     const snapshot = await buildCoursePageSnapshot(coursePageId, 'manual')
@@ -327,7 +332,7 @@ export async function createCoursePageCheckpoint(coursePageId: string) {
 }
 
 export async function getCoursePageVersions(coursePageId: string) {
-  const denied = await requireAdminAction()
+  const denied = await coursePageActionAccess({ pageId: coursePageId })
   if (denied) return denied
   const versions = await prisma.coursePageVersion.findMany({
     where: { coursePageId },
@@ -338,7 +343,7 @@ export async function getCoursePageVersions(coursePageId: string) {
 }
 
 export async function publishCoursePage(coursePageId: string) {
-  const denied = await requireAdminAction()
+  const denied = await coursePageActionAccess({ pageId: coursePageId })
   if (denied) return denied
   try {
     const snapshot = await buildCoursePageSnapshot(coursePageId, 'published')
@@ -346,7 +351,7 @@ export async function publishCoursePage(coursePageId: string) {
     const version = await createCoursePageVersion(coursePageId, snapshot)
     const page = await prisma.coursePage.update({
       where: { id: coursePageId },
-      data: { status: 'published', publishedAt: new Date() },
+      data: { status: 'published', publishedAt: new Date(), useTemplate: true },
     })
     revalidatePath(`/khoa-hoc/${page.slug}`)
     return { success: true, versionNumber: version.versionNumber }
@@ -357,7 +362,7 @@ export async function publishCoursePage(coursePageId: string) {
 }
 
 export async function restoreCoursePageVersion(coursePageId: string, versionNumber: number) {
-  const denied = await requireAdminAction()
+  const denied = await coursePageActionAccess({ pageId: coursePageId })
   if (denied) return denied
   try {
     const version = await prisma.coursePageVersion.findUnique({
@@ -402,7 +407,7 @@ export async function restoreCoursePageVersion(coursePageId: string, versionNumb
 }
 
 export async function deleteCoursePage(id: string) {
-  const denied = await requireAdminAction()
+  const denied = await coursePageActionAccess({ pageId: id })
   if (denied) return denied
 
   try {
@@ -435,58 +440,31 @@ export async function applyCoursePageTemplate(slug: string, courseName: string, 
 
   try {
     const preset = createCoursePageFromTemplate(templateKey, slug)
-    const existing = await prisma.coursePage.findUnique({ where: { slug } })
-
-    const seo = { ...(preset.seo as any), templateKey }
-    const page = existing
-      ? await prisma.coursePage.update({
-          where: { id: existing.id },
-          data: {
-            name: courseName || preset.name,
-            status: 'published',
-            seo,
-            theme: preset.theme as any,
-            navigation: preset.navigation as any,
-            checkoutConfig: preset.checkoutConfig as any,
-            useTemplate: true,
-            publishedAt: new Date(),
-          },
-        })
-      : await prisma.coursePage.create({
-          data: {
-            slug,
-            name: courseName || preset.name,
-            status: 'published',
-            seo,
-            theme: preset.theme as any,
-            navigation: preset.navigation as any,
-            checkoutConfig: preset.checkoutConfig as any,
-            useTemplate: true,
-            publishedAt: new Date(),
-          },
-        })
-
-    await prisma.$transaction(async (tx) => {
-      await tx.courseSection.deleteMany({ where: { coursePageId: page.id } })
-      await tx.courseSection.createMany({
-        data: preset.sections.map((section: any) => ({
-          coursePageId: page.id,
-          sectionKey: section.sectionKey,
-          sectionType: section.type,
-          variant: section.variant || null,
-          anchorId: section.anchorId || null,
-          enabled: section.enabled !== false,
-          sortOrder: section.sortOrder,
-          visibility: section.visibility || 'all',
-          content: section.content || {},
-        })),
-      })
+    const name = courseName || preset.name
+    const seo = { ...(preset.seo as any), ...(templateKey === 'wi300-gift' ? { title: name } : {}), templateKey }
+    const sectionData = preset.sections.map((section: any) => ({
+      sectionKey: section.sectionKey, sectionType: section.type, variant: section.variant || null,
+      anchorId: section.anchorId || null, enabled: section.enabled !== false,
+      sortOrder: section.sortOrder, visibility: section.visibility || 'all',
+      content: templateKey === 'wi300-gift' && section.type === 'hero' ? { ...section.content, title: name } : section.content || {},
+    }))
+    // Đổi mẫu và snapshot công khai cùng một transaction: không hiển thị lại mẫu cũ.
+    const page = await prisma.$transaction(async tx => {
+      const existing = await tx.coursePage.findUnique({ where: { slug } })
+      const data = { name, status: 'published', seo, theme: preset.theme as any, navigation: preset.navigation as any, checkoutConfig: preset.checkoutConfig as any, useTemplate: true, publishedAt: new Date() }
+      const saved = existing
+        ? await tx.coursePage.update({ where: { id: existing.id }, data })
+        : await tx.coursePage.create({ data: { slug, ...data } })
+      await tx.courseSection.deleteMany({ where: { coursePageId: saved.id } })
+      await tx.courseSection.createMany({ data: sectionData.map(section => ({ ...section, coursePageId: saved.id })) })
+      const latest = await tx.coursePageVersion.findFirst({ where: { coursePageId: saved.id }, orderBy: { versionNumber: 'desc' }, select: { versionNumber: true } })
+      await tx.coursePageVersion.create({ data: { coursePageId: saved.id, versionNumber: (latest?.versionNumber || 0) + 1, snapshot: { kind: 'published', name, seo, theme: preset.theme, navigation: preset.navigation, checkoutConfig: preset.checkoutConfig, useTemplate: true, sections: sectionData } as any } })
+      return saved
     })
-
     revalidatePath(`/khoa-hoc/${slug}`)
     revalidatePath('/tools/courses')
     revalidatePath('/tools/pages')
-    return { success: true, page: { ...page, seo } }
+    return { success: true, page }
   } catch (error: any) {
     console.error('[CoursePage] Apply template error:', error)
     return { success: false, error: error.message || 'Lỗi khi áp dụng mẫu giao diện' }

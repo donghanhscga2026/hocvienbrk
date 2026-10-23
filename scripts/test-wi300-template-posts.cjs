@@ -5,12 +5,7 @@ const ts = require('typescript')
 const { JSDOM } = require('jsdom')
 const React = require('react')
 function load(file, mocks = {}) {
-  const module = { exports: {} }
-  const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true }
-  }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name === '@/lib/wi300/projects' ? load('lib/wi300/projects.ts') : require(name), module, module.exports)
-  return module.exports
+  return require('./helpers/load-ts.cjs')(file, mocks)
 }
 async function run() {
   const { BRIDGE } = load('lib/course-page/importer/zip-browser.ts')
@@ -52,7 +47,7 @@ async function run() {
   const existing = { id: 'post-1', title: 'Old', content: 'Old content', image: '/stored.png', authorId: 7, createdAt: '2026-01-01', pin: 2 }
   const actions = load('app/actions/post-actions.ts', {
     '@/auth': { auth: async () => session },
-    '@/lib/prisma': { __esModule: true, default: { post: { findUnique: async () => { reads++; return existing }, update: async args => { updates.push(args); return { ...existing, ...args.data } } } } },
+    '@/lib/prisma': { __esModule: true, default: { user: { findUnique: async () => ({ role: session?.user?.role }) }, post: { findUnique: async () => { reads++; return existing }, update: async args => { updates.push(args); return { ...existing, ...args.data } } } } },
     'next/cache': { revalidatePath: value => revalidated.push(value) },
     '@/lib/image-utils': { resolveImageUrl: async value => { imageCalls.push(value); return value } }
   })
@@ -80,6 +75,8 @@ async function run() {
   const { createRoot } = require('react-dom/client')
   const { act } = React
   const root = createRoot(document.getElementById('root'))
+  const savedFetch = global.fetch
+  global.fetch = async (url, options = {}) => ({ ok: true, json: async () => options.method === 'POST' ? { post: existing } : url.includes('post-categories') ? { data: [] } : url.includes('?id=') ? { post: { ...existing, published: true, updatedAt: '2026-01-01', seo: load('lib/content/seo.ts').emptyContentSeo } } : { posts: [], totalPages: 1 } })
   const page = load('app/tools/posts/page.tsx', {
     'next-auth/react': { useSession: () => ({ data: session, status: 'authenticated' }) },
     'next/link': { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) },
@@ -94,12 +91,13 @@ async function run() {
   await act(async () => root.render(React.createElement(page)))
   assert.equal(document.getElementById('post-title').value, 'Old', 'Deep link opens the existing post form')
   await act(async () => document.querySelector('form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true })))
-  assert.match(document.body.textContent, /Đã cập nhật bài viết/)
+  assert.match(document.body.textContent, /Đã lưu bài viết/)
   session = { user: { role: 'STUDENT' } }
   await act(async () => root.render(React.createElement(page)))
   assert.equal(document.querySelector('form'), null)
   assert.equal(document.querySelector('button[aria-label^="Sửa"]'), null)
   await act(async () => root.unmount())
+  global.fetch = savedFetch
   uiDom.window.close()
 
   const Business = load('components/wi300/Wi300Businesses.tsx', {
@@ -109,10 +107,10 @@ async function run() {
   const html = require('react-dom/server').renderToStaticMarkup(React.createElement(Business))
   const businessDoc = new JSDOM(html).window.document
   assert.equal(businessDoc.querySelectorAll('ul[aria-label] li').length, 7)
-  assert.equal(businessDoc.querySelectorAll('ul[aria-label] [role="img"]').length, 1)
-  assert.equal(businessDoc.querySelectorAll('ul[aria-hidden="true"] li').length, 7)
+  assert.equal(businessDoc.querySelectorAll('ul[aria-label] li').length, 7, 'Current homepage uses seven unique cards')
+  assert.equal(businessDoc.querySelectorAll('ul[aria-hidden="true"] li').length, 0, 'No duplicated carousel cards')
   for (const logo of ['wi-art.webp', 'wi-mentor.webp', 'wi-finance.webp', 'wi-marketing.webp', 'wi-grow.png', 'wi-tech.png']) assert.ok(businessDoc.querySelector(`ul[aria-label] img[src$="${logo}"]`))
-  for (const img of businessDoc.querySelectorAll('ul[aria-label] img')) assert.ok(img.classList.contains('rounded-full'), 'Ảnh được bo tròn ngay trên phần tử ảnh')
+  for (const img of businessDoc.querySelectorAll('ul[aria-label] img')) assert.ok(img.classList.contains('object-contain'), 'Logo giữ nguyên tỷ lệ trên thẻ dự án')
   assert.equal(businessDoc.querySelectorAll('ul[aria-label] a[href^="/du-an/"]').length, 7, 'Project logos open internal profiles')
   assert.equal(businessDoc.querySelectorAll('a[href^="http"]').length, 0, 'No invented external company URLs')
   console.log('WI300 template viewport, repeated menu navigation, registration isolation, post edit authorization/UI and business identities passed.')

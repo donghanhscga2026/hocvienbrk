@@ -4,12 +4,7 @@ const ts = require('typescript'), React = require('react')
 const { renderToStaticMarkup } = require('react-dom/server')
 const { JSDOM } = require('jsdom')
 function load(file, mocks = {}) {
-  const mod = { exports: {} }
-  const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
-  }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name === '@/lib/wi300/appearance' ? load('lib/wi300/appearance.ts', { './projects': load('lib/wi300/projects.ts') }) : require(name), mod, mod.exports)
-  return mod.exports
+  return require('./helpers/load-ts.cjs')(file, mocks)
 }
 const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
 const image = { __esModule: true, default: ({ priority, sizes, unoptimized, ...props }) => React.createElement('img', props) }
@@ -86,7 +81,7 @@ async function run() {
   assert.ok(teachers.compareDocumentPosition(doc.querySelector('[aria-labelledby="wi300-course-partner-title"]')) & 4)
   assert.equal(teachers.querySelectorAll('ul[aria-label] li').length, 2, 'Only selected teachers with photos appear')
   assert.match(teachers.querySelector('h2').textContent, /Đội ngũ giảng viên/)
-  assert.ok(teachers.querySelector('a[href="/khoa-hoc?q=H%C6%B0%C6%A1ng%20Lucy"]'))
+  assert.ok(teachers.querySelector('a[href="/giang-vien/8"]'))
   assert.equal(teachers.querySelectorAll('ul[aria-hidden="true"]').length, 0, 'No repeated marquee copies')
   assert.ok(teachers.querySelector('a[href="/giang-vien"]'))
   dom.window.close()

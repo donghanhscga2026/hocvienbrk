@@ -1,7 +1,7 @@
 import { auth } from '@/auth'
 import prisma from '@/lib/prisma'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
-import { appearanceAdmin, readAppearance, saveAppearance } from '@/lib/wi300/appearance-service'
+import { appearanceAdmin, readAppearance, saveAppearance, saveManagedPage } from '@/lib/wi300/appearance-service'
 import { crmBody, crmResponse } from '@/lib/crm/http'
 import { CrmError } from '@/lib/crm/service'
 import { ZodError } from 'zod'
@@ -26,11 +26,22 @@ export async function PUT(request: Request) {
   try {
     const id = await actor()
     await appearanceAdmin(prisma, id)
-    const body = await crmBody(request, 40000)
+    const body = await crmBody(request, 2000000)
     const state = await saveAppearance(prisma, id, body)
-    // Draft/restore không thay đổi nội dung công khai hoặc cache website.
+    // Draft stays private; publish and restore both update the public settings.
     revalidatePath('/tools/wi-appearance')
-    if ((body as { action: string }).action === 'publish') revalidatePath('/', 'layout')
+    revalidatePath('/tools/wi-website')
+    if ((body as { action: string }).action !== 'draft') revalidatePath('/', 'layout')
+    return crmResponse(state)
+  } catch (error) { return failure(error) }
+}
+export async function PATCH(request: Request) {
+  try {
+    const id = await actor(); await appearanceAdmin(prisma, id)
+    const body = await crmBody(request, 150000)
+    const state = await saveManagedPage(prisma, id, body)
+    revalidatePath('/tools/wi-appearance')
+    if ((body as { action: string }).action !== 'draft') revalidatePath('/', 'layout')
     return crmResponse(state)
   } catch (error) { return failure(error) }
 }

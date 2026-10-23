@@ -2,10 +2,10 @@
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict'), ts = require('typescript')
 const React = require('react'), { JSDOM } = require('jsdom')
 function load(file, mocks = {}) {
-  mocks = { '@/auth': { auth: async () => null }, ...mocks }
+  mocks = { '@/auth': { auth: async () => null }, '@/lib/auth/roles': require('./helpers/load-ts.cjs')('lib/auth/roles.ts'), ...mocks }
   const module = { exports: {} }
   const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name === '@/lib/wi300/projects' ? load('lib/wi300/projects.ts') : name === './WiProjectTeamEditor' ? load('components/wi300/WiProjectTeamEditor.tsx') : require(name), module, module.exports)
+  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name === '@/lib/wi300/projects' ? load('lib/wi300/projects.ts') : name.startsWith('@/components/') || name.startsWith('./') ? load(name.startsWith('@/') ? name.slice(2) + '.tsx' : path.posix.join(path.posix.dirname(file), name + '.tsx'), mocks) : require(name), module, module.exports)
   return module.exports
 }
 class CrmError extends Error { constructor(message, status = 400) { super(message); this.status = status } }
@@ -16,7 +16,7 @@ async function run() {
   for (const url of ['', '/wi300/businesses/wi-grow.png', 'https://example.com/logo.png']) assert.equal(shared.safeProjectUrl(url), true)
   const rows = new Map(), users = new Map([[0, { id: 0, role: 'ADMIN', name: 'Admin' }], [8, { id: 8, role: 'STUDENT', name: 'Lucy' }], [9, { id: 9, role: 'STUDENT', name: 'Other' }]])
   let locks = 0, writes = 0, queue = Promise.resolve()
-  const db = { user: { findUnique: async ({ where }) => users.get(where.id) || null }, course: { count: async ({ where }) => where.id.in.filter(id => [1, 2].includes(id)).length }, systemConfig: {
+  const db = { user: { findUnique: async ({ where }) => users.get(where.id) || null }, course: { count: async ({ where }) => where.id.in.filter(id => [1, 2].includes(id) && (where.teacherId === undefined || ({ 1: 8, 2: 9 })[id] === where.teacherId)).length }, systemConfig: {
     findMany: async ({ where }) => [...rows].filter(([key]) => key.startsWith(where.key.startsWith)).map(([key, value]) => ({ key, value })),
     findUnique: async ({ where }) => rows.has(where.key) ? { key: where.key, value: rows.get(where.key) } : null,
     upsert: async ({ where, create, update }) => { writes++; rows.set(where.key, rows.has(where.key) ? update.value : create.value) },
@@ -114,6 +114,12 @@ async function run() {
   users.get(0).role = 'ADMIN'
   assert.equal((await api.DELETE(lifecycleRequest('DELETE', { revision: 1 }))).status, 200)
 
+  const linkProject = await service.createProject(db, 0, { slug: 'wi-link-permissions', name: 'Link Permissions', description: 'Check course owner permissions', ownerId: 8 })
+  const linkContent = Object.fromEntries(Object.keys(shared.projectContent.shape).map(key => [key, linkProject[key]]))
+  await assert.rejects(() => service.saveProject(db, 8, linkProject.slug, { revision: 1, content: { ...linkContent, courseIds: [2] } }), error => error.status === 403)
+  await service.saveProject(db, 8, linkProject.slug, { revision: 1, content: { ...linkContent, courseIds: [1] } })
+  await service.deleteProject(db, 0, linkProject.slug, { revision: 2 })
+
   const toolsApi = load('app/api/tools/route.ts', {
     '@/auth': { auth: async () => session }, '@/lib/prisma': { __esModule: true, default: { ...db, tool: { findMany: async () => [] } } },
     '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => brand }, '@/lib/wi300/project-service': service,
@@ -128,6 +134,7 @@ async function run() {
 
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://wi300.vn/du-an/quan-ly' })
   global.window = dom.window; global.document = dom.window.document; global.FormData = dom.window.FormData; global.IS_REACT_ACT_ENVIRONMENT = true
+  Object.defineProperty(global, 'navigator', { configurable: true, value: dom.window.navigator })
   const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
   const navigationCalls = []
   const Manager = load('components/wi300/WiProjectManager.tsx', { '@/lib/wi300/projects': shared, 'next/link': link, 'next/image': { __esModule: true, default: props => React.createElement('img', props) }, 'next/navigation': { useRouter: () => ({ refresh: () => navigationCalls.push(['refresh']), push: url => navigationCalls.push(['push', url]), replace: url => navigationCalls.push(['replace', url]) }) } }).default
@@ -137,6 +144,7 @@ async function run() {
   global.fetch = async (url, options) => { payload = JSON.parse(options.body); return { ok: !fail, json: async () => fail ? { error: 'Dữ liệu đã thay đổi. Tải lại.' } : { project: { ...initial, ...payload.content, revision: 1 } } } }
   try {
     await React.act(async () => root.render(React.createElement(Manager, { initialSlug: 'wi-grow', courses: [{ id: 1, name_lop: 'Khóa AI', id_khoa: 'AI' }], initial: { admin: false, projects: [{ ...initial, ownerId: 8, courseIds: [2] }] } })))
+    if (process.env.MANAGEMENT_UI_SNAPSHOT_DIR) { fs.mkdirSync(process.env.MANAGEMENT_UI_SNAPSHOT_DIR, { recursive: true }); fs.writeFileSync(path.join(process.env.MANAGEMENT_UI_SNAPSHOT_DIR, 'project-overview.html'), require('react-dom/server').renderToStaticMarkup(React.createElement(load('components/layout/ManagementWorkspace.tsx', { 'next/link': link }).default, { active: 'projects' }, React.createElement(Manager, { initialSlug: 'wi-grow', courses: [{ id: 1, name_lop: 'Khóa thực hành AI', id_khoa: 'AI', teacherName: 'Hương Lucy', status: true }], initial: { admin: true, projects: [{ ...initial, ownerId: 8, courseIds: [1] }], ownerNames: { '8': 'Hương Lucy' } } })))) }
     assert.equal(document.querySelector('[name="ownerId"]'), null)
     document.querySelector('[name="name"]').value = 'Dự án mới'
     const submit = () => document.querySelector('form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }))
@@ -158,7 +166,7 @@ async function run() {
     await React.act(async () => root.render(React.createElement(Manager, { courses: [], initial: { admin: true, projects: [initial] } })))
     // Chuyển từ chủ dự án sang admin bằng remount, như đổi phiên đăng nhập.
     await React.act(async () => root.render(React.createElement(Manager, { key: 'admin', courses: [], initial: { admin: true, projects: [initial] } })))
-    assert.equal(document.querySelector('select'), null, 'List is cards rather than a project dropdown')
+    assert.equal(document.querySelector('[aria-label="Trạng thái dự án"]').value, 'all', 'List supports a status filter without selecting a project')
     assert.equal(document.querySelector('form'), null, 'List does not automatically open the first project')
     assert.equal(document.querySelector('[aria-label="Quản lý Wi.Grow"]').getAttribute('href'), '/du-an/quan-ly?project=wi-grow')
     const createFetch = global.fetch
@@ -167,7 +175,7 @@ async function run() {
       togglePayload = JSON.parse(options.body)
       return { ok: false, json: async () => ({ error: 'Dữ liệu đã thay đổi. Tải lại.' }) }
     }
-    const homeToggle = document.querySelector('article input[type="checkbox"]')
+    const homeToggle = document.querySelector('input[aria-label="Hiển thị Wi.Grow trên trang chủ"]')
     await React.act(async () => homeToggle.click())
     assert.equal(togglePayload.controls.showOnHomepage, false)
     assert.equal(togglePayload.controls.featured, initial.featured, 'Homepage toggle preserves featuring')
@@ -177,7 +185,15 @@ async function run() {
       return { ok: true, json: async () => ({ project: { ...initial, ...togglePayload.controls, revision: initial.revision + 1 } }) }
     }
     await React.act(async () => homeToggle.click())
-    assert.equal(document.querySelector('article input[type="checkbox"]').checked, false)
+    assert.equal(document.querySelector('input[aria-label="Hiển thị Wi.Grow trên trang chủ"]').checked, false)
+    const publicToggle = document.querySelector('input[aria-label="Công khai Wi.Grow"]')
+    await React.act(async () => publicToggle.click())
+    assert.equal(togglePayload.controls.published, false)
+    assert.equal(togglePayload.controls.showOnHomepage, false, 'Public toggle preserves homepage choice')
+    const featureToggle = document.querySelector('input[aria-label="Tiêu biểu Wi.Grow"]')
+    await React.act(async () => featureToggle.click())
+    assert.equal(togglePayload.controls.featured, false)
+    assert.equal(togglePayload.controls.published, false, 'Featured toggle preserves public choice')
     global.fetch = createFetch
     await React.act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === '+ Thêm dự án').click())
     const createForm = document.querySelector('form')

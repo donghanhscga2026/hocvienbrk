@@ -85,7 +85,8 @@ function PlatformNotificationBell() {
   useEffect(() => {
     const check = () => { if (!document.hidden) void refresh() }
     check()
-    const timer = window.setInterval(check, 60000)
+    // [Tối ưu Vercel] 180 giây thay vì 60 giây: giảm 2/3 số lần gọi API thông báo nền mỗi tab.
+    const timer = window.setInterval(check, 180000)
     window.addEventListener('focus', check); document.addEventListener('visibilitychange', check)
     return () => { clearInterval(timer); pending.current?.abort(); pending.current = null; window.removeEventListener('focus', check); document.removeEventListener('visibilitychange', check) }
   }, [refresh, role])

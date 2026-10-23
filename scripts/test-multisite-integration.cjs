@@ -111,7 +111,7 @@ async function run(){
  // Admin homepage writes synchronize the owner's presentation revision.
  const registry=[{hostname:'old.example',profileId:7,isPrimary:true,isActive:true}]
  let occupied=false
- const adminDb={...fake,siteDomain:{findMany:async()=>occupied?[{hostname:'new.example'}]:[]},siteProfileDomain:{
+ const adminDb={...fake,user:{findUnique:async()=>({id:1,role:'ADMIN'})},siteDomain:{findMany:async()=>occupied?[{hostname:'new.example'}]:[]},siteProfileDomain:{
   findMany:async({where})=>registry.filter(d=>where.hostname.in.includes(d.hostname) && d.profileId!==where.NOT.profileId),
   updateMany:async()=>{registry.forEach(d=>d.isPrimary=false);return {count:registry.length}},
   deleteMany:async({where})=>{for(let i=registry.length-1;i>=0;i--)if(!where.hostname.notIn.includes(registry[i].hostname))registry.splice(i,1);return {count:0}},

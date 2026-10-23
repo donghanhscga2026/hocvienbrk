@@ -41,8 +41,8 @@ const getCatalog = unstable_cache(async (where: Prisma.CourseWhereInput) => pris
   where, select: courseSelect, orderBy: [{ pin: 'asc' }, { updatedAt: 'desc' }],
 }), ['wi300-course-catalog-v5'], { tags: ['site-profile'], revalidate: 600 })
 
-export default async function Wi300Home({ brand, session, view = 'home' }: { brand: DeploymentBrand; session: Session | null; view?: 'home' | 'catalog' | 'discover' | 'space' | 'teachers' }) {
-  const projectsReady = view === 'home' || view === 'discover'
+export default async function Wi300Home({ brand, session, view = 'home', catalogHeroRendered = false, loadHomeCourses = true }: { brand: DeploymentBrand; session: Session | null; view?: 'home' | 'catalog' | 'discover' | 'space' | 'teachers'; catalogHeroRendered?: boolean; loadHomeCourses?: boolean }) {
+  const projectsReady = view === 'home' || view === 'discover' || view === 'catalog'
     ? readPublicProjects(prisma).then(projects => ({ projects, projectsError: false })).catch(error => { console.error('[WI300 projects]', error instanceof Error ? error.name : 'Unknown'); return { projects: [], projectsError: true } })
     : Promise.resolve({ projects: [], projectsError: false })
   const userId = session?.user?.id != null ? Number(session.user.id) : null
@@ -67,20 +67,29 @@ export default async function Wi300Home({ brand, session, view = 'home' }: { bra
     return { teachingCourses: [], teachingError: false }
   })()
 
+  // The homepage has no course/learning section. Keep those queries only for
+  // catalog views or a homepage link that explicitly opens a payment modal.
+  const needsCourses = view !== 'home' || loadHomeCourses
   try {
-    const profile = await getCurrentSiteProfile()
-    preferences = await wi300CoursePreferences(prisma)
-    const enrolledCourseIds = view === 'space' && userId != null && Number.isInteger(userId)
-      ? (await prisma.enrollment.findMany({ where: { userId }, select: { courseId: true } })).map(row => row.courseId) : []
-    // Catalog hiding is independent of existing learning/enrollment access.
-    courses = await getCatalog(wi300CourseWhere(getCourseWhereForProfile(profile || { userId: 0 }), preferences, view !== 'space', enrolledCourseIds))
-    courses = courses.map(course => ({ ...course, status: preferences.get(course.id) ?? false }))
+    if (needsCourses) {
+      const [profile, coursePreferences, enrolledRows] = await Promise.all([
+        getCurrentSiteProfile(),
+        wi300CoursePreferences(prisma),
+        view === 'space' && userId != null && Number.isInteger(userId)
+          ? prisma.enrollment.findMany({ where: { userId }, select: { courseId: true } }) : Promise.resolve([]),
+      ])
+      preferences = coursePreferences
+      const enrolledCourseIds = enrolledRows.map(row => row.courseId)
+      // Catalog hiding is independent of existing learning/enrollment access.
+      courses = await getCatalog(wi300CourseWhere(getCourseWhereForProfile(profile || { userId: 0 }), preferences, view !== 'space', enrolledCourseIds))
+      courses = courses.map(course => ({ ...course, status: preferences.get(course.id) ?? false }))
+    }
   } catch (error) {
     // Không hiển thị khóa học giả hoặc khóa ngoài phạm vi khi database lỗi.
     console.error('[WI300] Không tải được danh mục khóa học', error)
     catalogError = true
   }
-  if (userId != null && Number.isInteger(userId)) {
+  if (needsCourses && userId != null && Number.isInteger(userId)) {
     try {
       const [user, rows, hiddenLearning] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId }, select: { phone: true } }),
@@ -109,5 +118,5 @@ export default async function Wi300Home({ brand, session, view = 'home' }: { bra
   }
   const { teachingCourses, teachingError } = await teachingReady
   const { projects, projectsError } = await projectsReady
-  return <Wi300HomeClient appearance={brand.appearance} projects={projects} projectsError={projectsError} brand={brand} courses={courses} enrollments={enrollments} teachingCourses={teachingCourses.map(course => ({ ...course, status: preferences.get(course.id) ?? false }))} teachingError={teachingError} userId={userId} userPhone={userPhone} loggedIn={!!session?.user} catalogError={catalogError} accountError={accountError} view={view} />
+  return <Wi300HomeClient catalogHeroRendered={catalogHeroRendered} appearance={brand.appearance} projects={projects} projectsError={projectsError} brand={brand} courses={courses} enrollments={enrollments} teachingCourses={teachingCourses.map(course => ({ ...course, status: preferences.get(course.id) ?? false }))} teachingError={teachingError} userId={userId} userPhone={userPhone} loggedIn={!!session?.user} catalogError={catalogError} accountError={accountError} view={view} />
 }

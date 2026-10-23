@@ -18,10 +18,11 @@ interface ProfileMember {
 interface Props {
   profileId: number
   initialMembers: ProfileMember[]
+  canManage?: boolean
   onUpdate?: () => void
 }
 
-export default function ProfileMemberManager({ profileId, initialMembers, onUpdate }: Props) {
+export default function ProfileMemberManager({ profileId, initialMembers, onUpdate, canManage = true }: Props) {
   const [members, setMembers] = useState<ProfileMember[]>(initialMembers)
 
   // Đồng bộ state khi props thay đổi từ cha
@@ -29,6 +30,8 @@ export default function ProfileMemberManager({ profileId, initialMembers, onUpda
     setMembers(initialMembers)
   }, [initialMembers])
 
+  const [allowManagement, setAllowManagement] = useState(false)
+  const [changingRole, setChangingRole] = useState<number | null>(null)
   const [newUserId, setNewUserId] = useState('')
   const [adding, setAdding] = useState(false)
   const [removing, setRemoving] = useState<number | null>(null)
@@ -45,7 +48,7 @@ export default function ProfileMemberManager({ profileId, initialMembers, onUpda
     setAdding(true)
     setError(null)
     try {
-      const result = await addProfileMember(profileId, userId)
+      const result = await addProfileMember(profileId, userId, allowManagement ? 'WEBSITE_MANAGER' : 'ASSOCIATE')
       if (result.error) {
         setError(result.error)
       } else {
@@ -60,6 +63,17 @@ export default function ProfileMemberManager({ profileId, initialMembers, onUpda
       setError('Lỗi khi kết nối server')
     }
     setAdding(false)
+  }
+
+  async function changeRole(userId: number, enabled: boolean) {
+    setChangingRole(userId); setError(null)
+    try {
+      const role = enabled ? 'WEBSITE_MANAGER' : 'ASSOCIATE'
+      const result = await addProfileMember(profileId, userId, role)
+      if (result.error) setError(result.error)
+      else { setMembers(prior => prior.map(member => member.userId === userId ? {...member, role} : member)); onUpdate?.() }
+    } catch { setError('Không thể đổi quyền cộng sự.') }
+    finally { setChangingRole(null) }
   }
 
   async function handleRemoveMember(userId: number) {
@@ -97,7 +111,7 @@ export default function ProfileMemberManager({ profileId, initialMembers, onUpda
       )}
 
       {/* Add Member Form */}
-      <div className="flex gap-2">
+      {canManage && <><label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={allowManagement} onChange={event=>setAllowManagement(event.target.checked)} />Cho phép quản trị website cho cộng sự mới</label><div className="flex flex-wrap gap-2">
         <div className="relative flex-1">
           <input
             type="text"
@@ -109,6 +123,7 @@ export default function ProfileMemberManager({ profileId, initialMembers, onUpda
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         </div>
         <button
+          type="button"
           onClick={handleAddMember}
           disabled={adding || !newUserId}
           className="bg-orange-500 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:brightness-110 disabled:opacity-50 transition-all"
@@ -118,6 +133,7 @@ export default function ProfileMemberManager({ profileId, initialMembers, onUpda
         </button>
       </div>
 
+      </>}
       {/* Member List */}
       <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
         {members.length === 0 ? (
@@ -128,7 +144,7 @@ export default function ProfileMemberManager({ profileId, initialMembers, onUpda
           members.map(member => (
             <div 
               key={member.userId} 
-              className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 group hover:border-orange-200 transition-all"
+              className="flex flex-wrap gap-3 items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 group hover:border-orange-200 transition-all"
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center overflow-hidden border border-orange-200">
@@ -147,7 +163,8 @@ export default function ProfileMemberManager({ profileId, initialMembers, onUpda
                 </div>
               </div>
               
-              <button
+              <label className="flex min-h-11 items-center gap-2 text-xs"><input type="checkbox" disabled={!canManage || changingRole!==null} checked={member.role==='WEBSITE_MANAGER'} onChange={event=>void changeRole(member.userId,event.target.checked)} />Cho phép quản trị website</label>
+              {canManage && <button type="button"
                 onClick={() => handleRemoveMember(member.userId)}
                 disabled={removing === member.userId}
                 className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
@@ -158,14 +175,14 @@ export default function ProfileMemberManager({ profileId, initialMembers, onUpda
                 ) : (
                   <Trash2 className="w-4 h-4" />
                 )}
-              </button>
+              </button>}
             </div>
           ))
         )}
       </div>
       
       <p className="text-[10px] text-gray-400 italic">
-        * Cộng sự sẽ được hiển thị các khóa học và bài viết của họ trên trang cộng đồng này.
+        * Cộng sự mặc định chỉ liên kết nội dung. Quyền quản trị cho phép sửa giao diện, trang con và nguồn khóa học; không cho cấp quyền cộng sự, đổi chủ sở hữu hoặc gói ứng dụng.
       </p>
     </section>
   )

@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { useManagementFrame } from '@/components/layout/ManagementFrameContext'
 import { useSearchParams } from 'next/navigation'
 import { CalendarClock, Check, ChevronLeft, ChevronRight, BarChart3, GitBranch, LayoutGrid, List, Loader2, Menu, MessageCircle, Plus, RefreshCw, Search, Settings, Users, X, Handshake } from 'lucide-react'
 import CrmDataTools, { CrmWebsitePanel, integrationRequest } from './CrmDataTools'
@@ -122,8 +123,9 @@ function TaskForm({ busy, onSave }: { busy: boolean; onSave: (data: Command) => 
 }
 
 export default function CrmWorkspace() {
+  const shared = useManagementFrame()
   const queryView = useSearchParams().get('view')
-  const [tab, setTab] = useState<'overview' | 'contacts' | 'cards' | 'board' | 'tasks' | 'requests' | 'students' | 'reports' | 'tools' | 'partners'>('overview')
+  const [requestedTab, setTab] = useState<'overview' | 'contacts' | 'cards' | 'board' | 'tasks' | 'requests' | 'students' | 'reports' | 'tools' | 'partners'>('overview')
   useEffect(() => { if (queryView === 'requests' || queryView === 'tasks' || queryView === 'contacts' || queryView === 'overview' || queryView === 'partners') setTab(queryView) }, [queryView])
   // Giữ kiểu xem khách hàng khi chuyển qua các mục chức năng khác.
   const [contactView, setContactView] = useState<'contacts' | 'cards'>('contacts')
@@ -134,6 +136,7 @@ export default function CrmWorkspace() {
   const [total, setTotal] = useState(0)
   const [owners, setOwners] = useState<CrmOwner[]>([])
   const [actor, setActor] = useState<{ id: number; isAdmin: boolean } | null>(null)
+  const tab = requestedTab === 'partners' && !actor?.isAdmin ? 'overview' : requestedTab
   const [tasks, setTasks] = useState<TasksResult>({ tasks: [], total: 0, stats: { today: 0, overdue: 0, unscheduled: 0 } })
   const [query, setQuery] = useState('')
   const [search, setSearch] = useState('')
@@ -239,14 +242,14 @@ export default function CrmWorkspace() {
   const sectionTitle = tab === 'overview' ? 'Tổng quan' : customerSection ? 'Khách hàng / Học viên' : tab === 'partners' ? 'Đối tác WI300' : tab === 'requests' ? 'Yêu cầu & phản hồi' : tab === 'board' ? 'Theo bước tư vấn' : tab === 'students' ? 'Đồng bộ học viên' : tab === 'reports' ? 'Báo cáo' : tab === 'tools' ? 'Cài đặt CRM' : 'Công việc'
 
   return <main className="mx-auto min-h-[75dvh] max-w-[1600px] bg-slate-50/80 p-3 text-slate-800 sm:p-6">
-    <div className="grid items-start gap-4 lg:grid-cols-[224px_minmax(0,1fr)] lg:gap-6">
+    <div className={shared ? "min-w-0 space-y-4" : "grid items-start gap-4 lg:grid-cols-[224px_minmax(0,1fr)] lg:gap-6"}>
       {/* Menu chức năng nằm bên trái; trên điện thoại có thể thu gọn. */}
-      <aside className="rounded-2xl border border-slate-200 bg-white p-3 lg:sticky lg:top-20">
-        <div className="flex items-center justify-between gap-2 px-2 py-2">
+      <aside className={shared ? "min-w-0 rounded-xl border border-brk-outline bg-white p-2" : "rounded-2xl border border-slate-200 bg-white p-3 lg:sticky lg:top-20"}>
+        <div className={shared ? "hidden" : "flex items-center justify-between gap-2 px-2 py-2"}>
           <p className="font-bold text-emerald-800">CRM · Chăm sóc</p>
           <button type="button" className={secondary + ' lg:hidden'} aria-label="Mở hoặc đóng menu CRM" aria-expanded={menuOpen} aria-controls="crm-sidebar-menu" onClick={() => setMenuOpen(value => !value)}><Menu size={18} />Menu</button>
         </div>
-        <nav id="crm-sidebar-menu" aria-label="Các mục CRM" className={(menuOpen ? 'grid' : 'hidden') + ' mt-2 gap-1 lg:grid'}>
+        <nav id="crm-sidebar-menu" aria-label="Các mục CRM" className={shared ? 'flex gap-1 overflow-x-auto' : (menuOpen ? 'grid' : 'hidden') + ' mt-2 gap-1 lg:grid'}>
           {([
             { key: 'overview', label: 'Tổng quan', icon: LayoutGrid },
             { key: 'contacts', label: 'Khách hàng / Học viên', icon: Users },
@@ -255,20 +258,20 @@ export default function CrmWorkspace() {
             { key: 'board', label: 'Tư vấn & công việc', icon: GitBranch },
             { key: 'reports', label: 'Báo cáo', icon: BarChart3 },
             { key: 'tools', label: 'Cài đặt CRM', icon: Settings },
-          ] as const).map(item => {
+          ] as const).filter(item => item.key !== 'partners' || actor?.isAdmin).map(item => {
             const active = item.key === 'contacts' ? customerSection : item.key === 'board' ? tab === 'board' || tab === 'tasks' : item.key === 'tools' ? tab === 'tools' || tab === 'students' : tab === item.key
             const Icon = item.icon
             const count = item.key === 'requests' ? newRequests : item.key === 'board' ? tasks.stats.overdue || tasks.stats.today : null
-            return <button key={item.key} type="button" aria-current={active ? 'page' : undefined} className={'flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm focus-visible:outline-2 focus-visible:outline-emerald-600 ' + (active ? 'bg-emerald-50 font-semibold text-emerald-900 ring-1 ring-inset ring-emerald-100' : 'text-slate-600 hover:bg-slate-100')} onClick={() => { setTab(item.key === 'contacts' ? contactView : item.key === 'tools' && !actor?.isAdmin ? 'students' : item.key); if (item.key === 'board') { setGroup('all'); setUnscheduled(false); setPage(1) } setMenuOpen(false) }}>
+            return <button key={item.key} type="button" aria-current={active ? 'page' : undefined} className={(shared ? 'shrink-0 ' : '') + 'flex min-h-12 ' + (shared ? '' : 'w-full ') + 'items-center gap-3 rounded-xl px-3 py-3 text-left text-sm focus-visible:outline-2 focus-visible:outline-emerald-600 ' + (active ? 'bg-emerald-50 font-semibold text-emerald-900 ring-1 ring-inset ring-emerald-100' : 'text-slate-600 hover:bg-slate-100')} onClick={() => { setTab(item.key === 'contacts' ? contactView : item.key === 'tools' && !actor?.isAdmin ? 'students' : item.key); if (item.key === 'board') { setGroup('all'); setUnscheduled(false); setPage(1) } setMenuOpen(false) }}>
               <Icon size={18} className="shrink-0" /><span className="min-w-0 flex-1">{item.label}</span>
               {count != null && count > 0 && <span aria-label={item.key === 'requests' ? count + ' yêu cầu mới' : count + (tasks.stats.overdue ? ' công việc quá hạn' : ' công việc đến hạn hôm nay')} className={'shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ' + (active ? 'bg-white text-emerald-800' : 'bg-amber-100 text-amber-900')}>{count}</span>}
             </button>
           })}
         </nav>
-        <p className="hidden px-2 pt-3 text-xs leading-relaxed text-slate-500 lg:block">Ưu tiên yêu cầu mới và công việc đến hạn.</p>
+        <p className={shared ? "hidden" : "hidden px-2 pt-3 text-xs leading-relaxed text-slate-500 lg:block"}>Ưu tiên yêu cầu mới và công việc đến hạn.</p>
       </aside>
       <section aria-label={sectionTitle} className="min-w-0 space-y-5">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="mb-1 text-xs font-medium text-slate-400">CRM · Chăm sóc & hỗ trợ</p><h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{sectionTitle}</h1><p className="mt-1 text-xs leading-5 text-slate-500">{tab === "overview" ? "Yêu cầu chờ phản hồi, lịch đến hạn và những cập nhật mới nhất." : tab === "partners" ? "Theo dõi doanh nghiệp, giảng viên và kết quả hợp tác." : "Thông tin và công việc trong phạm vi phụ trách của bạn."}</p></div>{customerSection && <button disabled={!actor || busy} className={button} onClick={() => { setCreate(true); setError(''); setNotice('') }}><Plus size={18} />Thêm khách</button>}</div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="mb-1 text-xs font-medium text-slate-400">CRM · Chăm sóc & hỗ trợ</p><h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{sectionTitle}</h1><p className="mt-1 text-xs leading-5 text-slate-500">{tab === "overview" ? "Yêu cầu chờ phản hồi, lịch đến hạn và những cập nhật mới nhất." : tab === "partners" ? "Theo dõi doanh nghiệp, giảng viên và kết quả hợp tác." : "Thông tin và công việc trong phạm vi phụ trách của bạn."}</p></div>{customerSection && <button disabled={!actor || busy} className={button} onClick={() => { setCreate(true); setError(''); setNotice('') }}><Plus size={18} />Thêm khách tư vấn</button>}</div>
     {feedback}
     {(tab === 'tasks' || tab === 'board') && <div className="grid grid-cols-3 gap-2 sm:gap-4">{[
       { label: 'Việc hôm nay', value: tasks.stats.today, run: () => { setTab('tasks'); setDue('today'); setTaskPage(1) } },
@@ -318,7 +321,7 @@ export default function CrmWorkspace() {
       </section>
     </div>
 
-    {create && actor && <Modal title="Thêm khách mới" onClose={close}>{feedback}<ContactEditor owners={owners} actorId={actor.id} isAdmin={actor.isAdmin} busy={busy} onCancel={close} onSave={async data => { const ok = await mutate({ action: 'contact.create', data }); if (ok) { setCreate(false); setPage(1) } return ok }} /></Modal>}
+    {create && actor && <Modal title="Thêm khách tư vấn" onClose={close}>{feedback}<p className="text-sm text-slate-600">Ghi nhận người đang quan tâm đến khóa học của bạn. Thao tác này không tạo tài khoản hoặc đăng ký khóa học, và không tự cấp quyền nhận email marketing.</p><ContactEditor owners={owners} actorId={actor.id} isAdmin={actor.isAdmin} busy={busy} onCancel={close} onSave={async data => { const ok = await mutate({ action: 'contact.create', data }); if (ok) { setCreate(false); setPage(1) } return ok }} /></Modal>}
     {selected != null && <CrmDrawer title={detail?.name || 'Hồ sơ khách'} onClose={close}>{feedback}{detailLoading ? <p role="status">Đang tải hồ sơ…</p> : detail && actor ? <>
       <nav aria-label="Các phần hồ sơ CRM" className="flex gap-1 overflow-x-auto border-b pb-3">{([{ id: 'summary', label: 'Tóm tắt' }, { id: 'requests', label: 'Yêu cầu' }, { id: 'learning', label: 'Học tập' }, { id: 'history', label: 'Lịch sử' }] as const).map(item => <button key={item.id} aria-pressed={detailTab === item.id} className={(detailTab === item.id ? button : secondary) + ' shrink-0'} onClick={() => setDetailTab(item.id)}>{item.label}</button>)}</nav>
       <div hidden={detailTab !== 'summary'} className="space-y-4">

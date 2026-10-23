@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/api-auth'
+import { normalizeRole, normalizeRoles } from '@/lib/auth/roles'
 
 const stepsInclude = {
   steps: { where: { isActive: true }, orderBy: { stepOrder: 'asc' as const } },
@@ -10,7 +11,7 @@ function roleFilter(role: string | null) {
   // roles rỗng = hiển thị cho mọi vai trò.
   // Chưa đăng nhập (không có role) chỉ thấy bài công khai — tránh lộ bài giới hạn vai trò.
   if (!role) return { roles: { isEmpty: true } }
-  return { OR: [{ roles: { isEmpty: true } }, { roles: { has: role } }] }
+  return { OR: [{ roles: { isEmpty: true } }, { roles: { hasSome: normalizeRole(role) === 'TEACHER' ? ['TEACHER', 'INSTRUCTOR'] : [role] } }] }
 }
 
 export async function GET(request: Request) {
@@ -110,7 +111,7 @@ export async function POST(request: Request) {
 
     const data = {
       pagePath, title, script, textContent, videoUrl, agentVideoUrl, toolSlug, sections,
-      roles: Array.isArray(roles) ? roles : [],
+      roles: Array.isArray(roles) ? normalizeRoles(roles.filter((role): role is string => typeof role === 'string')) : [],
       isActive,
     }
 

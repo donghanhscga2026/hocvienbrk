@@ -1,0 +1,83 @@
+{
+  "pages": [
+    {
+      "id": "home",
+      "label": "Trang chủ",
+      "url": "/"
+    },
+    {
+      "id": "courses",
+      "label": "Khóa học",
+      "url": "/khoa-hoc"
+    },
+    {
+      "id": "projects",
+      "label": "Dự án",
+      "url": "/du-an"
+    },
+    {
+      "id": "teachers",
+      "label": "Giảng viên",
+      "url": "/giang-vien"
+    },
+    {
+      "id": "about",
+      "label": "Giới thiệu Wi300",
+      "url": "/gioi-thieu"
+    },
+    {
+      "id": "products",
+      "label": "Sản phẩm",
+      "url": "/san-pham"
+    },
+    {
+      "id": "services",
+      "label": "Dịch vụ",
+      "url": "/dich-vu"
+    },
+    {
+      "id": "partners",
+      "label": "Đăng ký đối tác",
+      "url": "/doi-tac"
+    },
+    {
+      "id": "articles",
+      "label": "Bài viết",
+      "url": "/bai-viet"
+    }
+  ],
+  "reserved": [
+    ".well-known",
+    "account-settings",
+    "actions",
+    "admin",
+    "api",
+    "bai-viet",
+    "complete-profile",
+    "config",
+    "contexts",
+    "courses",
+    "dich-vu",
+    "doi-tac",
+    "du-an",
+    "favicon.ico",
+    "forgot-password",
+    "giang-vien",
+    "gioi-thieu",
+    "ho-so-hoc-tap",
+    "i18n",
+    "kham-pha",
+    "khoa-hoc",
+    "land",
+    "login",
+    "my-requests",
+    "my-space",
+    "page",
+    "register",
+    "reset-password",
+    "san-pham",
+    "site-domain",
+    "support",
+    "tools"
+  ]
+}

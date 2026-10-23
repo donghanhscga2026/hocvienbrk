@@ -8,7 +8,15 @@ const { act } = React
 function load(file, overrides = {}) {
   const module = { exports: {} }
   const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in overrides ? overrides[name] : require(name), module, module.exports)
+  new Function('require', 'module', 'exports', code)(name => {
+    if (name in overrides) return overrides[name]
+    if (name.startsWith('@/') || name.startsWith('./')) {
+      const base = name.startsWith('@/') ? name.slice(2) : path.posix.join(path.posix.dirname(file), name)
+      const resolved = ['.tsx', '.ts'].map(ext => base + ext).find(candidate => fs.existsSync(path.join(__dirname, '..', candidate)))
+      if (resolved) return load(resolved, overrides)
+    }
+    return require(name)
+  }, module, module.exports)
   return module.exports
 }
 async function run() {
@@ -29,6 +37,7 @@ async function run() {
     { id: 5, slug: 'custom', name: 'Công cụ mới', url: '/tools/new-helper', roles: [], isActive: true },
     { id: 7, slug: 'brk', name: 'BRK (Phước Báu)', url: '/tools/brk', roles: [], isActive: true },
     { id: 6, slug: 'genealogy', name: 'Nhân Mạch', url: '/tools/genealogy', roles: [], isActive: true },
+    { id: 8, slug: 'wi-appearance', name: 'Giao diện website', url: '/tools/wi-appearance', roles: ['ADMIN'], isActive: true },
   ]
   assert.equal(helpers.wi300ToolName(tools[5]), 'Ví Wi')
   assert.equal(tools[5].name, 'BRK (Phước Báu)', 'Nhãn Wi không sửa tên chung trong dữ liệu')
@@ -40,11 +49,11 @@ async function run() {
   assert.deepEqual(helpers.filterPersonalTools(tools, 'cham soc', 'marketing').map(t => t.id), [1])
   assert.deepEqual(helpers.filterPersonalTools(tools, 'youtube', 'system'), [])
 
-  assert.equal(helpers.toolWorkspace(tools[0]), 'teaching')
+  assert.equal(helpers.toolWorkspace(tools[0]), 'business')
   assert.equal(helpers.toolWorkspace(tools[1]), 'tools')
-  assert.equal(helpers.toolWorkspace(tools[2]), 'teaching')
+  assert.equal(helpers.toolWorkspace(tools[2]), 'business')
   assert.equal(helpers.toolWorkspace(tools[3]), 'admin')
-  for (const [slug, workspace] of [['roadmap', 'learning'], ['affiliate', 'affiliate'], ['genealogy', 'affiliate'], ['bank-accounts', 'account'], ['payments', 'teaching'], ['email-mkt', 'teaching'], ['dev-flow', 'tools']]) {
+  for (const [slug, workspace] of [['roadmap', 'learning'], ['affiliate', 'affiliate'], ['genealogy', 'affiliate'], ['bank-accounts', 'account'], ['payments', 'business'], ['email-mkt', 'business'], ['dev-flow', 'admin']]) {
     assert.equal(helpers.toolWorkspace({ id: 20, slug, name: slug, url: `/tools/${slug}`, roles: [], isActive: true }), workspace)
   }
 
@@ -64,7 +73,9 @@ async function run() {
   const Cover = load('components/wi300/Wi300CourseCover.tsx', { 'next/image': { __esModule: true, default: ({ fill, unoptimized, ...props }) => React.createElement('img', props) }, '@/lib/image-validation': load('lib/image-validation.ts') })
   const Teaching = load('components/wi300/Wi300TeachingPanel.tsx', { 'next/link': link, './Wi300CourseCover': Cover, './useCoursePageSize': responsive })
   const spaceMenu = load('components/wi300/Wi300SpaceMenu.tsx', { 'next/link': link, '@/lib/wi300/personal-space': helpers })
+  let sharedTools = null
   const SpaceModule = load('components/wi300/Wi300PersonalSpace.tsx', {
+    '@/components/layout/ManagementFrameContext': { useManagementFrame: () => sharedTools !== null, useManagementTools: () => sharedTools },
     'next/link': link, 'next-auth/react': { useSession: () => ({ data: { user: { role, name: 'Lucy' } } }) },
     'next/navigation': { useSearchParams: () => params, useRouter: () => ({ refresh: () => { refreshCalls++ }, push: href => { params = new URLSearchParams(href.split('?')[1]); render() } }) },
     'next/dynamic': { __esModule: true, default: () => props => { paymentProps = props; return React.createElement('div', { 'data-payment': true }, 'Payment') } },
@@ -88,7 +99,7 @@ async function run() {
     await act(async () => render())
     assert.equal(document.querySelectorAll('article').length, 6)
     assert.ok(document.querySelector('article img[src="https://example.com/course.png"]'))
-    assert.equal(document.querySelector('h1').textContent, 'Dành cho học viên')
+    assert.equal(document.querySelector('h1').textContent, 'Học tập')
     assert.ok(document.querySelector('nav a[href="/my-space?tab=affiliate"]'))
     assert.equal(document.querySelector('nav a[href="/my-space?tab=admin"]'), null)
     assert.match(document.querySelector('[aria-label="Phân trang khóa học"]').textContent, /Trang 1\/2/)
@@ -108,6 +119,7 @@ async function run() {
     await act(async () => paymentProps.onClose())
     await act(async () => document.getElementById('learning-tab-pending').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Home', bubbles: true })))
     assert.equal(document.getElementById('learning-tab-active').getAttribute('aria-selected'), 'true')
+
     assert.equal(document.querySelectorAll('article').length, 6)
     params = new URLSearchParams('tab=tools')
     await act(async () => render())
@@ -125,7 +137,7 @@ async function run() {
     assert.ok(document.querySelector('a[href="/tools/new-helper"]'))
     params = new URLSearchParams('tab=pages')
     await act(async () => render())
-    assert.ok(document.querySelector('a[href^="/tools/pages"]'))
+    assert.equal(document.querySelector('a[href^="/tools/pages"]'), null, 'Học viên không thấy công cụ quản lý Page')
     params = new URLSearchParams('tab=teaching')
     await act(async () => render())
     assert.equal(document.querySelector('a[href="/my-space?tab=teaching"]'), null, 'Học viên không thấy mục giảng dạy')
@@ -137,11 +149,17 @@ async function run() {
     assert.equal(document.querySelectorAll('li').length, 6)
     assert.match(document.querySelector('[aria-label="Phân trang khóa giảng dạy"]').textContent, /Trang 1\/2/)
     assert.ok(document.querySelector('a[href="/tools/courses/new?id=100"]'))
-    assert.ok(document.querySelector('a[href="/tools/crm"]'), 'CRM nằm trong khu giảng viên')
-    assert.ok(document.querySelector('a[href^="/tools/pages"]'), 'Website nằm trong khu giảng viên')
+    assert.equal(document.querySelector('a[href="/tools/crm"]'), null, 'CRM được chuyển sang kinh doanh')
+    assert.equal(document.querySelector('a[href^="/tools/pages"]'), null, 'Website được chuyển sang nhóm nội dung')
     await act(async () => [...document.querySelectorAll('button')].find(b => b.textContent.startsWith('Đã ẩn')).click())
     assert.equal(document.querySelectorAll('li').length, 1)
     assert.match(document.querySelector('li').textContent, /Dạy 8/)
+    params = new URLSearchParams('tab=business')
+    await act(async () => render())
+    assert.ok(document.querySelector('a[href="/tools/crm"]'), 'Kinh doanh không phụ thuộc quyền quản lý dự án')
+    params = new URLSearchParams('tab=pages')
+    await act(async () => render())
+    assert.ok(document.querySelector('a[href^="/tools/pages"]'))
     params = new URLSearchParams()
     await act(async () => render())
     assert.equal(document.getElementById('overview-tab-learning').getAttribute('aria-selected'), 'true')
@@ -175,6 +193,10 @@ async function run() {
     role = 'ADMIN'
     await act(async () => render())
     assert.ok(document.querySelector('a[href="/tools/backup"]'))
+    params = new URLSearchParams('tab=website-admin')
+    await act(async () => render())
+    assert.equal(document.querySelector('a[href="/tools/wi-appearance"]').textContent, 'Trang', 'Cards use the same label as sidebar/header even with old API labels')
+    assert.ok(document.querySelector('a[href="/tools/posts"]'))
     params = new URLSearchParams('view=teaching')
     await act(async () => render())
     assert.ok(document.getElementById('overview-tab-teaching'))
@@ -198,6 +220,15 @@ async function run() {
     params = new URLSearchParams('tab=learning&status=invalid')
     await act(async () => render())
     assert.equal(document.getElementById('learning-tab-active').getAttribute('aria-selected'), 'true')
+    let extraRequests = 0
+    global.fetch = async () => { extraRequests++; throw new Error('Unexpected duplicate tools request') }
+    sharedTools = { tools, loading: false, failed: false }; params = new URLSearchParams('tab=business')
+    await act(async () => render())
+    assert.equal(extraRequests, 0, 'Shared frame supplies tools without a second API request')
+    assert.ok(document.querySelector('a[href="/tools/crm"]'))
+    sharedTools = { tools: [], loading: true, failed: false }
+    await act(async () => render())
+    assert.equal(document.querySelector('a[href="/tools/crm"]'), null, 'Switching actor clears shared tools immediately')
   } finally { global.fetch = savedFetch }
 
   let pushed = null

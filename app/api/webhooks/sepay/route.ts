@@ -264,6 +264,68 @@ export async function POST(req: NextRequest) {
                     where: { id: txRecord.id },
                     data: { status: 'PROCESSED', enrollmentId: enrollment.id }
                 });
+
+                // Thông báo giống kênh AUTO_EMAIL (lib/auto-verify.ts): activity log
+                // PAYMENT_VERIFIED + Telegram 'ACTIVATE' + email kích hoạt cho học viên.
+                // Mỗi khối bọc try/catch riêng: lỗi thông báo KHÔNG được làm hỏng webhook.
+                const notifyBankName = gateway || bankAccount.bankName || 'SePay';
+                try {
+                    const { logActivity } = await import('@/lib/activity-logger');
+                    await logActivity({
+                        userId: enrollment.userId,
+                        action: 'PAYMENT_VERIFIED',
+                        detail: `Xác minh thanh toán tự động: ${enrollment.course.name_lop} - ${Number(transferAmount).toLocaleString()}đ`,
+                        metadata: { courseId: enrollment.courseId, enrollmentId: enrollment.id, amount: Number(transferAmount), bankName: notifyBankName },
+                        createdAt: transactionDate ? new Date(transactionDate) : new Date(),
+                    });
+                } catch (logErr) {
+                    console.error(`⚠️ [SEPAY] Không ghi được PAYMENT_VERIFIED cho HV ${enrollment.userId}:`, logErr);
+                }
+
+                try {
+                    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn';
+                    let refLink = '';
+                    if (activationResult.referrerId) {
+                        const affRef = await prisma.affiliateRef.findFirst({ where: { userId: activationResult.referrerId, isActive: true } });
+                        const refCode = affRef?.refKey || String(activationResult.referrerId);
+                        refLink = `🔗 Link ref: ${appUrl}/khoa-hoc/${enrollment.course.id_khoa}?ref=${refCode}\n`;
+                    }
+                    const brkPlacementMsg = activationResult.brkResult?.placement
+                        ? `📍 Vị trí: Dưới <b>#${activationResult.brkResult.placement.parentId} ${activationResult.brkResult.placement.parentName}</b>\n` +
+                            (activationResult.brkResult.placement.chain.length > 1
+                                ? `🔗 Tuyến trên: ${activationResult.brkResult.placement.chain.slice(1).map((a: any) => `#${a.userId} ${a.name}`).join(' → ')}\n`
+                                : '')
+                        : '';
+                    const msgAdmin = `✅ <b>KÍCH HOẠT TỰ ĐỘNG THÀNH CÔNG</b>\n\n` +
+                        `👤 Thành viên: <b>${enrollment.user.name}</b> (#${enrollment.userId})\n` +
+                        `📞 SĐT: ${enrollment.user.phone}\n` +
+                        `🎓 Khóa học: <b>${enrollment.course.name_lop} (${enrollment.course.id_khoa})</b>\n` +
+                        `${refLink}💰 Số tiền: ${Number(transferAmount).toLocaleString()}đ\n` +
+                        `🏦 Ngân hàng: ${notifyBankName}\n` +
+                        `📡 Nguồn: SePay\n` +
+                        `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}\n` +
+                        brkPlacementMsg;
+                    const { sendTelegram } = await import('@/lib/notifications');
+                    await sendTelegram(msgAdmin, 'ACTIVATE');
+                } catch (teleErr) {
+                    console.error(`⚠️ [SEPAY] Không gửi được Telegram kích hoạt cho HV ${enrollment.userId}:`, teleErr);
+                }
+
+                if (enrollment.user.email) {
+                    try {
+                        const { sendActivationEmail } = await import('@/lib/notifications');
+                        await sendActivationEmail(
+                            enrollment.user.email,
+                            enrollment.user.name || 'Bạn',
+                            enrollment.user.id,
+                            enrollment.course.name_lop || enrollment.course.id_khoa,
+                            null
+                        );
+                    } catch (mailErr) {
+                        console.error(`⚠️ [SEPAY] Không gửi được email kích hoạt cho HV ${enrollment.userId}:`, mailErr);
+                    }
+                }
+
                 break; // Xử lý xong 1 enrollment, thoát khỏi loop (1 giao dịch = 1 khóa học)
             } else {
                 console.error(`❌ [SEPAY] Lỗi khi kích hoạt: ${activationResult.error}`);

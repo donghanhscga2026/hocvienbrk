@@ -705,6 +705,14 @@ export async function cancelEnrollmentAction(enrollmentIds: number[]) {
         metadata: { enrollmentId, adminId: parseInt(session.user.id) }
       })
 
+      // Affiliate v2: thu hồi hoa hồng của đơn hàng liên quan (nếu đã từng tính)
+      try {
+        const { reverseCommissionForEnrollment } = await import('@/lib/affiliate/unified-commission')
+        await reverseCommissionForEnrollment(enrollmentId, `Admin hủy đăng ký #${enrollmentId}`)
+      } catch (revErr) {
+        console.error('[CancelEnrollment] Reverse commission error:', revErr)
+      }
+
       count++
     }
 

@@ -21,13 +21,13 @@ const ok = (value, message) => { assert.ok(value, message); checks++ }
 const deny = async (operation, status) => { await assert.rejects(operation, error => error.status === status); checks++ }
 const id = crypto.randomUUID(), teacher = { id: 1, role: 'TEACHER', name: 'Giảng viên' }, admin = { id: 0, role: 'ADMIN', name: 'Quản trị' }
 let row = { id, key: 'private-key', ipHash: 'private-ip', userId: 3, contactId: null, courseId: null, ownerId: null, category: 'CONSULTATION', source: workflow.PARTNER_SOURCE, version: 1, status: 'NEW', resolution: '', publicReply: '', history: [], name: 'Người gửi', content: 'Đăng ký: Doanh nghiệp\nDoanh nghiệp: Wi.Tech' }, notifications = [], users = [{ id: 0, role: 'ADMIN' }, { id: 1, role: 'TEACHER' }, { id: 2, role: 'TEACHER' }, { id: 3, role: 'STUDENT', name: 'Người gửi', image: null }]
-const matches = (where, value = row) => Object.entries(where).every(([key, field]) => key === 'OR' ? field.some(item => matches(item, value)) : key === 'AND' ? field.every(item => matches(item, value)) : key === 'course' ? value.courseId === 10 && field.teacherId === 1 : value[key] === field)
+const matches = (where, value = row) => Object.entries(where).every(([key, field]) => key === 'OR' ? field.some(item => matches(item, value)) : key === 'AND' ? field.every(item => matches(item, value)) : key === 'course' ? value.courseId === 10 && field.teacherId === 1 : field && typeof field === 'object' && 'not' in field ? value[key] !== field.not : value[key] === field)
 const fake = {
   crmRequest: {
     findFirst: async ({ where }) => matches(where) ? structuredClone(row) : null,
     findUnique: async ({ where }) => row?.key === where.key ? row : null,
     updateMany: async ({ where, data }) => { if (!matches(where)) return { count: 0 }; for (const [key, value] of Object.entries(data)) if (value !== undefined) row[key] = key === 'version' ? row.version + value.increment : structuredClone(value); return { count: 1 } },
-    findMany: async ({ where }) => { if (where.userId != null) return [{ id, source: row.source, category: row.category, status: row.status }]; return [structuredClone(row)] },
+    findMany: async ({ where }) => { if (!matches(where)) return []; if (where.userId != null) return [{ id, source: row.source, category: row.category, status: row.status }]; return [structuredClone(row)] },
     count: async () => 0,
     create: async ({ data }) => { row = { id: crypto.randomUUID(), userId: null, ownerId: null, contactId: null, status: 'NEW', history: [], version: 1, ...data }; return row },
   },
@@ -46,9 +46,16 @@ async function run() {
   ok(workflow.requestTopic({ category: 'SUPPORT', source: workflow.ACCOUNT_SUPPORT_SOURCE }) === 'ACCOUNT', 'Account support separate from technical support')
   ok(workflow.requestTopic({ category: 'SUPPORT', source: workflow.FEEDBACK_SOURCE }) === 'FEEDBACK', 'Feedback separate from generic support')
   await deny(() => requests.updateRequest(fake, teacher, { id, version: 1, status: 'NEW', resolution: 'Không có quyền' }), 409)
-  await requests.updateRequest(fake, admin, { id, version: 1, ownerId: 1, status: 'IN_PROGRESS', resolution: 'Ghi chú riêng', outcome: 'MORE_INFO' })
-  ok(row.ownerId === 1 && row.version === 2 && row.userId === 3, 'Assignment uses stored user and optimistic version')
+  await deny(() => requests.updateRequest(fake, admin, { id, version: 1, ownerId: 1 }), 403)
+  await requests.updateRequest(fake, admin, { id, version: 1, ownerId: 0, status: 'IN_PROGRESS', resolution: 'Ghi chú riêng', outcome: 'MORE_INFO' })
+  ok(row.ownerId === 0 && row.version === 2 && row.userId === 3, 'Partner assignment stays with an admin')
   ok(workflow.partnerOutcome(row.history) === 'MORE_INFO' && notifications.length === 0, 'Partner outcome and note do not send a public reply or grant roles')
+  row.ownerId = 1 // Simulate a historical assignment before the admin-only policy.
+  ok((await requests.readRequests(fake, teacher, 1)).requests.length === 0, 'Historical partner assignment is excluded from teacher inbox')
+  await deny(() => requests.requestSource(fake, teacher, id), 404)
+  await deny(() => requests.updateRequest(fake, teacher, { id, version: 2, action: 'SEND_REPLY', publicReply: 'Forbidden' }), 409)
+  await deny(() => requests.requestProfile(fake, teacher, id), 404)
+  row.source = 'Trang khóa học'; row.courseId = 10 // Continue testing ordinary course requests.
   await deny(() => requests.updateRequest(fake, teacher, { id, version: 2, ownerId: 2 }), 403)
   await deny(() => requests.updateRequest(fake, teacher, { id, version: 2, resolution: 'Private', publicReply: 'Accidental send' }), 400)
   await deny(() => requests.updateRequest(fake, teacher, { id, version: 2, action: 'SEND_REPLY', publicReply: ' ' }), 400)
@@ -67,7 +74,7 @@ async function run() {
   await requests.updateRequest(fake, teacher, { id, version: 4, status: 'RESOLVED', resolution: 'Đã xử lý' })
   ok(row.status === 'RESOLVED' && row.history.at(-1).authorName === teacher.name, 'Resolve writes actor and time')
   const list = await requests.readRequests(fake, teacher, 1)
-  ok(list.requests[0].topic === 'PARTNER' && !('history' in list.requests[0]) && !('key' in list.requests[0]) && !('ipHash' in list.requests[0]), 'Staff list excludes raw private metadata')
+  ok(list.requests[0].topic === 'CONSULTATION' && !('history' in list.requests[0]) && !('key' in list.requests[0]) && !('ipHash' in list.requests[0]), 'Staff list excludes raw private metadata')
   await deny(() => requests.requestProfile(fake, { id: 2, role: 'TEACHER', name: 'Other' }, id), 404)
   const profile = await requests.requestProfile(fake, teacher, id)
   ok(profile.profile.id === 3 && profile.profile.role === 'STUDENT' && profile.profile.learning.length === 1, 'Profile anchors stored sender to authorized request')

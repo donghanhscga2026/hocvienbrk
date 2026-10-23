@@ -1,6 +1,11 @@
 'use server'
 
 import { auth } from "@/auth"
+import { normalizeRole } from '@/lib/auth/roles'
+import { isTeachingRole } from '@/lib/auth/roles'
+import { changeMemberRole } from '@/lib/auth/change-member-role'
+import { learningProfileActor } from '@/lib/learning-profile/server'
+import { assertLearningStudent } from '@/lib/learning-profile/service'
 import { changeUserId, UserIdChangeError, type UserIdChangeState } from "@/lib/user-id-change"
 import { domainContext } from "@/lib/website/domain-context"
 import prisma from "@/lib/prisma"
@@ -627,17 +632,20 @@ export async function getUserSystemsAction() {
 
 export async function updateUserRoleAction(userId: number, role: Role) {
     try {
-        await checkAdmin()
+                if (await domainContext()) throw new Error('Đổi vai trò tại hệ thống chính.')
+        const session = await auth()
+        if (!session?.user?.id) throw new Error("Chưa đăng nhập")
+        const actor = await prisma.user.findUnique({ where: { id: Number(session.user.id) }, select: { id: true, role: true } })
+        if (!actor) throw new Error("Không tìm thấy tài khoản thực hiện")
+        role = normalizeRole(role)
         if (!Number.isInteger(userId)) throw new Error("Mã thành viên không hợp lệ")
         if (!Object.values(Role).includes(role)) throw new Error("Quyền không hợp lệ")
 
-        const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true } })
-        if (!user) throw new Error("Không tìm thấy thành viên")
-        if (user.role === role) return { success: true, role }
-
-        await prisma.user.update({ where: { id: userId }, data: { role } })
+        const result = await changeMemberRole(prisma, actor.id, userId, role)
         revalidatePath('/tools/students')
-        return { success: true, role }
+        revalidatePath('/ho-so-hoc-tap/' + userId)
+        revalidatePath('/giang-vien/' + userId)
+        return result
     } catch (error: any) {
         return { success: false, error: error.message || "Không thể cập nhật quyền" }
     }
@@ -645,12 +653,10 @@ export async function updateUserRoleAction(userId: number, role: Role) {
 
 export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'COURSE_86_DAYS' | 'UNVERIFIED', page: number = 0, limit: number = 20, sortBy: 'createdAt' | 'id' = 'createdAt', sortOrder: 'asc' | 'desc' = 'desc', courseId?: number) {
     try {
-        const session = await auth()
-        if (!session?.user?.id) throw new Error("Unauthorized")
-
-        const userId = parseInt(session.user.id)
-        const isAdmin = session.user.role === Role.ADMIN
-        const isTeacher = session.user.role === Role.TEACHER
+        const actor = await learningProfileActor()
+        const userId = actor.id
+        const isAdmin = actor.role === Role.ADMIN
+        const isTeacher = isTeachingRole(actor.role)
 
         if (!isAdmin && !isTeacher) throw new Error("Unauthorized")
 
@@ -680,7 +686,7 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
             } else if (role === 'UNVERIFIED') {
                 where.emailVerified = null
             } else if (role && role !== 'ALL') {
-                where.role = role
+                where.role = normalizeRole(role) === 'TEACHER' ? { in: [Role.TEACHER, Role.INSTRUCTOR] } : role
             }
         }
 
@@ -712,6 +718,7 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
                 where,
                 include: {
                     enrollments: {
+                        where: isAdmin ? {} : { course: { teacherId: userId } },
                         include: {
                             course: { select: { name_lop: true } },
                             _count: { select: { lessonProgress: { where: { status: 'COMPLETED' } } } }
@@ -729,7 +736,7 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
         ])
 
         const roleCounts: Record<string, number> = {}
-        rawRoleCounts.forEach((rc: any) => { roleCounts[rc.role] = rc._count.id })
+        rawRoleCounts.forEach((rc: any) => { const key = normalizeRole(rc.role); roleCounts[key] = (roleCounts[key] || 0) + rc._count.id })
 
         if (isAdmin) {
             roleCounts['ALL'] = await prisma.user.count()
@@ -741,7 +748,7 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
         }
 
         const totalPages = Math.ceil(total / limit)
-        return { success: true, students, total, page, totalPages, roleCounts }
+        return { success: true, students: students.map(student => ({ ...student, role: normalizeRole(student.role) })), total, page, totalPages, roleCounts }
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
@@ -803,11 +810,15 @@ function computeDayStatus(
  */
 async function checkCourseRosterAccess(courseId: number) {
     const session = await auth()
-    if (!session?.user?.id) return { error: "Unauthorized" as const }
+    if (session?.user?.id == null) return { error: "Unauthorized" as const }
 
-    const userId = parseInt(session.user.id)
-    const isAdmin = session.user.role === Role.ADMIN
-    const isTeacher = session.user.role === Role.TEACHER || session.user.role === Role.INSTRUCTOR
+    const userId = Number(session.user.id)
+    if (!Number.isInteger(userId) || userId < 0) return { error: "Unauthorized" as const }
+    // Quyền liên hệ dùng vai trò hiện tại trong DB, không dùng vai trò đã lưu trong phiên.
+    const actor = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
+    if (!actor) return { error: "Unauthorized" as const }
+    const isAdmin = actor.role === Role.ADMIN
+    const isTeacher = actor.role === Role.TEACHER || actor.role === Role.INSTRUCTOR
 
     const course = await prisma.course.findUnique({ where: { id: courseId }, select: { teacherId: true } })
     if (!course) return { error: "Không tìm thấy khóa học" as const }
@@ -831,21 +842,22 @@ async function checkCourseRosterAccess(courseId: number) {
  * Truy vấn dữ liệu roster dùng chung: danh sách bài học (theo `order` = ngày),
  * thành viên ACTIVE + trạng thái nộp bài từng ngày (missing/late/onTime).
  */
-async function buildCourseRoster(courseId: number) {
+async function buildCourseRoster(courseId: number, includePending = false) {
     const [course, lessons, enrollments] = await Promise.all([
         prisma.course.findUnique({ where: { id: courseId }, select: { id: true, name_lop: true, id_khoa: true, memberLabels: true } }),
         prisma.lesson.findMany({ where: { courseId }, orderBy: { order: 'asc' }, select: { id: true, order: true, title: true } }),
         prisma.enrollment.findMany({
-            where: { courseId, status: 'ACTIVE' },
+            where: { courseId, status: includePending ? { in: ['ACTIVE', 'PENDING'] } : 'ACTIVE' },
             select: {
                 id: true,
+                status: true,
                 memberRole: true,
                 team: true,
                 group: true,
                 startedAt: true,
                 activatedAt: true,
                 createdAt: true,
-                user: { select: { id: true, name: true, phone: true } },
+                user: { select: { id: true, name: true, phone: true, email: true, image: true } },
                 // status: loại RESET vì đó là bài của lộ trình CŨ trước khi
                 // thành viên "Đặt lại lộ trình" (confirmStartDateAction) — vẫn
                 // còn submittedAt/scores trong DB nhưng không thuộc chu kỳ hiện
@@ -864,11 +876,11 @@ async function buildCourseRoster(courseId: number) {
         )
         const base = e.startedAt || e.activatedAt || e.createdAt
 
-        const days = lessons.map(l => {
+        const days = (e.status === 'ACTIVE' ? lessons : []).map(l => {
             const p = progressByLesson.get(l.id)
             const deadlineUTC = computeLessonDeadlineUTC(base, l.order)
             const status = computeDayStatus(p, deadlineUTC, nowUTC)
-            return { order: l.order, status }
+            return { order: l.order, status, submittedAt: p?.submittedAt ?? null, submitted: !!p?.submittedAt }
         })
 
         // "Hôm nay là Ngày mấy" theo lịch riêng của thành viên — mỗi người bắt
@@ -876,7 +888,7 @@ async function buildCourseRoster(courseId: number) {
         // của mỗi người sẽ khác nhau. Dùng để: (a) cắt cửa sổ hiển thị ở thẻ rút
         // gọn theo đúng lịch cá nhân thay vì cắt cứng theo cuối danh sách bài
         // học chung, (b) tô sáng ô "bài hôm nay" ở giao diện.
-        const dayIndexToday = computeCurrentDayOrder(base)
+        const dayIndexToday = e.status === 'ACTIVE' ? computeCurrentDayOrder(base) : 0
 
         // % nộp ĐÚNG HẠN tính đến hết ngày hôm qua (không tính nộp muộn), theo mốc
         // bắt đầu học riêng của từng thành viên (giống cách tính hạn nộp trong
@@ -888,12 +900,15 @@ async function buildCourseRoster(courseId: number) {
 
         return {
             id: e.id,
+            enrollmentStatus: e.status,
             memberRole: e.memberRole,
             team: e.team,
             group: e.group,
             user: e.user,
             days,
             completionPercent,
+            submittedCount: days.filter(day => day.submitted).length,
+            lastSubmittedAt: days.reduce<Date | null>((latest, day) => day.submittedAt && (!latest || day.submittedAt > latest) ? day.submittedAt : latest, null),
             todayOrder: dayIndexToday,
             startDate: base,
         }
@@ -915,17 +930,17 @@ async function buildCourseRoster(courseId: number) {
  * trang khóa học công khai (icon "học viên"). Học viên ACTIVE của khóa được
  * xem nhưng không thấy SĐT; chỉ ADMIN/giáo viên sở hữu khóa mới thấy SĐT.
  */
-export async function getCourseMemberRosterAction(courseId: number) {
+export async function getCourseMemberRosterAction(courseId: number, includePending = false) {
     try {
         const access = await checkCourseRosterAccess(courseId)
         if (access.error) return { success: false, error: access.error }
 
-        const { course, lessons, members } = await buildCourseRoster(courseId)
+        const { course, lessons, members } = await buildCourseRoster(courseId, includePending && !!access.canViewPhone)
         if (!course) return { success: false, error: "Không tìm thấy khóa học" }
 
         const sanitizedMembers = members.map(m => ({
             ...m,
-            user: access.canViewPhone ? m.user : { id: m.user.id, name: m.user.name, phone: null }
+            user: access.canViewPhone ? m.user : { id: m.user.id, name: m.user.name, phone: null, email: null, image: m.user.image }
         }))
 
         return {
@@ -955,6 +970,7 @@ export async function getMemberSubmissionHistoryAction(enrollmentId: number) {
 
         const access = await checkCourseRosterAccess(enrollment.courseId)
         if (access.error) return { success: false, error: access.error }
+        if (!access.canViewPhone && Number((await auth())?.user?.id) !== enrollment.userId) return { success: false, error: 'Bạn chỉ được xem bài nộp của chính mình.' }
 
         const base = enrollment.startedAt || enrollment.activatedAt || enrollment.createdAt
         const baseMid = toVnMidnightUTC(base)
@@ -1188,47 +1204,24 @@ export async function updateCourseMemberAssignmentsAction(
  * Xuất danh sách thành viên ACTIVE của 1 khóa học ra Google Sheet (ID, họ tên,
  * vai trò, Team, Group) — dùng cho modal "Xem thành viên" ở trang quản lý khóa học.
  */
-export async function exportCourseMembersAction(courseId: number, courseName: string) {
+export async function exportCourseMembersAction(courseId: number, _courseName: string) {
     try {
-        const access = await checkCourseMemberAccess(courseId)
-        if (access.error) return { success: false, error: access.error }
-
-        const [enrollments, course] = await Promise.all([
-            prisma.enrollment.findMany({
-                where: { courseId, status: 'ACTIVE' },
-                select: { memberRole: true, team: true, group: true, user: { select: { id: true, name: true } } },
-                orderBy: [{ team: 'asc' }, { memberRole: 'asc' }, { group: 'asc' }, { activatedAt: 'asc' }]
-            }),
-            prisma.course.findUnique({ where: { id: courseId }, select: { memberLabels: true } })
-        ])
-
-        if (enrollments.length === 0) return { success: false, error: "Chưa có thành viên nào" }
-
-        const labels = (course?.memberLabels as CourseMemberLabels) || {}
-        const headers = ["STT", "ID", "Họ tên", "Vai trò", "Team", "Group"]
-        const rows = enrollments.map((e, index) => [
-            (index + 1).toString(),
-            e.user.id.toString(),
-            e.user.name || "Chưa có tên",
-            e.memberRole === 'PS' ? "Phụng sự (PS)" : "Thành viên (TV)",
-            teamLabel(e.team, labels),
-            e.memberRole === 'PS' ? "" : groupLabel(e.team, e.group, labels),
-        ])
-
-        const safeTitle = courseName.replace(/[<>:"/\\|?*]/g, "").substring(0, 90)
-        const dateStr = new Date().toLocaleDateString("vi-VN").replace(/\//g, "-")
-        const fileName = `ThanhVien_${safeTitle}_${dateStr}`
-
-        const csvHeader = headers.join(",")
-        const csvRows = rows.map(r => r.map(v => (v.includes(",") || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v)).join(","))
-        const csvContent = [csvHeader, ...csvRows].join("\n")
-
-        const { tryCreateSheet } = await import("@/lib/email-campaign-export")
-        const fullSheetTitle = `[Thành viên] ${safeTitle} - ${new Date().toLocaleDateString("vi-VN")}`
-        const { sheetUrl, error } = await tryCreateSheet(rows, headers, fullSheetTitle)
-
-        return { success: true, sheetUrl, csvContent, fileName, totalRows: rows.length, sheetError: error }
-    } catch (error: any) { return { success: false, error: error.message } }
+        if (await domainContext()) return { success: false, error: 'Xuất dữ liệu tại hệ thống chính.' }
+        const session = await auth()
+        const id = session?.user?.id == null ? NaN : Number(session.user.id)
+        if (!Number.isSafeInteger(id) || id < 0) return { success: false, error: 'Vui lòng đăng nhập.' }
+        const actor = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true, email: true, emailVerified: true } })
+        if (!actor) return { success: false, error: 'Vui lòng đăng nhập lại.' }
+        if (!actor.emailVerified) return { success: false, error: 'Xác minh email tài khoản để nhận Google Sheet. Bạn vẫn có thể dùng Xuất Excel.' }
+        const { memberExportSheets } = await import('@/lib/course/member-export')
+        const { createCourseGoogleSheet } = await import('@/lib/course/google-export')
+        const report = await memberExportSheets(prisma, actor, { courseIds: [courseId] })
+        const sheetUrl = await createCourseGoogleSheet(report.sheets, `Học viên - ${report.title} - ${new Date().toLocaleDateString('vi-VN')}`, actor.email)
+        return { success: true, sheetUrl, totalRows: report.total }
+    } catch (error) {
+        const { CrmError } = await import('@/lib/crm/service')
+        return { success: false, error: error instanceof CrmError ? error.message : 'Không tạo được Google Sheet. Hãy thử lại hoặc tải Excel.' }
+    }
 }
 
 // ==========================================
@@ -2077,13 +2070,12 @@ export async function deleteLessonAction(lessonId: string) {
 
 export async function getStudentDetailAction(studentId: number) {
     try {
-        const session = await auth()
-        if (!session?.user?.id) throw new Error("Unauthorized")
-
-        const userId = parseInt(session.user.id)
-        const isAdmin = session.user.role === Role.ADMIN
-        const isTeacher = session.user.role === Role.TEACHER
+        const actor = await learningProfileActor()
+        const userId = actor.id
+        const isAdmin = actor.role === Role.ADMIN
+        const isTeacher = isTeachingRole(actor.role)
         if (!isAdmin && !isTeacher) throw new Error("Unauthorized")
+        await assertLearningStudent(prisma, actor, studentId)
 
         const user = await prisma.user.findUnique({
             where: { id: studentId },
@@ -2092,6 +2084,7 @@ export async function getStudentDetailAction(studentId: number) {
                 image: true, role: true, createdAt: true,
                 emailVerified: true,
                 enrollments: {
+                    where: isAdmin ? {} : { course: { teacherId: userId } },
                     include: {
                         course: { select: { name_lop: true, teacherId: true } },
                         _count: { select: { lessonProgress: { where: { status: 'COMPLETED' } } } }
@@ -2106,17 +2099,14 @@ export async function getStudentDetailAction(studentId: number) {
             if (!hasAccess) throw new Error("Forbidden")
         }
 
-        return { success: true, user }
+        return { success: true, user, canViewEmailLogs: isAdmin }
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
 export async function getStudentEmailLogsAction(studentId: number) {
     try {
-        const session = await auth()
-        if (!session?.user?.id) throw new Error("Unauthorized")
-        const isAdmin = session.user.role === Role.ADMIN
-        const isTeacher = session.user.role === Role.TEACHER
-        if (!isAdmin && !isTeacher) throw new Error("Unauthorized")
+        const actor = await learningProfileActor()
+        if (actor.role !== Role.ADMIN) throw new Error('Chỉ admin được xem lịch sử email hệ thống.')
 
         const logs = await prisma.emailLog.findMany({
             where: { userId: studentId },
@@ -2177,9 +2167,9 @@ export async function resendVerificationAction(studentId: number) {
     }
 }
 
-// Chỉ admin root (id=0) hoặc admin đặc biệt (id=3773) được reset mật khẩu tài khoản bất kỳ
+// Chỉ nhóm admin cao nhất (0, 26, 3773) được gửi link đặt lại mật khẩu.
 function isSuperAdminId(userId: number): boolean {
-    return userId === 0 || userId === 3773
+    return [0, 26, 3773].includes(userId)
 }
 
 export async function adminResetStudentPasswordAction(studentId: number) {
@@ -2188,7 +2178,8 @@ export async function adminResetStudentPasswordAction(studentId: number) {
         if (!session?.user?.id) return { success: false, error: "Chưa đăng nhập" }
 
         const adminId = parseInt(session.user.id)
-        if (!isSuperAdminId(adminId)) {
+        const actor = await prisma.user.findUnique({ where: { id: adminId }, select: { role: true } })
+        if (!isSuperAdminId(adminId) || actor?.role !== Role.ADMIN || await domainContext()) {
             return { success: false, error: "Không có quyền thực hiện thao tác này" }
         }
 

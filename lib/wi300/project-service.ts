@@ -3,6 +3,37 @@ import { z } from 'zod'
 import { CrmError } from '@/lib/crm/service'
 import { PROJECT_PREFIX, mergeProjects, projectContent, projectControls, projectDefaults, projectSlug, publicProject, projectMembers, canManageProject } from './projects'
 
+export const projectBulkInput = z.object({
+  action: z.enum(['publish', 'hide', 'feature', 'unfeature', 'homepage', 'unhomepage', 'delete']),
+  projects: z.array(z.object({ slug: projectSlug, revision: z.number().int().min(0) }).strict()).min(1).max(100).refine(items => new Set(items.map(item => item.slug)).size === items.length, 'Dự án bị trùng.'),
+}).strict()
+export async function bulkProjects(db: PrismaClient, id: number, raw: unknown) {
+  const input = projectBulkInput.parse(raw)
+  return db.$transaction(async tx => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${PROJECT_PREFIX}))`
+    const actor = await tx.user.findUnique({ where: { id }, select: { role: true } })
+    if (!actor) throw new CrmError('Vui lòng đăng nhập lại.', 401)
+    if (actor.role !== 'ADMIN') throw new CrmError('Chỉ quản trị viên được thao tác hàng loạt với dự án.', 403)
+    const rows = await tx.systemConfig.findMany({ where: { key: { in: input.projects.map(item => PROJECT_PREFIX + item.slug) } }, select: { key: true, value: true } })
+    const current = new Map(mergeProjects(rows).map(project => [project.slug, project]))
+    const selected = input.projects.map(item => {
+      const project = current.get(item.slug)
+      if (!project) throw new CrmError('Có dự án đã bị xóa. Tải lại danh sách trước khi tiếp tục.', 409)
+      if (project.revision !== item.revision) throw new CrmError(`Dự án “${project.name}” đã thay đổi. Chưa áp dụng thao tác nào; hãy tải lại.`, 409)
+      return project
+    })
+    const changes = { publish: { published: true }, hide: { published: false }, feature: { featured: true }, unfeature: { featured: false }, homepage: { showOnHomepage: true }, unhomepage: { showOnHomepage: false }, delete: { published: false, featured: false, showOnHomepage: false, deleted: true } }
+    const updated = []
+    for (const project of selected) {
+      const { slug, ...record } = project
+      const value = { ...record, ...changes[input.action], revision: project.revision + 1 }
+      await tx.systemConfig.upsert({ where: { key: PROJECT_PREFIX + slug }, create: { key: PROJECT_PREFIX + slug, value }, update: { value } })
+      updated.push({ slug, ...value })
+    }
+    return { projects: updated, count: updated.length, action: input.action }
+  }, { timeout: 15000 })
+}
+
 export async function readProjects(db: PrismaClient) {
   return mergeProjects(await db.systemConfig.findMany({ where: { key: { startsWith: PROJECT_PREFIX } }, select: { key: true, value: true } }))
 }
@@ -49,6 +80,8 @@ export async function saveProject(db: PrismaClient, id: number, slug: string, ra
     const controls = envelope.controls || { ownerId: current.ownerId, published: current.published, featured: current.featured, showOnHomepage: current.showOnHomepage, order: current.order }
     if (controls.ownerId != null && !await tx.user.findUnique({ where: { id: controls.ownerId }, select: { id: true } })) throw new CrmError('Mã thành viên của chủ dự án không tồn tại.')
     if (envelope.content.courseIds.length && await tx.course.count({ where: { id: { in: envelope.content.courseIds } } }) !== envelope.content.courseIds.length) throw new CrmError('Một số khóa học không tồn tại. Vui lòng chọn lại.')
+    const addedCourseIds = envelope.content.courseIds.filter(courseId => !current.courseIds.includes(courseId))
+    if (!admin && addedCourseIds.length && await tx.course.count({ where: { id: { in: addedCourseIds }, teacherId: id } }) !== addedCourseIds.length) throw new CrmError('Chỉ được thêm khóa học bạn có quyền quản lý.', 403)
     const value = { ...envelope.content, category: envelope.content.category ?? current.category ?? 'OTHER', ...controls, members: envelope.members || current.members || [], revision: current.revision + 1 }
     await tx.systemConfig.upsert({ where: { key: PROJECT_PREFIX + slug }, create: { key: PROJECT_PREFIX + slug, value }, update: { value } })
     return { slug, ...value }

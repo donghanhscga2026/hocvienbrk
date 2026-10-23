@@ -23,12 +23,15 @@ export function groupLabel(team: number, group: number, labels?: CourseMemberLab
 
 export type RosterMember = {
     id: number
+    enrollmentStatus?: string
     memberRole: 'TV' | 'PS'
     team: number
     group: number
-    user: { id: number; name: string | null; phone: string | null }
-    days: { order: number; status: DayStatus }[]
+    user: { id: number; name: string | null; phone: string | null; email?: string | null; image?: string | null }
+    days: { order: number; status: DayStatus; submittedAt?: Date | string | null; submitted?: boolean }[]
     completionPercent: number | null
+    submittedCount?: number
+    lastSubmittedAt?: Date | string | null
     todayOrder: number
     startDate: string | Date
 }
@@ -130,7 +133,7 @@ export default function MemberRosterPanel({ members, labels, canViewPhone, cours
 
     const effectiveDisplay: DisplayToggles = { ...display, phone: display.phone && canViewPhone }
 
-    const handleExportImage = () => {
+    const handleExportImage = async () => {
         if (members.length === 0) return
         setExportingImage(true)
         try {
@@ -156,7 +159,9 @@ export default function MemberRosterPanel({ members, labels, canViewPhone, cours
                 startDate: m.startDate,
                 days: m.days || [],
             }))
-            downloadRosterAsImage(courseName, rows)
+            await downloadRosterAsImage(courseName, rows)
+        } catch (error) {
+            alert(error instanceof Error ? error.message : 'Không tạo được ảnh.')
         } finally {
             setExportingImage(false)
         }

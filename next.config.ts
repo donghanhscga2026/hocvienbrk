@@ -157,7 +157,11 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https:`,
+              // [Bảo mật P0] Bỏ wildcard https: ở script-src: chỉ script của
+              // chính site và YouTube IFrame API (VideoPlayer) được nạp.
+              // 'unsafe-inline' tạm giữ vì Next.js và script khởi tạo theme
+              // đang nội tuyến; lộ trình bỏ hẳn nằm ở CSP Report-Only bên dưới.
+              `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://www.youtube.com`,
               "style-src 'self' 'unsafe-inline' https:",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data: https:",
@@ -168,6 +172,27 @@ const nextConfig: NextConfig = {
               "base-uri 'self'",
               "form-action 'self'",
               "frame-ancestors 'self'",
+            ].join("; "),
+          },
+          {
+            // [Bảo mật P0] Chính sách siết chặt chạy ở chế độ chỉ báo cáo
+            // (không chặn) để thu thập vi phạm thật qua /api/csp-report,
+            // làm căn cứ bỏ 'unsafe-inline' ở bản CSP bắt buộc trong đợt sau.
+            key: "Content-Security-Policy-Report-Only",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' https://www.youtube.com",
+              "style-src 'self' 'unsafe-inline' https:",
+              "img-src 'self' data: https: blob:",
+              "font-src 'self' data: https:",
+              "connect-src 'self' https: ws: wss:",
+              `frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://www.dailymotion.com https://www.tiktok.com https://www.facebook.com https://drive.google.com https://docs.google.com https://*.supabase.co${wi300AppFrames}${isVercelPreview ? " https://vercel.live" : ""}`,
+              "media-src 'self' https: blob:",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+              "frame-ancestors 'self'",
+              "report-uri /api/csp-report",
             ].join("; "),
           },
         ],

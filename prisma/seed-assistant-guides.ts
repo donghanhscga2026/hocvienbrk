@@ -8,6 +8,7 @@
  * Cần biến môi trường DATABASE_URL trỏ tới DB muốn seed.
  */
 import { PrismaClient } from '@prisma/client'
+import { normalizeRoles } from '../lib/auth/roles'
 
 const prisma = new PrismaClient()
 const EXECUTE = process.argv.includes('--execute')
@@ -1675,6 +1676,7 @@ async function main() {
   let stepsWritten = 0
 
   for (const g of GUIDES) {
+    g.roles = normalizeRoles(g.roles)
     const existing = await prisma.assistantGuide.findFirst({ where: { pagePath: g.pagePath } })
     console.log(`- [${g.pagePath}] "${g.title}" roles=[${g.roles.join(',') || 'mọi vai trò'}] — ${g.steps.length} bước`)
     g.steps.forEach((s, i) => {

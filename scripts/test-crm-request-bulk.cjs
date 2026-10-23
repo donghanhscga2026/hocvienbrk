@@ -12,7 +12,7 @@ function load(file, overrides = {}) {
 const bulk = load('lib/crm/request-bulk'), admin = { id: 0, role: 'ADMIN', name: 'Admin' }, teacher = { id: 1, role: 'TEACHER', name: 'Teacher' }
 const make = (extra = {}) => ({ id: crypto.randomUUID(), version: 1, courseId: null, ownerId: 1, status: 'NEW', resolution: '', publicReply: '', content: 'Question', history: [], ...extra })
 let rows = [make(), make({ courseId: 10 }), make({ ownerId: 2 })], writes = 0, notifications = 0, queries = []
-const matches = (row, where) => Object.entries(where).every(([key, value]) => key === 'AND' ? value.every(w => matches(row, w)) : key === 'OR' ? value.some(w => matches(row, w)) : key === 'course' ? row.courseId === 10 && value.teacherId === 1 : row[key] === value)
+const matches = (row, where) => Object.entries(where).every(([key, value]) => key === 'AND' ? value.every(w => matches(row, w)) : key === 'OR' ? value.some(w => matches(row, w)) : key === 'course' ? row.courseId === 10 && value.teacherId === 1 : value && typeof value === 'object' && 'not' in value ? row[key] !== value.not : row[key] === value)
 const db = {
   crmRequest: {
     findFirst: async ({ where }) => structuredClone(rows.find(row => matches(row, where)) || null),
@@ -60,6 +60,10 @@ async function run() {
   assert.equal(response.status, 200); assert.match(response.headers.get('cache-control'), /no-store/)
   const bytes = Buffer.from(await response.arrayBuffer()); assert.ok(bytes.includes(Buffer.from('t="inlineStr"'))); assert.ok(!bytes.includes(Buffer.from('PRIVATE HASH'))); assert.ok(bytes.includes(Buffer.from('=formula')))
   denied = true; assert.equal((await post({ action: 'EXPORT' })).status, 403)
+  rows = [make({ source: 'Wi300: Đăng ký đối tác' })]
+  assert.equal((await bulk.selectRequests(db, teacher, {})).items.length, 0, 'Legacy partner assignment cannot enter teacher bulk selection/export')
+  const partnerUpdate = await bulk.updateRequestsBulk(db, teacher, { action: 'PROCESS', items: rows.map(({ id, version }) => ({ id, version })) })
+  assert.equal(partnerUpdate.updated, 0)
   console.log('Bulk requests passed: scoped selection, versions, partial failure, admin zero, source ownership, completion validation, bounded batches and no public reply (isolated fixtures).')
 }
 run().catch(e => { console.error(e); process.exitCode = 1 })

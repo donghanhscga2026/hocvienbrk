@@ -1,10 +1,7 @@
 // Mock database only; never touches live user data.
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict'), ts = require('typescript')
 function load(file, mocks = {}) {
-  const module = { exports: {} }
-  const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : require(name), module, module.exports)
-  return module.exports
+  return require('./helpers/load-ts.cjs')(file, mocks)
 }
 class CrmError extends Error { constructor(message, status = 400) { super(message); this.status = status } }
 async function run() {
@@ -81,6 +78,7 @@ async function run() {
   assert.ok(html.includes('Website service')); assert.ok(!html.includes('Private draft'))
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://wi300.vn/du-an/noi-dung' })
   global.window = dom.window; global.document = dom.window.document; global.FormData = dom.window.FormData; global.IS_REACT_ACT_ENVIRONMENT = true
+  Object.defineProperty(global, 'navigator', { configurable: true, value: dom.window.navigator })
   const { createRoot } = require('react-dom/client'), root = createRoot(document.getElementById('root'))
   const Manager = load('components/wi300/WiOfferingManager.tsx').default
   const Team = load('components/wi300/WiProjectTeamEditor.tsx').default
@@ -104,7 +102,7 @@ async function run() {
     await React.act(async () => root.render(React.createElement(Team, { key: 'readonly', members: [{ userId: 9, title: 'Helper', visible: true, canManage: true }], names: {}, editable: false })))
     assert.equal(document.querySelector('[name="members"]'), null, 'Helpers cannot submit team changes')
     assert.ok([...document.querySelectorAll('input')].every(input => input.disabled))
-    const CourseProjects = load('components/wi300/WiCourseProjects.tsx').default
+    const CourseProjects = load('components/wi300/WiCourseProjects.tsx', { './ProjectMultiSelect': load('components/wi300/ProjectMultiSelect.tsx') }).default
     for (const [key, status, projects] of [['no-projects', 200, []], ['forbidden', 403, undefined], ['guest', 401, undefined]]) {
       global.fetch = async () => ({ status, ok: status === 200, json: async () => ({ projects }) })
       await React.act(async () => root.render(React.createElement(CourseProjects, { key, courseId: '1' })))

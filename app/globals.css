@@ -443,6 +443,10 @@ body {
 html[data-site-variant="wi300"] body { font-family: var(--wi300-font, var(--font-be-vietnam-pro)), ui-sans-serif, system-ui, sans-serif; }
 html[data-site-variant="wi300"] .max-w-7xl { max-width: var(--wi300-content-width, 1280px); }
 html[data-site-variant="wi300"] [hidden] { display: none; }
+/* Khung quản lý dùng màu chính cho điều hướng và tiêu đề như mẫu duyệt. */
+html[data-site-variant="wi300"] [data-management-workspace] .text-brk-primary {
+  color: var(--color-primary);
+}
 html[data-site-variant="wi300"] .wi300-project-card,
 html[data-site-variant="wi300"] .wi300-teacher-card,
 html[data-site-variant="wi300"] .wi300-branded-cta,

@@ -2,12 +2,18 @@
 
 import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { isTeachingRole } from '@/lib/auth/roles'
 import { createCourseAction, getTeachersAction } from '@/app/actions/course-actions'
 import { updateCourseAction, updateLessonAction, deleteLessonAction } from '@/app/actions/admin-actions'
 import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle2, AlertCircle, List, Play, Edit2, X, FileSpreadsheet, Download, Save, Trash2, Plus, Mail, ArrowUp, ArrowDown, Bell } from 'lucide-react'
 import Link from 'next/link'
+import ManagementWorkspace from '@/components/layout/ManagementWorkspace'
 import MainHeader from '@/components/layout/MainHeader'
 import WiCourseProjects from '@/components/wi300/WiCourseProjects'
+import CourseManagementActivity from '@/components/course/CourseManagementActivity'
+import CourseSalesPagePanel from '@/components/course/CourseSalesPagePanel'
+import CourseRosterWorkspace from '@/components/course/CourseRosterWorkspace'
+import CourseActivityFeedTab from '@/components/course/CourseActivityFeedTab'
 
 import { ImportLessonsModal } from '@/components/admin/courses/ImportLessonsModal'
 import { LessonEditModal } from '@/components/admin/courses/LessonEditModal'
@@ -31,13 +37,25 @@ function CreateCourseContent() {
     const courseId = searchParams.get('id')
     const isEditMode = !!courseId
     
-    const [activeTab, setActiveTab] = useState<'info' | 'lessons'>('info')
+    type ManagementTab = 'info' | 'lessons' | 'members' | 'stats' | 'feed' | 'activity' | 'sales'
+    const initialTab = searchParams.get('tab')
+    const [activeTab, setActiveTab] = useState<ManagementTab>((['info', 'lessons', 'members', 'stats', 'feed', 'activity', 'sales'] as string[]).includes(initialTab || '') ? initialTab as ManagementTab : 'info')
+    const [infoGroup, setInfoGroup] = useState<'basic' | 'description' | 'payment' | 'voucher' | 'email'>('basic')
+    const [visitedSales, setVisitedSales] = useState(initialTab === 'sales')
+    const [visitedRoster, setVisitedRoster] = useState(initialTab === 'members' || initialTab === 'stats')
+    const [initialStudentId, setInitialStudentId] = useState<number | undefined>()
+    function selectTab(tab: ManagementTab) {
+        if (tab === 'members' || tab === 'stats') setVisitedRoster(true)
+        if (tab === 'sales') setVisitedSales(true)
+        setActiveTab(tab)
+    }
     const [lessons, setLessons] = useState<any[]>([])
     // ✅ Sắp xếp danh sách bài giảng theo thứ tự — mặc định giảm dần (bài mới/thứ tự lớn nhất lên đầu)
+    const [lessonSearch, setLessonSearch] = useState('')
     const [lessonSortDir, setLessonSortDir] = useState<'asc' | 'desc'>('desc')
     const sortedLessons = useMemo(() => {
-        return [...lessons].sort((a, b) => lessonSortDir === 'asc' ? a.order - b.order : b.order - a.order)
-    }, [lessons, lessonSortDir])
+        return lessons.filter(lesson => !lessonSearch.trim() || lesson.title.toLowerCase().includes(lessonSearch.toLowerCase()) || String(lesson.order) === lessonSearch.trim()).sort((a, b) => lessonSortDir === 'asc' ? a.order - b.order : b.order - a.order)
+    }, [lessons, lessonSortDir, lessonSearch])
     const [showImport, setShowImport] = useState(false)
     const [selectedLesson, setSelectedLesson] = useState<any>(null)
     const [announcementLesson, setAnnouncementLesson] = useState<{ id: string; title: string } | null>(null)
@@ -162,7 +180,7 @@ function CreateCourseContent() {
         const fetchData = async () => {
             const res = await fetch('/api/auth/session').then(r => r.json())
             const isAdminUser = res?.user?.role === 'ADMIN'
-            const isTeacherUser = res?.user?.role === 'TEACHER'
+            const isTeacherUser = isTeachingRole(res?.user?.role)
             setIsAdmin(isAdminUser)
             setIsTeacher(isTeacherUser)
              
@@ -352,35 +370,30 @@ function CreateCourseContent() {
     
     return (
         <div className="min-h-screen bg-gray-50">
-            <MainHeader title={isEditMode ? "SỬA KHÓA HỌC" : "TẠO KHÓA HỌC MỚI"} toolSlug="courses" />
+            <MainHeader title={isEditMode ? "Quản lý khóa học" : "Tạo khóa học mới"} toolSlug="courses" />
+            <ManagementWorkspace active="courses" appearance="forest">
             
-            {isEditMode && (
-                <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl mx-4 mb-6">
-                    <button 
-                        onClick={() => setActiveTab('info')} 
-                        className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'info' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                    >
-                        <Settings className="w-4 h-4 inline mr-2" /> Thông tin
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('lessons')} 
-                        className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'lessons' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                    >
-                        <List className="w-4 h-4 inline mr-2" /> Bài giảng ({lessons.length})
-                    </button>
-                </div>
-            )}
+            {isEditMode && <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-4"><div className="flex min-w-0 items-center gap-4">{linkAnhBia ? <img src={linkAnhBia} alt="" className="h-20 w-28 shrink-0 rounded-xl object-cover" /> : <div className="flex h-20 w-28 shrink-0 items-center justify-center rounded-xl bg-white text-brk-primary"><BookOpen size={30} /></div>}<div><h1 className="text-2xl font-bold text-brk-primary">{nameLop || 'Quản lý khóa học'}</h1><p className="mt-2 text-sm text-gray-500">{idKhoa} · {categories.find(category => category.id === categoryId)?.name || 'Khác'} · {lessons.length} bài giảng</p></div></div><div className="flex flex-wrap gap-2"><Link href={`/khoa-hoc/${idKhoa}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-xl border border-brk-outline bg-white px-4 text-sm font-semibold text-brk-primary">Xem khóa học ↗</Link><button hidden={activeTab !== 'info'} type="submit" form="course-settings-form" disabled={loading || !idKhoa || !nameLop} className="min-h-11 rounded-xl bg-brk-primary px-4 text-sm font-semibold text-white disabled:opacity-50">Lưu thay đổi</button></div></div>
+                <nav aria-label="Quản lý khóa học" className="flex gap-2 overflow-x-auto pb-2">{([{ id: 'info', label: 'Thông tin' }, { id: 'lessons', label: 'Bài giảng' }, { id: 'members', label: 'Học viên' }, { id: 'stats', label: 'Thống kê' }, { id: 'activity', label: 'Hoạt động học viên' }, { id: 'feed', label: 'Nhật ký' }, { id: 'sales', label: 'Trang bán khóa học' }] as const).map(tab => <button key={tab.id} type="button" aria-current={activeTab === tab.id ? 'page' : undefined} onClick={() => selectTab(tab.id)} className={`min-h-12 shrink-0 border-b-2 px-4 text-sm font-semibold ${activeTab === tab.id ? 'border-brk-primary text-brk-primary' : 'border-transparent text-gray-500 hover:bg-white/60'}`}>{tab.label}</button>)}</nav>
+            </div>}
             
-            <div className="max-w-2xl mx-auto space-y-8 p-4 pb-32">
+            <div className="space-y-6 pb-12">
                 <Link href="/tools/courses" className="inline-flex items-center gap-2 text-xs font-black text-gray-400 uppercase hover:text-purple-600 transition-colors">
                     <ArrowLeft className="w-4 h-4" /> Quay lại danh sách
                 </Link>
                 
-                {isEditMode && activeTab === 'info' && <WiCourseProjects key={courseId} courseId={courseId!} />}
-                {( !isEditMode || activeTab === 'info' ) && (
-                <form onSubmit={handleSubmit} className="space-y-8">
+                {isEditMode && activeTab === 'activity' && <CourseManagementActivity courseId={Number(courseId)} onOpenStudent={id => { setInitialStudentId(id); selectTab('members') }} />}
+                {isEditMode && visitedRoster && <div hidden={activeTab !== 'members' && activeTab !== 'stats'}><CourseRosterWorkspace key={courseId} courseId={Number(courseId)} courseName={nameLop} tab={activeTab === 'stats' ? 'stats' : 'members'} initialStudentId={initialStudentId} onActivity={() => selectTab('activity')} /></div>}
+                {isEditMode && activeTab === 'feed' && <div className="rounded-2xl border bg-white"><CourseActivityFeedTab courseId={Number(courseId)} showAllActivity /></div>}
+                {isEditMode && visitedSales && idKhoa && <div hidden={activeTab !== 'sales'}><CourseSalesPagePanel slug={idKhoa} courseName={nameLop} courseId={courseId ? Number(courseId) : undefined} canEdit={isAdmin || isTeacher} /></div>}
+                <div hidden={isEditMode && activeTab !== 'info'} className={isEditMode ? "grid grid-cols-1 items-start gap-4 xl:grid-cols-[160px_minmax(0,1fr)_260px]" : "space-y-5"}>
+                {isEditMode && <nav aria-label="Nhóm thông tin khóa học" className="flex gap-1 overflow-x-auto rounded-2xl border border-brk-outline bg-white p-2 xl:flex-col">{([{ id: 'basic', label: 'Thông tin cơ bản' }, { id: 'description', label: 'Mô tả & hình ảnh' }, { id: 'payment', label: 'Thanh toán & kích hoạt' }, { id: 'voucher', label: 'Voucher' }, { id: 'email', label: 'Email & Zalo' }] as const).map(group => <button key={group.id} type="button" aria-pressed={infoGroup === group.id} onClick={() => setInfoGroup(group.id)} className={`min-h-11 shrink-0 rounded-xl px-3 text-left text-sm ${infoGroup === group.id ? 'bg-brk-background font-bold text-brk-primary' : 'text-gray-500 hover:bg-gray-50'}`}>{group.label}</button>)}</nav>}
+                <form id="course-settings-form" onSubmit={handleSubmit} onInvalid={event => { const group = (event.target as HTMLElement).closest<HTMLElement>('[data-info-group]')?.dataset.infoGroup; if (group === 'basic' || group === 'description' || group === 'payment' || group === 'voucher' || group === 'email') { setInfoGroup(group); setActiveTab('info') } }} className="space-y-8">
+                {/* Giữ form được mount để không mất dữ liệu khi chuyển nhóm / tab. */}
+                <div data-info-group="basic" hidden={isEditMode && infoGroup !== 'basic'} className="space-y-5">
                 {/* SECTION 1: THÔNG TIN CƠ BẢN */}
-                <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
+                <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-brk-outline">
                     <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
                         <BookOpen className="w-5 h-5 text-blue-500" /> Thông tin cơ bản *
                     </h2>
@@ -458,7 +471,7 @@ function CreateCourseContent() {
                                     </Link>
                                 )}
                             </div>
-                            <div className="space-y-1.5">
+                            <div hidden={isEditMode} className="space-y-1.5">
                                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Trạng thái</label>
                                 <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3">
                                     <label className="flex items-center gap-2 cursor-pointer">
@@ -510,6 +523,8 @@ function CreateCourseContent() {
                             )}
                         </div>
 
+                </div>
+                </div><div data-info-group="voucher" hidden={isEditMode && infoGroup !== 'voucher'} className="rounded-2xl border border-brk-outline bg-white p-5"><h2 className="text-lg font-bold">Voucher của khóa học</h2>
                         <div className="space-y-4 mt-4">
                             <div>
                                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Voucher áp dụng cho khóa này</label>
@@ -590,10 +605,10 @@ function CreateCourseContent() {
                                 </div>
                             </div>
                         </div>
-                </div>
-                
+
+                </div><div data-info-group="description" hidden={isEditMode && infoGroup !== 'description'} className="space-y-5">
                 {/* SECTION 2: MÔ TẢ & HÌNH ẢNH */}
-                <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
+                <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-brk-outline">
                     <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
                         <Settings className="w-5 h-5 text-green-500" /> Mô tả & Hình ảnh
                     </h2>
@@ -604,7 +619,7 @@ function CreateCourseContent() {
                             value={moTaNgan} 
                             onChange={(e) => setMoTaNgan(e.target.value)}
                             onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaNgan)}
-                            rows={6}
+                            rows={3}
                             className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" 
                             placeholder="Mô tả ngắn gọn... (Enter để xuống dòng sẽ tự thêm <br>)" 
                         />
@@ -616,7 +631,7 @@ function CreateCourseContent() {
                             value={moTaDai} 
                             onChange={(e) => setMoTaDai(e.target.value)}
                             onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaDai)}
-                            rows={10}
+                            rows={5}
                             className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" 
                             placeholder="Mô tả chi tiết khóa học... (Enter để xuống dòng sẽ tự thêm <br>)" 
                         />
@@ -652,8 +667,9 @@ function CreateCourseContent() {
                     </div>
                 </div>
                 
+                </div><div data-info-group="payment" hidden={isEditMode && infoGroup !== 'payment'}>
                 {/* SECTION 3: HỌC PHÍ & THANH TOÁN */}
-                <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
+                <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-brk-outline">
                     <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
                         <DollarSign className="w-5 h-5 text-yellow-500" /> Học phí & Thanh toán
                     </h2>
@@ -748,8 +764,9 @@ function CreateCourseContent() {
                     </div>
                 </div>
                 
+                </div><div data-info-group="email" hidden={isEditMode && infoGroup !== 'email'}>
                 {/* SECTION 4: EMAIL & ZALO */}
-                <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
+                <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-brk-outline">
                     <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
                         <Upload className="w-5 h-5 text-purple-500" /> Email & Zalo
                     </h2>
@@ -788,6 +805,7 @@ function CreateCourseContent() {
                     </div>
                 </div>
                 
+                </div>
                 {message && (
                     <div className={`p-4 rounded-2xl flex items-center gap-3 text-xs font-bold ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                         {message.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
@@ -799,13 +817,14 @@ function CreateCourseContent() {
                     data-help-id="btn-create-course"
                     type="submit"
                     disabled={loading || !idKhoa || !nameLop}
-                    className="w-full bg-black text-yellow-400 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-brk-primary text-white py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <BookOpen className="w-5 h-5" />}
                     {isEditMode ? 'Lưu Khóa học' : 'Tạo Khóa học'}
                 </button>
                 </form>
-                )}
+                {isEditMode && <aside className="space-y-4"><section className="rounded-2xl border border-brk-outline bg-white p-5"><h2 className="font-bold">Hiển thị khóa học</h2><label className="mt-4 flex min-h-11 items-center justify-between gap-3 text-sm"><span>{status ? 'Đang hiển thị công khai' : 'Đang ẩn khóa học'}</span><input type="checkbox" aria-label="Hiển thị khóa học" checked={status} onChange={event => setStatus(event.target.checked)} className="h-5 w-5 accent-green-700" /></label><p className="mt-2 text-xs leading-5 text-gray-500">Bấm Lưu thay đổi để áp dụng.</p><button type="button" onClick={() => selectTab('sales')} className="mt-4 min-h-11 text-sm font-semibold text-brk-primary">Thiết lập trang bán khóa học →</button></section><WiCourseProjects key={courseId} courseId={courseId!} compact /><CourseSalesPagePanel slug={idKhoa} courseName={nameLop} courseId={Number(courseId)} canEdit={isAdmin || isTeacher} compact active={activeTab === 'info'} onOpen={() => selectTab('sales')} /></aside>}
+                </div>
 
                 {isEditMode && activeTab === 'lessons' && (
                     <div className="space-y-4">
@@ -836,10 +855,10 @@ function CreateCourseContent() {
                             </button>
                         </div>
                     </div>
-                        <div className="space-y-3">
+                        <input aria-label="Tìm bài giảng" value={lessonSearch} onChange={event => setLessonSearch(event.target.value)} placeholder="Tìm theo tên hoặc thứ tự bài giảng…" className="min-h-11 w-full rounded-xl border border-brk-outline bg-white px-4 text-sm" />
+                        <div className="overflow-x-auto rounded-2xl border border-brk-outline bg-white"><div className="min-w-[700px]"><div className="grid grid-cols-[64px_minmax(0,1fr)_250px] gap-3 bg-gray-50 p-4 text-xs font-semibold text-gray-500"><span>Thứ tự</span><span>Bài giảng / Loại nội dung</span><span>Thao tác</span></div><div className="divide-y divide-brk-outline">
                             {sortedLessons.map((lesson: any) => (
-                                <div key={lesson.id} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-lg shadow-gray-100/50 flex flex-col sm:flex-row gap-3 sm:items-center justify-between group">
-                                    <div className="flex items-center gap-4 min-w-0">
+                                <div key={lesson.id} className="grid grid-cols-[64px_minmax(0,1fr)_250px] items-center gap-3 p-4">
                                         <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-xs font-black font-mono">
                                             #{lesson.order}
                                         </div>
@@ -849,7 +868,6 @@ function CreateCourseContent() {
                                                 <Play className="w-3 h-3" /> {lesson.videoUrl ? 'Đã có Video' : 'Chưa có Video'}
                                             </div>
                                         </div>
-                                    </div>
                                     <div className="flex flex-wrap items-center gap-2 shrink-0">
                                         <button type="button" onClick={() => setAnnouncementLesson({ id: lesson.id, title: lesson.title })} className="min-h-11 px-3 rounded-xl bg-indigo-50 text-indigo-700 flex items-center gap-2 text-xs font-semibold">
                                             <Bell className="w-4 h-4" /> Thông báo học viên
@@ -869,20 +887,22 @@ function CreateCourseContent() {
                                     </div>
                                 </div>
                             ))}
-                            {lessons.length === 0 && (
+                            {sortedLessons.length === 0 && (
                                 <div className="text-center py-8 text-gray-400 text-xs font-black uppercase">
-                                    Chưa có bài giảng nào. Hãy import bài học!
+                                    {lessons.length ? 'Không tìm thấy bài giảng phù hợp.' : 'Chưa có bài giảng nào. Hãy thêm hoặc nhập bài học.'}
                                 </div>
                             )}
-                        </div>
+                        </div></div></div>
                     </div>
                 )}
             </div>
+            </ManagementWorkspace>
 
             {/* MODALS */}
             {announcementLesson && courseId && <LessonAnnouncementModal courseId={courseId} lesson={announcementLesson} onClose={() => setAnnouncementLesson(null)} />}
             {selectedLesson && (
                 <LessonEditModal
+                    presentation="drawer"
                     lesson={selectedLesson}
                     onClose={() => setSelectedLesson(null)}
                     onSave={async (data: any) => {
@@ -894,7 +914,7 @@ function CreateCourseContent() {
                             // Refresh data
                             const courseRes = await fetch(`/api/courses/${courseId}`).then(r => r.json())
                             if (courseRes && !courseRes.error) setLessons(courseRes.lessons || [])
-                        }
+                        } else { throw new Error(res.error || 'Không lưu được bài học.') }
                     }}
                     onDelete={handleDeleteLesson}
                 />

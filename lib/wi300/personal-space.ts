@@ -1,10 +1,11 @@
 import { searchText } from './catalog'
+import { normalizeRole, normalizeRoles, isProfileTool, canCreateProfile } from '@/lib/auth/roles'
 
 export type PersonalTool = { id: number; slug?: string; name: string; url: string; roles: string[]; isActive: boolean; icon?: string | null; description?: string | null }
 
 // Cùng điều kiện hiển thị giảng dạy ở header và dữ liệu riêng trên server.
 export function canTeach(role?: string | null) {
-  return role === 'TEACHER' || role === 'ADMIN'
+  return role === 'TEACHER' || role === 'INSTRUCTOR' || role === 'ADMIN'
 }
 
 // Phân nhóm bằng mã ổn định; đổi tên hiển thị không làm công cụ chuyển nhóm.
@@ -36,12 +37,15 @@ export function toolGroup(tool: PersonalTool) {
 export function toolWorkspace(tool: PersonalTool) {
   const slug = routeSlug(tool) || tool.slug || ''
   if (slug === 'wi-projects') return 'business'
-  if (slug === 'dev-flow') return 'tools'
+  if (['wi-website', 'wi-appearance', 'posts'].includes(slug)) return 'website-admin'
+  if (isContentTool(tool)) return 'business'
   if (tool.roles.length && tool.roles.every(role => ['ADMIN', 'DEVELOPER'].includes(role))) return 'admin'
+  if (['reserved-ids', 'vouchers', 'dev-flow'].includes(slug)) return 'admin'
   if (['roadmap', 'my-learning'].includes(slug)) return 'learning'
   if (['affiliate', 'genealogy'].includes(slug)) return 'affiliate'
-  if (['bank-accounts', 'vouchers', 'brk', 'ho-tro', 'account-assistant', 'assistant-guide'].includes(slug)) return 'account'
-  if (isContentTool(tool) || ['courses', 'students', 'crm', 'email-mkt', 'payments'].includes(slug)) return 'teaching'
+  if (['bank-accounts', 'brk', 'ho-tro', 'account-assistant', 'assistant-guide'].includes(slug)) return 'account'
+  if (['crm', 'email-mkt', 'payments', 'students'].includes(slug)) return 'business'
+  if (slug === 'courses') return 'teaching'
   if (toolGroup(tool) === 'system') return 'admin'
   return 'tools'
 }
@@ -63,6 +67,8 @@ export function pendingCourseLabel(payment?: { status: string; proofImage: strin
 
 // Quyền menu dùng cùng quy tắc với màn công cụ; không thay thế kiểm tra ở server.
 export function canUseTool(role: string, roles: string[]) {
+  role = normalizeRole(role)
+  roles = normalizeRoles(roles)
   return !roles.length || roles.includes(role) || (role === 'ADMIN' && roles.some(r => ['TEACHER', 'AFFILIATE', 'STUDENT'].includes(r))) || (role === 'TEACHER' && roles.some(r => ['AFFILIATE', 'STUDENT'].includes(r)))
 }
 export function safeToolUrl(url: string) {
@@ -76,31 +82,36 @@ export type SpaceNavGroup = { id: string; label: string; href: string; icon: str
 export function spaceNavigation(role: string, tools: PersonalTool[]): SpaceNavGroup[] {
   const loggedIn = role !== 'guest'
   const groups: SpaceNavGroup[] = [
-    { id: 'home', label: 'Tổng quan cá nhân', href: '/my-space', icon: 'LayoutGrid', items: [
-      { label: 'Tổng quan học tập', href: '/my-space?view=learning', icon: 'BookOpen' },
-      ...(canTeach(role) ? [{ label: 'Tổng quan giảng dạy', href: '/my-space?view=teaching', icon: 'GraduationCap' }] : []),
-    ] },
-    { id: 'learning', label: 'Dành cho học viên', href: '/my-space?tab=learning', icon: 'BookOpen', items: [
+    { id: 'home', label: 'Tổng quan', href: '/my-space', icon: 'LayoutGrid', items: [] },
+    { id: 'learning', label: 'Học tập', href: '/my-space?tab=learning', icon: 'BookOpen', items: [
       { label: 'Khóa đang học', href: '/my-space?tab=learning&status=active', icon: 'BookOpen' },
       { label: 'Khóa đã hoàn thành', href: '/my-space?tab=learning&status=completed', icon: 'GraduationCap' },
       { label: 'Đăng ký chờ xử lý', href: '/my-space?tab=learning&status=pending', icon: 'CreditCard' },
       ...(loggedIn ? [{ label: 'Yêu cầu của tôi', href: '/my-requests', icon: 'MessageCircle' }] : []),
+      ...(loggedIn ? [{ label: 'Hồ sơ học tập của tôi', href: '/ho-so-hoc-tap', icon: 'UserRound' }] : []),
     ] },
-    ...(canTeach(role) ? [{ id: 'teaching', label: 'Dành cho giảng viên', href: '/my-space?tab=teaching', icon: 'GraduationCap', items: [] }] : []),
-    ...(loggedIn ? [{ id: 'affiliate', label: 'Dành cho cộng tác viên', href: '/my-space?tab=affiliate', icon: 'Link2', items: [{ label: 'Link giới thiệu & hoa hồng', href: '/tools/affiliate', icon: 'Link2' }] }] : []),
-    ...(loggedIn && tools.some(tool => tool.slug === 'wi-projects' && tool.isActive && canUseTool(role, tool.roles)) ? [{ id: 'business', label: 'Quản lý & kinh doanh', href: '/my-space?tab=business', icon: 'Handshake', items: [] }] : []),
+    ...(canTeach(role) ? [{ id: 'teaching', label: 'Giảng dạy', href: '/my-space?tab=teaching', icon: 'GraduationCap', items: [{ label: 'Hồ sơ giảng viên', href: '/tools/wi-teacher-profile', icon: 'UserRound' }, { label: 'Thư viện mẫu trang bán', href: '/tools/courses/templates', icon: 'PanelsTopLeft' }] }] : []),
+    ...(loggedIn ? [{ id: 'affiliate', label: 'Cộng tác viên', href: '/my-space?tab=affiliate', icon: 'Link2', items: [{ label: 'Link giới thiệu & hoa hồng', href: '/tools/affiliate', icon: 'Link2' }] }] : []),
+    ...(loggedIn ? [{ id: 'business', label: 'Quản lý & kinh doanh', href: '/my-space?tab=business', icon: 'Handshake', items: [] }] : []),
+    ...(role === 'ADMIN' ? [{ id: 'website-admin', label: 'Quản trị website', href: '/tools/wi-website', icon: 'Globe', items: [
+      { label: 'Cấu hình chung', href: '/tools/wi-website?section=common', icon: 'Settings' },
+      { label: 'Trang', href: '/tools/wi-appearance', icon: 'PanelsTopLeft' },
+      { label: 'Bài viết', href: '/tools/posts', icon: 'FileText' },
+      { label: 'Thư viện media', href: '/tools/media', icon: 'Image' },
+    ] }] : []),
     { id: 'tools', label: 'Công cụ & tiện ích', href: '/my-space?tab=tools', icon: 'LayoutGrid', items: [] },
-    { id: 'account', label: 'Tài khoản & cài đặt', href: '/my-space?tab=account', icon: 'UserRound', items: [
+    { id: 'account', label: 'Tài khoản & tài chính', href: '/my-space?tab=account', icon: 'UserRound', items: [
       { label: loggedIn ? 'Cài đặt tài khoản' : 'Đăng nhập', href: loggedIn ? '/account-settings' : '/login', icon: 'Settings' },
       { label: 'Hỗ trợ & phản hồi', href: '/support', icon: 'LifeBuoy' },
       { label: 'Đăng ký đối tác', href: '/doi-tac', icon: 'Handshake' },
     ] },
-    ...(role === 'ADMIN' ? [{ id: 'admin', label: 'Quản trị hệ thống', href: '/my-space?tab=admin', icon: 'ShieldCheck', items: [] }] : []),
+    ...(['ADMIN', 'DEVELOPER'].includes(role) ? [{ id: 'admin', label: 'Quản trị hệ thống', href: '/my-space?tab=admin', icon: 'ShieldCheck', items: role === 'ADMIN' ? [{ label: 'Thư viện media', href: '/tools/media', icon: 'Image' }] : [] }] : []),
   ]
   for (const tool of tools) {
+    if (tool && isProfileTool(tool) && !canCreateProfile(role)) continue
     if (!tool || !tool.isActive || !Array.isArray(tool.roles) || !tool.roles.every(r => typeof r === 'string') || !canUseTool(role, tool.roles) || typeof tool.url !== 'string' || !safeToolUrl(tool.url) || typeof tool.name !== 'string') continue
     const group = groups.find(g => g.id === toolWorkspace(tool))
-    if (group && !group.items.some(i => i.href === tool.url)) group.items.push({ label: wi300ToolName(tool), href: tool.url, icon: tool.icon })
+    if (group && !groups.some(g => g.items.some(i => i.href === tool.url))) group.items.push({ label: wi300ToolName(tool), href: tool.url, icon: tool.icon })
   }
-  return groups
+  return groups.filter(group => !['business', 'pages'].includes(group.id) || group.items.length > 0)
 }
