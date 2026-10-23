@@ -42,6 +42,11 @@ model User {
   userBadges                 UserBadge[]
   wallet                       AffiliateWallet?
   courses                      Course[]
+  bookingSessions              BookingSession[]        @relation("BookingExpert")
+  bookings                     Booking[]               @relation("BookingCustomer")
+  expertBookings               Booking[]               @relation("BookingExpertSchedule")
+  expertAvailability           ExpertAvailability[]    @relation("ExpertWeeklyAvailability")
+  availabilityExceptions       AvailabilityException[] @relation("ExpertAvailabilityExceptions")
   emailCampaigns               EmailCampaign[]       @relation("UserToEmailCampaign")
   emailLogs                    EmailLog[]
   enrollmentReferrals          Enrollment[]          @relation("EnrollmentReferrer")
@@ -361,6 +366,7 @@ model CourseCategory {
 model Course {
   crmRequests CrmRequest[]
   crmOpportunities CrmOpportunity[]
+  bookingSessions BookingSession[]
   id                          Int                     @id @default(autoincrement())
   id_khoa                     String                  @unique
   name_lop                    String
@@ -2078,6 +2084,7 @@ model CrmContact {
   opportunities CrmOpportunity[]
   activities    CrmActivity[]
   tasks         CrmTask[]
+  bookings      Booking[]
 
   @@index([ownerId, archived, updatedAt])
   @@unique([ownerId, email])
@@ -2592,4 +2599,138 @@ model ProcessedTransaction {
 
   @@index([status])
   @@map("processed_transaction")
+}
+
+// ─── Đặt lịch hẹn coach 1:1 (Giai đoạn 1, tham khảo Bookify — chốt 23/10/2026) ───
+// Quy ước giờ: startsAt/endsAt là thời điểm vật lý lưu UTC (kiểu new Date());
+// lịch rảnh khai theo phút-trong-ngày giờ Việt Nam (UTC+7, không có DST).
+
+enum BookingSessionStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum BookingMode {
+  ZOOM
+  MEET
+  OFFLINE
+}
+
+enum BookingStatus {
+  HELD
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum BookingWaitlistStatus {
+  WAITING
+  NOTIFIED
+  BOOKED
+  EXPIRED
+}
+
+model BookingSession {
+  id               Int                  @id @default(autoincrement())
+  code             String               @unique
+  expertId         Int
+  expert           User                 @relation("BookingExpert", fields: [expertId], references: [id], onDelete: Cascade)
+  courseId         Int?
+  course           Course?              @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  title            String
+  description      String               @default("")
+  coverUrl         String?
+  durationMin      Int                  @default(30)
+  mode             BookingMode          @default(ZOOM)
+  meetingUrl       String?
+  price            Int                  @default(0)
+  isPrivate        Boolean              @default(true)
+  formSchema       Json                 @default("[]")
+  autoConfirm      Boolean              @default(true)
+  cancelBeforeHours Int                 @default(3)
+  minNoticeHours   Int                  @default(2)
+  maxDaysAhead     Int                  @default(30)
+  bufferMin        Int                  @default(0)
+  status           BookingSessionStatus @default(ACTIVE)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  bookings         Booking[]
+  waitlist         BookingWaitlist[]
+
+  @@index([expertId, status])
+}
+
+model ExpertAvailability {
+  id       Int  @id @default(autoincrement())
+  expertId Int
+  expert   User @relation("ExpertWeeklyAvailability", fields: [expertId], references: [id], onDelete: Cascade)
+  weekday  Int
+  startMin Int
+  endMin   Int
+
+  @@unique([expertId, weekday, startMin])
+  @@index([expertId, weekday])
+}
+
+model AvailabilityException {
+  id       Int      @id @default(autoincrement())
+  expertId Int
+  expert   User     @relation("ExpertAvailabilityExceptions", fields: [expertId], references: [id], onDelete: Cascade)
+  date     DateTime @db.Date
+  isOff    Boolean  @default(true)
+  startMin Int?
+  endMin   Int?
+  note     String   @default("")
+
+  @@unique([expertId, date])
+  @@index([expertId, date])
+}
+
+model Booking {
+  id            Int           @id @default(autoincrement())
+  code          String        @unique
+  sessionId     Int
+  session       BookingSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  expertId      Int
+  expert        User          @relation("BookingExpertSchedule", fields: [expertId], references: [id], onDelete: Cascade)
+  userId        Int?
+  user          User?         @relation("BookingCustomer", fields: [userId], references: [id], onDelete: SetNull)
+  contactId     Int?
+  contact       CrmContact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  guestName     String
+  guestEmail    String
+  guestPhone    String?
+  startsAt      DateTime
+  endsAt        DateTime
+  status        BookingStatus @default(HELD)
+  formAnswers   Json          @default("{}")
+  source        String?
+  tags          String?
+  holdExpiresAt DateTime?
+  cancelReason  String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([expertId, startsAt])
+  @@index([sessionId, startsAt])
+  @@index([guestEmail])
+  @@index([status, holdExpiresAt])
+}
+
+model BookingWaitlist {
+  id        Int                   @id @default(autoincrement())
+  sessionId Int
+  session   BookingSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  date      DateTime              @db.Date
+  name      String
+  email     String
+  phone     String?
+  note      String                @default("")
+  status    BookingWaitlistStatus @default(WAITING)
+  createdAt DateTime              @default(now())
+
+  @@index([sessionId, date, status])
+  @@index([email])
 }
