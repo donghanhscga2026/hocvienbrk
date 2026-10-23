@@ -143,7 +143,11 @@ export default async function AffiliateSettlementPage({
                   {cs.affiliates.map(a => (
                     <tr key={a.affiliateId} className="border-t border-gray-50">
                       <td className="py-1.5">
-                        <span className="font-medium text-gray-700">{a.affiliateName}</span>
+                        {role === 'ADMIN' ? (
+                          <Link href={`/tools/affiliate/members/${a.affiliateId}`} className="font-medium text-blue-600 hover:underline" title="Xem chi tiết hoa hồng của thành viên này">{a.affiliateName}</Link>
+                        ) : (
+                          <span className="font-medium text-gray-700">{a.affiliateName}</span>
+                        )}
                         {a.affiliateEmail && <span className="text-gray-400"> · {a.affiliateEmail}</span>}
                       </td>
                       <td className="py-1.5 text-right text-gray-500">{a.count}</td>

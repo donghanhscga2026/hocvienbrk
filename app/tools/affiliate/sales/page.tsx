@@ -60,17 +60,18 @@ export default async function AffiliateSalesPage({
   // Tổng hợp
   const totalGmv = orders.reduce((s, o) => s + o.totalAmount, 0)
 
-  // Hoa hồng đã sinh cho các đơn này (theo conversion.orderRecordId)
+  // Hoa hồng còn hiệu lực của các đơn này (không tính dòng đã thu hồi CANCELLED)
   const orderIds = orders.map(o => o.id)
   const commissions = orderIds.length
     ? await prisma.affiliateCommission.findMany({
-        where: { conversion: { orderRecordId: { in: orderIds } } },
+        where: { conversion: { orderRecordId: { in: orderIds } }, status: { not: 'CANCELLED' } },
         select: { affiliateId: true, kind: true, netAmount: true, status: true }
       })
     : []
   const totalCommission = commissions.reduce((s, c) => s + c.netAmount, 0)
 
-  // Theo CTV
+  // Theo CTV (cộng cả hoa hồng tri ân của người giới thiệu không có đơn
+  // qua link của chính họ — để tổng các dòng khớp thẻ tổng ở trên)
   const byAffiliate = new Map<number, { name: string; gmv: number; orders: number; commission: number }>()
   for (const o of orders) {
     if (!o.affiliateId) continue
@@ -79,13 +80,23 @@ export default async function AffiliateSalesPage({
     cur.orders += 1
     byAffiliate.set(o.affiliateId, cur)
   }
+  const missingAffiliateIds = [...new Set(commissions.map(c => c.affiliateId))].filter(id => !byAffiliate.has(id))
+  if (missingAffiliateIds.length) {
+    const extraUsers = await prisma.user.findMany({
+      where: { id: { in: missingAffiliateIds } },
+      select: { id: true, name: true }
+    })
+    for (const u of extraUsers) {
+      byAffiliate.set(u.id, { name: u.name || `#${u.id}`, gmv: 0, orders: 0, commission: 0 })
+    }
+  }
   for (const c of commissions) {
     const cur = byAffiliate.get(c.affiliateId)
     if (cur) cur.commission += c.netAmount
   }
   const affiliateRows = [...byAffiliate.entries()]
     .map(([id, v]) => ({ id, ...v }))
-    .sort((a, b) => b.gmv - a.gmv)
+    .sort((a, b) => b.gmv - a.gmv || b.commission - a.commission)
 
   // Theo sản phẩm
   const byProduct = new Map<string, { name: string; type: string; gmv: number; qty: number }>()
@@ -179,7 +190,7 @@ export default async function AffiliateSalesPage({
                   <tr key={r.id} className="hover:bg-gray-50/50">
                     <td className="px-3 py-2 font-semibold text-gray-800">
                       {isAdmin ? (
-                        <Link href={filterQs({ affiliateId: String(r.id) })} className="text-blue-600 hover:underline">
+                        <Link href={`/tools/affiliate/members/${r.id}`} className="text-blue-600 hover:underline" title="Xem chi tiết hoa hồng của thành viên này">
                           {r.name} <span className="text-gray-400 font-normal">#{r.id}</span>
                         </Link>
                       ) : (
