@@ -1708,6 +1708,12 @@ model Badge {
   tier         Int         @default(1)
   thresholdGmv Float       @default(0)
   isActive     Boolean     @default(true)
+  /// Nhóm huy hiệu: AFFILIATE (khung cũ theo GMV) hoặc LEARNING /
+  /// CONTENT / BUSINESS / RACE cho engine trao tự động ở GĐ3.
+  category     String      @default("AFFILIATE")
+  /// Luật trao tự động dạng JSON: { metric, threshold } — engine ở
+  /// lib/badges/ đọc luật này; null = trao bằng cơ chế khác/tay.
+  rule         Json?
   userBadges   UserBadge[]
 
   @@index([tier])
