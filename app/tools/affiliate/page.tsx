@@ -763,7 +763,7 @@ export default function AffiliateToolsPage() {
                 <AdminSubNav
                     title="Affiliate"
                     items={affiliateSubNav.filter(
-                        (i) => i.href === '/tools/affiliate' || i.href === '/tools/affiliate/config'
+                        (i) => i.href === '/tools/affiliate' || i.href === '/tools/affiliate/config' || i.href === '/tools/affiliate/settlement'
                     )}
                 />
             )}
