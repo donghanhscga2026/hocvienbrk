@@ -35,6 +35,20 @@ const RESOURCE_PREFIXES = new Set(['khoa-hoc', 'land', 'page', 'du-an'])
 // tiếp), lớp này chỉ để tránh lọt route mới thêm sau này mà quên gắn check.
 const ADMIN_ONLY_PREFIXES = ['/api/admin', '/api/sync-tca', '/api/system-tree']
 
+// [Bảo mật P0] Chặn cứng 404 các đường dẫn dò quét (dotfile, bản sao lưu,
+// file cấu hình) trước mọi logic định tuyến. Trước đây các đường này rơi
+// vào trang "không tìm thấy" tùy chỉnh và trả HTTP 200 (soft-404), vừa gây
+// hiểu nhầm là file tồn tại, vừa làm sai kết quả của các công cụ quét.
+// Ngoại lệ duy nhất: /.well-known/ là đường chuẩn công khai hợp lệ.
+const PROBE_FILE_EXTENSIONS = /\.(?:env|sql|bak|old|swp|swo|log|ini|conf|config|dist|save|orig|tmp)$/i
+export function isBlockedProbePath(pathname: string) {
+    if (pathname.startsWith('/.well-known/')) return false
+    const segments = pathname.split('/').filter(Boolean)
+    if (segments.some((segment) => segment.startsWith('.') && segment.length > 1)) return true
+    const last = segments[segments.length - 1] || ''
+    return PROBE_FILE_EXTENSIONS.test(last)
+}
+
 /**
  * proxy.ts (Next.js 16+)
  * Thay thế cho middleware.ts để xử lý routing, auth và affiliate.
@@ -100,6 +114,7 @@ function needsAuthLayer(pathname: string) {
 export default async function proxy(request: NextRequest, event: NextFetchEvent) {
     const hostname=requestHostname(request.headers.get('host') || '')
     const path=request.nextUrl.pathname
+    if(isBlockedProbePath(path)) return new NextResponse('Not found',{status:404,headers:{'Cache-Control':'no-store','Content-Type':'text/plain; charset=utf-8'}})
     if(isPlatformHost(hostname)) {
         if(path.startsWith('/site-domain/')) return new NextResponse('Not found',{status:404})
         if(path.startsWith('/api/') && !ADMIN_ONLY_PREFIXES.some(p=>path.startsWith(p))) return NextResponse.next()

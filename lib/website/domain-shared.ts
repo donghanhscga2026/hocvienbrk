@@ -35,6 +35,7 @@ export function safeReturnPath(raw: string|null) { return raw && raw.startsWith(
 export function domainRoute(path: string, modules: DomainModules): 'page' | 'account' | 'catalog' | 'system' | 'deny' {
   if(path==='/login' || path==='/register' || path==='/forgot-password' || path==='/complete-profile' || path==='/account-settings' || /^\/reset-password\/[a-zA-Z0-9_-]+$/.test(path) || path.startsWith('/api/auth/')) return 'system'
   if(path==='/api/account-support') return 'system'
+  if(path==='/api/csp-report') return 'system' // Trình duyệt gửi báo cáo vi phạm CSP; không chứa dữ liệu người dùng.
   if(path==='/support' || path==='/my-requests' || path==='/api/my-requests') return modules.crm ? 'system' : 'deny'
   if(path==='/api/upload/url') return 'system' // Ảnh đại diện của tài khoản đã đăng nhập.
   if(path==='/cong-cu') return 'page'
