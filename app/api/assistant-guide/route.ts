@@ -65,6 +65,25 @@ export async function GET(request: Request) {
           return regex.test(pagePath)
         }) || null
       }
+      if (!pageGuide) {
+        // Fallback trang cha: trang con chưa có guide riêng thì kế thừa guide của
+        // trang cha gần nhất. Ví dụ /tools/affiliate/clicks dùng guide của
+        // /tools/affiliate; /du-an/quan-ly dùng guide của /du-an.
+        const segs = pagePath.split('/').filter(Boolean)
+        const candidates: string[] = []
+        while (segs.length > 0) {
+          segs.pop()
+          candidates.push('/' + segs.join('/'))
+        }
+        if (candidates.length > 0) {
+          const parentGuides = await prisma.assistantGuide.findMany({
+            where: { pagePath: { in: candidates }, isActive: true, ...roleFilter(role) },
+            include: stepsInclude,
+          })
+          parentGuides.sort((a, b) => (b.pagePath?.length || 0) - (a.pagePath?.length || 0))
+          pageGuide = parentGuides[0] || null
+        }
+      }
       return NextResponse.json({ success: true, data: { pageGuide: pageGuide || null, toolGuide: toolGuide || null } })
     }
 
