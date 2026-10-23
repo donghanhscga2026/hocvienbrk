@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, ArrowUpRight, Expand, Image, ScanLine } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Expand, Image, ScanLine, Sparkles } from 'lucide-react'
 import { externalApps, externalAppHref, type ExternalApp } from '@/lib/wi300/external-apps'
 
 function AppIcon({ app }: { app: ExternalApp }) {
@@ -14,6 +14,7 @@ function AppIcon({ app }: { app: ExternalApp }) {
 export function ExternalAppsCatalog() {
   return <section aria-labelledby="external-apps-heading" className="rounded-2xl border border-brk-outline bg-white p-4 sm:p-5">
     <div className="mb-4"><h2 id="external-apps-heading" className="text-lg font-bold">Ứng dụng của Wi</h2><p className="mt-1 text-sm text-brk-muted">Chọn công cụ để bắt đầu sử dụng.</p></div>
+    <Link href="/tools/landing-ai" className="mb-4 flex min-h-24 items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900"><Sparkles size={28} className="shrink-0" aria-hidden="true" /><span className="min-w-0"><span className="block font-bold">Wi Landing AI <span className="text-xs font-normal">· Bản thử</span></span><span className="mt-1 block text-sm">Duyệt dàn ý, tạo trang mẫu và chỉnh sửa landing page.</span></span><ArrowUpRight size={18} className="ml-auto shrink-0" aria-hidden="true" /></Link>
     <div className="grid gap-3 sm:grid-cols-2">{externalApps.map(app => <Link key={app.slug} href={externalAppHref(app.slug)} className="flex min-w-0 items-start gap-3 rounded-2xl border border-brk-outline p-4 hover:border-brk-primary hover:bg-brk-background focus-visible:outline-brk-primary">
       <AppIcon app={app} /><span className="min-w-0 flex-1"><span className="block font-bold">{app.name}</span><span className="mt-1 block text-sm leading-6 text-brk-muted">{app.description}</span><span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brk-primary">Sử dụng<ArrowUpRight size={16} aria-hidden="true" /></span></span>
     </Link>)}</div>
