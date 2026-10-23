@@ -73,6 +73,7 @@ model User {
   crmIdentityContact           CrmContact? @relation("CrmIdentity")
   crmStudentProfiles           CrmContact[] @relation("CrmStudentProfile")
   learnerBaselines             LearnerBaseline[]
+  attendanceRecords            AttendanceRecord[]
 
   @@index([email])
   @@index([phone])
@@ -402,6 +403,7 @@ model Course {
   benefitVouchers             VoucherCourseBenefit[]
   systemTree                  SystemTree?
   learnerBaselines            LearnerBaseline[]
+  attendanceSessions          AttendanceSession[]
 
   @@index([teacherId])
 }
@@ -476,6 +478,39 @@ model Enrollment {
 /// khi vào khóa) và Điểm B (kết quả khi kết thúc). GĐ1 — kế hoạch nâng cấp
 /// từ WIPA OS (23/10/2026). Mỗi học viên có tối đa 1 Điểm A + 1 Điểm B
 /// cho mỗi khóa; sửa lại là cập nhật cùng dòng (ghi ActivityLog ở action).
+/// Điểm danh buổi học trực tiếp theo khóa học. Buổi học (AttendanceSession)
+/// do quản trị tạo; bản ghi (AttendanceRecord) sinh từ nhập báo cáo Zoom
+/// hoặc đánh dấu tay. GĐ1 — kế hoạch nâng cấp từ WIPA OS (23/10/2026).
+model AttendanceSession {
+  id              Int                @id @default(autoincrement())
+  courseId        Int
+  title           String
+  sessionDate     DateTime
+  durationMinutes Int                @default(90)
+  createdById     Int?
+  createdAt       DateTime           @default(now())
+  course          Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  records         AttendanceRecord[]
+
+  @@index([courseId, sessionDate])
+}
+
+model AttendanceRecord {
+  id              Int              @id @default(autoincrement())
+  sessionId       Int
+  userId          Int
+  status          AttendanceStatus @default(PRESENT)
+  minutesAttended Int              @default(0)
+  source          String           @default("ZOOM_IMPORT")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  session         AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+  @@index([userId])
+}
+
 model LearnerBaseline {
   id         Int          @id @default(autoincrement())
   userId     Int
@@ -2243,6 +2278,11 @@ enum EnrollmentMode {
 enum EnrollmentMemberRole {
   TV
   PS
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
 }
 
 enum BaselineKind {
