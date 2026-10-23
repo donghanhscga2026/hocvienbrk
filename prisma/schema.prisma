@@ -72,6 +72,7 @@ model User {
   crmForms                     CrmForm[]
   crmIdentityContact           CrmContact? @relation("CrmIdentity")
   crmStudentProfiles           CrmContact[] @relation("CrmStudentProfile")
+  learnerBaselines             LearnerBaseline[]
 
   @@index([email])
   @@index([phone])
@@ -400,6 +401,7 @@ model Course {
   voucherAwards               CourseVoucherAward[]
   benefitVouchers             VoucherCourseBenefit[]
   systemTree                  SystemTree?
+  learnerBaselines            LearnerBaseline[]
 
   @@index([teacherId])
 }
@@ -468,6 +470,31 @@ model Enrollment {
   @@index([userId])
   @@index([courseId])
   @@index([referrerId])
+}
+
+/// Đo lường biến đổi của học viên theo từng khóa học: Điểm A (xuất phát điểm
+/// khi vào khóa) và Điểm B (kết quả khi kết thúc). GĐ1 — kế hoạch nâng cấp
+/// từ WIPA OS (23/10/2026). Mỗi học viên có tối đa 1 Điểm A + 1 Điểm B
+/// cho mỗi khóa; sửa lại là cập nhật cùng dòng (ghi ActivityLog ở action).
+model LearnerBaseline {
+  id         Int          @id @default(autoincrement())
+  userId     Int
+  courseId   Int
+  kind       BaselineKind
+  followers  Int          @default(0)
+  views      Int          @default(0)
+  customers  Int          @default(0)
+  revenue    Float        @default(0)
+  note       String?
+  recordedAt DateTime     @default(now())
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course     Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId, kind])
+  @@index([courseId, kind])
+  @@index([userId])
 }
 
 model LessonProgress {
@@ -2216,6 +2243,11 @@ enum EnrollmentMode {
 enum EnrollmentMemberRole {
   TV
   PS
+}
+
+enum BaselineKind {
+  A
+  B
 }
 
 enum Role {
