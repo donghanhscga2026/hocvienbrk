@@ -2,7 +2,7 @@ import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import prisma from "@/lib/prisma"
-import { getBaselinePair } from "@/lib/baseline/service"
+import { getBaselinePair, getMeasuredTotals } from "@/lib/baseline/service"
 import BaselineForm, { GrowthSummary } from "@/components/baseline/BaselineForm"
 
 /**
@@ -62,13 +62,14 @@ export default async function DiemABPage({
 
 async function BaselineSection({ userId, courseId, courseTitle }: { userId: number; courseId: number; courseTitle: string }) {
   const pair = await getBaselinePair(userId, courseId)
+  const measured = await getMeasuredTotals(userId)
   const serialize = (x: typeof pair.a) => x ? { ...x, recordedAt: x.recordedAt.toISOString() } : null
   return (
     <div className="mt-6 space-y-4">
       <h2 className="font-semibold text-gray-800">{courseTitle}</h2>
       <div className="grid md:grid-cols-2 gap-4">
         <BaselineForm courseId={courseId} kind="A" initial={serialize(pair.a)} />
-        <BaselineForm courseId={courseId} kind="B" initial={serialize(pair.b)} />
+        <BaselineForm courseId={courseId} kind="B" initial={serialize(pair.b)} suggestion={measured} />
       </div>
       {pair.growth && <GrowthSummary growth={pair.growth} />}
       {!pair.a && (
