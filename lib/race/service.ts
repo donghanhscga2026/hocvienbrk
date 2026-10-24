@@ -39,3 +39,26 @@ export async function getLeaderboard(raceId: number, limit = 200): Promise<Leade
 export function metricLabel(key: string): string {
     return METRIC_LABELS[key as MetricKey] ?? key
 }
+
+export interface TeamStanding {
+    team: number
+    members: number
+    totalPoints: number
+    avgPoints: number
+}
+
+/** Bảng điểm theo đội trong một cuộc đua — cộng từ chính bảng xếp hạng
+ *  cá nhân nên hai bảng không bao giờ lệch nhau. */
+export async function getRaceTeamStandings(raceId: number): Promise<TeamStanding[]> {
+    const leaderboard = await getLeaderboard(raceId, 1000)
+    const map = new Map<number, TeamStanding>()
+    for (const row of leaderboard) {
+        const entry = map.get(row.team) ?? { team: row.team, members: 0, totalPoints: 0, avgPoints: 0 }
+        entry.members++
+        entry.totalPoints += row.totalPoints
+        map.set(row.team, entry)
+    }
+    const rows = [...map.values()]
+    for (const r of rows) r.avgPoints = r.members > 0 ? Math.round((r.totalPoints / r.members) * 10) / 10 : 0
+    return rows.sort((a, b) => b.totalPoints - a.totalPoints || a.team - b.team)
+}

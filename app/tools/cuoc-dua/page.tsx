@@ -2,7 +2,7 @@ import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import prisma from "@/lib/prisma"
-import { getLeaderboard, metricLabel } from "@/lib/race/service"
+import { getLeaderboard, getRaceTeamStandings, metricLabel } from "@/lib/race/service"
 import { METRIC_KEYS } from "@/lib/race/scoring"
 import { CreateRaceForm, RaceControls, LeaveDecision } from "@/components/race/RaceAdminPanel"
 
@@ -30,6 +30,7 @@ export default async function ToolsCuocDuaPage({
   ])
   const race = races.find((r) => r.id === Number(params.raceId)) ?? races[0]
   const leaderboard = race ? await getLeaderboard(race.id) : []
+  const teamStandings = race ? await getRaceTeamStandings(race.id) : []
   const pendingLeaves = race
     ? await prisma.raceLeave.findMany({
         where: { raceId: race.id, status: 'PENDING' },
@@ -106,6 +107,19 @@ export default async function ToolsCuocDuaPage({
               </table>
             </div>
           </div>
+
+          {teamStandings.length > 1 && (
+            <div className="rounded-2xl border border-gray-200 bg-white p-5">
+              <h3 className="font-bold text-gray-900">Điểm theo đội</h3>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {teamStandings.map((t, i) => (
+                  <span key={t.team} className="rounded-full bg-gray-50 border border-gray-200 px-3 py-1.5 text-sm">
+                    #{i + 1} Đội {t.team}: <b>{t.totalPoints} điểm</b> · {t.members} người · TB {t.avgPoints}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {pendingLeaves.length > 0 && (
             <div className="rounded-2xl border border-gray-200 bg-white p-5">

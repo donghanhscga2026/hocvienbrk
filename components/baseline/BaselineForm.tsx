@@ -9,11 +9,14 @@ interface BaselineFormProps {
     courseId: number
     kind: 'A' | 'B'
     initial: (BaselineMetrics & { recordedAt: string; note: string | null }) | null
+    /** Số liệu hệ thống đã tự đo (chỉ truyền cho form Điểm B) — học viên
+     *  bấm một nút để điền, vẫn sửa được trước khi lưu. */
+    suggestion?: { followers: number; views: number; customers: number; revenue: number } | null
 }
 
 const FIELDS = Object.keys(METRIC_LABELS) as (keyof BaselineMetrics)[]
 
-export default function BaselineForm({ courseId, kind, initial }: BaselineFormProps) {
+export default function BaselineForm({ courseId, kind, initial, suggestion }: BaselineFormProps) {
     const router = useRouter()
     const [values, setValues] = useState<Record<string, string>>(() => {
         const v: Record<string, string> = {}
@@ -24,6 +27,14 @@ export default function BaselineForm({ courseId, kind, initial }: BaselineFormPr
     const [busy, setBusy] = useState(false)
     const [message, setMessage] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
+
+    function applySuggestion() {
+        if (!suggestion) return
+        const v: Record<string, string> = {}
+        for (const f of FIELDS) v[f] = String(suggestion[f as keyof typeof suggestion] ?? 0)
+        setValues(v)
+        setMessage('Đã điền số liệu hệ thống đo được — kiểm tra và chỉnh nếu cần rồi bấm Lưu.')
+    }
 
     async function onSave() {
         setBusy(true)
@@ -76,7 +87,12 @@ export default function BaselineForm({ courseId, kind, initial }: BaselineFormPr
             </label>
             {error && <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>}
             {message && <p className="mt-3 text-sm text-green-700">{message}</p>}
-            <button
+            {suggestion && (
+                        <button type="button" onClick={applySuggestion} className="rounded-lg border border-emerald-600 text-emerald-700 px-3 py-2 text-sm font-medium">
+                            Điền số liệu hệ thống đã đo
+                        </button>
+                    )}
+                    <button
                 type="button"
                 disabled={busy}
                 onClick={onSave}
