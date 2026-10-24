@@ -23,3 +23,5 @@ ok(expires && new Date(expires).getTime() > Date.now(), 'security.txt: Expires c
 ok(sec.includes('Canonical: https://giautoandien.io.vn/.well-known/security.txt'), 'security.txt: Canonical đúng đường dẫn')
 
 console.log(`test-security-basics: ${checks} kiểm chứng PASS`)
+
+// (commit bổ sung để kích hoạt lại CI sau lần chạy đầu không khởi động)
