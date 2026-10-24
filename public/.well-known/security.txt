@@ -1,0 +1,4 @@
+Contact: https://giautoandien.io.vn/
+Expires: 2027-10-24T00:00:00.000Z
+Preferred-Languages: vi, en
+Canonical: https://giautoandien.io.vn/.well-known/security.txt
