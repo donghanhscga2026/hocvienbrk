@@ -2,7 +2,7 @@ import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import prisma from "@/lib/prisma"
-import { getLeaderboard, metricLabel } from "@/lib/race/service"
+import { getLeaderboard, getRaceTeamStandings, metricLabel } from "@/lib/race/service"
 import { METRIC_KEYS } from "@/lib/race/scoring"
 import LeaveForm from "@/components/race/LeaveForm"
 
@@ -31,6 +31,7 @@ export default async function CuocDuaPage({
   const fmtQty = (key: string, q: number) => key === 'REVENUE' ? q.toLocaleString('vi-VN') + 'đ' : q.toLocaleString('vi-VN')
 
   const leaderboard = race ? await getLeaderboard(race.id, 50) : []
+  const teamStandings = race ? await getRaceTeamStandings(race.id) : []
   const me = leaderboard.find((r) => r.userId === userId)
   const myRank = me ? leaderboard.indexOf(me) + 1 : null
   const myLeaves = race
@@ -93,6 +94,20 @@ export default async function CuocDuaPage({
               {leaderboard.length === 0 && <li className="py-3 text-sm text-gray-400">Chưa có dữ liệu điểm.</li>}
             </ol>
           </div>
+
+          {teamStandings.length > 1 && (
+            <div className="rounded-2xl border border-gray-200 bg-white p-5">
+              <h3 className="font-bold text-gray-900">Điểm theo đội</h3>
+              <ol className="mt-3 divide-y divide-gray-100">
+                {teamStandings.map((t, i) => (
+                  <li key={t.team} className="flex items-center justify-between py-2 text-sm">
+                    <span>#{i + 1} · Đội {t.team} <span className="text-gray-400">· {t.members} thành viên · trung bình {t.avgPoints}</span></span>
+                    <span className="font-semibold">{t.totalPoints} điểm</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
 
           <div className="rounded-2xl border border-gray-200 bg-white p-5">
             <h3 className="font-bold text-gray-900">Xin nghỉ một ngày</h3>
