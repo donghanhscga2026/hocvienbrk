@@ -2,6 +2,9 @@
   "regions": [
     "sin1"
   ],
+  "git": {
+    "deploymentEnabled": false
+  },
   "redirects": [
     {
       "source": "/(.*)",
