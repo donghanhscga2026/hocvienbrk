@@ -15,6 +15,17 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      # Đã kiểm chứng hỏng bằng chạy CI local đầy đủ (24/10/2026, PR #226):
+      # dompurify 3.4.17 làm test-template-youtube fail (sanitizer cắt
+      # mất cầu nối YouTube trong template đã biên dịch); @auth/core
+      # 0.41.3 xung đột kiểu với bản @auth/core lồng trong next-auth
+      # (TS2769 ở route NextAuth). Chỉ bỏ qua đúng 2 phiên bản lỗi —
+      # bản mới hơn vẫn được đề xuất bình thường.
+      - dependency-name: "dompurify"
+        versions: ["3.4.17"]
+      - dependency-name: "@auth/core"
+        versions: ["0.41.3"]
     labels:
       - "dependencies"
   - package-ecosystem: "github-actions"

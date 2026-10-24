@@ -12,4 +12,6 @@ ok(dep.includes('package-ecosystem: "npm"') && dep.includes('interval: "weekly"'
 ok(dep.includes('package-ecosystem: "github-actions"') && dep.includes('interval: "monthly"'), 'dependabot: github-actions hằng tháng')
 ok(dep.includes('open-pull-requests-limit'), 'dependabot: có giới hạn PR đồng thời')
 ok(dep.includes('minor') && dep.includes('patch'), 'dependabot: gom minor/patch')
+ok(dep.includes('dependency-name: "dompurify"') && dep.includes('"3.4.17"'), 'dependabot: bỏ qua dompurify 3.4.17 (đã kiểm chứng hỏng)')
+ok(dep.includes('dependency-name: "@auth/core"') && dep.includes('"0.41.3"'), 'dependabot: bỏ qua @auth/core 0.41.3 (đã kiểm chứng hỏng)')
 console.log(`test-dependabot: ${checks} kiểm chứng PASS`)
