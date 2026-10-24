@@ -4,7 +4,7 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Scan for Malicious Files
         run: |
           if [ -f "project-source.md" ]; then
