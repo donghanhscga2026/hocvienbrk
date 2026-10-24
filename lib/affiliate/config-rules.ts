@@ -35,3 +35,17 @@ export function formatDateVN(iso: string): string {
   const [y, m, d] = iso.split('-')
   return `${d}/${m}/${y}`
 }
+
+/**
+ * Quyền CHẠY LẠI hoa hồng cho giao dịch cũ theo khóa học
+ * (lib/affiliate/recalculate.ts, thêm 2026-10-23 theo yêu cầu vận hành).
+ *
+ * Giai đoạn test: TEACHER được chạy lại cho khóa của chính mình để thử
+ * các mức cấu hình mà không cần can thiệp DB tay. SAU giai đoạn test,
+ * đặt RERUN_TEACHER_ALLOWED = false → chỉ ADMIN được chạy lại.
+ */
+export const RERUN_TEACHER_ALLOWED = true
+
+export function canRerunCommissions(role: string): boolean {
+  return role === 'ADMIN' || (role === 'TEACHER' && RERUN_TEACHER_ALLOWED)
+}
