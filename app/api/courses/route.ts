@@ -7,6 +7,7 @@ import { resolveCourseCategoryName } from "@/lib/course/category"
 import { canPinAnotherCourse, PIN_LIMIT_ERROR } from "@/lib/course/pin-limit"
 import { formatCourseSaveError } from "@/lib/course/errors"
 import { resolveImageUrl } from "@/lib/image-utils"
+import { ensureDefaultAffiliateConfig } from "@/lib/affiliate/default-config"
 
 /**
  * POST /api/courses - Tạo khóa học mới (ADMIN + TEACHER)
@@ -97,6 +98,9 @@ export async function POST(request: NextRequest) {
                 }))
             })
         }
+
+        // Tự sinh cấu hình affiliate mặc định (mức sàn) cho khóa thu phí.
+        await ensureDefaultAffiliateConfig(course.id, courseData.phi_coc || 0, ctx.userId)
 
         revalidatePath('/tools/courses')
         return NextResponse.json({ success: true, course })
