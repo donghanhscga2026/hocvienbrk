@@ -4,6 +4,8 @@ import { AdminSubNav } from "@/components/admin/AdminSubNav"
 import { affiliateSubNav } from "../affiliate-nav"
 import { getSettlementData, currentPeriodSaigon, type SettlementLine } from "@/lib/affiliate/settlement"
 import SettlementActions from "@/components/affiliate/SettlementActions"
+import SettlementSendButton from "@/components/affiliate/SettlementSendButton"
+import prisma from "@/lib/prisma"
 import Link from "next/link"
 
 /**
@@ -36,6 +38,23 @@ export default async function AffiliateSettlementPage({
     : currentPeriodSaigon()
 
   const data = await getSettlementData({ period, viewerId: userId, viewerRole: role })
+
+  // Kỳ nào đã gửi email cho giảng viên nào (từ ActivityLog SETTLEMENT_SENT)
+  const sentMap = new Map<number, string>()
+  if (period !== 'all' && role === 'ADMIN') {
+    const sentLogs = await prisma.activityLog.findMany({
+      where: { action: 'SETTLEMENT_SENT', metadata: { path: ['period'], equals: period } },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+      select: { createdAt: true, metadata: true }
+    })
+    for (const l of sentLogs) {
+      const tid = (l.metadata as { teacherId?: number } | null)?.teacherId
+      if (typeof tid === 'number' && !sentMap.has(tid)) {
+        sentMap.set(tid, l.createdAt.toISOString())
+      }
+    }
+  }
   const fmt = (n: number) => n.toLocaleString('vi-VN') + 'đ'
   const navItems = role === 'ADMIN'
     ? affiliateSubNav
@@ -122,6 +141,9 @@ export default async function AffiliateSettlementPage({
               <span className="text-gray-400"> · </span>
               <span className="text-amber-600 font-semibold">Chờ {fmt(t.waitingAmount)}</span>
             </div>
+            {role === 'ADMIN' && period !== 'all' && t.teacherId != null && (
+              <SettlementSendButton teacherId={t.teacherId} period={period} sentAt={sentMap.get(t.teacherId) ?? null} />
+            )}
           </div>
 
           {t.courses.map(cs => (
