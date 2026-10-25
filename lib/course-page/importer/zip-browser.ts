@@ -174,6 +174,11 @@ export const BRIDGE = `
   if (window.__MFC_ZIP_BRIDGE__) return;
   window.__MFC_ZIP_BRIDGE__ = true;
   var cfg = { selectedBlockKeys: null, registrationBlockKeys: [], syncStickyNavigation: false };
+  // Chốt viewport trước khi khung tự nở; chỉ thông điệp từ trang cha cập nhật nó.
+  function setViewportHeight(height){
+    if(Number.isFinite(height) && height>0 && height<10000) document.documentElement.style.setProperty('--mfc-viewport-height',height+'px');
+  }
+  setViewportHeight(window.innerHeight);
   var navigation = [], viewportTop = 0;
   // Iframe mở rộng không tự cuộn: nhận viewport của trang cha cho menu sticky gốc.
   function collectNavigation(){
@@ -280,7 +285,7 @@ export const BRIDGE = `
       collectNavigation();
       return;
     }
-    if(data.type==='viewport'){syncNavigation(data.top);return;}
+    if(data.type==='viewport'){setViewportHeight(data.height);syncNavigation(data.top);return;}
     if(data.type==='navigate_anchor' && typeof data.anchor==='string'){
       navigateAnchor(data.anchor,false);
     }

@@ -23,6 +23,7 @@ const nextConfig: NextConfig = {
   // Tailwind đọc CSS nền từ ổ đĩa lúc nhập HTML trên máy chủ.
   outputFileTracingIncludes: {
     "/api/admin/course-page-templates/analyze": ["./node_modules/tailwindcss-importer/lib/css/*.css"],
+    "/api/course-templates": ["./node_modules/tailwindcss-importer/lib/css/*.css", "./node_modules/aos/dist/aos.js", "./node_modules/aos/dist/aos.css", "./node_modules/aos/LICENSE"],
   },
 
   // Strict mode giúp phát hiện bug React

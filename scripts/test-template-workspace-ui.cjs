@@ -6,6 +6,7 @@ Object.defineProperty(global, 'navigator', { configurable: true, value: dom.wind
 dom.window.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }; dom.window.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open') }
 const saved = [], applied = [], params = new URLSearchParams('course=AI&name=AI&courseId=1')
 let failSave = false
+const pendingPreviews = []
 const mocks = {
   'next/link': { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) },
   'next/navigation': { useSearchParams: () => params },
@@ -15,6 +16,7 @@ const mocks = {
     if (!input && url.includes('?page=')) return { template: { name: 'Current page copy', description: '', sourceType: 'html' }, source: { entryPath: 'index.html', files: [{ path: 'index.html', kind: 'html', content: '<section id="current"><h1>Applied page source</h1></section>' }] } }
     if (!input) return { templates: [], admin: false, revision: { id: 'page-1', updatedAt: '2026-10-17T00:00:00.000Z' } }
     if (input.action === 'apply') { applied.push([input.slug, input.name, input.id]); return { success: true } }
+    if (input.action === 'preview-course-code') return new Promise(resolve => pendingPreviews.push({ resolve, html: input.html }))
     if (failSave) throw new Error('Storage failed; code retained')
     saved.push(input); return { revision: { id: 'page-1', updatedAt: '2026-10-17T00:01:00.000Z' }, template: { id: 'saved', name: input.name, description: input.description, sourceType: input.sourceType, updatedAt: '2026-10-14T00:00:00.000Z' } }
   } },
@@ -61,6 +63,21 @@ async function run() {
     const previewBefore = document.querySelector('iframe[srcdoc]').srcdoc
     await code('<section><img src="ftp://invalid.test/missing.png"></section>'); await tick()
     assert.match(document.body.textContent, /Đường dẫn chưa được hỗ trợ/); assert.equal(document.querySelector('iframe[srcdoc]').srcdoc, previewBefore, 'Invalid changes keep the last valid preview and the editable draft')
+    await code('<script src="https://cdn.tailwindcss.com"></script><h1>Canvas remote preview</h1>')
+    await React.act(async () => new Promise(resolve => setTimeout(resolve, 1300)))
+    assert.equal(pendingPreviews.length, 1)
+    await code('<h1>Newer local preview</h1>'); await tick()
+    await React.act(async () => pendingPreviews[0].resolve({ html: '<h1>Stale server response</h1>', warnings: [] }))
+    assert.match(document.querySelector('iframe[srcdoc]').srcdoc, /Newer local preview/, 'A stale server response cannot overwrite a newer preview')
+    await code('<script src="https://cdn.tailwindcss.com"></script><h1>Latest Canvas preview</h1>')
+    await React.act(async () => new Promise(resolve => setTimeout(resolve, 1300)))
+    await React.act(async () => pendingPreviews[1].resolve({ html: '<h1>Compiled Canvas preview</h1>', warnings: ['Tailwind prepared'] }))
+    assert.match(document.querySelector('iframe[srcdoc]').srcdoc, /Compiled Canvas preview/)
+    await code('<h1 data-aos="fade-up">AOS preview without Tailwind</h1>')
+    await React.act(async () => new Promise(resolve => setTimeout(resolve, 1300)))
+    assert.equal(pendingPreviews.length, 3, 'AOS-only HTML also uses server library preparation')
+    await React.act(async () => pendingPreviews[2].resolve({ html: '<h1>AOS prepared preview</h1>', warnings: ['AOS bundled'] }))
+    assert.match(document.querySelector('iframe[srcdoc]').srcdoc, /AOS prepared preview/)
     const event = new window.Event('beforeunload', { cancelable: true }); window.dispatchEvent(event); assert.equal(event.defaultPrevented, true)
     await React.act(async () => root.render(React.createElement(load('components/course/CourseTemplateWorkspace.tsx').default, { key: 'inline', embedded: true, context: { slug: 'AI', name: 'Inline course', courseId: 1 }, startPageId: 'current' })))
     assert.equal(document.querySelector('[data-management-workspace]'), null, 'Embedded editor does not repeat the application navigation')
