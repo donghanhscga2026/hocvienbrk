@@ -37,7 +37,7 @@
     "@codemirror/state": "6.7.6",
     "@codemirror/view": "6.43.15",
     "@getbrevo/brevo": "^6.2.0",
-    "@hookform/resolvers": "^5.2.2",
+    "@hookform/resolvers": "^6.0.0",
     "@prisma/client": "^5.22.0",
     "@supabase/supabase-js": "^2.118.0",
     "@xyflow/react": "^12.12.0",
