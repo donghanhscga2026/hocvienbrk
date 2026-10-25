@@ -17,15 +17,32 @@ export interface VietQRResponse {
   }
 }
 
+// VietinBank qua SePay (kết nối API Banking) CHỈ nhận thông báo biến động
+// số dư khi nội dung chuyển khoản BẮT ĐẦU bằng từ khóa "SEVQR" — SePay cảnh
+// báo việc này ngay trong trang tài khoản ngân hàng VietinBank trên
+// my.sepay.vn. Nội dung chuẩn của hệ thống bắt đầu bằng "SDT ..." nên với
+// TK nhận là VietinBank phải thêm tiền tố "SEVQR ", nếu không SePay không
+// hề nhìn thấy giao dịch và không có webhook nào được gửi về (đã xảy ra
+// thực tế với các khóa của GV dùng VietinBank, 10/2026).
+// Bộ khớp giao dịch (webhook SePay + parser email Gmail) đều dùng regex
+// không neo đầu câu nên tiền tố này không ảnh hưởng việc đối soát.
+export function isVietinBank(bankName?: string | null): boolean {
+  if (!bankName) return false
+  const n = bankName.toLowerCase()
+  return n.includes('vietinbank') || n.includes('công thương') || n.includes('cong thuong') || n.includes('970415')
+}
+
 export function generateTransferContent(options: {
   phone: string
   userId: number
   courseCode: string
+  bankName?: string | null // Ngân hàng của TK NHẬN tiền — VietinBank thì thêm tiền tố SEVQR
 }): string {
   // Format: SDT [phone_cuoi] HV [id] COC [code]
-  const { phone, userId, courseCode } = options
+  const { phone, userId, courseCode, bankName } = options
   const cleanPhone = phone.replace(/\D/g, '').slice(-6)
-  const content = `SDT ${cleanPhone} HV ${userId} COC ${courseCode}`.toUpperCase()
+  const base = `SDT ${cleanPhone} HV ${userId} COC ${courseCode}`.toUpperCase()
+  const content = isVietinBank(bankName) ? `SEVQR ${base}` : base
   return content.slice(0, 50) // Tăng giới hạn ký tự lên 50 vì có khoảng cách
 }
 
@@ -103,7 +120,8 @@ export async function createPaymentQR(options: {
   const transferContent = generateTransferContent({
     phone: options.phone,
     userId: options.userId,
-    courseCode: options.courseCode
+    courseCode: options.courseCode,
+    bankName: options.acqId // acqId ở đây mang tên ngân hàng của TK nhận (caller truyền bankName)
   })
 
   const qrResult = await generateVietQR({
