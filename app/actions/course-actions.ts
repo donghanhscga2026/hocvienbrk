@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache"
 import { after } from "next/server"
 import { cookies, headers } from "next/headers"
 import { createPaymentQR, generateTransferContent } from "@/lib/vietqr"
+import { ensureDefaultAffiliateConfig } from "@/lib/affiliate/default-config"
 import { resolveBankBin } from "@/lib/bank-bin"
 import { resolveRefToUserId } from "@/lib/affiliate/resolve-ref-helper"
 import { toTitleCase } from "@/lib/utils/text-format"
@@ -1001,6 +1002,10 @@ export async function createCourseAction(formData: FormData) {
         } catch (cfgErr) {
             console.error('⚠️ Auto-create AutoVerifyConfig failed:', cfgErr)
         }
+
+        // Tự sinh cấu hình affiliate mặc định (mức sàn) cho khóa thu phí —
+        // tránh CTV quảng bá mà mất hoa hồng trực tiếp vì khóa chưa cấu hình.
+        await ensureDefaultAffiliateConfig(newCourse.id, (courseData as any).phi_coc || 0, userId)
 
         // Create accepted voucher records
         const acceptedVoucherIdsRaw = formData.get('acceptedVoucherIds') as string
