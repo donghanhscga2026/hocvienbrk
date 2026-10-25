@@ -71,6 +71,16 @@ export default function BookingWizard({ session, source, tags, prefill }: Bookin
   const [error, setError] = useState('')
   const [done, setDone] = useState<{ bookingCode: string; status: string; meetingUrl: string | null } | null>(null)
 
+  // Danh sách chờ (Giai đoạn 2): hiện khi ngày đã kín lịch
+  const [wlName, setWlName] = useState(prefill.name)
+  const [wlEmail, setWlEmail] = useState(prefill.email)
+  const [wlPhone, setWlPhone] = useState('')
+  const [wlNote, setWlNote] = useState('')
+  const [wlWebsite, setWlWebsite] = useState('')
+  const [wlBusy, setWlBusy] = useState(false)
+  const [wlMsg, setWlMsg] = useState('')
+  const [wlError, setWlError] = useState('')
+
   // Tải khung giờ mỗi khi đổi ngày
   useEffect(() => {
     let cancelled = false
@@ -132,6 +142,26 @@ export default function BookingWizard({ session, source, tags, prefill }: Bookin
       setSlotsRefresh((n) => n + 1)
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function doJoinWaitlist() {
+    setWlBusy(true); setWlError(''); setWlMsg('')
+    try {
+      const res = await fetch('/api/booking/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: session.code, dateVN: selectedDate, name: wlName, email: wlEmail, phone: wlPhone, note: wlNote, website: wlWebsite }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Không đăng ký chờ được.')
+      setWlMsg(data.alreadyRegistered
+        ? 'Bạn đã có tên trong danh sách chờ của ngày này rồi. Hệ thống sẽ gửi email ngay khi có khung giờ trống.'
+        : 'Đã ghi danh sách chờ. Khi ngày này có khung giờ trống, hệ thống sẽ gửi email mời bạn đặt lịch ngay.')
+    } catch (e) {
+      setWlError(e instanceof Error ? e.message : 'Đã có lỗi xảy ra.')
+    } finally {
+      setWlBusy(false)
     }
   }
 
@@ -304,6 +334,27 @@ export default function BookingWizard({ session, source, tags, prefill }: Bookin
                 >
                   Xem ngày tiếp theo →
                 </button>
+                {availableCount === 0 && (
+                  <div className="mx-auto mt-5 max-w-sm rounded-xl border border-slate-200 bg-slate-50 p-4 text-left">
+                    <h3 className="text-sm font-semibold text-slate-800">Đăng ký danh sách chờ cho ngày này</h3>
+                    <p className="mt-1 text-xs text-slate-500">Nếu có người hủy hoặc đổi lịch, hệ thống sẽ gửi email mời bạn đặt ngay.</p>
+                    <div className="mt-3 space-y-2">
+                      <input className={inputCls} value={wlName} onChange={(e) => setWlName(e.target.value)} placeholder="Họ và tên *" />
+                      <input className={inputCls} type="email" value={wlEmail} onChange={(e) => setWlEmail(e.target.value)} placeholder="Địa chỉ email *" />
+                      <input className={inputCls} value={wlPhone} onChange={(e) => setWlPhone(e.target.value)} placeholder="Số điện thoại / Zalo" />
+                      <input className={inputCls} value={wlNote} onChange={(e) => setWlNote(e.target.value)} placeholder="Khung giờ mong muốn / ghi chú" />
+                      <label hidden aria-hidden="true">Website<input tabIndex={-1} autoComplete="off" value={wlWebsite} onChange={(e) => setWlWebsite(e.target.value)} /></label>
+                    </div>
+                    {wlError && <p role="alert" className="mt-2 text-xs text-red-700">{wlError}</p>}
+                    {wlMsg ? (
+                      <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">{wlMsg}</p>
+                    ) : (
+                      <button type="button" className={`${primaryBtn} mt-3 w-full`} disabled={wlBusy || !wlName.trim() || !wlEmail.trim()} onClick={doJoinWaitlist}>
+                        {wlBusy ? 'Đang đăng ký…' : 'Vào danh sách chờ'}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-2">

@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation'
 import { formatMin, type FormField } from '@/lib/booking/slots'
 import {
   changeBookingStatus,
+  changeWaitlistStatus,
   removeBookingException,
   saveBookingAvailability,
   saveBookingException,
   saveBookingSession,
+  sendWaitlistInvite,
 } from '@/app/actions/booking-actions'
 
 export interface SessionRow {
@@ -56,6 +58,18 @@ export interface ExceptionRow {
   note: string
 }
 
+export interface WaitlistRow {
+  id: number
+  dateVN: string
+  name: string
+  email: string
+  phone: string | null
+  note: string
+  status: string
+  sessionTitle: string
+  createdAt: string
+}
+
 interface AdminBookingPanelProps {
   meId: number
   role: string
@@ -65,6 +79,14 @@ interface AdminBookingPanelProps {
   initialRules: { weekday: number; startMin: number; endMin: number }[]
   initialExceptions: ExceptionRow[]
   bookings: BookingRow[]
+  waitlist: WaitlistRow[]
+}
+
+const WAITLIST_LABELS: Record<string, string> = {
+  WAITING: 'Đang chờ',
+  NOTIFIED: 'Đã mời đặt',
+  BOOKED: 'Đã đặt được',
+  EXPIRED: 'Hết hạn',
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -109,7 +131,7 @@ function blankSession(): SessionRow {
 
 export default function AdminBookingPanel(props: AdminBookingPanelProps) {
   const router = useRouter()
-  const [tab, setTab] = useState<'sessions' | 'availability' | 'bookings'>('sessions')
+  const [tab, setTab] = useState<'sessions' | 'availability' | 'bookings' | 'waitlist'>('sessions')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -214,6 +236,45 @@ export default function AdminBookingPanel(props: AdminBookingPanelProps) {
     [],
   )
 
+  async function onWaitlistStatus(waitlistId: number, next: 'EXPIRED' | 'BOOKED' | 'WAITING') {
+    setBusy(true)
+    try {
+      const result = await changeWaitlistStatus({ waitlistId, next })
+      if (!result.ok) { flash(false, result.error || 'Không đổi được trạng thái đăng ký chờ.'); return }
+      flash(true, 'Đã cập nhật đăng ký chờ.')
+      router.refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onWaitlistInvite(waitlistId: number) {
+    setBusy(true)
+    try {
+      const result = await sendWaitlistInvite({ waitlistId })
+      if (!result.ok) { flash(false, result.error || 'Không gửi được email mời.'); return }
+      flash(true, 'Đã gửi email mời đặt lịch cho khách chờ.')
+      router.refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Thống kê cơ bản từ danh sách lịch đang xem: theo trạng thái và nguồn (trk).
+  const stats = useMemo(() => {
+    const byStatus: Record<string, number> = {}
+    const bySource: Record<string, number> = {}
+    for (const b of props.bookings) {
+      byStatus[b.status] = (byStatus[b.status] || 0) + 1
+      const src = b.source?.trim() ? b.source.trim() : '(không rõ nguồn)'
+      bySource[src] = (bySource[src] || 0) + 1
+    }
+    const attended = (byStatus.COMPLETED || 0) + (byStatus.NO_SHOW || 0)
+    const noShowRate = attended > 0 ? Math.round(((byStatus.NO_SHOW || 0) / attended) * 100) : null
+    const topSources = Object.entries(bySource).sort((a, b) => b[1] - a[1]).slice(0, 5)
+    return { byStatus, noShowRate, topSources }
+  }, [props.bookings])
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
@@ -221,6 +282,7 @@ export default function AdminBookingPanel(props: AdminBookingPanelProps) {
           { id: 'sessions', label: 'Phiên hẹn' },
           { id: 'availability', label: 'Lịch rảnh & ngày nghỉ' },
           { id: 'bookings', label: `Lịch đã đặt (${props.bookings.length})` },
+          { id: 'waitlist', label: `Danh sách chờ (${props.waitlist.length})` },
         ] as const).map((item) => (
           <button
             key={item.id}
@@ -496,6 +558,18 @@ export default function AdminBookingPanel(props: AdminBookingPanelProps) {
       {tab === 'bookings' && (
         <section className="rounded-2xl border border-slate-200 bg-white p-5">
           <h3 className="mb-3 font-semibold text-slate-800">Lịch đã đặt (30 ngày từ hôm nay)</h3>
+          {props.bookings.length > 0 && (
+            <div className="mb-4 flex flex-wrap gap-2 text-xs text-slate-600">
+              <span className="rounded-full bg-slate-100 px-3 py-1.5">Đã xác nhận: <b>{stats.byStatus.CONFIRMED || 0}</b></span>
+              <span className="rounded-full bg-slate-100 px-3 py-1.5">Chờ xác nhận: <b>{stats.byStatus.PENDING || 0}</b></span>
+              <span className="rounded-full bg-slate-100 px-3 py-1.5">Đã hoàn thành: <b>{stats.byStatus.COMPLETED || 0}</b></span>
+              <span className="rounded-full bg-slate-100 px-3 py-1.5">Đã hủy: <b>{stats.byStatus.CANCELLED || 0}</b></span>
+              <span className="rounded-full bg-slate-100 px-3 py-1.5">Vắng mặt: <b>{stats.byStatus.NO_SHOW || 0}</b>{stats.noShowRate != null ? ` (tỷ lệ vắng ${stats.noShowRate}%)` : ''}</span>
+              {stats.topSources.map(([src, count]) => (
+                <span key={src} className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-800">Nguồn {src}: <b>{count}</b></span>
+              ))}
+            </div>
+          )}
           {props.bookings.length === 0 && <p className="text-sm text-slate-400">Chưa có lịch hẹn nào trong khoảng này.</p>}
           <div className="divide-y divide-slate-100">
             {props.bookings.map((b) => (
@@ -523,6 +597,45 @@ export default function AdminBookingPanel(props: AdminBookingPanelProps) {
                       <button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-xs" disabled={busy} onClick={() => onStatus(b.id, 'COMPLETED')}>Hoàn thành</button>
                       <button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-xs" disabled={busy} onClick={() => onStatus(b.id, 'NO_SHOW')}>Vắng mặt</button>
                     </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {tab === 'waitlist' && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5">
+          <h3 className="mb-1 font-semibold text-slate-800">Danh sách chờ đặt lịch</h3>
+          <p className="mb-3 text-sm text-slate-500">
+            Khách đăng ký chờ cho ngày đã kín lịch. Hệ thống tự gửi email mời khi ngày đó có khung giờ trống (do hủy, đổi lịch hoặc hết giữ chỗ); bạn cũng có thể mời thủ công.
+          </p>
+          {props.waitlist.length === 0 && <p className="text-sm text-slate-400">Chưa có ai đăng ký chờ.</p>}
+          <div className="divide-y divide-slate-100">
+            {props.waitlist.map((w) => (
+              <div key={w.id} className="flex flex-wrap items-center gap-3 py-3">
+                <div className="min-w-44">
+                  <p className="text-sm font-semibold text-slate-800">Ngày chờ: {w.dateVN}</p>
+                  <p className="text-xs text-slate-500">{w.sessionTitle}</p>
+                </div>
+                <div className="min-w-52 flex-1">
+                  <p className="text-sm text-slate-800">{w.name} — {w.email}{w.phone ? ` — ${w.phone}` : ''}</p>
+                  {w.note && <p className="text-xs text-slate-500">Ghi chú: {w.note}</p>}
+                </div>
+                <span className={`rounded-full px-2 py-1 text-xs font-medium ${w.status === 'WAITING' ? 'bg-amber-50 text-amber-700' : w.status === 'NOTIFIED' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                  {WAITLIST_LABELS[w.status] || w.status}
+                </span>
+                <div className="flex gap-1">
+                  {(w.status === 'WAITING' || w.status === 'NOTIFIED') && (
+                    <>
+                      <button type="button" className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white" disabled={busy} onClick={() => onWaitlistInvite(w.id)}>Mời đặt ngay</button>
+                      <button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-xs" disabled={busy} onClick={() => onWaitlistStatus(w.id, 'BOOKED')}>Đã đặt được</button>
+                      <button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-xs" disabled={busy} onClick={() => onWaitlistStatus(w.id, 'EXPIRED')}>Hết hạn</button>
+                    </>
+                  )}
+                  {w.status === 'EXPIRED' && (
+                    <button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-xs" disabled={busy} onClick={() => onWaitlistStatus(w.id, 'WAITING')}>Mở lại</button>
                   )}
                 </div>
               </div>

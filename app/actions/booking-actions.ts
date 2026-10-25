@@ -9,8 +9,10 @@ import {
   createSession,
   deleteException,
   isExpertRole,
+  notifyWaitlistEntryNow,
   replaceAvailability,
   setBookingStatus,
+  setWaitlistStatus,
   updateSession,
   upsertException,
   type AvailabilityRuleInput,
@@ -139,6 +141,47 @@ export async function changeBookingStatus(input: {
       action: 'BOOKING_STATUS_CHANGED',
       detail: `Chuyển lịch hẹn #${input.bookingId} sang ${input.next}`,
       metadata: { bookingId: input.bookingId, next: input.next },
+    })
+    revalidatePath('/tools/dat-lich')
+    return { ok: true }
+  } catch (error) {
+    return fail(error)
+  }
+}
+
+/** Chuyển trạng thái một lượt đăng ký chờ: hết hạn / đã đặt được / mở lại. */
+export async function changeWaitlistStatus(input: {
+  waitlistId: number
+  next: 'EXPIRED' | 'BOOKED' | 'WAITING'
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const actor = await requireActor()
+    await setWaitlistStatus(actor, input.waitlistId, input.next)
+    await logActivity({
+      userId: actor.id,
+      action: 'BOOKING_WAITLIST_UPDATED',
+      detail: `Chuyển đăng ký chờ #${input.waitlistId} sang ${input.next}`,
+      metadata: { waitlistId: input.waitlistId, next: input.next },
+    })
+    revalidatePath('/tools/dat-lich')
+    return { ok: true }
+  } catch (error) {
+    return fail(error)
+  }
+}
+
+/** Chủ động gửi email mời đặt lịch cho một lượt chờ (khi ngày đó có slot trống). */
+export async function sendWaitlistInvite(input: {
+  waitlistId: number
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const actor = await requireActor()
+    await notifyWaitlistEntryNow(actor, input.waitlistId)
+    await logActivity({
+      userId: actor.id,
+      action: 'BOOKING_WAITLIST_UPDATED',
+      detail: `Gửi email mời đặt lịch cho đăng ký chờ #${input.waitlistId}`,
+      metadata: { waitlistId: input.waitlistId, next: 'NOTIFIED' },
     })
     revalidatePath('/tools/dat-lich')
     return { ok: true }
