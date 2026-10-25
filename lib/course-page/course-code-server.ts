@@ -2,7 +2,8 @@ import { parse, parseFragment, serialize, type DefaultTreeAdapterMap } from 'par
 import postcss from 'postcss'
 import tailwind from 'tailwindcss-importer'
 import { readTailwindConfig } from './importer/prepare-html'
-import { compileCourseCode, CourseCodeError, needsTailwindPreparation } from './course-code'
+import { compileCourseCode, CourseCodeError, needsCourseCodePreparation } from './course-code'
+import { bundleCourseLibraries } from './course-code-libraries-server'
 
 type Element = DefaultTreeAdapterMap['element']
 const attr = (node: Element, name: string) => node.attrs.find(item => item.name === name)?.value || ''
@@ -12,8 +13,10 @@ const remove = (node: Element) => { if (node.parentNode) node.parentNode.childNo
 /** Dùng chung cho preview và lưu. Không tải CDN/ảnh, không chạy JS của mẫu trên server. */
 export async function prepareCourseCode(html: string) {
   const validated = compileCourseCode(html)
-  if (!needsTailwindPreparation(html)) return validated
+  if (!needsCourseCodePreparation(html)) return validated
   try {
+    const bundled = bundleCourseLibraries(html)
+    html = bundled.html
     const doc = parse(html), elements: Element[] = []
     const visit = (node: DefaultTreeAdapterMap['node']) => {
       if ('tagName' in node) elements.push(node)
@@ -26,7 +29,10 @@ export async function prepareCourseCode(html: string) {
       try { const url = new URL(attr(node, 'src')); return url.protocol === 'https:' && url.hostname === 'cdn.tailwindcss.com' && !url.username && !url.password } catch { return false }
     })
     const saved = scripts.filter(node => node.attrs.some(item => item.name === 'data-course-tailwind-config'))
-    if (!loaders.length && !saved.length) return validated
+    if (!loaders.length && !saved.length) {
+      const compiled = compileCourseCode(html)
+      return { ...compiled, warnings: [...new Set([...compiled.warnings, ...bundled.warnings])] }
+    }
     if (saved.length > 1) throw new Error('Mẫu có nhiều cấu hình Tailwind đã lưu.')
     const configScripts = scripts.filter(node => !attr(node, 'src') && /tailwind\s*\.\s*config\s*=/.test(text(node)))
     // Parser chỉ đọc literal/object/array; không eval, không nạp plugin hoặc file cấu hình.
@@ -46,6 +52,6 @@ export async function prepareCourseCode(html: string) {
     for (const child of fragment.childNodes) child.parentNode = head
     head.childNodes.unshift(...fragment.childNodes)
     const compiled = compileCourseCode('<!doctype html>\n' + serialize(doc))
-    return { ...compiled, warnings: [...new Set([...compiled.warnings, 'Đã tự xử lý Tailwind; giữ nguyên link ảnh ngoài, không tải ảnh về Storage.'])] }
+    return { ...compiled, warnings: [...new Set([...compiled.warnings, ...bundled.warnings, 'Đã tự xử lý Tailwind; giữ nguyên link ảnh ngoài, không tải ảnh về Storage.'])] }
   } catch (error) { throw error instanceof CourseCodeError ? error : new CourseCodeError(error instanceof Error ? error.message : 'Không xử lý được Tailwind.') }
 }

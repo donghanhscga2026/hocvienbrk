@@ -17,7 +17,7 @@ export function compileCourseCode(html: string) {
   return compiled
 }
 
-/** Chỉ gửi mẫu Tailwind tới bộ biên dịch máy chủ; HTML thông thường preview tại chỗ. */
-export function needsTailwindPreparation(html: string) {
-  return /cdn\.tailwindcss\.com|@tailwindcss\/browser|data-course-tailwind-config/i.test(html)
+/** Mẫu có thư viện hỗ trợ được đóng gói trên server; HTML thường preview tại chỗ. */
+export function needsCourseCodePreparation(html: string) {
+  return /cdn\.tailwindcss\.com|@tailwindcss\/browser|data-course-tailwind-config|data-aos|\bAOS\s*\.|data-course-library/i.test(html)
 }

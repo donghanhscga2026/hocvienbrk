@@ -7,7 +7,7 @@ import { ArrowLeft, Code2, Eye, Save, X } from 'lucide-react'
 import ManagementWorkspace from '@/components/layout/ManagementWorkspace'
 import TemplatePreviewFrame from './TemplatePreviewFrame'
 import { COURSE_TEMPLATE_LIBRARY } from '@/lib/course-page/templates'
-import { compileCourseCode, needsTailwindPreparation } from '@/lib/course-page/course-code'
+import { compileCourseCode, needsCourseCodePreparation } from '@/lib/course-page/course-code'
 import { compileTemplateSource, type TemplateSource } from '@/lib/course-page/template-source'
 import { templateWorkspaceRequest } from '@/lib/course-page/template-workspace-client'
 import type { PageRevision } from '@/lib/course-page/stage-template'
@@ -76,14 +76,14 @@ export default function CourseTemplateWorkspace({ embedded = false, workflow = f
     previewRequest.current = controller; setPreparing(true)
     try {
       let result = compileCourseCode(html)
-      if (needsTailwindPreparation(html)) result = await templateWorkspaceRequest(endpoint, { action: 'preview-course-code', slug: courseSlug, html }, controller.signal)
+      if (needsCourseCodePreparation(html)) result = await templateWorkspaceRequest(endpoint, { action: 'preview-course-code', slug: courseSlug, html }, controller.signal)
       if (controller.signal.aborted) return
       setRendered(result.html); setCompileError(''); setWarnings(result.warnings)
     } catch (error) { if (!controller.signal.aborted) setCompileError(error instanceof Error ? error.message : 'Không tạo được bản xem trước.') }
     finally { if (!controller.signal.aborted) setPreparing(false) }
   }, [html, courseSlug])
   useEffect(() => {
-    const timer = auto && html !== null ? setTimeout(() => void renderPreview(), needsTailwindPreparation(html) ? 1200 : 650) : null
+    const timer = auto && html !== null ? setTimeout(() => void renderPreview(), needsCourseCodePreparation(html) ? 1200 : 650) : null
     // Mã mới/hủy editor phải vô hiệu phản hồi preview cũ ngay, kể cả khi tắt tự cập nhật.
     setPreparing(false)
     return () => { if (timer) clearTimeout(timer); previewRequest.current?.abort() }
@@ -140,7 +140,7 @@ export default function CourseTemplateWorkspace({ embedded = false, workflow = f
       </article>)}</div>
       {courseSlug && <button type="button" disabled={busy || loading || !revision} onClick={() => openCode(starter, true)} className={button}><Code2 size={17} />Dán code riêng</button>}
     </> : <>
-      <p className="rounded-xl bg-brk-background p-3 text-sm">Dán toàn bộ HTML từ Gemini Canvas vào một ô, không cần tách CSS/JavaScript. Tự xử lý Tailwind từ cdn.tailwindcss.com; giữ nguyên link ảnh HTTPS bên ngoài. Mã tối đa 1 MB, hỗ trợ họa tiết SVG nhỏ. Nút <code>#dang-ky</code> hoặc <code>#register</code> mở đăng ký khóa học của hệ thống.</p>
+      <p className="rounded-xl bg-brk-background p-3 text-sm">Dán toàn bộ HTML từ Gemini Canvas vào một ô, không cần tách CSS/JavaScript. Tự xử lý Tailwind từ cdn.tailwindcss.com và hiệu ứng cuộn AOS; giữ nguyên link ảnh HTTPS bên ngoài. Mã tối đa 1 MB, hỗ trợ họa tiết SVG nhỏ. Nút <code>#dang-ky</code> hoặc <code>#register</code> mở đăng ký khóa học của hệ thống.</p>
       <div className="flex gap-2 xl:hidden">{(['code', 'preview'] as const).map(value => <button key={value} type="button" onClick={() => setMobilePanel(value)} aria-pressed={mobilePanel === value} className={button}>{value === 'code' ? 'Code' : 'Xem trước'}</button>)}</div>
       <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2">
         <section className={`${mobilePanel === 'preview' ? 'hidden xl:block' : ''} min-w-0 space-y-3 rounded-2xl border border-brk-outline bg-white p-4`}>
