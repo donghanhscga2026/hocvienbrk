@@ -149,6 +149,7 @@ export default function AffiliateConfigPage() {
   }
 
   const fmtMoney = (n: number) => `${n >= 0 ? '' : '−'}${Math.abs(n).toLocaleString('vi-VN')}đ`
+  const missingConfig = courses.filter((c) => (c.listedPrice ?? 0) > 0 && !c.config)
   const hasChanges = !!rerunReport && (rerunReport.created + rerunReport.adjusted + rerunReport.removed > 0)
 
   return (
@@ -160,6 +161,12 @@ export default function AffiliateConfigPage() {
       </p>
 
       {msg && <div className="mb-4 px-4 py-2 text-sm bg-blue-50 text-blue-700 rounded-xl">{msg}</div>}
+
+      {!loading && missingConfig.length > 0 && (
+        <div className="mb-4 px-4 py-3 text-sm bg-amber-50 border border-amber-200 text-amber-800 rounded-xl">
+          ⚠️ <b>{missingConfig.length} khóa thu phí chưa có cấu hình hoa hồng</b> — CTV quảng bá các khóa này sẽ <b>không có hoa hồng trực tiếp</b>: {missingConfig.map((c) => c.name).join(', ')}. Hãy đặt tỷ lệ cho từng khóa ngay trong bảng bên dưới.
+        </div>
+      )}
 
       {loading ? (
         <p className="text-gray-400 italic">Đang tải...</p>
