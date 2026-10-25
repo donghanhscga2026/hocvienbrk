@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import MainHeader from '@/components/layout/MainHeader'
-import { requestPayout } from '@/app/actions/affiliate-actions'
 import { AdminSubNav } from '@/components/admin/AdminSubNav'
 import { affiliateSubNav } from './affiliate-nav'
 
@@ -346,159 +345,6 @@ function LinksTab() {
     )
 }
 
-function WithdrawTab() {
-    const [wallet, setWallet] = useState<{ balance: number } | null>(null)
-    const [campaign, setCampaign] = useState<Campaign | null>(null)
-    const [user, setUser] = useState<{ bankName: string | null; bankAccount: string | null; bankHolder: string | null } | null>(null)
-    const [loading, setLoading] = useState(true)
-    const [submitting, setSubmitting] = useState(false)
-    const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
-
-    useEffect(() => {
-        loadData()
-    }, [])
-
-    async function loadData() {
-        try {
-            const res = await fetch('/api/affiliate/dashboard')
-            if (res.ok) {
-                const result = await res.json()
-                setWallet(result.data.wallet)
-                setCampaign(result.campaign)
-                const userRes = await fetch('/api/user/profile')
-                if (userRes.ok) {
-                    const userData = await userRes.json()
-                    setUser(userData.user || userData)
-                }
-            }
-        } catch (e) { console.error(e) }
-        setLoading(false)
-    }
-
-    async function handleWithdraw(formData: FormData) {
-        setSubmitting(true)
-        setMessage(null)
-        
-        const amount = Number(formData.get('amount'))
-        
-        try {
-            const res = await fetch('/api/affiliate/withdraw', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    amount,
-                    bankName: user?.bankName || '',
-                    bankAccount: user?.bankAccount || '',
-                    accountHolder: user?.bankHolder || ''
-                })
-            })
-            
-            if (res.ok) {
-                setMessage({ type: 'success', text: 'Yêu cầu rút tiền đã gửi thành công!' })
-                loadData()
-            } else {
-                const data = await res.json()
-                setMessage({ type: 'error', text: data.error || 'Lỗi khi gửi yêu cầu' })
-            }
-        } catch (e) {
-            setMessage({ type: 'error', text: 'Đã xảy ra lỗi' })
-        }
-        
-        setSubmitting(false)
-    }
-
-    if (loading) {
-        return (
-            <div className="text-center py-12 text-gray-400">
-                <p>Đang tải...</p>
-            </div>
-        )
-    }
-
-    const balance = wallet?.balance || 0
-    const minPayout = campaign?.minPayout || 200000
-    const feeAmount = campaign?.feeAmount || 3300
-
-    return (
-        <div className="space-y-6">
-            <div className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm text-center">
-                <p className="text-gray-500 text-sm">Số dư khả dụng</p>
-                <p className="text-4xl font-bold text-emerald-600 mt-2">{balance.toLocaleString('vi-VN')}đ</p>
-            </div>
-
-            {user?.bankAccount && user?.bankName ? (
-                <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-                    <h3 className="font-bold text-gray-900 mb-3">Thông tin tài khoản</h3>
-                    <div className="text-sm space-y-1 text-gray-600">
-                        <p>Ngân hàng: <strong>{user.bankName}</strong></p>
-                        <p>Số tài khoản: <strong>{user.bankAccount}</strong></p>
-                        <p>Chủ tài khoản: <strong>{user.bankHolder}</strong></p>
-                    </div>
-                </div>
-            ) : (
-                <div className="bg-red-50 rounded-xl p-4">
-                    <p className="text-red-700 text-sm">
-                        Bạn chưa cập nhật thông tin tài khoản ngân hàng. 
-                        Vui lòng cập nhật trong <Link href="/settings" className="underline font-medium">Cài đặt tài khoản</Link>.
-                    </p>
-                </div>
-            )}
-
-            {message && (
-                <div className={`p-4 rounded-xl ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                    {message.text}
-                </div>
-            )}
-
-            <form action={handleWithdraw} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-                <h3 className="font-bold text-gray-900 mb-4">Yêu cầu rút tiền</h3>
-                
-                <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Số tiền muốn rút</label>
-                    <input
-                        type="number"
-                        name="amount"
-                        min={minPayout}
-                        max={balance}
-                        placeholder={`Tối thiểu ${minPayout.toLocaleString('vi-VN')}đ`}
-                        className="w-full px-4 py-2 border border-gray-200 rounded-lg"
-                        required
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Tối thiểu: {minPayout.toLocaleString('vi-VN')}đ</p>
-                </div>
-
-                <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
-                    <div className="flex justify-between mb-1">
-                        <span className="text-gray-500">Phí chuyển khoản:</span>
-                        <span>{feeAmount.toLocaleString('vi-VN')}đ</span>
-                    </div>
-                    <div className="flex justify-between font-medium pt-2 border-t">
-                        <span>Thực nhận (ước tính):</span>
-                        <span className="text-emerald-600">~{(balance - feeAmount).toLocaleString('vi-VN')}đ</span>
-                    </div>
-                </div>
-
-                <button
-                    type="submit"
-                    disabled={submitting || balance < minPayout || !user?.bankAccount}
-                    className="w-full bg-emerald-500 text-white py-3 rounded-lg font-medium hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                >
-                    {submitting ? 'Đang gửi...' : 'Gửi yêu cầu rút tiền'}
-                </button>
-            </form>
-
-            <div className="bg-gray-50 rounded-xl p-4 text-sm">
-                <h4 className="font-bold text-gray-700 mb-2">Lưu ý</h4>
-                <ul className="text-gray-500 space-y-1">
-                    <li>• Xử lý trong 24-48 giờ</li>
-                    <li>• Phí: {feeAmount.toLocaleString('vi-VN')}đ/lần</li>
-                    <li>• Thuế 5% áp dụng khi {'>'} 2 triệu</li>
-                </ul>
-            </div>
-        </div>
-    )
-}
-
 interface AffiliateRef {
     id: number
     refKey: string
@@ -751,7 +597,7 @@ function RefsTab() {
 
 export default function AffiliateToolsPage() {
     const { data: session } = useSession()
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'links' | 'withdraw' | 'refs'>('dashboard')
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'links' | 'refs'>('dashboard')
 
     return (
         <div className="min-h-screen bg-gray-50 pb-20">
@@ -800,23 +646,15 @@ export default function AffiliateToolsPage() {
                     >
                         🔤 Refs
                     </button>
-                    <button
-                        onClick={() => setActiveTab('withdraw')}
-                        className={`flex-1 py-3 px-2 rounded-xl font-bold text-xs transition-all ${
-                            activeTab === 'withdraw'
-                                ? 'bg-emerald-500 text-white'
-                                : 'text-gray-500 hover:bg-gray-50'
-                        }`}
-                    >
-                        💰 Rút tiền
-                    </button>
                 </div>
 
+                <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-800">
+                    💡 Từ 25/10/2026, nền tảng <b>không giữ tiền hoa hồng</b>: học phí về thẳng tài khoản của giảng viên, và giảng viên thanh toán hoa hồng trực tiếp cho bạn theo báo cáo quyết toán của hệ thống.
+                </div>
                 {activeTab === 'dashboard' && <DashboardTab />}
                 {activeTab === 'links' && <LinksTab />}
                 {activeTab === 'refs' && <RefsTab />}
-                {activeTab === 'withdraw' && <WithdrawTab />}
-            </div>
+                            </div>
         </div>
     )
 }
