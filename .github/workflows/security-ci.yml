@@ -51,6 +51,9 @@ jobs:
       - name: Security P0 invariant tests
         run: node scripts/test-security-p0.cjs
 
+      - name: Soft-404 slug guard tests
+        run: node scripts/test-soft404-slug-guard.cjs
+
       - name: Website and custom domain isolation tests
         run: |
           npm run test:website-templates
