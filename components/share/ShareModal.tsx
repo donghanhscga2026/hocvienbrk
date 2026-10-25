@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useSyncExternalStore } from 'react'
-import { X, Link2, Facebook, MessageCircle, Send, Check } from 'lucide-react'
+import { X, Link2, MessageCircle, Send, Check } from 'lucide-react'
+import { FacebookBrandIcon as Facebook } from '@/components/icons/brands'
 import { useDomainBrand } from '@/components/website/DomainShell'
 
 const subscribeMounted = () => () => {}
