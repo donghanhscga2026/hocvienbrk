@@ -42,40 +42,47 @@ jobs:
           preview_cutoff=$(( now_ms - PREVIEW_KEEP_DAYS * 86400000 ))
           failed_cutoff=$(( now_ms - FAILED_KEEP_HOURS * 3600000 ))
 
+          # Gom deployments vào FILE TẠM rồi để jq đọc từ file.
+          # (Bản refactor 11/10 nhồi toàn bộ JSON vào tham số --argjson
+          # nên chết lỗi "Argument list too long" khi danh sách lớn.)
+          tmp_dir=$(mktemp -d)
+          trap 'rm -rf "$tmp_dir"' EXIT
+          pages_file="$tmp_dir/pages.ndjson"
+          all_file="$tmp_dir/deployments.json"
+          : > "$pages_file"
+
           echo "Lấy danh sách deployments (tất cả các trang)..."
-            all_deps="[]"
-            page_url="$API/v6/deployments?projectId=$VERCEL_PROJECT_ID&$SCOPE&limit=100"
-            while [ -n "$page_url" ]; do
-            resp=$(curl -s -H "$AUTH_HEADER" "$page_url")
-            all_deps=$(echo "$all_deps" | jq --argjson r "$resp" '. + $r.deployments')
-            next=$(echo "$resp" | jq -r '.pagination.next // empty')
+          page_url="$API/v6/deployments?projectId=$VERCEL_PROJECT_ID&$SCOPE&limit=100"
+          while [ -n "$page_url" ]; do
+            curl -s -H "$AUTH_HEADER" "$page_url" > "$tmp_dir/page.json"
+            cat "$tmp_dir/page.json" >> "$pages_file"
+            echo "" >> "$pages_file"
+            next=$(jq -r '.pagination.next // empty' "$tmp_dir/page.json")
             if [ -z "$next" ]; then
-            page_url=""
+              page_url=""
             else
-            page_url="$API/v6/deployments?projectId=$VERCEL_PROJECT_ID&$SCOPE&limit=100&until=$next"
+              page_url="$API/v6/deployments?projectId=$VERCEL_PROJECT_ID&$SCOPE&limit=100&until=$next"
             fi
-            done
-            echo "Tổng số deployments: $(echo "$all_deps" | jq 'length')"
-            resp=$(jq -n --argjson d "$all_deps" '{deployments: $d}')
+          done
+          jq -s '[.[].deployments[]]' "$pages_file" > "$all_file"
+          echo "Tổng số deployments: $(jq 'length' "$all_file")"
 
-            to_delete=$(echo "$resp" | jq -r \
-
+          to_delete=$(jq -r \
             --argjson keep "$KEEP_PRODUCTION" \
             --argjson preview_cutoff "$preview_cutoff" \
             --argjson failed_cutoff "$failed_cutoff" '
-            (.deployments
-              | map(select(.target == "production" and .state == "READY"))
+            ( . | map(select(.target == "production" and .state == "READY"))
               | sort_by(.created) | reverse
               | to_entries | map(select(.key >= $keep)) | map(.value)
               | map(.uid)) as $oldprod
-            | [ .deployments[]
+            | [ .[]
                 | select(
                     ((.state == "ERROR" or .state == "CANCELED") and .created < $failed_cutoff)
                     or ((.target != "production") and .created < $preview_cutoff)
                     or (.uid as $u | $oldprod | index($u))
                   )
                 | .uid
-              ] | unique | .[]')
+              ] | unique | .[]' "$all_file")
 
           if [ -z "$to_delete" ]; then
             echo "Không có deployment nào cần xóa."
