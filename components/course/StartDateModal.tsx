@@ -11,7 +11,7 @@ import {
 } from 'date-fns'
 import { vi } from 'date-fns/locale'
 import { DayPicker } from 'react-day-picker'
-import 'react-day-picker/dist/style.css'
+import 'react-day-picker/style.css'
 
 import {
   Dialog,
@@ -98,23 +98,22 @@ export default function StartDateModal({
               classNames={{
                 months: "flex flex-col",
                 month: "space-y-1",
-                caption: "flex justify-center pt-1 relative items-center px-6 mb-1",
+                month_caption: "flex justify-center pt-1 relative items-center px-6 mb-1",
                 caption_label: "text-xs font-bold text-zinc-200",
                 nav: "flex items-center",
-                nav_button: "h-6 w-6 bg-transparent p-0 opacity-50 hover:opacity-100",
-                nav_button_previous: "absolute left-0",
-                nav_button_next: "absolute right-0",
-                table: "w-full border-collapse",
-                head_row: "flex",
-                head_cell: "text-zinc-500 w-7 sm:w-8 font-normal text-[0.65rem] uppercase",
-                row: "flex w-full mt-0.5",
-                cell: "relative p-0 text-center text-xs focus-within:relative focus-within:z-20",
-                day: "h-7 w-7 sm:h-8 sm:w-8 p-0 font-normal hover:bg-zinc-800 rounded transition-colors text-xs",
-                day_selected: "bg-sky-600 text-white hover:bg-sky-500 font-bold !opacity-100",
-                day_today: "text-sky-400 font-bold underline underline-offset-4",
-                day_outside: "text-zinc-700 opacity-30",
-                day_disabled: "text-zinc-800 opacity-10",
-                day_hidden: "invisible",
+                button_previous: "h-6 w-6 bg-transparent p-0 opacity-50 hover:opacity-100 absolute left-0",
+                button_next: "h-6 w-6 bg-transparent p-0 opacity-50 hover:opacity-100 absolute right-0",
+                month_grid: "w-full border-collapse",
+                weekdays: "flex",
+                weekday: "text-zinc-500 w-7 sm:w-8 font-normal text-[0.65rem] uppercase",
+                week: "flex w-full mt-0.5",
+                day: "relative p-0 text-center text-xs focus-within:relative focus-within:z-20",
+                day_button: "h-7 w-7 sm:h-8 sm:w-8 p-0 font-normal hover:bg-zinc-800 rounded transition-colors text-xs",
+                selected: "bg-sky-600 text-white hover:bg-sky-500 font-bold !opacity-100",
+                today: "text-sky-400 font-bold underline underline-offset-4",
+                outside: "text-zinc-700 opacity-30",
+                disabled: "text-zinc-800 opacity-10",
+                hidden: "invisible",
               }}
             />
           </div>
