@@ -47,7 +47,7 @@ export const crmCommand = z.discriminatedUnion('action', [
 ])
 export type CrmCommand = z.infer<typeof crmCommand>
 export const crmQuery = z.object({
-  view: z.enum(['contacts', 'tasks', 'owners', 'detail', 'overview']).default('contacts'),
+  view: z.enum(['contacts', 'tasks', 'owners', 'detail', 'overview', 'today']).default('contacts'),
   id: z.coerce.number().int().positive().optional(),
   page: z.coerce.number().int().min(1).max(100000).default(1),
   q: text(150).default(''), source: text(100).default(''), tag: text(40).default(''),

@@ -7,6 +7,7 @@ import { projectStudent, studentIdentity, studentUserSelect } from './student-pr
 import { learningSummaries } from './learning'
 import { requestScope } from './requests'
 import { readDashboard } from './dashboard'
+import { readToday } from './today'
 
 export class CrmError extends Error {
   constructor(message: string, public status = 400) { super(message) }
@@ -26,6 +27,7 @@ export async function readCrm(db: PrismaClient, actor: CrmActor, query: z.infer<
   assertActor(actor)
   const scope = contactScope(actor)
   if (query.view === 'overview') return readDashboard(db, actor)
+  if (query.view === 'today') return readToday(db, actor, query.page)
   if (query.view === 'owners') {
     const owners = await db.user.findMany({
       where: actor.role === 'ADMIN' ? { role: { in: ['ADMIN', 'TEACHER', 'INSTRUCTOR'] } } : { id: actor.id },

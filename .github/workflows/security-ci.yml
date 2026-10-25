@@ -74,6 +74,7 @@ jobs:
           node scripts/test-unified-teaching-role.cjs
           node scripts/test-learning-profiles.cjs
           node scripts/test-crm-request-workflow.cjs
+          node scripts/test-crm-today.cjs
           node scripts/test-crm-request-ui.cjs
           node scripts/test-crm-request-bulk.cjs
           node scripts/test-crm-course-links.cjs
