@@ -37,6 +37,7 @@ async function run() {
   const PublicHome = load('components/wi300/Wi300PublicHome.tsx', {
     '@/lib/prisma': moduleOf({}),
     '@/lib/wi300/project-service': { readPublicProjects: () => { reads++; return deferred } },
+    'next/cache': { unstable_cache: fn => fn },
     'next/image': image, 'next/link': link,
   }).default
   const final = await capture(React.createElement(PublicHome, { brand }), shell => {

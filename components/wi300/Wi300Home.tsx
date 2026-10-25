@@ -7,7 +7,7 @@ import type { DeploymentBrand } from '@/lib/site-profile/deployment-brand'
 import Wi300HomeClient from './Wi300HomeClient'
 import { canTeach } from '@/lib/wi300/personal-space'
 import { wi300CoursePreferences, wi300CourseWhere, wi300HiddenLearning } from '@/lib/wi300/course-visibility'
-import { readPublicProjects } from '@/lib/wi300/project-service'
+import { getPublicProjects } from '@/lib/wi300/public-projects'
 
 // Chỉ gửi dữ liệu dùng bởi card, bộ lọc và đăng ký; bỏ nội dung dài/email quản trị.
 const courseSelect = {
@@ -43,7 +43,7 @@ const getCatalog = unstable_cache(async (where: Prisma.CourseWhereInput) => pris
 
 export default async function Wi300Home({ brand, session, view = 'home', catalogHeroRendered = false, loadHomeCourses = true }: { brand: DeploymentBrand; session: Session | null; view?: 'home' | 'catalog' | 'discover' | 'space' | 'teachers'; catalogHeroRendered?: boolean; loadHomeCourses?: boolean }) {
   const projectsReady = view === 'home' || view === 'discover' || view === 'catalog'
-    ? readPublicProjects(prisma).then(projects => ({ projects, projectsError: false })).catch(error => { console.error('[WI300 projects]', error instanceof Error ? error.name : 'Unknown'); return { projects: [], projectsError: true } })
+    ? getPublicProjects().then(projects => ({ projects, projectsError: false })).catch(error => { console.error('[WI300 projects]', error instanceof Error ? error.name : 'Unknown'); return { projects: [], projectsError: true } })
     : Promise.resolve({ projects: [], projectsError: false })
   const userId = session?.user?.id != null ? Number(session.user.id) : null
   let preferences = new Map<number, boolean>()

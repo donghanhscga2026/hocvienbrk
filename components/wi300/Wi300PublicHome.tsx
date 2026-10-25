@@ -1,8 +1,7 @@
 import { Suspense } from 'react'
-import prisma from '@/lib/prisma'
 import type { DeploymentBrand } from '@/lib/site-profile/deployment-brand'
 import { defaultAppearance } from '@/lib/wi300/appearance'
-import { readPublicProjects } from '@/lib/wi300/project-service'
+import { getPublicProjects } from '@/lib/wi300/public-projects'
 import Wi300Businesses from './Wi300Businesses'
 import { createHomeSections } from './Wi300HomeSections'
 
@@ -18,7 +17,7 @@ export default function Wi300PublicHome({ brand }: { brand: DeploymentBrand }) {
 
 async function Projects({ limit }: { limit: number }) {
   try {
-    const projects = await readPublicProjects(prisma)
+    const projects = await getPublicProjects()
     return <Wi300Businesses projects={projects} limit={limit} />
   } catch (error) {
     console.error('[WI300 public home projects]', error instanceof Error ? error.name : 'Unknown')

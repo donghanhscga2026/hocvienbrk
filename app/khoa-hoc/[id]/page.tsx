@@ -13,7 +13,8 @@ import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime
 import Wi300Header from '@/components/wi300/Wi300Header'
 import Wi300Breadcrumb from '@/components/wi300/Wi300Breadcrumb'
 import { courseLoadingPlan } from '@/lib/course-page/loading-plan'
-import { readPublicProjects } from '@/lib/wi300/project-service'
+import { getCoursePublicExtras } from '@/lib/course-page/public-extras'
+import { getPublicProjects } from '@/lib/wi300/public-projects'
 import CourseProjectBadges from '@/components/course/CourseProjectBadges'
 
 // Dùng chung kiểm tra phạm vi trong metadata và nội dung của cùng request.
@@ -52,7 +53,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const defaultDescription = brand?.description || siteProfile?.metaDescription || siteProfile?.subtitle || undefined
     const defaultImage = brand?.ogImageUrl || siteProfile?.metaImage || siteProfile?.heroImage || '/og-image.png'
     const courseImg = course.link_anh_bia || (course as any).link_anh_bia_khoa
-    
+
     // Check if dynamic course page exists
     const coursePage = await prisma.coursePage.findFirst({
         where: { slug: id, status: 'published' }
@@ -116,14 +117,12 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
 
     // [OPTIMIZE] Các truy vấn dưới đây độc lập với nhau — chạy song song
     // thay vì tuần tự để giảm tổng thời gian chờ của trang bán khóa học.
+    // Riêng dữ liệu công khai của khóa (bài học, thống kê, testimonials) đi qua
+    // getCoursePublicExtras đã cache 300s; enrollment và SĐT vẫn tươi theo phiên.
     const [
         userRow,
         enrollment,
-        lessons,
-        durationRows,
-        activeStudentCount,
-        reflectionsLP,
-        lessonComments,
+        extras,
         coursePage,
         projectBadges
     ] = await Promise.all([
@@ -133,78 +132,20 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
         userId
             ? prisma.enrollment.findFirst({ where: { userId, courseId } })
             : Promise.resolve(null),
-        loadPlan.lessons ? prisma.lesson.findMany({
-            where: { courseId },
-            orderBy: { order: 'asc' },
-            select: { id: true, title: true, order: true }
-        }) : Promise.resolve([]),
-        // Tổng thời lượng video từ lessonProgress.maxTime
-        loadPlan.statistics ? prisma.lessonProgress.groupBy({
-            by: ['lessonId'],
-            where: { lesson: { courseId }, maxTime: { gt: 0 } },
-            _max: { maxTime: true }
-        }) : Promise.resolve([]),
-        // Số thành viên đang học
-        loadPlan.statistics ? prisma.enrollment.count({ where: { courseId, status: 'ACTIVE' } }) : Promise.resolve(0),
-        // Testimonials từ dữ liệu thật (LessonProgress.assignment.reflection)
-        loadPlan.testimonials ? prisma.lessonProgress.findMany({
-            where: { lesson: { courseId }, status: 'COMPLETED' },
-            include: {
-                enrollment: {
-                    include: { user: { select: { id: true, name: true, image: true } } }
-                },
-                lesson: { select: { title: true, order: true } }
-            },
-            orderBy: { submittedAt: 'desc' },
-            take: 5
-        }) : Promise.resolve([]),
-        loadPlan.testimonials ? prisma.lessonComment.findMany({
-            where: { lesson: { courseId } },
-            include: {
-                user: { select: { id: true, name: true, image: true } },
-                lesson: { select: { title: true } }
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 10
-        }) : Promise.resolve([]),
+        getCoursePublicExtras(courseId, loadPlan.lessons, loadPlan.statistics, loadPlan.testimonials),
         Promise.resolve(publishedPage),
         // Chỉ lấy dự án công khai sau khi đã kiểm tra phạm vi khóa học.
-        deploymentBrand ? readPublicProjects(prisma)
+        deploymentBrand ? getPublicProjects()
             .then(projects => projects.filter(project => project.courseIds.includes(courseId)).map(({ slug, name, logo }) => ({ slug, name, logo })))
             .catch(error => { console.error('[Course projects]', error instanceof Error ? error.name : 'Unknown'); return [] })
             : Promise.resolve([])
     ])
 
     const userPhone = userRow?.phone || null
-    const totalSeconds = durationRows.reduce((sum, r) => sum + (r._max.maxTime || 0), 0)
-    const totalHours = Math.max(1, Math.ceil(totalSeconds / 3600))
-
-    const testimonials = [
-        ...reflectionsLP
-            .filter(lp => {
-                if (!lp.assignment) return false
-                const a = lp.assignment as Record<string, unknown>
-                return typeof a.reflection === 'string' && a.reflection.trim().length > 0
-            })
-            .map(lp => ({
-                id: `ref-${lp.id}`,
-                name: lp.enrollment.user.name || 'Thành viên',
-                content: ((lp.assignment as Record<string, unknown>).reflection as string).trim(),
-                avatar: lp.enrollment.user.image,
-                role: `Bài ${lp.lesson.order}`,
-                rating: Math.min(5, Math.max(1, Math.round(lp.totalScore / 2))) || 5,
-            })),
-        ...lessonComments
-            .filter(c => c.content && c.content.trim().length > 0)
-            .map(c => ({
-                id: `cmt-${c.id}`,
-                name: c.user.name || 'Thành viên',
-                content: c.content.trim(),
-                avatar: c.user.image,
-                role: `Bình luận bài: ${c.lesson.title}`,
-                rating: 5,
-            }))
-    ].slice(0, 5)
+    const lessons = extras.lessons
+    const totalHours = extras.totalHours
+    const activeStudentCount = extras.activeStudentCount
+    const testimonials = extras.testimonials
 
     // Chỉ tự mở bài từ thông báo khi bài đó thực sự thuộc khóa học này.
     const notificationEntry = typeof requestedLesson === 'string'
