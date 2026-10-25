@@ -9,6 +9,7 @@ import AccountAssistantModal from '@/components/auth/AccountAssistantModal'
 import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
 import { enrollInCourseAction, checkEnrollmentStatusAction, getBrkMbvBalanceAction, getBrkVndWalletBalanceAction, getApplicableVouchersAction } from '@/app/actions/course-actions'
 import { resolveBankBin } from '@/lib/bank-bin'
+import { generateTransferContent } from '@/lib/vietqr'
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
 
 type FlowStep = 'auth' | 'voucher_confirm' | 'payment' | 'thankyou'
@@ -195,8 +196,7 @@ export default function RegistrationFlowModal({
   const finalPaidWithVoucher = useVoucher ? Math.min(voucherBalance, voucherAmountToUse, course.phi_coc || 0) : 0
   const finalPaidWithVnd = useVndWallet ? Math.min(vndBalance, Math.max(0, (course.phi_coc || 0) - finalPaidWithVoucher)) : 0
   const effectiveAmount = payment?.amount ?? Math.max(0, (course.phi_coc || 0) - finalPaidWithVoucher - finalPaidWithVnd)
-  const cleanPhone = userPhone ? userPhone.replace(/\D/g, '').slice(-6) : ''
-  const effectiveContent = payment?.transferContent || `SDT ${cleanPhone} HV ${effectiveUserId} COC ${course.id_khoa}`.toUpperCase().slice(0, 50)
+  const effectiveContent = payment?.transferContent || generateTransferContent({ phone: userPhone || '', userId: effectiveUserId, courseCode: course.id_khoa, bankName: payment?.bankName || course.teacherBankAccount?.bankName })
   const bankAcc = course.teacherBankAccount
   const bankId = bankAcc ? resolveBankBin(bankAcc.bankName) : ''
   const qrCodeUrl = payment?.qrCodeUrl

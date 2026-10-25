@@ -7,7 +7,7 @@ import type { Enrollment } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 import { after } from "next/server"
 import { cookies, headers } from "next/headers"
-import { createPaymentQR } from "@/lib/vietqr"
+import { createPaymentQR, generateTransferContent } from "@/lib/vietqr"
 import { resolveBankBin } from "@/lib/bank-bin"
 import { resolveRefToUserId } from "@/lib/affiliate/resolve-ref-helper"
 import { toTitleCase } from "@/lib/utils/text-format"
@@ -232,9 +232,8 @@ export async function enrollInCourseAction(
                         console.error("Failed to regenerate QR:", qrError)
                     }
 
-                    const cleanPhone = user?.phone ? user.phone.replace(/\D/g, '').slice(-6) : ''
                     if (!transferContent) {
-                        transferContent = `SDT ${cleanPhone} HV ${userId} COC ${course.id_khoa}`.toUpperCase()
+                        transferContent = generateTransferContent({ phone: user?.phone || '', userId, courseCode: course.id_khoa, bankName: bankAcc.bankName })
                     }
 
                     if (!qrCodeUrl) {
@@ -527,9 +526,8 @@ export async function enrollInCourseAction(
                 }
             }
 
-            const cleanPhone = user?.phone ? user.phone.replace(/\D/g, '').slice(-6) : ''
             if (!transferContent) {
-                transferContent = `SDT ${cleanPhone} HV ${userId} COC ${course.id_khoa}`.toUpperCase()
+                transferContent = generateTransferContent({ phone: user?.phone || '', userId, courseCode: course.id_khoa, bankName: bankAcc.bankName })
             }
 
             if (!qrCodeUrl) {

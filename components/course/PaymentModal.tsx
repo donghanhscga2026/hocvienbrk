@@ -5,6 +5,7 @@ import React, { useState } from 'react'
 import Image from 'next/image'
 import UploadProofModal from '@/components/payment/UploadProofModal'
 import { resolveBankBin } from '@/lib/bank-bin'
+import { generateTransferContent } from '@/lib/vietqr'
 
 interface PaymentModalProps {
     course: any
@@ -45,9 +46,8 @@ export default function PaymentModal({ course, enrollment, userPhone = null, use
     const effectiveAmount = payment?.amount ?? course.phi_coc ?? 0
     const voucherSaved = course.phi_coc ? Math.max(0, course.phi_coc - effectiveAmount) : 0
     
-    // Format nội dung thống nhất với lib/vietqr: SDT [6_cuối] HV [userId] COC [courseCode]
-    const cleanPhone = userPhone ? userPhone.replace(/\D/g, '').slice(-6) : ''
-    const effectiveContent = payment?.transferContent || `SDT ${cleanPhone} HV ${userId} COC ${course.id_khoa}`.toUpperCase().slice(0, 50)
+    // Format nội dung thống nhất với lib/vietqr (TK nhận VietinBank có thêm tiền tố SEVQR)
+    const effectiveContent = payment?.transferContent || generateTransferContent({ phone: userPhone || '', userId, courseCode: course.id_khoa, bankName: payment?.bankName || course.teacherBankAccount?.bankName })
     
     const bankAcc = course.teacherBankAccount
 

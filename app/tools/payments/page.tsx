@@ -8,6 +8,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 import { resolveBankBin } from '@/lib/bank-bin'
+import { generateTransferContent } from '@/lib/vietqr'
 import { isValidImageUrl } from '@/lib/image-validation'
 
 interface PaymentData {
@@ -805,8 +806,7 @@ export default function PaymentsPage() {
 
                   {/* Cú pháp chuyển khoản chuẩn */}
                   {(() => {
-                    const cleanPhone = payment.enrollment.user.phone ? payment.enrollment.user.phone.replace(/\D/g, '').slice(-6) : ''
-                    const standardContent = `SDT ${cleanPhone} HV ${payment.enrollment.user.id} COC ${payment.enrollment.course.id_khoa}`.toUpperCase()
+                    const standardContent = generateTransferContent({ phone: payment.enrollment.user.phone || '', userId: payment.enrollment.user.id, courseCode: payment.enrollment.course.id_khoa, bankName: payment.bankName })
                     const isContentMatch = payment.content ? payment.content.trim().toUpperCase() === standardContent : false
 
                     return (
@@ -948,8 +948,7 @@ export default function PaymentsPage() {
         if (!p || !p.enrollment.course.teacherBankAccount) return null
         const bankAcc = p.enrollment.course.teacherBankAccount
         const bankId = resolveBankBin(bankAcc.bankName)
-        const cleanPhone = p.enrollment.user.phone ? p.enrollment.user.phone.replace(/\D/g, '').slice(-6) : ''
-        const standardContent = `SDT ${cleanPhone} HV ${p.enrollment.user.id} COC ${p.enrollment.course.id_khoa}`.toUpperCase()
+        const standardContent = generateTransferContent({ phone: p.enrollment.user.phone || '', userId: p.enrollment.user.id, courseCode: p.enrollment.course.id_khoa, bankName: bankAcc.bankName })
         const effectiveAmount = p.enrollment.phi_coc !== undefined && p.enrollment.phi_coc !== null ? p.enrollment.phi_coc : (p.amount || p.enrollment.course.phi_coc || 0)
         const mbvDeducted = Math.max(0, (p.enrollment.course.phi_coc || 0) - effectiveAmount)
         const qrUrl = `https://img.vietqr.io/image/${bankId}-${bankAcc.accountNumber}-qr_only.png?amount=${effectiveAmount}&addInfo=${encodeURIComponent(standardContent)}&accountName=${encodeURIComponent(bankAcc.accountHolder)}`
