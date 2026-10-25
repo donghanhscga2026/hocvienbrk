@@ -30,6 +30,15 @@ jobs:
           curl -s -o /dev/null -w "%{http_code}" -X GET "${{ vars.SITE_URL }}/api/cron/mbtca-orchestrator" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
 
+  booking-reminders:
+    if: github.event.schedule == '5 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call booking-reminders
+        run: |
+          curl --fail --silent --show-error --max-time 120 -X GET "${{ vars.SITE_URL }}/api/cron/booking-reminders" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
   gmail-watch:
     if: github.event.schedule == '0 0 * * *' || github.event.schedule == '*/15 * * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
