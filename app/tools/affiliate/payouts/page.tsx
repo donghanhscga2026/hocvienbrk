@@ -38,6 +38,10 @@ export default async function AdminAffiliatePayoutsPage() {
                 <div className="mb-8">
                     <h1 className="text-2xl font-bold">Quản lý Rút Tiền</h1>
                     <p className="text-gray-600">Duyệt và xử lý yêu cầu rút tiền của CTV</p>
+                    <div className="mt-4 px-4 py-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-sm">
+                        ⚠️ Từ 25/10/2026, nền tảng <b>không còn giữ tiền hoa hồng</b> (học phí về thẳng tài khoản giảng viên).
+                        Trang này chỉ để tra cứu dữ liệu cũ; việc thanh toán cho CTV do giảng viên thực hiện theo trang <b>Quyết Toán GV</b>.
+                    </div>
                 </div>
 
                 {/* Pending Payouts */}

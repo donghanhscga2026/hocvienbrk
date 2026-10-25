@@ -121,3 +121,11 @@ jobs:
         run: |
           curl --fail --silent --show-error --max-time 120 -X GET "${{ vars.SITE_URL }}/api/cron/baseline-reminders" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+      - name: Affiliate commissions release (PENDING -> AVAILABLE)
+        run: |
+          curl --fail --silent --show-error --max-time 300 -X POST "${{ vars.SITE_URL }}/api/cron/process-commissions" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+      - name: Affiliate leaderboard snapshot (monthly)
+        run: |
+          curl --fail --silent --show-error --max-time 120 -X POST "${{ vars.SITE_URL }}/api/cron/affiliate-leaderboard" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
