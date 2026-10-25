@@ -12,6 +12,12 @@ import ManagementWorkspace from '@/components/layout/ManagementWorkspace'
 import MainHeader from '@/components/layout/MainHeader'
 import type { ActivitySummary } from '@/components/course/CourseManagementActivity'
 
+// Nhãn dạng phí dùng chung cho danh sách và thẻ khóa học.
+const courseFeeLabels: Record<string, string> = {
+    MIEN_PHI: 'Miễn phí', PHI_TUY_TINH: 'Phí tùy tâm', PHI_CAM_KET: 'Phí cam kết',
+    PHI_DONG_HANH: 'Phí đồng hành', PHI_TOI_THIEU: 'Phí tối thiểu',
+}
+
 // Chỉ tải màn thống kê/học viên khi người dùng mở, giảm mã tải ban đầu.
 const CourseDashboardModal = dynamic(() => import('@/components/course/CourseDashboardModal'), { ssr: false })
 const AdminMemberRosterTab = dynamic(() => import('@/components/course/AdminMemberRosterTab'), { ssr: false })
@@ -367,15 +373,19 @@ function CoursesTab() {
                     {activityError && <p role="alert" className="text-sm text-red-700">{activityError} · Bấm Tải lại hoạt động để thử lại.</p>}
                     <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-gray-600">Danh sách khóa học</p><div className="flex rounded-xl border border-brk-outline bg-white p-1">{(['list', 'cards'] as const).map(mode => <button key={mode} type="button" aria-pressed={display === mode} onClick={() => setDisplay(mode)} className={`min-h-10 rounded-lg px-3 text-sm ${display === mode ? 'bg-brk-background font-semibold text-brk-primary' : 'text-gray-500'}`}>{mode === 'list' ? 'Danh sách' : 'Thẻ'}</button>)}</div></div>
                     <div className={display === 'list' ? 'overflow-x-auto rounded-2xl border border-brk-outline bg-white' : 'rounded-2xl'}>
-                        <div className={display === 'list' ? 'min-w-[1100px]' : ''}>
-                        {display === 'list' && <div className="grid grid-cols-[24px_minmax(240px,2fr)_130px_minmax(100px,1fr)_100px_80px_minmax(140px,1.2fr)_120px] items-center gap-3 bg-brk-background px-4 py-3 text-xs font-semibold text-brk-on-surface"><span /><span>Khóa học / Giảng viên</span><span>Danh mục</span><span>Dự án</span><span>Hiển thị</span><span>Học viên</span><span>Hoạt động</span><span>Thao tác</span></div>}
+                        <div className={display === 'list' ? 'min-w-[1240px]' : ''}>
+                        {display === 'list' && <div className="grid grid-cols-[24px_minmax(240px,2fr)_140px_130px_minmax(100px,1fr)_100px_80px_minmax(140px,1.2fr)_120px] items-center gap-3 bg-brk-background px-4 py-3 text-xs font-semibold text-brk-on-surface"><span /><span>Khóa học / Giảng viên</span><span>Học phí</span><span>Danh mục</span><span>Dự án</span><span>Hiển thị</span><span>Học viên</span><span>Hoạt động</span><span>Thao tác</span></div>}
                         <div className={display === 'cards' ? 'grid gap-4 sm:grid-cols-2 xl:grid-cols-3' : 'divide-y divide-brk-outline'}>
                         {visibleCourses.map(course => {
+                            const feeLabel = courseFeeLabels[course.feeType] || 'Học phí'
+                            const feeAmount = typeof course.phi_coc === 'number' && Number.isFinite(course.phi_coc) && course.phi_coc >= 0 ? course.phi_coc : null
+                            const feeText = feeAmount === null ? 'Chưa có học phí' : feeAmount === 0 && course.feeType === 'MIEN_PHI' ? 'Miễn phí' : feeAmount === 0 && course.feeType === 'PHI_TUY_TINH' ? 'Tùy tâm' : feeAmount.toLocaleString('vi-VN') + 'đ'
                             const summary = activity.find(item => item.courseId === course.id)
                             const names = projects.filter(project => project.courseIds.includes(course.id)).map(project => project.name)
-                            return <article key={course.id} className={`gap-3 p-4 ${display === 'list' ? 'grid grid-cols-[24px_minmax(240px,2fr)_130px_minmax(100px,1fr)_100px_80px_minmax(140px,1.2fr)_120px] items-center' : 'grid rounded-2xl border border-brk-outline bg-white'} ${selectedIds.has(course.id) ? 'bg-brk-background ring-2 ring-inset ring-brk-primary' : ''}`}>
+                            return <article key={course.id} className={`gap-3 p-4 ${display === 'list' ? 'grid grid-cols-[24px_minmax(240px,2fr)_140px_130px_minmax(100px,1fr)_100px_80px_minmax(140px,1.2fr)_120px] items-center' : 'grid rounded-2xl border border-brk-outline bg-white'} ${selectedIds.has(course.id) ? 'bg-brk-background ring-2 ring-inset ring-brk-primary' : ''}`}>
                                 <input type="checkbox" aria-label={`Chọn ${course.name_lop}`} checked={selectedIds.has(course.id)} onChange={() => toggleSelect(course.id)} className="h-4 w-4 accent-green-700" />
                                 <div className="flex min-w-0 items-center gap-3">{course.link_anh_bia ? <img src={course.link_anh_bia} alt="" loading="lazy" decoding="async" width={80} height={64} className="h-16 w-20 shrink-0 rounded-lg object-cover" /> : <div className="flex h-16 w-20 shrink-0 items-center justify-center rounded-lg bg-brk-background text-brk-primary"><BookOpen size={24} /></div>}<div className="min-w-0"><Link href={`/tools/courses/new?id=${course.id}`} className="break-words text-sm font-bold text-brk-primary">{course.name_lop}</Link><p className="mt-1 text-xs text-gray-500">{course.id_khoa}</p><p className="mt-1 text-xs text-gray-500">{course.teacher?.name || course.teacher?.email || 'Chưa phân công'} · {course._count?.lessons || 0} bài</p></div></div>
+                                <div className="min-w-0"><p className="text-xs text-gray-500">{display === 'cards' ? 'Học phí · ' : ''}{feeLabel}</p><p className="mt-1 break-words text-sm font-semibold text-brk-primary">{feeText}</p></div>
                                 <p className="break-words text-xs font-medium text-brk-primary">{course.courseCategory?.name || course.category || 'Khác'}</p>
                                 <p className="break-words text-xs text-gray-600">{names.join(', ') || 'Chưa liên kết'}</p>
                                 <span className={`w-fit rounded-full px-2 py-1 text-xs ${course.status ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{course.status ? 'Hiển thị' : 'Đang ẩn'}</span>
