@@ -11,7 +11,8 @@ import { COURSE_TEMPLATE_LIBRARY, createCoursePageFromTemplate } from '@/lib/cou
 import { checkRateLimit } from '@/lib/rate-limit'
 import { zipSelectedBlockKeys } from '@/lib/course-page/importer/source-url'
 import { CrmError } from '@/lib/crm/service'
-import { compileCourseCode, CourseCodeError } from '@/lib/course-page/course-code'
+import { CourseCodeError } from '@/lib/course-page/course-code'
+import { prepareCourseCode } from '@/lib/course-page/course-code-server'
 import { isMissingTemplateSource } from '@/lib/course-page/missing-template-source'
 
 const json = (value: unknown, status = 200) => NextResponse.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } })
@@ -59,6 +60,7 @@ export async function GET(request: Request) {
   } catch (error) { return failure(error) }
 }
 const inputSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('preview-course-code'), slug: z.string().min(1).max(200), html: z.string().min(1).max(1024 * 1024) }).strict(),
   z.object({ action: z.literal('save-course-code'), slug: z.string().min(1).max(200), name: z.string().min(1).max(200), html: z.string().min(1).max(1024 * 1024), revision: z.object({ id: z.string().nullable(), updatedAt: z.string().datetime().nullable() }).strict() }).strict(),
   z.object({ action: z.literal('apply'), id: z.string(), system: z.boolean(), slug: z.string().min(1).max(200), name: z.string().min(1).max(200) }).strict(),
 ])
@@ -74,11 +76,15 @@ export async function POST(request: Request) {
     const bytes = Buffer.concat(chunks)
     const text = request.headers.get('content-type')?.includes('gzip') ? gunzipSync(bytes, { maxOutputLength: 10 * 1024 * 1024 }).toString('utf8') : bytes.toString('utf8')
     const raw = JSON.parse(text)
-    if (!['save-course-code', 'apply'].includes(raw?.action)) throw new CrmError('Đã ngừng nhập và lưu mẫu riêng. Hãy mở khóa học để chỉnh giao diện bằng code.', 410)
+    if (!['save-course-code', 'preview-course-code', 'apply'].includes(raw?.action)) throw new CrmError('Đã ngừng nhập và lưu mẫu riêng. Hãy mở khóa học để chỉnh giao diện bằng code.', 410)
     const input = inputSchema.parse(raw)
+    if (input.action === 'preview-course-code') {
+      await assertCourseEditor(prisma, actor, { slug: input.slug })
+      return json(await prepareCourseCode(input.html))
+    }
     if (input.action === 'save-course-code') {
       await assertCourseEditor(prisma, actor, { slug: input.slug })
-      const compiled = compileCourseCode(input.html)
+      const compiled = await prepareCourseCode(input.html)
       const snapshot = { theme: { importedLayout: true }, navigation: { shortName: input.name, ctaText: 'Đăng ký khóa học', sticky: false }, checkoutConfig: { enabled: true, provider: 'vietqr', currency: 'VND' }, sections: [{ sectionKey: 'course-code', type: 'rich_content', variant: 'zip-source-v1', enabled: true, sortOrder: 0, visibility: 'all', content: { exactSource: { html: compiled.html, entryPath: 'index.html' } } }] }
       const page = await stageTemplate(prisma, actor, input.slug, input.name, snapshot, 'course-code', { revision: input.revision, codeOnly: true })
       revalidatePath('/tools/courses')
