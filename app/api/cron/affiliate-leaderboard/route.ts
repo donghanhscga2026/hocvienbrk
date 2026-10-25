@@ -48,14 +48,54 @@ export async function POST(request: Request) {
       .filter((g) => g.gmv > 0)
       .sort((a, b) => b.gmv - a.gmv)
 
+    // Hoa hồng ghi nhận trong kỳ cho từng người hưởng — cùng cơ sở kỳ với
+    // GMV ở trên: đơn PAID có paidAt trong tháng, lấy tổng netAmount các
+    // dòng hoa hồng chưa bị thu hồi (status khác CANCELLED) của các đơn đó.
+    // Dùng cho mục "Top hoa hồng" trên trang /vinh-danh.
+    const commissionGroups = await prisma.affiliateCommission.groupBy({
+      by: ['affiliateId'],
+      where: {
+        status: { not: 'CANCELLED' },
+        conversion: {
+          orderRecord: { status: 'PAID', paidAt: { gte: from, lt: to } }
+        }
+      },
+      _sum: { netAmount: true }
+    })
+    const commissionOf = new Map(
+      commissionGroups.map((g) => [g.affiliateId, g._sum.netAmount ?? 0])
+    )
+
+    // Người hưởng hoa hồng nhưng không có doanh số qua link trong kỳ
+    // (thường là hoa hồng tri ân cho người giới thiệu đầu tiên): vẫn đưa
+    // vào snapshot với gmv = 0, xếp sau nhóm có GMV — để mục Top hoa hồng
+    // trên trang /vinh-danh không sót người hưởng cao nhất kỳ.
+    const rankedIds = new Set(ranked.map((r) => r.userId))
+    const commissionOnly = [...commissionOf.entries()]
+      .filter(([userId, amount]) => !rankedIds.has(userId) && amount > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([userId, amount]) => ({ userId, gmv: 0, orders: 0, commission: amount }))
+
     // Ghi snapshot
     await prisma.leaderboardSnapshot.createMany({
-      data: ranked.map((r, idx) => ({
-        userId: r.userId,
-        period,
-        rank: idx + 1,
-        gmv: r.gmv
-      }))
+      data: [
+        ...ranked.map((r, idx) => ({
+          userId: r.userId,
+          period,
+          rank: idx + 1,
+          gmv: r.gmv,
+          orderCount: r.orders,
+          commissionEarned: commissionOf.get(r.userId) ?? 0
+        })),
+        ...commissionOnly.map((r, idx) => ({
+          userId: r.userId,
+          period,
+          rank: ranked.length + idx + 1,
+          gmv: 0,
+          orderCount: 0,
+          commissionEarned: r.commission
+        }))
+      ]
     })
 
     // Seed 4 huy hiệu mặc định nếu chưa có (idempotent theo code)
