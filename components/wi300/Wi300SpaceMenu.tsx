@@ -2,11 +2,12 @@
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
-import { BookOpen, ChevronDown, ChevronRight, ContactRound, CreditCard, FileText, Globe, GraduationCap, Handshake, LayoutGrid, LifeBuoy, Link2, Mail, Network, Settings, ShieldCheck, UserRound, Users, Wallet, Youtube, type LucideIcon } from 'lucide-react'
+import { BookOpen, ChevronDown, ChevronRight, ContactRound, CreditCard, FileText, Globe, GraduationCap, Handshake, LayoutGrid, LifeBuoy, Link2, Mail, Network, Settings, ShieldCheck, UserRound, Users, Wallet, type LucideIcon } from 'lucide-react'
+import { YoutubeBrandIcon } from '@/components/icons/brands'
 import { managementNavigation } from '@/lib/wi300/management-navigation'
 import { type PersonalTool, type SpaceNavGroup, type SpaceShortcut } from '@/lib/wi300/personal-space'
 
-const icons: Record<string, LucideIcon> = { BookOpen, ContactRound, CreditCard, FileText, Globe, GraduationCap, Handshake, LayoutGrid, LifeBuoy, Link2, Mail, Network, Settings, ShieldCheck, UserRound, Users, Wallet, Youtube }
+const icons: Record<string, LucideIcon> = { Youtube: YoutubeBrandIcon, BookOpen, ContactRound, CreditCard, FileText, Globe, GraduationCap, Handshake, LayoutGrid, LifeBuoy, Link2, Mail, Network, Settings, ShieldCheck, UserRound, Users, Wallet }
 function ShortcutIcon({ name }: { name?: string | null }) {
   const Icon = icons[name || ''] || LayoutGrid
   return <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
