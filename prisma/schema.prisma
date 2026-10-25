@@ -2870,6 +2870,8 @@ model Booking {
   tags          String?
   holdExpiresAt DateTime?
   cancelReason  String?
+  reminder24SentAt DateTime?
+  reminder1SentAt  DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -2877,6 +2879,7 @@ model Booking {
   @@index([sessionId, startsAt])
   @@index([guestEmail])
   @@index([status, holdExpiresAt])
+  @@index([status, startsAt])
 }
 
 model BookingWaitlist {

@@ -73,11 +73,33 @@ export async function GET() {
             c.descendant.emailVerified && c.descendantId !== 0
         ).length
         
-        const commissionSummary = { pending: 0, available: 0, total: 0 }
-        for (const c of commissions) {
-            if (c.status === 'PENDING') commissionSummary.pending += c.netAmount
-            else commissionSummary.available += c.netAmount
-            commissionSummary.total += c.netAmount
+        // Tổng hợp trên TOÀN BỘ hoa hồng (không dùng danh sách 10 dòng gần nhất
+        // ở trên — danh sách đó chỉ để hiển thị). "Đã chốt" theo cùng quy tắc
+        // trang Quyết Toán GV: status khác PENDING, hoặc PENDING nhưng đã tới
+        // hạn availableAt. Dòng CANCELLED không tính.
+        const now = new Date()
+        const [settledAgg, dueAgg, awaitingAgg] = await Promise.all([
+            prisma.affiliateCommission.aggregate({
+                where: { affiliateId: userId, status: { in: ['AVAILABLE', 'WITHDRAWN'] } },
+                _sum: { netAmount: true }
+            }),
+            prisma.affiliateCommission.aggregate({
+                where: { affiliateId: userId, status: 'PENDING', availableAt: { lte: now } },
+                _sum: { netAmount: true }
+            }),
+            prisma.affiliateCommission.aggregate({
+                where: { affiliateId: userId, status: 'PENDING', OR: [{ availableAt: null }, { availableAt: { gt: now } }] },
+                _sum: { netAmount: true }
+            })
+        ])
+        const settledAmount = (settledAgg._sum.netAmount || 0) + (dueAgg._sum.netAmount || 0)
+        const awaitingAmount = awaitingAgg._sum.netAmount || 0
+        const commissionSummary = {
+            pending: awaitingAmount,
+            available: settledAmount,
+            total: settledAmount + awaitingAmount,
+            settled: settledAmount,
+            awaiting: awaitingAmount
         }
         
         return NextResponse.json({

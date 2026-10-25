@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma'
 import MainHeader from '@/components/layout/MainHeader'
 import AdminBookingPanel from '@/components/booking/AdminBookingPanel'
 import { parseFormSchema } from '@/lib/booking/slots'
-import { isExpertRole, listAvailability, listBookings, listSessions, type BookingActor } from '@/lib/booking/service'
+import { isExpertRole, listAvailability, listBookings, listSessions, listWaitlist, type BookingActor } from '@/lib/booking/service'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,10 +33,11 @@ export default async function ToolsDatLichPage() {
     )
   }
 
-  const [sessions, availability, bookings, courses] = await Promise.all([
+  const [sessions, availability, bookings, waitlist, courses] = await Promise.all([
     listSessions(actor),
     listAvailability(actor, actor.id),
     listBookings(actor),
+    listWaitlist(actor),
     prisma.course.findMany({
       where: actor.role === 'ADMIN' ? {} : { teacherId: actor.id },
       orderBy: { id: 'desc' },
@@ -91,6 +92,17 @@ export default async function ToolsDatLichPage() {
             sessionTitle: b.session.title,
             expertName: b.expert.name || 'Chuyên gia',
             source: b.source,
+          }))}
+          waitlist={waitlist.map((w) => ({
+            id: w.id,
+            dateVN: w.date.toISOString().slice(0, 10),
+            name: w.name,
+            email: w.email,
+            phone: w.phone,
+            note: w.note,
+            status: w.status,
+            sessionTitle: w.session.title,
+            createdAt: w.createdAt.toISOString(),
           }))}
         />
       </main>

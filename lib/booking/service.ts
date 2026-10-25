@@ -24,7 +24,14 @@ import {
 } from './slots'
 
 export type { AvailabilityRuleInput } from './slots'
-import { notifyBookingCreated, formatVnDateTime } from './notify'
+import {
+  notifyBookingCancelled,
+  notifyBookingCreated,
+  notifyBookingRescheduled,
+  notifyWaitlistSlotOpen,
+  formatVnDateTime,
+} from './notify'
+import { checkGuestModify } from './policy'
 
 export class BookingError extends Error {
   status: number
@@ -569,5 +576,434 @@ export async function setBookingStatus(actor: BookingActor, bookingId: number, n
       },
     })
   }
+  // Phía quản trị hủy lịch: báo cho khách qua email để khách không tới
+  // nhầm buổi đã hủy (Giai đoạn 2 bổ sung — trước đây hủy không báo ai).
+  if (next === 'CANCELLED' && booking.guestEmail) {
+    const [session, expert] = await Promise.all([
+      prisma.bookingSession.findUnique({
+        where: { id: booking.sessionId },
+        select: { title: true, meetingUrl: true },
+      }),
+      prisma.user.findUnique({ where: { id: booking.expertId }, select: { name: true } }),
+    ])
+    await notifyBookingCancelled({
+      bookingId: booking.id,
+      bookingCode: booking.code,
+      guestName: booking.guestName,
+      guestEmail: booking.guestEmail,
+      guestUserId: booking.userId,
+      expertId: booking.expertId,
+      expertName: expert?.name || 'Chuyên gia',
+      sessionTitle: session?.title || 'Phiên hẹn',
+      meetingUrl: session?.meetingUrl ?? null,
+      startsAt: booking.startsAt,
+      endsAt: booking.endsAt,
+      byGuest: false,
+    })
+  }
   return updated
+}
+
+// ─── Khách tự phục vụ & danh sách chờ (Giai đoạn 2) ───
+
+/**
+ * Tìm lịch hẹn theo cặp Email + Mã đặt lịch (hai yếu tố biết, như cổng
+ * tra cứu của Bookify). Email so khớp không phân biệt hoa thường; mã
+ * được chuẩn hóa về chữ hoa. Không khớp → null (không lộ lý do).
+ */
+async function findGuestBooking(email: string, code: string) {
+  const normalizedCode = (code || '').trim().toUpperCase()
+  const normalizedEmail = (email || '').trim().toLowerCase()
+  if (!normalizedCode || !normalizedEmail) return null
+  const booking = await prisma.booking.findUnique({ where: { code: normalizedCode } })
+  if (!booking || !booking.guestEmail) return null
+  if (booking.guestEmail.trim().toLowerCase() !== normalizedEmail) return null
+  return booking
+}
+
+function guestModifyError(block: 'NOT_MODIFIABLE' | 'TOO_LATE', cancelBeforeHours: number): BookingError {
+  if (block === 'TOO_LATE') {
+    return new BookingError(
+      `Đã quá hạn đổi/hủy — phiên này yêu cầu đổi hoặc hủy trước giờ hẹn ít nhất ${cancelBeforeHours} giờ. Vui lòng liên hệ chuyên gia để được hỗ trợ.`,
+      409,
+    )
+  }
+  return new BookingError('Lịch hẹn này không còn đổi hoặc hủy được nữa.', 409)
+}
+
+export async function getGuestBooking(email: string, code: string) {
+  const booking = await findGuestBooking(email, code)
+  if (!booking) {
+    throw new BookingError('Không tìm thấy lịch hẹn. Vui lòng kiểm tra lại email và mã đặt lịch.', 404)
+  }
+  const session = await prisma.bookingSession.findUnique({
+    where: { id: booking.sessionId },
+    include: { expert: { select: { name: true } } },
+  })
+  if (!session) throw new BookingError('Phiên hẹn không còn tồn tại.', 404)
+  const block = checkGuestModify(booking.status, booking.startsAt, session.cancelBeforeHours, new Date())
+  return {
+    code: booking.code,
+    status: booking.status,
+    guestName: booking.guestName,
+    guestEmail: booking.guestEmail,
+    guestPhone: booking.guestPhone,
+    startsAt: booking.startsAt.toISOString(),
+    endsAt: booking.endsAt.toISOString(),
+    cancelReason: booking.cancelReason,
+    session: {
+      code: session.code,
+      title: session.title,
+      mode: session.mode,
+      durationMin: session.durationMin,
+      cancelBeforeHours: session.cancelBeforeHours,
+      maxDaysAhead: session.maxDaysAhead,
+      meetingUrl: booking.status === 'CONFIRMED' ? session.meetingUrl : null,
+    },
+    expertName: session.expert.name || 'Chuyên gia',
+    canModify: block === 'OK',
+    modifyBlocked: block !== 'OK',
+    modifyNote:
+      block === 'TOO_LATE'
+        ? `Phiên này yêu cầu đổi hoặc hủy trước giờ hẹn ít nhất ${session.cancelBeforeHours} giờ.`
+        : block === 'NOT_MODIFIABLE'
+          ? 'Lịch hẹn ở trạng thái hiện tại không tự đổi hoặc hủy được.'
+          : null,
+  }
+}
+
+export type GuestBookingView = Awaited<ReturnType<typeof getGuestBooking>>
+
+export async function guestCancelBooking(email: string, code: string, reason?: string) {
+  const booking = await findGuestBooking(email, code)
+  if (!booking) {
+    throw new BookingError('Không tìm thấy lịch hẹn. Vui lòng kiểm tra lại email và mã đặt lịch.', 404)
+  }
+  const session = await prisma.bookingSession.findUnique({ where: { id: booking.sessionId } })
+  if (!session) throw new BookingError('Phiên hẹn không còn tồn tại.', 404)
+  const block = checkGuestModify(booking.status, booking.startsAt, session.cancelBeforeHours, new Date())
+  if (block !== 'OK') throw guestModifyError(block, session.cancelBeforeHours)
+
+  const cancelReason = (reason || '').trim().slice(0, 300) || 'Khách tự hủy qua cổng tra cứu'
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${BOOKING_LOCK})`
+    const fresh = await tx.booking.findUnique({ where: { id: booking.id } })
+    if (!fresh || (fresh.status !== 'CONFIRMED' && fresh.status !== 'PENDING')) {
+      throw new BookingError('Lịch hẹn vừa thay đổi trạng thái, vui lòng tra cứu lại.', 409)
+    }
+    await tx.booking.update({
+      where: { id: booking.id },
+      data: { status: 'CANCELLED', cancelReason },
+    })
+    if (fresh.contactId) {
+      await tx.crmActivity.create({
+        data: {
+          contactId: fresh.contactId,
+          type: 'BOOKING',
+          authorId: -1,
+          authorName: 'Hệ thống đặt lịch',
+          content: `Khách tự hủy lịch hẹn "${session.title}" lúc ${formatVnDateTime(fresh.startsAt)} (mã ${fresh.code}). Lý do: ${cancelReason}.`,
+        },
+      })
+    }
+  })
+
+  const expert = await prisma.user.findUnique({ where: { id: session.expertId }, select: { name: true } })
+  await notifyBookingCancelled({
+    bookingId: booking.id,
+    bookingCode: booking.code,
+    guestName: booking.guestName,
+    guestEmail: booking.guestEmail,
+    guestUserId: booking.userId,
+    expertId: booking.expertId,
+    expertName: expert?.name || 'Chuyên gia',
+    sessionTitle: session.title,
+    meetingUrl: session.meetingUrl,
+    startsAt: booking.startsAt,
+    endsAt: booking.endsAt,
+    byGuest: true,
+  })
+  // Slot vừa trống: mời danh sách chờ của ngày đó (lỗi ở đây không làm hỏng việc hủy).
+  try {
+    await notifyWaitlistForDate(session.id, vnDateString(booking.startsAt))
+  } catch (error) {
+    console.error('guestCancelBooking: báo danh sách chờ thất bại', error)
+  }
+  return { ok: true as const, bookingCode: booking.code }
+}
+
+export async function guestRescheduleBooking(email: string, code: string, dateVN: string, startMin: number) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateVN)) throw new BookingError('Ngày mới không hợp lệ.')
+  const booking = await findGuestBooking(email, code)
+  if (!booking) {
+    throw new BookingError('Không tìm thấy lịch hẹn. Vui lòng kiểm tra lại email và mã đặt lịch.', 404)
+  }
+  const session = await prisma.bookingSession.findUnique({ where: { id: booking.sessionId } })
+  if (!session) throw new BookingError('Phiên hẹn không còn tồn tại.', 404)
+  const block = checkGuestModify(booking.status, booking.startsAt, session.cancelBeforeHours, new Date())
+  if (block !== 'OK') throw guestModifyError(block, session.cancelBeforeHours)
+
+  const todayVN = vnDateString(new Date())
+  if (dateVN < todayVN || dateVN > addDaysVN(todayVN, session.maxDaysAhead)) {
+    throw new BookingError('Ngày mới nằm ngoài phạm vi mở lịch của phiên này.')
+  }
+  const newStartsAt = slotStartUtc(dateVN, startMin)
+  if (newStartsAt.getTime() === booking.startsAt.getTime()) {
+    throw new BookingError('Đây chính là khung giờ hiện tại của bạn, hãy chọn khung giờ khác.')
+  }
+  const slots = await loadDayContext(session, dateVN)
+  const slot = slots.find((s) => s.startMin === startMin)
+  if (!slot || !slot.available) {
+    throw new BookingError('Khung giờ mới không còn trống, vui lòng chọn khung giờ khác.', 409)
+  }
+  const newEndsAt = new Date(slot.endsAt)
+  const oldStartsAt = booking.startsAt
+  const oldDateVN = vnDateString(oldStartsAt)
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${BOOKING_LOCK})`
+    const fresh = await tx.booking.findUnique({ where: { id: booking.id } })
+    if (!fresh || fresh.startsAt.getTime() !== oldStartsAt.getTime() || (fresh.status !== 'CONFIRMED' && fresh.status !== 'PENDING')) {
+      throw new BookingError('Lịch hẹn vừa thay đổi, vui lòng tra cứu lại.', 409)
+    }
+    const conflict = await tx.booking.findFirst({
+      where: {
+        id: { not: booking.id },
+        expertId: session.expertId,
+        startsAt: { lt: newEndsAt },
+        endsAt: { gt: newStartsAt },
+        OR: activeBookingOr(),
+      },
+      select: { id: true },
+    })
+    if (conflict) throw new BookingError('Khung giờ mới vừa có người đặt, vui lòng chọn khung giờ khác.', 409)
+    const row = await tx.booking.update({
+      where: { id: booking.id },
+      data: {
+        startsAt: newStartsAt,
+        endsAt: newEndsAt,
+        reminder24SentAt: null,
+        reminder1SentAt: null,
+      },
+    })
+    if (fresh.contactId) {
+      await tx.crmActivity.create({
+        data: {
+          contactId: fresh.contactId,
+          type: 'BOOKING',
+          authorId: -1,
+          authorName: 'Hệ thống đặt lịch',
+          content: `Khách tự đổi lịch hẹn "${session.title}" từ ${formatVnDateTime(oldStartsAt)} sang ${formatVnDateTime(newStartsAt)} (mã ${fresh.code}).`,
+        },
+      })
+    }
+    return row
+  })
+
+  const expert = await prisma.user.findUnique({ where: { id: session.expertId }, select: { name: true } })
+  await notifyBookingRescheduled({
+    bookingId: booking.id,
+    bookingCode: booking.code,
+    guestName: booking.guestName,
+    guestEmail: booking.guestEmail,
+    guestUserId: booking.userId,
+    expertId: booking.expertId,
+    expertName: expert?.name || 'Chuyên gia',
+    sessionTitle: session.title,
+    meetingUrl: session.meetingUrl,
+    startsAt: updated.startsAt,
+    endsAt: updated.endsAt,
+    oldStartsAt,
+  })
+  if (oldDateVN !== dateVN) {
+    try {
+      await notifyWaitlistForDate(session.id, oldDateVN)
+    } catch (error) {
+      console.error('guestRescheduleBooking: báo danh sách chờ thất bại', error)
+    }
+  }
+  return {
+    ok: true as const,
+    bookingCode: booking.code,
+    status: updated.status,
+    startsAt: updated.startsAt.toISOString(),
+    endsAt: updated.endsAt.toISOString(),
+    meetingUrl: updated.status === 'CONFIRMED' ? session.meetingUrl : null,
+  }
+}
+
+// ─── Danh sách chờ ───
+
+export interface JoinWaitlistInput {
+  code: string
+  dateVN: string
+  name: string
+  email: string
+  phone?: string
+  note?: string
+  website?: string
+}
+
+export async function joinWaitlist(input: JoinWaitlistInput) {
+  // Honeypot chống bot — giả vờ nhận thành công, không ghi gì (khuôn CRM).
+  if (input.website) return { received: true as const }
+
+  const name = (input.name || '').trim().slice(0, 150)
+  const email = (input.email || '').trim().slice(0, 254)
+  const phone = (input.phone || '').trim().slice(0, 40)
+  const note = (input.note || '').trim().slice(0, 1000)
+  if (!name) throw new BookingError('Vui lòng nhập họ và tên.')
+  if (!EMAIL_RE.test(email)) throw new BookingError('Địa chỉ email chưa hợp lệ.')
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.dateVN)) throw new BookingError('Ngày chờ không hợp lệ.')
+
+  const session = await prisma.bookingSession.findUnique({ where: { code: input.code } })
+  if (!session || session.status !== 'ACTIVE') {
+    throw new BookingError('Phiên hẹn không tồn tại hoặc đã tạm dừng.', 404)
+  }
+  const todayVN = vnDateString(new Date())
+  if (input.dateVN < todayVN || input.dateVN > addDaysVN(todayVN, session.maxDaysAhead)) {
+    throw new BookingError('Ngày bạn chọn nằm ngoài phạm vi mở lịch của phiên này.')
+  }
+  const date = dateOnly(input.dateVN)
+  const existing = await prisma.bookingWaitlist.findFirst({
+    where: {
+      sessionId: session.id,
+      date,
+      email: { equals: email, mode: 'insensitive' },
+      status: { in: ['WAITING', 'NOTIFIED'] },
+    },
+    select: { id: true },
+  })
+  if (existing) return { received: false as const, alreadyRegistered: true }
+  await prisma.bookingWaitlist.create({
+    data: { sessionId: session.id, date, name, email, phone: phone || null, note },
+  })
+  return { received: false as const, alreadyRegistered: false }
+}
+
+/** Ngày dateVN của phiên còn ít nhất một slot đặt được không. */
+export async function hasAvailableSlot(
+  session: { expertId: number; durationMin: number; bufferMin: number; minNoticeHours: number },
+  dateVN: string,
+): Promise<boolean> {
+  const slots = await loadDayContext(session, dateVN)
+  return slots.some((s) => s.available)
+}
+
+/**
+ * Mời những người đang WAITING của một ngày đặt lịch khi ngày đó có slot
+ * trống: gửi email mời và chuyển trạng thái NOTIFIED để không mời lặp.
+ * Trả số email đã gửi. Dùng cho luồng hủy/đổi lịch và cron quét định kỳ.
+ */
+export async function notifyWaitlistForDate(sessionId: number, dateVN: string): Promise<number> {
+  const session = await prisma.bookingSession.findUnique({
+    where: { id: sessionId },
+    include: { expert: { select: { name: true } } },
+  })
+  if (!session || session.status !== 'ACTIVE') return 0
+  const entries = await prisma.bookingWaitlist.findMany({
+    where: { sessionId, date: dateOnly(dateVN), status: 'WAITING' },
+    orderBy: { createdAt: 'asc' },
+    take: 20,
+  })
+  if (entries.length === 0) return 0
+  if (!(await hasAvailableSlot(session, dateVN))) return 0
+  let sent = 0
+  for (const entry of entries) {
+    await notifyWaitlistSlotOpen({
+      name: entry.name,
+      email: entry.email,
+      sessionTitle: session.title,
+      sessionCode: session.code,
+      expertName: session.expert.name || 'Chuyên gia',
+      dateVN,
+    })
+    await prisma.bookingWaitlist.update({ where: { id: entry.id }, data: { status: 'NOTIFIED' } })
+    sent++
+  }
+  return sent
+}
+
+export async function listWaitlist(actor: BookingActor, sessionId?: number) {
+  if (!isExpertRole(actor.role)) throw new BookingError('Bạn không có quyền xem danh sách chờ.', 403)
+  return prisma.bookingWaitlist.findMany({
+    where: {
+      ...(sessionId ? { sessionId } : {}),
+      ...(actor.role === 'ADMIN' ? {} : { session: { expertId: actor.id } }),
+    },
+    orderBy: [{ date: 'asc' }, { createdAt: 'asc' }],
+    take: 300,
+    include: {
+      session: { select: { id: true, title: true, code: true, expertId: true } },
+    },
+  })
+}
+
+const WAITLIST_TRANSITIONS: Record<string, string[]> = {
+  WAITING: ['EXPIRED', 'BOOKED'],
+  NOTIFIED: ['EXPIRED', 'BOOKED'],
+  EXPIRED: ['WAITING'],
+  BOOKED: [],
+}
+
+export async function setWaitlistStatus(actor: BookingActor, waitlistId: number, next: string) {
+  const entry = await prisma.bookingWaitlist.findUnique({
+    where: { id: waitlistId },
+    include: { session: { select: { expertId: true } } },
+  })
+  if (!entry) throw new BookingError('Không tìm thấy lượt đăng ký chờ.', 404)
+  assertCanManage(actor, entry.session.expertId)
+  const allowed = WAITLIST_TRANSITIONS[entry.status] || []
+  if (!allowed.includes(next)) {
+    throw new BookingError(`Không thể chuyển đăng ký chờ từ trạng thái ${entry.status} sang ${next}.`)
+  }
+  return prisma.bookingWaitlist.update({ where: { id: waitlistId }, data: { status: next as never } })
+}
+
+/** Quản trị chủ động gửi lại email mời cho một lượt chờ cụ thể. */
+export async function notifyWaitlistEntryNow(actor: BookingActor, waitlistId: number) {
+  const entry = await prisma.bookingWaitlist.findUnique({
+    where: { id: waitlistId },
+    include: {
+      session: { include: { expert: { select: { name: true } } } },
+    },
+  })
+  if (!entry) throw new BookingError('Không tìm thấy lượt đăng ký chờ.', 404)
+  assertCanManage(actor, entry.session.expertId)
+  if (entry.status !== 'WAITING' && entry.status !== 'NOTIFIED') {
+    throw new BookingError('Lượt chờ này không còn ở trạng thái có thể mời đặt lịch.')
+  }
+  const dateVN = entry.date.toISOString().slice(0, 10)
+  if (!(await hasAvailableSlot(entry.session, dateVN))) {
+    throw new BookingError('Ngày này hiện vẫn chưa có khung giờ trống để mời.')
+  }
+  await notifyWaitlistSlotOpen({
+    name: entry.name,
+    email: entry.email,
+    sessionTitle: entry.session.title,
+    sessionCode: entry.session.code,
+    expertName: entry.session.expert.name || 'Chuyên gia',
+    dateVN,
+  })
+  return prisma.bookingWaitlist.update({ where: { id: waitlistId }, data: { status: 'NOTIFIED' } })
+}
+
+// ─── Lịch hẹn của học viên (trang yêu cầu của tôi) ───
+
+export async function listMyBookings(userId: number, email: string | null) {
+  const or: Record<string, unknown>[] = [{ userId }]
+  if (email) or.push({ guestEmail: { equals: email, mode: 'insensitive' } })
+  return prisma.booking.findMany({
+    where: {
+      OR: or as never,
+      status: { not: 'HELD' },
+      guestEmail: { not: '' },
+    },
+    orderBy: { startsAt: 'desc' },
+    take: 50,
+    include: {
+      session: { select: { code: true, title: true } },
+      expert: { select: { name: true } },
+    },
+  })
 }

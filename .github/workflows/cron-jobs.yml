@@ -8,6 +8,7 @@ on:
     - cron: '5 17 * * *'
     - cron: '*/15 * * * *'
     - cron: '20 1 * * *'
+    - cron: '30 1 * * 1'
   workflow_dispatch:
 
 jobs:
@@ -27,6 +28,15 @@ jobs:
       - name: Call mbtca-orchestrator
         run: |
           curl -s -o /dev/null -w "%{http_code}" -X GET "${{ vars.SITE_URL }}/api/cron/mbtca-orchestrator" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  booking-reminders:
+    if: github.event.schedule == '5 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call booking-reminders
+        run: |
+          curl --fail --silent --show-error --max-time 120 -X GET "${{ vars.SITE_URL }}/api/cron/booking-reminders" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
 
   gmail-watch:
@@ -128,4 +138,13 @@ jobs:
       - name: Affiliate leaderboard snapshot (monthly)
         run: |
           curl --fail --silent --show-error --max-time 120 -X POST "${{ vars.SITE_URL }}/api/cron/affiliate-leaderboard" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  affiliate-weekly-check:
+    if: github.event.schedule == '30 1 * * 1' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Weekly missing-commission scan
+        run: |
+          curl --fail --silent --show-error --max-time 300 -X POST "${{ vars.SITE_URL }}/api/cron/affiliate-missing-commissions" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

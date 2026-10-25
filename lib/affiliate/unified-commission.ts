@@ -453,7 +453,7 @@ export async function reverseOrderCommission(orderId: number, reason: string) {
           // AVAILABLE hoặc WITHDRAWN: trừ vào số dư ví (có thể âm nếu đã rút)
           await tx.affiliateWallet.update({
             where: { userId: c.affiliateId },
-            data: { balance: { decrement: c.netAmount } }
+            data: { balance: { decrement: c.netAmount }, totalEarned: { decrement: c.netAmount } }
           })
           await tx.affiliateTransaction.create({
             data: {
