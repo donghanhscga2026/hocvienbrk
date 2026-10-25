@@ -1,4 +1,4 @@
-import NextAuth, { AuthError, CredentialsSignin, type NextAuthConfig } from "next-auth"
+import NextAuth, { CredentialsSignin, type NextAuthConfig } from "next-auth"
 import { normalizeRole } from '@/lib/auth/roles'
 import Credentials from "next-auth/providers/credentials"
 import Google from "next-auth/providers/google"
@@ -216,7 +216,7 @@ export const authOptions: NextAuthConfig = {
                 }
 
                 if (isLoginFailed || !user) {
-                    console.warn(`⚠️ [Auth] Đăng nhập thất bại (${errorCode || "INVALID_CREDENTIALS"}).`);
+                    console.warn(`⚠️ [Auth] Đăng nhập thất bại (${errorCode || "INVALID_CREDENTIALS"}${failReason ? ` — ${failReason}` : ""}).`);
                     throw new CustomLoginError("Thông tin đăng nhập không chính xác.", "INVALID_CREDENTIALS");
                 }
 
@@ -280,7 +280,7 @@ export const authOptions: NextAuthConfig = {
                 const urlObj = new URL(url);
                 const baseObj = new URL(baseUrl);
                 if (urlObj.origin === baseObj.origin) return url;
-            } catch (e) {
+            } catch {
                 // Ignore invalid URLs
             }
 

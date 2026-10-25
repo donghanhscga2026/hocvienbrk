@@ -21,7 +21,6 @@ function LoginForm() {
     const [isLoading, setIsLoading] = useState(false)
     const [isChangingPassword, setIsChangingPassword] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const [actionType, setActionType] = useState<string | null>(null)
     const [showPassword, setShowPassword] = useState(false)
     const [phoneStep, setPhoneStep] = useState(false)
     const [loginMethod, setLoginMethod] = useState<"password" | "email">("password")
@@ -160,7 +159,6 @@ function LoginForm() {
         setIsLoading(true)
         setError(null)
         setWarning(null)
-        setActionType(null)
 
         try {
             const callbackUrl = safeReturnPath(searchParams.get('callbackUrl')) || (redirectSlug ? safeReturnPath(`/${redirectSlug}`) : null) || "/"
@@ -187,7 +185,6 @@ function LoginForm() {
                     return
                 }
                 let errorMsg = "Thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại."
-                let extraAction = ""
 
                 try {
                     const errRes = await fetch('/api/auth/report-failed-login', {
@@ -195,11 +192,11 @@ function LoginForm() {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ identifier: data.identifier })
                     })
-                    const errData = await errRes.json()
+                    // Đọc body để hoàn tất request; nội dung trả về cố ý KHÔNG dùng:
+                    // lỗi công khai phải giữ chung chung để kẻ xấu không dò được tài khoản.
+                    await errRes.json()
 
-                    // Keep the public error generic so attackers cannot enumerate accounts.
                     errorMsg = "Không thể đăng nhập. Kiểm tra thông tin xác thực và mã Authenticator nếu tài khoản đã bật MFA."
-                    extraAction = "forgot_password"
                 } catch {
                     // report-failed-login thất bại, dùng thông tin cơ bản
                     const identifier = data.identifier
@@ -214,7 +211,6 @@ function LoginForm() {
 
 
                 setError(errorMsg)
-                setActionType(extraAction || null)
                 setIsLoading(false)
                 return
             }
@@ -271,13 +267,15 @@ function LoginForm() {
                 setIsChangingPassword(false)
                 // Sign out để user đăng nhập lại
                 setTimeout(() => {
+                    // Cố ý tải lại toàn trang (không dùng router) để xóa sạch session/state phía client sau khi đổi mật khẩu.
+                    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
                     window.location.href = '/login'
                 }, 2000)
             } else {
                 const result = await res.json()
                 setError(result.error || "Đổi mật khẩu thất bại.")
             }
-        } catch (err) {
+        } catch {
             setError("Đã xảy ra lỗi khi đổi mật khẩu.")
         } finally {
             setIsLoading(false)
