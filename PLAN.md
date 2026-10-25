@@ -2221,3 +2221,11 @@ Thiết lập quy trình an toàn để nhiều developer/AI phát triển song 
 - Cài đặt và hỗ trợ có icon; giữ ảnh đại diện khóa học, phân trang và giao diện điện thoại.
 - File: `components/wi300/Wi300PersonalSpace.tsx`, `components/wi300/Wi300Header.tsx`.
 - Kiểm thử khu vực cá nhân, điều hướng, TypeScript và build GitHub/Vercel đạt trên PR #125. CRM trong PR vẫn đang được tiếp tục nghiệm thu.
+
+## ✅ Đặt lịch hẹn coach 1:1 — Giai đoạn 1 (2026-10-25)
+
+- PR #219 (merge ngày 2026-10-24, commit 439c2c5): tính năng đặt lịch hẹn 1:1 theo từng phiên hẹn (tham chiếu Bookify Pro) — 5 bảng BookingSession, ExpertAvailability, AvailabilityException, Booking, BookingWaitlist; trang khách `/dat-lich/[mã phiên]` 4 bước (chọn slot, liên hệ, biểu mẫu, xác nhận), giữ slot 10 phút chống đặt trùng; trang quản trị `/tools/dat-lich` cho Admin/Giáo viên; email xác nhận kèm file `.ics` qua Brevo, chuông thông báo và Telegram cho chuyên gia, đồng bộ CRM (Contact, Activity, Task).
+- Migration `20261023235900_add_booking_dat_lich` đã áp vào production ngày 2026-10-24 (bảng `_prisma_migrations` từ 34 lên 35 bản ghi).
+- Nghiệm thu đầu-cuối trên production ngày 2026-10-25: đăng nhập tài khoản #3773, tạo phiên kiểm tra `77TKN43UGD`, đặt thành công lịch `BK-BRKNBF` (Thứ 2, 26/10/2026, 09:00–09:30), trạng thái Đã xác nhận hiện đúng ở trang quản trị; phiên kiểm tra đã tạm dừng sau nghiệm thu.
+- File: `prisma/schema.prisma`, `lib/booking/`, `app/dat-lich/[code]/`, `app/tools/dat-lich/`, `app/api/booking/`, `components/booking/`, `scripts/test-booking.cjs` (58 kiểm chứng đạt), `prisma/migrations/20261023235900_add_booking_dat_lich/`.
+- Trạng thái: Giai đoạn 1 hoàn thành, đang chạy trên giautoandien.io.vn. Giai đoạn 2 (cổng tra cứu/đổi/hủy `/tra-cuu-hen`, danh sách chờ, cron nhắc hẹn 24 giờ/1 giờ, bài Trợ lý hướng dẫn) triển khai tiếp theo.
