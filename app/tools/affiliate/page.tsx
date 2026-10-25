@@ -110,14 +110,14 @@ function DashboardTab() {
                     <p className="text-xs opacity-80 mt-1">Người đăng ký</p>
                 </div>
                 <div className="bg-gradient-to-br from-amber-500 to-green-600 rounded-xl p-4 text-white">
-                    <p className="text-xs opacity-80">Số dư khả dụng</p>
-                    <p className="text-2xl font-bold mt-1">{(data?.wallet?.balance || 0).toLocaleString('vi-VN')}đ</p>
-                    <p className="text-xs opacity-80 mt-1">Có thể rút ngay</p>
+                    <p className="text-xs opacity-80">Đã chốt đối soát</p>
+                    <p className="text-2xl font-bold mt-1">{(data?.commissionSummary?.available || 0).toLocaleString('vi-VN')}đ</p>
+                    <p className="text-xs opacity-80 mt-1">Giảng viên thanh toán cho bạn</p>
                 </div>
                 <div className="bg-gradient-to-br from-orange-500 to-yellow-600 rounded-xl p-4 text-white">
-                    <p className="text-xs opacity-80">Chờ xử lý</p>
-                    <p className="text-2xl font-bold mt-1">{(data?.wallet?.pendingBalance || 0).toLocaleString('vi-VN')}đ</p>
-                    <p className="text-xs opacity-80 mt-1">Đối soát</p>
+                    <p className="text-xs opacity-80">Chờ đối soát</p>
+                    <p className="text-2xl font-bold mt-1">{(data?.commissionSummary?.pending || 0).toLocaleString('vi-VN')}đ</p>
+                    <p className="text-xs opacity-80 mt-1">Tự chốt sau 30 ngày</p>
                 </div>
             </div>
 
