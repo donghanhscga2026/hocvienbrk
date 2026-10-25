@@ -7,6 +7,8 @@ import { domainRoute, requestHostname, isPlatformHost } from '@/lib/website/doma
 import prisma from '@/lib/prisma'
 import {courseBelongsToProfile} from '@/lib/site-profile/config'
 import { applicationKeys, type ApplicationKey } from '@/lib/website/applications'
+import { getDeploymentBrand } from '@/lib/site-profile/deployment-brand'
+import { appearanceKey, readAppearance } from '@/lib/wi300/appearance-service'
 
 const { auth } = NextAuth(authConfig)
 
@@ -47,6 +49,65 @@ export function isBlockedProbePath(pathname: string) {
     if (segments.some((segment) => segment.startsWith('.') && segment.length > 1)) return true
     const last = segments[segments.length - 1] || ''
     return PROBE_FILE_EXTENSIONS.test(last)
+}
+
+// [Soft-404] Trang [slug] chỉ phục vụ các trang tự tạo đã xuất bản của thương
+// hiệu triển khai, nhưng nó nằm sau loading.tsx ở gốc: vỏ trang đã phát về
+// trình duyệt với mã 200 trước khi trang kịp gọi notFound(), nên đường lạ một
+// đoạn thành soft-404 (đo thật trên cả wi300.vn và giautoandien.io.vn). Vì
+// vậy quyết định 404 cho nhóm đường này phải chốt tại proxy — cùng nguyên
+// tắc với lớp chặn đường dò quét ở trên: trạng thái HTTP không thể trông vào
+// tầng hiển thị phát trực tiếp (streaming).
+// PLATFORM_ROUTE_SEGMENTS: mọi thư mục cấp 1 trong app/ (route thật luôn
+// thắng [slug] trong định tuyến của Next). Thêm thư mục route cấp 1 mới thì
+// bổ sung vào đây, cùng kỷ luật với RESERVED_PATHS.
+const PLATFORM_ROUTE_SEGMENTS = new Set([
+    'account-settings', 'actions', 'admin', 'api', 'bai-viet',
+    'complete-profile', 'config', 'contexts', 'courses', 'cuoc-dua',
+    'dich-vu', 'diem-a-b', 'diem-danh', 'doi-tac', 'du-an', 'giang-vien',
+    'gioi-thieu', 'hanh-trinh', 'ho-so-hoc-tap', 'huy-hieu', 'i18n',
+    'ket-noi-tai-khoan', 'kham-pha', 'khoa-hoc', 'land', 'lich-su-kien',
+    'login', 'my-requests', 'my-space', 'page', 'register', 'san-pham',
+    'site-domain', 'support', 'tools', 'vinh-danh', 'vinh-danh-hoc-tap'
+])
+
+/** Đường một đoạn sẽ rơi vào trang [slug]; trả null nếu không thuộc nhóm này. */
+export function platformSlugCandidate(pathname: string): string | null {
+    const parts = pathname.split('/').filter(Boolean)
+    if (parts.length !== 1) return null
+    const single = parts[0]
+    if (RESERVED_PATHS.has(single) || PLATFORM_ROUTE_SEGMENTS.has(single) || single.includes('.')) return null
+    try { return decodeURIComponent(single) } catch { return single }
+}
+
+/**
+ * Chốt chặn soft-404: chỉ chặn khi đã đọc chắc danh sách slug đã xuất bản
+ * (slugs khác null) và slug không nằm trong đó. Mọi trường hợp chưa chắc
+ * (chưa có thương hiệu triển khai, lỗi đọc cấu hình) đều cho qua để trang
+ * [slug] tự quyết như hiện tại — chặn nhầm trang thật là lỗi nặng hơn.
+ */
+export function shouldBlockUnknownSlug(pathname: string, slugs: ReadonlySet<string> | null): boolean {
+    if (!slugs) return false
+    const candidate = platformSlugCandidate(pathname)
+    return candidate !== null && !slugs.has(candidate)
+}
+
+const SLUG_LOOKUP_TTL_MS = 60_000
+let slugLookupCache: { at: number; slugs: Set<string> } | null = null
+
+/** Danh sách slug trang tự tạo đã xuất bản của thương hiệu triển khai (cache 60 giây trong tiến trình). */
+async function publishedCustomPageSlugs(): Promise<Set<string> | null> {
+    if (!getDeploymentBrand()) return null
+    const now = Date.now()
+    if (slugLookupCache && now - slugLookupCache.at < SLUG_LOOKUP_TTL_MS) return slugLookupCache.slugs
+    try {
+        const { published } = await readAppearance(prisma, appearanceKey())
+        const slugs = new Set(published.customPages.filter((page) => page.published && !page.deleted).map((page) => page.slug))
+        slugLookupCache = { at: now, slugs }
+        return slugs
+    } catch {
+        return null
+    }
 }
 
 /**
@@ -117,6 +178,7 @@ export default async function proxy(request: NextRequest, event: NextFetchEvent)
     if(isBlockedProbePath(path)) return new NextResponse('Not found',{status:404,headers:{'Cache-Control':'no-store','Content-Type':'text/plain; charset=utf-8'}})
     if(isPlatformHost(hostname)) {
         if(path.startsWith('/site-domain/')) return new NextResponse('Not found',{status:404})
+        if(platformSlugCandidate(path) && shouldBlockUnknownSlug(path, await publishedCustomPageSlugs())) return new NextResponse('Not found',{status:404,headers:{'Cache-Control':'no-store','Content-Type':'text/plain; charset=utf-8'}})
         if(path.startsWith('/api/') && !ADMIN_ONLY_PREFIXES.some(p=>path.startsWith(p))) return NextResponse.next()
         if(needsAuthLayer(path)) return (proxyHandler as unknown as NextMiddleware)(request,event)
         return handlePlatformRequest(request, null)
