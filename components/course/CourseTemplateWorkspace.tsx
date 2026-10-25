@@ -7,7 +7,7 @@ import { ArrowLeft, Code2, Eye, Save, X } from 'lucide-react'
 import ManagementWorkspace from '@/components/layout/ManagementWorkspace'
 import TemplatePreviewFrame from './TemplatePreviewFrame'
 import { COURSE_TEMPLATE_LIBRARY } from '@/lib/course-page/templates'
-import { compileCourseCode } from '@/lib/course-page/course-code'
+import { compileCourseCode, needsTailwindPreparation } from '@/lib/course-page/course-code'
 import { compileTemplateSource, type TemplateSource } from '@/lib/course-page/template-source'
 import { templateWorkspaceRequest } from '@/lib/course-page/template-workspace-client'
 import type { PageRevision } from '@/lib/course-page/stage-template'
@@ -33,6 +33,8 @@ export default function CourseTemplateWorkspace({ embedded = false, workflow = f
   const [retry, setRetry] = useState(0)
   const [sourceMissing, setSourceMissing] = useState(false)
   const dialog = useRef<HTMLDialogElement>(null), request = useRef<AbortController | null>(null)
+  const previewRequest = useRef<AbortController | null>(null)
+  const [preparing, setPreparing] = useState(false)
   const dirty = html !== null && html !== baseline
   useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
   useEffect(() => { onBusyChange?.(busy || loading) }, [busy, loading, onBusyChange])
@@ -67,12 +69,25 @@ export default function CourseTemplateWorkspace({ embedded = false, workflow = f
     // Component được khóa theo bối cảnh khóa học từ nơi gọi.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retry])
-  const renderPreview = useCallback(() => {
+  const renderPreview = useCallback(async () => {
     if (html === null || !html.trim()) return
-    try { const result = compileCourseCode(html); setRendered(result.html); setCompileError(''); setWarnings(result.warnings) }
-    catch (error) { setCompileError(error instanceof Error ? error.message : 'Không tạo được bản xem trước.') }
-  }, [html])
-  useEffect(() => { if (!auto || html === null) return; const timer = setTimeout(renderPreview, 650); return () => clearTimeout(timer) }, [auto, html, renderPreview])
+    previewRequest.current?.abort()
+    const controller = new AbortController()
+    previewRequest.current = controller; setPreparing(true)
+    try {
+      let result = compileCourseCode(html)
+      if (needsTailwindPreparation(html)) result = await templateWorkspaceRequest(endpoint, { action: 'preview-course-code', slug: courseSlug, html }, controller.signal)
+      if (controller.signal.aborted) return
+      setRendered(result.html); setCompileError(''); setWarnings(result.warnings)
+    } catch (error) { if (!controller.signal.aborted) setCompileError(error instanceof Error ? error.message : 'Không tạo được bản xem trước.') }
+    finally { if (!controller.signal.aborted) setPreparing(false) }
+  }, [html, courseSlug])
+  useEffect(() => {
+    const timer = auto && html !== null ? setTimeout(() => void renderPreview(), needsTailwindPreparation(html) ? 1200 : 650) : null
+    // Mã mới/hủy editor phải vô hiệu phản hồi preview cũ ngay, kể cả khi tắt tự cập nhật.
+    setPreparing(false)
+    return () => { if (timer) clearTimeout(timer); previewRequest.current?.abort() }
+  }, [auto, html, renderPreview])
   const copyBuiltin = useCallback((code: string) => { if (preview?.copying) openCode(code, true) }, [preview])
   async function apply(id: string, name: string) {
     if (!courseSlug || busy || loading || !window.confirm(`Tạo bản nháp từ mẫu “${name}” cho “${courseName}”? Trang công khai chỉ đổi khi bạn Xuất bản.`)) return
@@ -125,7 +140,7 @@ export default function CourseTemplateWorkspace({ embedded = false, workflow = f
       </article>)}</div>
       {courseSlug && <button type="button" disabled={busy || loading || !revision} onClick={() => openCode(starter, true)} className={button}><Code2 size={17} />Dán code riêng</button>}
     </> : <>
-      <p className="rounded-xl bg-brk-background p-3 text-sm">Dán HTML hoàn chỉnh, CSS trong &lt;style&gt;, JavaScript trong &lt;script&gt;. Ảnh dùng URL HTTPS; tối đa 1 MB, không nhúng file Base64. Nút đăng ký dùng <code>#dang-ky</code>.</p>
+      <p className="rounded-xl bg-brk-background p-3 text-sm">Dán toàn bộ HTML từ Gemini Canvas vào một ô, không cần tách CSS/JavaScript. Tự xử lý Tailwind từ cdn.tailwindcss.com; giữ nguyên link ảnh HTTPS bên ngoài. Mã tối đa 1 MB, hỗ trợ họa tiết SVG nhỏ. Nút <code>#dang-ky</code> hoặc <code>#register</code> mở đăng ký khóa học của hệ thống.</p>
       <div className="flex gap-2 xl:hidden">{(['code', 'preview'] as const).map(value => <button key={value} type="button" onClick={() => setMobilePanel(value)} aria-pressed={mobilePanel === value} className={button}>{value === 'code' ? 'Code' : 'Xem trước'}</button>)}</div>
       <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2">
         <section className={`${mobilePanel === 'preview' ? 'hidden xl:block' : ''} min-w-0 space-y-3 rounded-2xl border border-brk-outline bg-white p-4`}>
@@ -134,7 +149,7 @@ export default function CourseTemplateWorkspace({ embedded = false, workflow = f
         <section className={`${mobilePanel === 'code' ? 'hidden xl:block' : ''} min-w-0 space-y-3 rounded-2xl border border-brk-outline bg-white p-4`}>
           <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-bold">Xem trước</h2><label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={auto} onChange={event => setAuto(event.target.checked)} />Tự cập nhật</label></div>
           <div className="flex flex-wrap gap-2">{[{ width: 1280, label: 'Máy tính' }, { width: 768, label: 'Tablet' }, { width: 390, label: 'Điện thoại' }].map(item => <button key={item.width} type="button" onClick={() => setDevice(item.width)} aria-pressed={device === item.width} className={button}>{item.label}</button>)}<button type="button" onClick={renderPreview} className={button}>Cập nhật</button></div>
-          {compileError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{compileError} · Đang giữ bản xem trước hợp lệ gần nhất.</p>}{rendered && <TemplatePreviewFrame html={rendered} width={device} />}{warnings.map(warning => <p key={warning} className="text-xs text-amber-700">{warning}</p>)}
+          {preparing && <p role="status" className="text-xs text-brk-muted">Đang chuẩn bị bản xem trước…</p>}{compileError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{compileError} · Đang giữ bản xem trước hợp lệ gần nhất.</p>}{rendered && <TemplatePreviewFrame html={rendered} width={device} />}{warnings.map(warning => <p key={warning} className="text-xs text-amber-700">{warning}</p>)}
         </section>
       </div>
       {!workflow && <div className="sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brk-outline bg-white p-4 shadow-lg"><span role="status" className="text-sm">{busy ? 'Đang xử lý…' : dirty ? 'Có thay đổi chưa lưu' : 'Code hiện tại của khóa học'}</span><button type="button" disabled={busy || loading || !revision} onClick={() => void save()} className={button}><Save size={17} />Lưu bản nháp cho khóa học</button></div>}

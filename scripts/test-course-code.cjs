@@ -44,6 +44,11 @@ async function run() {
     assert.deepEqual(listed.templates, [], 'No private template metadata transferred')
     assert.deepEqual((await (await api.GET(new Request('https://test.invalid/api/course-templates?course=OWN'))).json()).revision, revision())
     const before = writes
+    const previewResponse = await api.POST(request({ action: 'preview-course-code', slug: 'OWN', html: '<script src="https://cdn.tailwindcss.com"></script><h1 class="text-3xl">Preview only</h1>' }))
+    assert.equal(previewResponse.status, 200)
+    assert.match((await previewResponse.json()).html, /data-course-tailwind-css/)
+    assert.equal(writes, before, 'Preparing a Canvas preview must never create or update a draft')
+    assert.equal((await api.POST(request({ action: 'preview-course-code', slug: 'OTHER', html }))).status, 403)
     assert.equal((await api.POST(request(input(), 'https://evil.invalid'))).status, 403)
     denied = true; assert.equal((await api.POST(request())).status, 401); denied = false
     actor = { id: 2, role: 'TEACHER' }; assert.equal((await api.POST(request())).status, 403)
