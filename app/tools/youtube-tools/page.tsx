@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
-import { Play, Search, Loader2, Copy, Download, FileSpreadsheet, Check, AlertCircle, Info, X, Youtube, Link2, RefreshCw, Trash2, CheckCircle2, Eye, Globe, Lock, FileText } from 'lucide-react'
+import { Play, Search, Loader2, Copy, Download, FileSpreadsheet, Check, AlertCircle, Info, X, Link2, RefreshCw, Trash2, CheckCircle2, Eye, Globe, Lock, FileText } from 'lucide-react'
+import { YoutubeBrandIcon as Youtube } from '@/components/icons/brands'
 import MainHeader from '@/components/layout/MainHeader'
 
 interface VideoResult {
