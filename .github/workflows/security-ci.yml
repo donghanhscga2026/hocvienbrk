@@ -75,6 +75,7 @@ jobs:
           node scripts/test-my-requests-ui.cjs
           node scripts/test-notification-pagination.cjs
           node scripts/test-notification-feed-ui.cjs
+          node scripts/test-activation-email-content.cjs
           node scripts/test-pwa-install.cjs
           node scripts/test-wi300-partners.cjs
           node scripts/test-wi300-catalog-partners.cjs

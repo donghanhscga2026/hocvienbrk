@@ -39,11 +39,6 @@ const quotes = [
   'Mỗi ngày là một cơ hội để trở nên tốt hơn.',
 ];
 
-// Random timestamp cho unique tracking
-function getTimestamp(): string {
-  return new Date().toISOString();
-}
-
 // Random ID cho tracking
 function generateEmailId(): string {
   return `HV${Date.now().toString(36)}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
@@ -524,15 +519,20 @@ export async function sendVerificationEmail(to: string, studentName: string, tok
   return result;
 }
 
-export async function sendActivationEmail(to: string, studentName: string, studentId: number, courseName: string, _customContent: string | null) {
+export async function sendActivationEmail(to: string, studentName: string, studentId: number, courseName: string, customContent: string | null) {
   const subject = `[Cộng đồng MFC] Kích hoạt thành công khóa học: ${courseName}`;
-  const htmlBody = `Chào <b>${studentName}</b> (#${studentId}),<br><br>Khóa học <b>${courseName}</b> đã được kích hoạt.`;
-  const result = await sendGmail(to, subject, htmlBody);
+  const greeting = `Chào <b>${studentName}</b> (#${studentId}),<br><br>Khóa học <b>${courseName}</b> đã được kích hoạt.`;
+  // Nội dung riêng theo khóa học do giảng viên nhập ở trường "Nội dung email kích hoạt"
+  // (textarea văn bản thuần): nối vào sau phần chào mặc định. Escape HTML và giữ nguyên
+  // xuống dòng để giảng viên không chèn được mã HTML vào email gửi học viên.
+  const customText = (customContent || '').trim();
+  const customHtml = customText ? `<br><br>${escapeHtml(customText).replace(/\r?\n/g, '<br>')}` : '';
+  const result = await sendGmail(to, subject, greeting + customHtml);
   return result;
 }
 
-export async function sendLoginNotification(user: { id: number; name: string }, _ip: string, _userAgent: string) {
-  const msg = `🔑 <b>THÔNG BÁO ĐĂNG NHẬP</b>\n👤 Thành viên: <b>${user.name}</b> (#${user.id})`;
+export async function sendLoginNotification(user: { id: number; name: string }, ip: string, userAgent: string) {
+  const msg = `🔑 <b>THÔNG BÁO ĐĂNG NHẬP</b>\n👤 Thành viên: <b>${escapeHtml(user.name)}</b> (#${user.id})\n🌐 IP: <code>${escapeHtml(ip || 'Unknown')}</code>\n🖥️ Thiết bị: <code>${escapeHtml(userAgent || 'Unknown')}</code>`;
   await sendTelegram(msg, 'CHANGE'); // Chuyển từ FAILED_LOGIN sang CHANGE (Kênh biến động tài khoản bảo mật hơn)
 }
 
