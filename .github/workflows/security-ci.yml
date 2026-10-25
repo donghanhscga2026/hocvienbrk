@@ -116,6 +116,7 @@ jobs:
           node scripts/test-template-youtube.cjs
           node scripts/test-course-code.cjs
           node scripts/test-canvas-course-code.cjs
+          node scripts/test-template-viewport.cjs
           node scripts/test-course-sales-flow.cjs
           node scripts/test-template-workspace-ui.cjs
           node scripts/test-course-builder-ui.cjs

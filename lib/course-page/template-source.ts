@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { parse, serialize } from 'parse5'
 import { BRIDGE } from './importer/zip-browser'
 import { prepareYouTubeSlot, YOUTUBE_BRIDGE } from './youtube-embed'
+import { templateViewportCss } from './template-viewport'
 
 export const sourceFileSchema = z.object({ path: z.string().min(1).max(200).regex(/^[\w@() .\/-]+$/).refine(path => !path.startsWith('/') && !path.split('/').some(part => !part || part === '.' || part === '..'), 'Đường dẫn file không hợp lệ.'), kind: z.enum(['html', 'css', 'js', 'asset']), content: z.string().max(8 * 1024 * 1024) }).strict()
 export const templateSourceSchema = z.object({ entryPath: z.string().min(1).max(200), baseUrl: z.string().url().optional(), files: z.array(sourceFileSchema).min(1).max(200) }).strict().superRefine((source, ctx) => {
@@ -31,6 +32,7 @@ export function compileTemplateSource(raw: TemplateSource) {
   }
   function css(text: string, base: string, chain: string[] = []): string {
     if (chain.includes(base) || chain.length > 8) throw new Error('CSS có vòng lặp @import.')
+    text = templateViewportCss(text)
     text = text.replace(/@import\s+(?:url\(\s*)?["']([^"']+)["']\s*\)?\s*;/gi, (all, ref) => {
       const value = resolve(base, ref)
       return value.file ? css(value.file.content, value.file.path, [...chain, base]) : `@import url("${value.url}");`
