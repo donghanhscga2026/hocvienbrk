@@ -7,6 +7,7 @@ on:
     - cron: '0 5 * * *'
     - cron: '5 17 * * *'
     - cron: '*/15 * * * *'
+    - cron: '20 1 * * *'
   workflow_dispatch:
 
 jobs:
@@ -95,3 +96,28 @@ jobs:
           curl --fail-with-body --silent --show-error --max-time 65 \
             -H "Authorization: Bearer $CRON_SECRET" \
             "$SITE_URL/api/cron/web-push?execute=1"
+
+  academy-daily-sync:
+    if: github.event.schedule == '20 1 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sales ledger sync
+        run: |
+          curl --fail --silent --show-error --max-time 120 -X GET "${{ vars.SITE_URL }}/api/cron/sales-ledger" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+      - name: Social (YouTube) sync
+        run: |
+          curl --fail --silent --show-error --max-time 300 -X GET "${{ vars.SITE_URL }}/api/cron/social-sync" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+      - name: Race points sync
+        run: |
+          curl --fail --silent --show-error --max-time 120 -X GET "${{ vars.SITE_URL }}/api/cron/race-sync" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+      - name: Badge awards
+        run: |
+          curl --fail --silent --show-error --max-time 300 -X GET "${{ vars.SITE_URL }}/api/cron/badge-awards" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+      - name: Baseline reminders
+        run: |
+          curl --fail --silent --show-error --max-time 120 -X GET "${{ vars.SITE_URL }}/api/cron/baseline-reminders" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
