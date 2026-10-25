@@ -7,7 +7,8 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import Wi300CourseCover from './Wi300CourseCover'
 import { ExternalAppsCatalog } from './Wi300ExternalApps'
-import { Youtube, DollarSign, Settings, Users, CreditCard, BookOpen, FileText, Gem, Map as MapIcon, Mail, Layout, Globe, Wallet, Tag, LayoutGrid, GraduationCap, UserRound, ShieldCheck, ContactRound, Link2, DatabaseBackup, LifeBuoy, Network, type LucideIcon } from 'lucide-react'
+import { DollarSign, Settings, Users, CreditCard, BookOpen, FileText, Gem, Map as MapIcon, Mail, Layout, Globe, Wallet, Tag, LayoutGrid, GraduationCap, UserRound, ShieldCheck, ContactRound, Link2, DatabaseBackup, LifeBuoy, Network, type LucideIcon } from 'lucide-react'
+import { YoutubeBrandIcon } from '@/components/icons/brands'
 import { recentActiveCourses } from '@/lib/wi300/catalog'
 import { canTeach, isContentTool, wi300ToolName, pendingCourseLabel, toolGroup, toolGroups, type PersonalTool } from '@/lib/wi300/personal-space'
 import type { Wi300Course, Wi300Enrollment, Wi300TeachingCourse } from './Wi300Home'
@@ -27,7 +28,7 @@ const box = 'rounded-2xl border border-brk-outline bg-white p-4 sm:p-5'
 const action = 'inline-flex min-h-11 items-center justify-center rounded-xl bg-brk-primary px-4 text-sm font-semibold text-white'
 
 // Dùng lại tên icon và mã màu mà màn công cụ gốc lưu trong database.
-const toolIcons: Record<string, LucideIcon> = { Youtube, DollarSign, Settings, Users, CreditCard, BookOpen, FileText, Gem, Map: MapIcon, Mail, Layout, Globe, Wallet, Tag, LayoutGrid, GraduationCap, UserRound, ShieldCheck, ContactRound, Link2, DatabaseBackup, LifeBuoy, Network }
+const toolIcons: Record<string, LucideIcon> = { Youtube: YoutubeBrandIcon, DollarSign, Settings, Users, CreditCard, BookOpen, FileText, Gem, Map: MapIcon, Mail, Layout, Globe, Wallet, Tag, LayoutGrid, GraduationCap, UserRound, ShieldCheck, ContactRound, Link2, DatabaseBackup, LifeBuoy, Network }
 const toolColors: Record<string, string> = {
   bgRed600: 'bg-red-600', bgRed700: 'bg-red-700', bgGray500: 'bg-gray-500',
   bgEmerald500: 'bg-emerald-500', bgIndigo500: 'bg-indigo-500', bgGreen500: 'bg-green-500',
@@ -45,7 +46,7 @@ const toolDefaults: Record<string, { icon: LucideIcon; color: string }> = {
   affiliate: { icon: Link2, color: 'bg-orange-500' }, genealogy: { icon: Network, color: 'bg-purple-500' },
   payments: { icon: CreditCard, color: 'bg-emerald-500' }, 'bank-accounts': { icon: Wallet, color: 'bg-blue-500' },
   brk: { icon: Wallet, color: 'bg-amber-500' }, vouchers: { icon: Tag, color: 'bg-pink-500' },
-  'youtube-tools': { icon: Youtube, color: 'bg-red-600' }, settings: { icon: Settings, color: 'bg-gray-500' },
+  'youtube-tools': { icon: YoutubeBrandIcon, color: 'bg-red-600' }, settings: { icon: Settings, color: 'bg-gray-500' },
   backup: { icon: DatabaseBackup, color: 'bg-blue-500' }, 'ho-tro': { icon: LifeBuoy, color: 'bg-teal-500' },
   learning: { icon: BookOpen, color: 'bg-emerald-500' }, teaching: { icon: GraduationCap, color: 'bg-emerald-500' }, tools: { icon: LayoutGrid, color: 'bg-cyan-500' },
   account: { icon: UserRound, color: 'bg-indigo-500' }, admin: { icon: ShieldCheck, color: 'bg-gray-500' },
