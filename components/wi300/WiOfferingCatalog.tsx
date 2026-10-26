@@ -3,17 +3,19 @@ import { BriefcaseBusiness, Package } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import prisma from '@/lib/prisma'
 import { readProjects } from '@/lib/wi300/project-service'
-import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
+import { getPresentationBrand } from '@/lib/site-profile/presentation'
 import { systemPageContent, systemPageHidden } from '@/lib/wi300/managed-page-runtime'
 import { gridColumns } from '@/lib/wi300/appearance'
 import WiContentPage from './WiContentPage'
 
 /** Hai trang dùng chung giao diện, chỉ lấy nội dung đúng loại từ dự án công khai. */
 export default async function WiOfferingCatalog({ kind }: { kind: 'PRODUCT' | 'SERVICE' }) {
-  const brand = await getCurrentDeploymentBrand()
-  if (!brand) notFound()
   const product = kind === 'PRODUCT'
   const pageId = product ? 'products' : 'services'
+  // Brand theo trang: deployment brand, hoặc brand chọn-dùng khi site bật
+  // bản wi300 cho riêng trang sản phẩm/dịch vụ qua siteConfig.ui.pages.
+  const brand = await getPresentationBrand(pageId)
+  if (!brand) notFound()
   if (systemPageHidden(brand, pageId)) notFound()
   const page = systemPageContent(brand, pageId)
   const title = product ? 'Sản phẩm' : 'Dịch vụ'

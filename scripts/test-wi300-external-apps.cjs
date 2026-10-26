@@ -36,7 +36,7 @@ async function run(){
   const click=name=>[...document.querySelectorAll('button')].find(b=>b.textContent===name).click()
   let brand={name:'WI300'}
   const missing=()=>{throw Error('not-found')}
-  const overrides={'next/navigation':{notFound:missing},'@/lib/site-profile/deployment-runtime':{getCurrentDeploymentBrand:async()=>brand},'@/lib/site-profile/presentation':{getPagePresentation:async()=>brand?'wi300':'classic'},'@/lib/wi300/external-apps':registry,'@/components/wi300/Wi300ExternalApps':ui}
+  const overrides={'next/navigation':{notFound:missing},'@/lib/site-profile/deployment-runtime':{getCurrentDeploymentBrand:async()=>brand},'@/lib/site-profile/presentation':{getPagePresentation:async()=>brand?'wi300':'classic',getPresentationBrand:async()=>brand},'@/lib/wi300/external-apps':registry,'@/components/wi300/Wi300ExternalApps':ui}
   const page=load('app/tools/apps/[slug]/page.tsx',overrides).default
   const catalogPage=load('app/tools/apps/page.tsx',overrides).default
   try{

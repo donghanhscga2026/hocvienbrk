@@ -3,16 +3,15 @@ import { systemPageContent, systemPageMetadata, systemPageHidden } from '@/lib/w
 import Wi300Businesses from '@/components/wi300/Wi300Businesses'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
-import { getPagePresentation } from '@/lib/site-profile/presentation'
+import { getPagePresentation, getPresentationBrand } from '@/lib/site-profile/presentation'
 
-export async function generateMetadata() { const brand = await getCurrentDeploymentBrand(); return brand ? systemPageMetadata(brand, 'about') : { title: 'Giới thiệu' } }
+export async function generateMetadata() { const brand = await getPresentationBrand('about'); return brand ? systemPageMetadata(brand, 'about') : { title: 'Giới thiệu' } }
 export default async function Page() {
   if (await getPagePresentation('about') === 'classic') {
     const { default: ClassicAboutPage } = await import('@/components/classic/ClassicAbout')
     return <ClassicAboutPage />
   }
-  const brand = await getCurrentDeploymentBrand()
+  const brand = await getPresentationBrand('about')
   if (!brand || systemPageHidden(brand, 'about')) notFound()
   const page = systemPageContent(brand, 'about')
   const body = `${brand.description}\n\n${brand.name} hướng đến một hệ sinh thái dành cho cá nhân và doanh nghiệp, chia sẻ tri thức, giới thiệu sản phẩm và dịch vụ, tạo cơ hội hợp tác và cùng nâng cao năng lực trong thời đại số.\n\n300DNS là dự án của WIPA. Các dự án thuộc 300DNS được WIPA cố vấn.\n\nGiai đoạn đầu tập trung vào khóa học. Sản phẩm và dịch vụ sẽ được bổ sung khi cộng đồng sẵn sàng.`

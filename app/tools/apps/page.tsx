@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation'
-import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
-import { getPagePresentation } from '@/lib/site-profile/presentation'
+import { getPagePresentation, getPresentationBrand } from '@/lib/site-profile/presentation'
 import { ExternalAppsCatalog } from '@/components/wi300/Wi300ExternalApps'
 
 export const metadata = { title: 'Ứng dụng WI300', robots: { index: false, follow: false } }
@@ -15,6 +14,6 @@ export default async function Page() {
       </main>
     )
   }
-  if (!await getCurrentDeploymentBrand()) notFound()
+  if (!await getPresentationBrand('external-apps')) notFound()
   return <ExternalAppsCatalog />
 }

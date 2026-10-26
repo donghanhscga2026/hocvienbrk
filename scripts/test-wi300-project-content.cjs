@@ -72,6 +72,7 @@ async function run() {
     'next/navigation': { notFound: () => { throw new Error('404') } },
     '@/lib/prisma': { __esModule: true, default: {} },
     '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => ({ name: 'Wi300' }) },
+    '@/lib/site-profile/presentation': { getPresentationBrand: async () => ({ name: 'Wi300' }) },
     '@/lib/wi300/project-service': { readProjects: async () => [{ ...grow, published: true, offerings: [offering] }, { ...grow, slug: 'wi-hidden', published: false, offerings: [{ ...offering, name: 'Private draft' }] }] },
   }).default
   const html = require('react-dom/server').renderToStaticMarkup(await publicCatalog({ kind: 'SERVICE' }))

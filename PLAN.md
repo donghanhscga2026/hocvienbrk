@@ -2292,3 +2292,41 @@ Mọi trang công khai và trang cá nhân có hai bản hiển thị dùng chun
 - ⏳ Đã sửa và kiểm tra cục bộ (tsc + test liên quan + test gác cổng mới); chờ deploy riêng theo phê duyệt của người dùng (deploy/migration/env không thuộc giai đoạn này).
 - Điểm cần lưu ý: CSP frame-src cho ứng dụng ngoài trong `next.config` đang gắn với biến môi trường phía wi300; bản classic nhúng iframe app ngoài trên project giautoandien có thể bị CSP chặn tùy cấu hình project — viewer có nút "Mở riêng" dự phòng. Giai đoạn 3 sẽ cài công tắc chọn giao diện theo từng trang trong siteConfig tại điểm nối đã chừa trong helper.
 - PR của giai đoạn này: #279 (nhánh `feat/site-ui-split-gd2`).
+
+## ✅ Tách giao diện giautoandien / wi300 — Giai đoạn 3: công tắc chọn giao diện theo từng trang (2026-10-26)
+
+### Mục tiêu
+Site tự chọn giao diện cho TỪNG trang trong cấu hình của mình (siteConfig.ui.pages), thay vì cả web phải theo một bản triển khai: mặc định theo deployment (giautoandien = classic mọi trang, project wi300 = wi300 mọi trang); site chọn riêng trang nào thì trang đó thắng mặc định — ví dụ giautoandien bật bản wi300 cho đúng trang khóa học, hoặc một trang của wi300 về classic — không phải đổi cả web.
+
+### Các file đã sửa
+#### `lib/site-profile/config.ts`
+- Thêm `ui.pages` vào `SiteRuntimeConfig`: bản đồ pageKey → 'classic' | 'wi300' parse từ `siteConfig.ui.pages` qua `getSiteRuntimeConfig`. Chỉ giữ khóa thuộc `PAGE_PRESENTATION_KEYS` (khớp union `PageKey` trong presentation.ts) với đúng hai giá trị; khóa lạ, giá trị lạ, kiểu sai đều bỏ qua. Mặc định rỗng (không đổi hành vi khi site chưa đặt công tắc).
+
+#### `lib/site-profile/presentation.ts`
+- `getPagePresentation(pageKey)` phân giải theo thứ tự: (a) override `ui.pages` của SiteProfile hiện tại (`getCurrentSiteProfile` + `getSiteRuntimeConfig`) nếu có → dùng nó; (b) không có → quy tắc GĐ2 (có deployment brand → 'wi300', không → 'classic'). Hàm thuần `resolvePagePresentation(override, hasDeploymentBrand)` tách riêng để test gọi trực tiếp. Đọc cấu hình site lỗi thì coi như chưa chọn (fail-open về quy tắc deployment).
+- Thêm `getPresentationBrand(pageKey)`: brand để render nhánh wi300 của một trang — trang đang classic → null; có deployment brand → dùng deployment brand; không có deployment brand mà trang được chọn dùng 'wi300' → brand chọn-dùng dựng từ chính SiteProfile hiện tại (`getOptInBrand`): tên/logo/favicon lấy từ `branding` của profile (không lấy tên/logo WI300), description/SEO lấy từ profile, appearance đọc từ `readAppearance(appearanceKey())` như deployment-runtime và bảng màu chốt qua `configuredBrand` như bình thường (riêng tên/logo của profile được giữ nguyên sau bước đó để không lẫn nhận diện site khác).
+
+#### Các page lấy brand theo trang (nhánh classic giữ nguyên, phần wi300 giữ nguyên khi có deployment brand)
+- `app/khoa-hoc/page.tsx` ('courses', cả generateMetadata), `app/giang-vien/page.tsx` ('teachers', cả generateMetadata), `app/giang-vien/[id]/page.tsx` ('teacher-detail' trong readTeacher), `app/du-an/page.tsx` ('projects', cả generateMetadata), `app/du-an/[slug]/page.tsx` ('project-detail'), `app/du-an/chu-du-an/[id]/page.tsx` ('project-owner'), `app/gioi-thieu/page.tsx` ('about', cả generateMetadata), `app/doi-tac/page.tsx` ('partners', cả generateMetadata), `app/my-space/page.tsx` ('my-space'), `app/tools/apps/page.tsx` ('external-apps'), `app/tools/apps/[slug]/page.tsx` ('external-app'): thay `getCurrentDeploymentBrand()` ở nhánh wi300 bằng `getPresentationBrand(pageKey)`.
+- `components/wi300/WiOfferingCatalog.tsx` ('products' / 'services' theo kind): cùng thay đổi như trên.
+
+#### `components/admin/SiteRuntimeConfigEditor.tsx` (cách đặt công tắc qua giao diện)
+- Thêm khối "Giao diện theo trang" trong trang sửa hồ sơ website (`/tools/site-profiles/[id]/edit`, admin): 8 khóa trang chính (courses, teachers, products, services, about, partners, projects, my-space), mỗi khóa 3 lựa chọn Mặc định / Classic (giautoandien) / Wi300; lưu cùng nút "Lưu thông tin website" qua `updateSiteProfileRuntime` (gộp khóa cấp cao nhất vào siteConfig, các khóa trang ngoài danh sách — ví dụ teacher-detail — được giữ nguyên). Đặt qua JSON cũng được, mẫu chính xác: `{"ui":{"pages":{"courses":"wi300"}}}` trong siteConfig của hồ sơ.
+
+#### `scripts/test-presentation-toggle.cjs` (mới) + `.github/workflows/security-ci.yml`
+- Test mới (49 kiểm chứng): parse ui.pages (hợp lệ giữ, lạ bỏ, kiểu sai bỏ); thứ tự phân giải của getPagePresentation (override thắng brand cả hai chiều, không override thì theo brand như GĐ2) và của hàm thuần resolvePagePresentation; getPresentationBrand (classic → null, có deployment brand → dùng đúng brand đó, chọn-dùng wi300 khi không có brand → brand dựng từ branding của profile, đúng tên/logo/favicon của profile). Đã đăng ký vào Security CI (step "Site presentation per-page toggle tests").
+- Cập nhật mock trong 6 test cũ theo cách gắn mới (chỉ thêm `getPresentationBrand` vào mock `presentation` sẵn có, giữ nguyên kịch bản khẳng định): `scripts/test-wi300-projects.cjs`, `scripts/test-wi300-external-apps.cjs`, `scripts/test-wi300-home-ecosystem.cjs`, `scripts/test-wi300-appearance.cjs`, `scripts/test-wi300-course-hero.cjs`, `scripts/test-wi300-project-content.cjs`.
+
+### Phạm vi và giới hạn đã biết
+- Công tắc chỉ đổi PHẦN NỘI DUNG của trang. Khung shell toàn site (Wi300Shell/Wi300BrandProvider, header/footer wi300, biến màu giao diện ở layout) vẫn theo deployment — layout chỉ bọc shell khi project có deployment brand; bản wi300 chọn-dùng trên giautoandien hiển thị trong khung classic của gia, và trang `my-space` bản wi300 dùng khung độc lập sẵn có của `Wi300PersonalSpace` (sidebar riêng) thay cho khung quản lý của shell. Đây là giới hạn thiết kế đã chốt của GĐ3, không hack layout.
+- Khóa 'home': nhận trong cấu hình nhưng trang chủ chưa rẽ nhánh qua helper (GĐ2 không tách trang chủ — trang chủ vẫn theo deployment brand như cũ) nên override 'home' chưa có tác dụng. Khóa 'explore': trang vốn là stub chuyển về trang chủ ở cả hai bản nên override không tạo khác biệt nhìn thấy.
+- Mọi khóa còn lại (courses, teachers, teacher-detail, products, services, about, partners, projects, project-detail, project-owner, external-apps, external-app, my-space) hoạt động cả hai chiều ở cấp nội dung trang: đã kiểm chứng các component nội dung phía wi300 nhận brand qua props (Wi300Home/Wi300HomeClient, WiProjectDirectory, WiContentPage, WiOfferingCatalog, Wi300PartnerForm) và không phụ thuộc Wi300BrandContext — context chỉ do header/footer/loading của shell dùng.
+
+### Tổng kết chương trình tách giao diện 3 giai đoạn
+- GĐ1 (PR #278): chặn rò giao diện wi300 sang giautoandien, gỡ 404/link chết trên đường đi của giautoandien.
+- GĐ2 (PR #279): mọi trang công khai/cá nhân có hai bản hiển thị dùng chung logic/dữ liệu — classic của giautoandien (mặc định) và wi300 — qua helper `getPagePresentation`, kèm test gác cổng.
+- GĐ3 (PR này): công tắc chọn giao diện theo từng trang trong siteConfig (`ui.pages`) + brand chọn-dùng cho project không có deployment brand + mục chọn trong trang sửa hồ sơ website. Nguyên tắc xuyên suốt: chức năng dùng chung logic xử lý và dữ liệu, giao diện hiển thị riêng từng web và chỉ dùng chung khi site chọn; gốc là giautoandien.
+
+### Trạng thái
+- ⏳ Đã sửa và kiểm tra cục bộ (tsc exit 0 + test công tắc mới + test gác cổng GĐ2 + chùm test liên quan); chờ deploy riêng theo phê duyệt của người dùng (deploy/migration/env không thuộc giai đoạn này; công tắc chỉ có tác dụng sau khi bản này được deploy và admin đặt `ui.pages` cho hồ sơ tương ứng).
+- PR của giai đoạn này: #282 (nhánh `feat/site-ui-split-gd3`).

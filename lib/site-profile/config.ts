@@ -1,7 +1,19 @@
 import type {Prisma} from '@prisma/client'
+import type {PageKey} from './presentation'
 
 export type SiteHomepageType = 'community' | 'profile' | 'landing' | 'website'
 export type SiteCourseScopeMode = 'all' | 'profile' | 'teacher' | 'ids' | 'category'
+
+/**
+ * Danh sách khóa trang hợp lệ cho công tắc giao diện theo từng trang
+ * (siteConfig.ui.pages) — phải khớp union PageKey trong presentation.ts.
+ * Test scripts/test-presentation-toggle.cjs gác cổng danh sách này.
+ */
+export const PAGE_PRESENTATION_KEYS: readonly PageKey[] = [
+  'home', 'courses', 'teachers', 'teacher-detail', 'products', 'services',
+  'about', 'partners', 'explore', 'projects', 'project-detail',
+  'project-owner', 'external-apps', 'external-app', 'my-space',
+]
 
 export interface SiteRuntimeConfig {
   branding: {
@@ -30,6 +42,10 @@ export interface SiteRuntimeConfig {
   }
   theme: {
     allowUserOverride: boolean
+  }
+  ui: {
+    /** Công tắc giao diện theo từng trang (GĐ3): chỉ các khóa/giá trị hợp lệ mới được giữ. */
+    pages: Partial<Record<PageKey, 'classic' | 'wi300'>>
   }
 }
 
@@ -96,6 +112,20 @@ export function getSiteRuntimeConfig(profile: {
     ? raw.theme as Record<string, unknown>
     : {}
 
+  const rawUi = raw.ui && typeof raw.ui === 'object' && !Array.isArray(raw.ui)
+    ? raw.ui as Record<string, unknown>
+    : {}
+  const rawUiPages = rawUi.pages && typeof rawUi.pages === 'object' && !Array.isArray(rawUi.pages)
+    ? rawUi.pages as Record<string, unknown>
+    : {}
+  // Chỉ giữ khóa trang hợp lệ với đúng hai giá trị; phần lạ bỏ qua để
+  // cấu hình sai không làm đổi giao diện ngoài ý muốn.
+  const uiPages: Partial<Record<PageKey, 'classic' | 'wi300'>> = {}
+  for (const key of PAGE_PRESENTATION_KEYS) {
+    const value = rawUiPages[key]
+    if (value === 'classic' || value === 'wi300') uiPages[key] = value
+  }
+
   const shortText = (value: unknown) => typeof value === 'string' && value.trim() && value.length <= 500
     ? value.trim()
     : undefined
@@ -132,6 +162,9 @@ export function getSiteRuntimeConfig(profile: {
     },
     theme: {
       allowUserOverride: bool(rawTheme.allowUserOverride, false),
+    },
+    ui: {
+      pages: uiPages,
     },
   }
 }

@@ -30,6 +30,7 @@ async function run() {
   let sessionCalls = 0
   const Page = load('app/khoa-hoc/page.tsx', {
     '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => ({ appearance: defaultAppearance }) },
+    '@/lib/site-profile/presentation': { getPagePresentation: async () => 'wi300', getPresentationBrand: async () => ({ appearance: defaultAppearance }) },
     '@/lib/get-session': { getSession: () => { sessionCalls++; return new Promise(() => {}) } },
     '@/components/wi300/Wi300Home': { __esModule: true, default: () => null },
   }).default

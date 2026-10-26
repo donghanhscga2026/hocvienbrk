@@ -44,6 +44,7 @@ async function run() {
   for (const [route, page] of [['khoa-hoc', 'courses'], ['du-an', 'projects'], ['giang-vien', 'teachers']]) {
     const publicPage = load('app/' + route + '/page.tsx', {
       '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => ownBrand },
+      '@/lib/site-profile/presentation': { getPagePresentation: async () => 'wi300', getPresentationBrand: async () => ownBrand },
       '@/lib/get-session': { getSession: async () => null }, '@/lib/prisma': { __esModule: true, default: {} },
       '@/components/wi300/Wi300Home': { __esModule: true, default: () => null },
       '@/components/wi300/WiProjectDirectory': { __esModule: true, default: () => null },

@@ -3,8 +3,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import prisma from '@/lib/prisma'
-import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
-import { getPagePresentation } from '@/lib/site-profile/presentation'
+import { getPagePresentation, getPresentationBrand } from '@/lib/site-profile/presentation'
 import { getCurrentSiteProfile, getCourseWhereForProfile } from '@/lib/site-profile/runtime'
 import { wi300CoursePreferences, wi300CourseWhere } from '@/lib/wi300/course-visibility'
 import { teacherProfileKey, teacherProfileSchema } from '@/lib/wi300/teacher-profile'
@@ -14,7 +13,7 @@ import { canCreateProfile } from '@/lib/auth/roles'
 const readTeacher = cache(async (raw: string) => {
   if (!/^\d+$/.test(raw) || !Number.isSafeInteger(Number(raw))) return null
   const id = Number(raw)
-  const [brand, scope] = await Promise.all([getCurrentDeploymentBrand(), getCurrentSiteProfile()])
+  const [brand, scope] = await Promise.all([getPresentationBrand('teacher-detail'), getCurrentSiteProfile()])
   if (!brand || brand.appearance?.hiddenPages.includes('teachers')) return null
   const preferences = await wi300CoursePreferences(prisma)
   const where = { AND: [wi300CourseWhere(getCourseWhereForProfile(scope || { userId: 0 }), preferences), { teacherId: id }] }
