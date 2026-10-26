@@ -371,7 +371,7 @@ function CreateCourseContent() {
     return (
         <div className="min-h-screen bg-gray-50">
             <MainHeader title={isEditMode ? "Quản lý khóa học" : "Tạo khóa học mới"} toolSlug="courses" />
-            <ManagementWorkspace active="courses" appearance="forest">
+            <ManagementWorkspace active="courses">
             
             {isEditMode && <div className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-4"><div className="flex min-w-0 items-center gap-4">{linkAnhBia ? <img src={linkAnhBia} alt="" className="h-20 w-28 shrink-0 rounded-xl object-cover" /> : <div className="flex h-20 w-28 shrink-0 items-center justify-center rounded-xl bg-white text-brk-primary"><BookOpen size={30} /></div>}<div><h1 className="text-2xl font-bold text-brk-primary">{nameLop || 'Quản lý khóa học'}</h1><p className="mt-2 text-sm text-gray-500">{idKhoa} · {categories.find(category => category.id === categoryId)?.name || 'Khác'} · {lessons.length} bài giảng</p></div></div><div className="flex flex-wrap gap-2"><Link href={`/khoa-hoc/${idKhoa}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-xl border border-brk-outline bg-white px-4 text-sm font-semibold text-brk-primary">Xem khóa học ↗</Link><button hidden={activeTab !== 'info'} type="submit" form="course-settings-form" disabled={loading || !idKhoa || !nameLop} className="min-h-11 rounded-xl bg-brk-primary px-4 text-sm font-semibold text-white disabled:opacity-50">Lưu thay đổi</button></div></div>
