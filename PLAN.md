@@ -2329,3 +2329,4 @@ Site tự chọn giao diện cho TỪNG trang trong cấu hình của mình (sit
 
 ### Trạng thái
 - ⏳ Đã sửa và kiểm tra cục bộ (tsc exit 0 + test công tắc mới + test gác cổng GĐ2 + chùm test liên quan); chờ deploy riêng theo phê duyệt của người dùng (deploy/migration/env không thuộc giai đoạn này; công tắc chỉ có tác dụng sau khi bản này được deploy và admin đặt `ui.pages` cho hồ sơ tương ứng).
+- PR của giai đoạn này: #282 (nhánh `feat/site-ui-split-gd3`).
