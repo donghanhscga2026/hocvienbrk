@@ -2259,3 +2259,35 @@ Chức năng dùng chung logic xử lý và dữ liệu, giao diện hiển th�
 ### Trạng thái
 - ⏳ Đã sửa và kiểm tra cục bộ (tsc + test liên quan); chờ người dùng test sau khi deploy (deploy chưa được duyệt riêng).
 - Giai đoạn 2 sẽ xử lý tiếp: dựng bản classic cho các trang công khai đang gated wi300 (`/khoa-hoc`, `/giang-vien`, `/san-pham`, `/dich-vu`, `/gioi-thieu`, `/doi-tac`, `/kham-pha`) và trang cá nhân classic cho `/my-space` thay cho chuyển hướng tạm về `/`.
+
+## ✅ Tách giao diện giautoandien / wi300 — Giai đoạn 2: hai bản hiển thị dùng chung dữ liệu (2026-10-26)
+
+### Mục tiêu
+Mọi trang công khai và trang cá nhân có hai bản hiển thị dùng chung logic/dữ liệu: bản wi300 (chỉ khi project có deployment brand wi300) và bản classic của giautoandien (mặc định khi không có brand). Hành vi phía wi300 không đổi. Helper dùng chung `getPagePresentation(pageKey)` (`lib/site-profile/presentation.ts`) quyết định bản hiển thị; điểm nối GĐ3 (override theo từng pageKey trong siteConfig) đã ghi comment trong helper, chưa cài ở giai đoạn này.
+
+### Các file đã thêm
+#### `lib/site-profile/presentation.ts`
+- `getPagePresentation(pageKey)`: có brand → 'wi300', không có → 'classic'. Mọi page rẽ nhánh qua helper này thay vì tự kiểm tra brand.
+
+#### `components/classic/` (bản classic dùng component/token sẵn có của gia: MainHeader, FooterSection, CourseSection, class bg-brk-*/text-brk-*)
+- `ClassicCourseCatalog.tsx`: danh mục `/khoa-hoc` — cùng nguồn `getCoursesForProfile` như trang chủ, nhóm theo category, khóa sắp pin trước rồi mới nhất, trạng thái ghi danh như trang chủ. Không áp `wi300CoursePreferences` (riêng wi300).
+- `ClassicTeachers.tsx`: danh sách `/giang-vien` (gom từ khóa công khai trong phạm vi profile) và chi tiết `/giang-vien/[id]` qua `loadClassicTeacher` — cùng điều kiện nghiệp vụ phía wi300 (có hồ sơ tự tạo + khóa công khai trong phạm vi profile, tối đa 13 khóa), nguồn hồ sơ cùng `SystemConfig` (teacherProfileSchema); chỉ khác trình bày.
+- `ClassicOfferings.tsx`: `/san-pham` + `/dich-vu` — cùng dữ liệu offerings từ `readProjects` (lọc published), thay bản đồ tin cậy/map của wi300 bằng lưới thẻ classic.
+- `ClassicAbout.tsx`: `/gioi-thieu` — nội dung từ SiteProfile (title/subtitle/mô tả/heroImage) trong khung classic.
+- `ClassicPartner.tsx`: `/doi-tac` — dùng chung form và hành động gửi yêu cầu đối tác hiện tại (`Wi300PartnerForm`), chỉ bọc khung classic.
+- `ClassicProjects.tsx`: `/du-an`, `/du-an/[slug]`, `/du-an/chu-du-an/[id]` — cùng `getPublicProjects`/`readProjects`; phạm vi khóa dùng `getCourseWhereForProfile` như trang chủ (không áp wi300CoursePreferences).
+- `ClassicMySpace.tsx`: `/my-space` classic thật thay cho chuyển hướng tạm của GĐ1 — menu/sections là dữ liệu dùng chung `spaceNavigation` (lọc bỏ nhóm quản trị website và các mục chỉ có ở wi300), dữ liệu học tập từ enrollments + `getCoursesForProfile` như trang chủ; khối Tổng quan / Học tập / Giảng dạy (khi có quyền) / Cộng tác viên / Công cụ / Tài khoản, hỗ trợ `?tab=` và `?status=` như phía wi300.
+
+### Các file đã sửa
+#### Các page rẽ nhánh qua `getPagePresentation` (phần wi300 giữ nguyên)
+- `app/khoa-hoc/page.tsx`, `app/giang-vien/page.tsx`, `app/giang-vien/[id]/page.tsx` (cả generateMetadata), `app/san-pham/page.tsx`, `app/dich-vu/page.tsx`, `app/gioi-thieu/page.tsx`, `app/doi-tac/page.tsx`, `app/kham-pha/page.tsx` (cả hai bản đều redirect '/' — trang vốn là stub), `app/du-an/page.tsx`, `app/du-an/[slug]/page.tsx`, `app/du-an/chu-du-an/[id]/page.tsx`, `app/tools/apps/page.tsx`, `app/tools/apps/[slug]/page.tsx` (danh mục/xem ứng dụng ngoài dùng chung component; bản classic bọc khung công cụ), `app/my-space/page.tsx`.
+
+#### `scripts/test-site-presentation-guard.cjs` (mới) + `.github/workflows/security-ci.yml`
+- Test gác cổng: quét `app/**/page.tsx`, FAIL nếu còn mẫu notFound()/return null chỉ vì thiếu brand wi300 ngoài DANH SÁCH CHO PHÉP (trang thuần wi300): `app/tools/wi-appearance`, `app/tools/wi-website`, `app/du-an/quan-ly`, `app/du-an/noi-dung`, `app/[slug]` (trang tự tạo của website-builder wi300). Đồng thời bắt buộc 14 page đã tách phải gọi `getPagePresentation`. Đã đăng ký vào Security CI (step "Site presentation split guard tests").
+
+#### Cập nhật test cũ theo hành vi mới (không có brand → bản classic thay vì 404)
+- `scripts/test-wi300-teacher-profile.cjs`, `scripts/test-wi300-projects.cjs`, `scripts/test-wi300-home-ecosystem.cjs`, `scripts/test-wi300-external-apps.cjs`: đổi khẳng định "không brand → 404" thành "không brand → render bản classic"; mọi khẳng định phía wi300 giữ nguyên.
+
+### Trạng thái
+- ⏳ Đã sửa và kiểm tra cục bộ (tsc + test liên quan + test gác cổng mới); chờ deploy riêng theo phê duyệt của người dùng (deploy/migration/env không thuộc giai đoạn này).
+- Điểm cần lưu ý: CSP frame-src cho ứng dụng ngoài trong `next.config` đang gắn với biến môi trường phía wi300; bản classic nhúng iframe app ngoài trên project giautoandien có thể bị CSP chặn tùy cấu hình project — viewer có nút "Mở riêng" dự phòng. Giai đoạn 3 sẽ cài công tắc chọn giao diện theo từng trang trong siteConfig tại điểm nối đã chừa trong helper.

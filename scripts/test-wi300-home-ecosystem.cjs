@@ -115,13 +115,16 @@ async function run() {
   assert.equal(doc.querySelector('#wi300-course-partner-title').textContent, 'Bạn muốn chia sẻ chuyên môn?')
   dom.window.close()
   let directoryBrand = null
+  const ClassicTeachersPageStub = () => null
   const DirectoryPage = load('app/giang-vien/page.tsx', {
     'next/navigation': { notFound: () => { throw Error('404') } },
     '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => directoryBrand },
     '@/lib/get-session': { getSession: async () => null },
     '@/components/wi300/Wi300Home': { __esModule: true, default: () => null },
+    // GĐ2: không có brand thì trang rẽ sang bản classic (mock module classic).
+    '@/components/classic/ClassicTeachers': { ClassicTeachersPage: ClassicTeachersPageStub },
   }).default
-  await assert.rejects(() => DirectoryPage(), /404/)
+  assert.equal((await DirectoryPage()).type, ClassicTeachersPageStub, 'Teacher directory renders the classic presentation when there is no wi300 brand')
   directoryBrand = base.brand
   assert.equal((await DirectoryPage()).props.view, 'teachers')
   // Chuyển URL trên cùng component phải đổi kết quả, không giữ từ khóa cũ.

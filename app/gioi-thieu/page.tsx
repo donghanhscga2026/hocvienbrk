@@ -4,9 +4,14 @@ import Wi300Businesses from '@/components/wi300/Wi300Businesses'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
+import { getPagePresentation } from '@/lib/site-profile/presentation'
 
 export async function generateMetadata() { const brand = await getCurrentDeploymentBrand(); return brand ? systemPageMetadata(brand, 'about') : { title: 'Giới thiệu' } }
 export default async function Page() {
+  if (await getPagePresentation('about') === 'classic') {
+    const { default: ClassicAboutPage } = await import('@/components/classic/ClassicAbout')
+    return <ClassicAboutPage />
+  }
   const brand = await getCurrentDeploymentBrand()
   if (!brand || systemPageHidden(brand, 'about')) notFound()
   const page = systemPageContent(brand, 'about')
