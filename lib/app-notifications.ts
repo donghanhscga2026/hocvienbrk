@@ -51,11 +51,13 @@ export function visibleNotifications(actor: Actor) {
             SELECT 1 FROM public."Enrollment" se JOIN public."Course" sc ON sc.id = se."courseId"
             WHERE se."userId" = ct."studentUserId" AND sc."teacherId" = ${actor.id}
           )))))
+        OR (n.kind = 'BADGE_AWARDED')
       )`
 }
 
 type NotificationRow = { id: string; kind: string; title: string; readAt: Date | null; createdAt: Date; notBefore: Date; requestId: string | null; taskId: number | null; commentId: number | null; slug: string | null; commentLessonId: string | null; lessonId?: string | null }
 export function notificationHref(row: NotificationRow) {
+  if (row.kind === 'BADGE_AWARDED') return '/huy-hieu'
   if (row.kind === 'REQUEST_INCOMING') return '/tools/crm?view=requests&request=' + encodeURIComponent(row.requestId!)
   if (row.kind.startsWith('REQUEST_')) return '/my-requests?request=' + encodeURIComponent(row.requestId!)
   if (row.kind === 'TASK_DUE') return '/tools/crm?view=tasks'
