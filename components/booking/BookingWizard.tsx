@@ -239,6 +239,12 @@ export default function BookingWizard({ session, source, tags, prefill }: Bookin
               <p className="text-sm font-semibold text-slate-800">{session.expert.name}</p>
               <p className="text-xs text-slate-500">Chuyên gia tư vấn</p>
             </div>
+            <a
+              href={`/dat-lich/giang-vien/${session.expert.id}?code=${session.code}`}
+              className="ml-auto text-xs font-semibold text-emerald-800 underline"
+            >
+              Hồ sơ giảng viên →
+            </a>
           </div>
           {session.description && <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-600">{session.description}</p>}
         </div>

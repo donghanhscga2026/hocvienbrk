@@ -238,4 +238,25 @@ const policy = loadModule('lib/booking/policy.ts')
   ok(ci.includes('node scripts/test-booking.cjs'), 'gd2: CI chay test-booking')
 }
 
+// 10. Hồ sơ giảng viên + bộ lọc buổi ở cổng tra cứu (bổ sung theo Bookify)
+{
+  const service3 = fs.readFileSync(path.join(root, 'lib/booking/service.ts'), 'utf8')
+  ok(service3.includes('function getExpertPublicProfile'), 'profile: service co getExpertPublicProfile')
+  ok(service3.includes('!s.isPrivate') && service3.includes('isViaCode'), 'profile: phien rieng tu chi hien qua viaCode, danh dau dang chon')
+  ok(service3.includes("expert.role !== 'TEACHER' && expert.role !== 'ADMIN'"), 'profile: chi giang vien/quan tri moi co ho so')
+  const profilePagePath = path.join(root, 'app/dat-lich/giang-vien/[expertId]/page.tsx')
+  ok(fs.existsSync(profilePagePath), 'profile: co route /dat-lich/giang-vien/[expertId]')
+  const profilePage = fs.readFileSync(profilePagePath, 'utf8')
+  ok(profilePage.includes('getExpertPublicProfile') && profilePage.includes('CopyLinkButton'), 'profile: trang dung service + nut sao chep link')
+  ok(profilePage.includes('Lịch làm việc hằng tuần'), 'profile: hien lich lam viec theo tuan')
+  ok(fs.existsSync(path.join(root, 'components/booking/CopyLinkButton.tsx')), 'profile: co component CopyLinkButton')
+  const wizard3 = fs.readFileSync(path.join(root, 'components/booking/BookingWizard.tsx'), 'utf8')
+  ok(wizard3.includes('/dat-lich/giang-vien/'), 'profile: trang dat lich co link ho so giang vien')
+  const panel3 = fs.readFileSync(path.join(root, 'components/booking/AdminBookingPanel.tsx'), 'utf8')
+  ok(panel3.includes('Hồ sơ đặt lịch của bạn') && panel3.includes('CopyLinkButton'), 'profile: quan tri co khoi link ho so + sao chep')
+  const portal3 = fs.readFileSync(path.join(root, 'components/booking/GuestPortal.tsx'), 'utf8')
+  ok(portal3.includes('visibleSlots') && portal3.includes('countPeriod'), 'filter: cong tra cuu co chip loc Sang/Chieu/Toi khi doi lich')
+  ok(wizard3.includes('countByPeriod'), 'filter: trang dat lich van giu chip loc buoi kem so slot')
+}
+
 console.log(`test-booking: ${checks} checks PASS`)
