@@ -51,6 +51,8 @@ export default function GuestPortal({ initialEmail, initialCode }: GuestPortalPr
   const [slots, setSlots] = useState<DaySlot[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [newSlot, setNewSlot] = useState<DaySlot | null>(null)
+  const [period, setPeriod] = useState<'ALL' | DaySlot['period']>('ALL')
+  const PERIOD_LABELS: Record<DaySlot['period'], string> = { SANG: 'Sáng', CHIEU: 'Chiều', TOI: 'Tối' }
 
   // Hủy lịch
   const [showCancel, setShowCancel] = useState(false)
@@ -142,6 +144,11 @@ export default function GuestPortal({ initialEmail, initialCode }: GuestPortalPr
     }
   }
 
+  // Lọc khung giờ theo buổi (Sáng/Chiều/Tối) — đồng nhất với trang đặt lịch.
+  const visibleSlots = period === 'ALL' ? slots : slots.filter((s) => s.period === period)
+  const countPeriod = (p: DaySlot['period']) => slots.filter((s) => s.period === p && s.available).length
+  const availTotal = slots.filter((s) => s.available).length
+
   const inputCls = 'w-full min-h-11 rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900'
   const primaryBtn = 'min-h-11 rounded-lg bg-emerald-700 px-5 text-sm font-semibold text-white disabled:opacity-50'
   const ghostBtn = 'min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm text-slate-700'
@@ -194,7 +201,7 @@ export default function GuestPortal({ initialEmail, initialCode }: GuestPortalPr
 
           {booking.canModify ? (
             <div className="mt-5 flex flex-wrap gap-2">
-              <button type="button" className={primaryBtn} onClick={() => { setShowReschedule((v) => !v); setShowCancel(false); setNewDate(vnDateString(new Date(booking.startsAt))) }}>
+              <button type="button" className={primaryBtn} onClick={() => { setShowReschedule((v) => !v); setShowCancel(false); setNewDate(vnDateString(new Date(booking.startsAt))); setPeriod('ALL') }}>
                 Đổi giờ hẹn
               </button>
               <button type="button" className={ghostBtn} onClick={() => { setShowCancel((v) => !v); setShowReschedule(false) }}>
@@ -209,15 +216,31 @@ export default function GuestPortal({ initialEmail, initialCode }: GuestPortalPr
             <div className="mt-5 rounded-xl border border-slate-200 p-4">
               <h3 className="font-semibold text-slate-800">Chọn giờ hẹn mới</h3>
               <label className="mt-3 block text-sm">Ngày hẹn mới
-                <input className={inputCls} type="date" min={todayVN} max={maxDateVN} value={newDate} onChange={(e) => setNewDate(e.target.value)} />
+                <input className={inputCls} type="date" min={todayVN} max={maxDateVN} value={newDate} onChange={(e) => { setNewDate(e.target.value); setPeriod('ALL') }} />
               </label>
               {loadingSlots ? (
                 <p className="py-4 text-sm text-slate-400">Đang tải khung giờ…</p>
               ) : slots.length === 0 ? (
                 <p className="py-4 text-sm text-slate-500">Ngày này không có khung giờ nào. Hãy chọn ngày khác.</p>
               ) : (
-                <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {slots.map((slot) => (
+                <>
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {(['ALL', 'SANG', 'CHIEU', 'TOI'] as const).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPeriod(p)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-medium ${period === p ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}
+                      >
+                        {p === 'ALL' ? `Tất cả (${availTotal})` : `${PERIOD_LABELS[p]} (${countPeriod(p)})`}
+                      </button>
+                    ))}
+                  </div>
+                  {visibleSlots.length === 0 ? (
+                    <p className="py-4 text-sm text-slate-500">Buổi này không có khung giờ. Hãy chọn buổi khác.</p>
+                  ) : (
+                    <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                      {visibleSlots.map((slot) => (
                     <button
                       key={slot.startMin}
                       type="button"
@@ -225,10 +248,12 @@ export default function GuestPortal({ initialEmail, initialCode }: GuestPortalPr
                       onClick={() => setNewSlot(slot)}
                       className={`rounded-lg px-2 py-2.5 text-sm ${!slot.available ? 'bg-slate-50 text-slate-300 line-through' : newSlot?.startMin === slot.startMin ? 'bg-emerald-700 font-bold text-white' : 'bg-emerald-50 font-medium text-emerald-900 hover:bg-emerald-100'}`}
                     >
-                      {formatMin(slot.startMin)}
-                    </button>
-                  ))}
-                </div>
+                          {formatMin(slot.startMin)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
               <div className="mt-4 flex gap-2">
                 <button type="button" className={ghostBtn} onClick={() => setShowReschedule(false)}>Để sau</button>

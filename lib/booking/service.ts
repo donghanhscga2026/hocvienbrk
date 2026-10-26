@@ -1007,3 +1007,50 @@ export async function listMyBookings(userId: number, email: string | null) {
     },
   })
 }
+
+/**
+ * Hồ sơ đặt lịch công khai của giảng viên (kiểu Bookify "Hồ Sơ Chuyên Gia"):
+ * chỉ hiện các phiên đang mở và CÔNG KHAI. Phiên riêng tư (chỉ qua link mời)
+ * không lộ ra hồ sơ — ngoại trừ chính phiên mà khách đang đi từ link mời của nó
+ * (viaCode khớp và thuộc đúng giảng viên này), phiên đó được đánh dấu đang chọn.
+ */
+export async function getExpertPublicProfile(expertId: number, viaCode?: string) {
+  const expert = await prisma.user.findUnique({
+    where: { id: expertId },
+    select: { id: true, name: true, image: true, role: true },
+  })
+  if (!expert || (expert.role !== 'TEACHER' && expert.role !== 'ADMIN')) return null
+
+  const allSessions = await prisma.bookingSession.findMany({
+    where: { expertId, status: 'ACTIVE' },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      code: true, title: true, description: true, coverUrl: true,
+      durationMin: true, mode: true, price: true, isPrivate: true,
+    },
+  })
+  const sessions = allSessions
+    .filter((s) => !s.isPrivate || (!!viaCode && s.code === viaCode))
+    .map((s) => ({
+      code: s.code,
+      title: s.title,
+      description: s.description ? s.description.slice(0, 240) : null,
+      coverUrl: s.coverUrl,
+      durationMin: s.durationMin,
+      mode: s.mode,
+      price: s.price,
+      isViaCode: !!viaCode && s.code === viaCode,
+    }))
+
+  const rules = await prisma.expertAvailability.findMany({
+    where: { expertId },
+    orderBy: [{ weekday: 'asc' }, { startMin: 'asc' }],
+    select: { weekday: true, startMin: true, endMin: true },
+  })
+
+  return {
+    expert: { id: expert.id, name: expert.name || 'Chuyên gia', image: expert.image, role: expert.role },
+    sessions,
+    weekly: rules,
+  }
+}
