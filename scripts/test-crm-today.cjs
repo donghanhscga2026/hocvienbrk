@@ -17,6 +17,7 @@ const root = path.resolve(__dirname, '..')
 const { readToday } = load(root + '/lib/crm/today.ts')
 const { readCrm, CrmError } = load(root + '/lib/crm/service.ts')
 const { crmQuery } = load(root + '/lib/crm/validation.ts')
+const { readNewAccountsExport, accountsExportBounds, buildAccountsCsv } = load(root + '/lib/crm/accounts-export.ts')
 
 function matches(row, where) {
   if (!where) return true
@@ -136,6 +137,43 @@ async function main() {
   }
   const viaService = await readCrm(liveDb, admin, crmQuery.parse({ view: 'today' }))
   ok(viaService.stats.contacts === 1 && viaService.contacts[0].name === 'Vừa đăng ký', 'readCrm điều phối view today tới đúng danh sách hôm nay')
+
+  // ---- Xuất danh sách tài khoản mới theo khoảng ngày ----
+  const exportUsers = [
+    { id: 201, name: 'Đầu khoảng', email: 'dau@test.invalid', phone: '+84901000001', role: 'STUDENT', referrerId: 0, referrer: { name: 'Coach Cương' }, emailVerified: at('2026-10-13T17:05:00Z'), affiliateCode: null, enrollments: [{ course: { teacherId: 7 } }], createdAt: at('2026-10-13T17:00:00Z') },
+    { id: 202, name: 'Cuối khoảng', email: 'cuoi@test.invalid', phone: null, role: 'STUDENT', referrerId: null, referrer: null, emailVerified: null, affiliateCode: 'AFF202', enrollments: [], createdAt: at('2026-10-25T16:59:59Z') },
+    { id: 203, name: 'Ngoài khoảng', email: 'ngoai@test.invalid', phone: null, role: 'STUDENT', referrerId: null, referrer: null, emailVerified: null, affiliateCode: null, enrollments: [{ course: { teacherId: 7 } }], createdAt: at('2026-10-25T17:00:00Z') },
+    { id: 204, name: 'Tên, có "dấu phẩy"', email: 'comma@test.invalid', phone: '0901234567', role: 'STUDENT', referrerId: 201, referrer: { name: 'Đầu khoảng' }, emailVerified: null, affiliateCode: null, enrollments: [{ course: { teacherId: 9 } }], createdAt: at('2026-10-20T02:00:00Z') },
+    { id: 205, name: 'Ngày tương lai', email: 'future@test.invalid', phone: null, role: 'STUDENT', referrerId: null, referrer: null, emailVerified: null, affiliateCode: null, enrollments: [], createdAt: at('2026-11-30T19:11:00Z') },
+  ]
+  const exportDb = { user: model(exportUsers) }
+
+  const bounds = accountsExportBounds('2026-10-14', '2026-10-25')
+  ok(bounds.start.toISOString() === '2026-10-13T17:00:00.000Z' && bounds.end.toISOString() === '2026-10-25T17:00:00.000Z', 'Biên khoảng ngày là 00:00 Việt Nam, đầu khoảng gồm, cuối khoảng trừ')
+  assert.throws(() => accountsExportBounds('2026-02-30', '2026-03-01'), e => e instanceof CrmError && e.status === 400); checks++
+  assert.throws(() => accountsExportBounds('2026-10-25', '2026-10-14'), e => e instanceof CrmError && e.status === 400); checks++
+  assert.throws(() => accountsExportBounds('2025-10-25', '2026-10-26'), e => e instanceof CrmError && e.status === 400); checks++
+  ok(accountsExportBounds('2025-10-26', '2026-10-26').end.getTime() - accountsExportBounds('2025-10-26', '2026-10-26').start.getTime() === 366 * 86400000, 'Khoảng 366 ngày vẫn được phép')
+
+  const exported = await readNewAccountsExport(exportDb, admin, { from: '2026-10-14', to: '2026-10-25' }, NOW)
+  ok(exported.total === 3 && exported.filename === 'tai-khoan-moi-2026-10-14-2026-10-25.csv', 'Admin xuất đúng 3 tài khoản trong khoảng, gồm biên đầu, trừ biên cuối')
+  const lines = exported.csv.replace(/^﻿/, '').trimEnd().split('\n')
+  ok(lines[0] === 'STT,ID,Họ và tên,Email,Số điện thoại,Ngày đăng ký (giờ VN),Vai trò,Người giới thiệu,ID người giới thiệu,Email đã xác minh,Mã affiliate,Ghi chú', 'Dòng tiêu đề CSV khớp mẫu đã giao cho người dùng')
+  ok(lines[1].startsWith('1,201,Đầu khoảng,dau@test.invalid,\'+84901000001,14/10/2026 00:00,STUDENT,Coach Cương,0,Có,'), 'Dòng biên đầu: giờ Việt Nam, số điện thoại ép kiểu chữ, người giới thiệu ID 0 vẫn hiện, email đã xác minh')
+  ok(lines[2].includes('"Tên, có ""dấu phẩy"""') && lines[2].includes("'0901234567") && lines[2].includes('20/10/2026 09:00'), 'Tên có dấu phẩy được bọc nháy đúng chuẩn CSV, số 09 được giữ nguyên số 0 đầu')
+  ok(lines[3].startsWith('3,202,Cuối khoảng') && lines[3].includes('25/10/2026 23:59') && lines[3].includes('Chưa') && lines[3].includes('AFF202'), 'Dòng biên cuối 23:59:59 vẫn trong khoảng, email chưa xác minh, có mã affiliate')
+
+  const teacherExport = await readNewAccountsExport(exportDb, teacher, { from: '2026-10-14', to: '2026-10-25' }, NOW)
+  ok(teacherExport.total === 1 && teacherExport.csv.includes('Đầu khoảng') && !teacherExport.csv.includes('Cuối khoảng'), 'Giáo viên chỉ xuất tài khoản đã ghi danh khóa của mình')
+
+  const futureExport = await readNewAccountsExport(exportDb, admin, { from: '2026-11-30', to: '2026-12-01' }, NOW)
+  ok(futureExport.total === 1 && futureExport.csv.includes('Ngày đăng ký trong hệ thống nằm ở tương lai, cần kiểm tra lại'), 'Tài khoản có ngày đăng ký ở tương lai được gắn cờ trong cột ghi chú')
+
+  const defaultExport = await readNewAccountsExport(exportDb, admin, {}, NOW)
+  ok(defaultExport.total === 3 && defaultExport.filename === 'tai-khoan-moi-2026-09-26-2026-10-25.csv', 'Không chọn ngày thì mặc định xuất 30 ngày gần nhất tính theo ngày Việt Nam')
+
+  await assert.rejects(() => readNewAccountsExport(exportDb, { id: 55, role: 'STUDENT', name: 'Học viên' }, { from: '2026-10-14', to: '2026-10-25' }, NOW), e => e instanceof CrmError && e.status === 403); checks++
+  ok(buildAccountsCsv([], NOW).startsWith('﻿STT,ID,'), 'CSV luôn bắt đầu bằng BOM để Excel đọc đúng tiếng Việt')
 
   console.log('test-crm-today: ' + checks + ' checks PASS')
 }
