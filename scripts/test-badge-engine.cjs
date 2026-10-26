@@ -59,4 +59,24 @@ ok(cron.includes('CRON_SECRET'), 'cron: có khóa CRON_SECRET')
 const page = fs.readFileSync(path.join(root, 'app/huy-hieu/page.tsx'), 'utf8')
 ok(!page.includes('awardBadgesForUser'), 'page: hiển thị không tự ghi — trao qua nút cập nhật/action')
 
+// Tối ưu vận hành + lối vào + thông báo (26/10/2026):
+// - catalog chỉ đồng bộ 1 lần mỗi tiến trình (promise dùng chung), không
+//   upsert lại trước mỗi thành viên như bản đầu gây timeout 900 giây.
+// - lượt toàn hệ thống đo gộp (groupBy) và trao bằng createMany.
+// - nhận huy hiệu mới có chuông BADGE_AWARDED, hiện trong feed và bấm
+//   sang /huy-hieu; học viên có lối vào từ menu tài khoản; trang công cụ
+//   có icon Medal cho thẻ Huy hiệu.
+ok(engine.includes('let catalogReady'), 'engine: catalog đồng bộ 1 lần mỗi tiến trình')
+ok(engine.includes('measureAllMembers') && engine.includes('groupBy'), 'engine: lượt toàn hệ thống đo gộp theo lô')
+ok(engine.includes('planAllBadgeAwards'), 'engine: có hàm tính trước dry-run không ghi DB')
+ok(engine.includes('userBadge.createMany') && engine.includes('skipDuplicates: true'), 'engine: trao bằng createMany chống trùng')
+ok(engine.includes("kind: 'BADGE_AWARDED'") && engine.includes('notifyBadgeAwards'), 'engine: có báo chuông khi nhận huy hiệu mới')
+const notif = fs.readFileSync(path.join(root, 'lib/app-notifications.ts'), 'utf8')
+ok(notif.includes("n.kind = 'BADGE_AWARDED'"), 'notifications: BADGE_AWARDED nằm trong danh sách hiển thị của chuông')
+ok(notif.includes("if (row.kind === 'BADGE_AWARDED') return '/huy-hieu'"), 'notifications: bấm thông báo huy hiệu sang /huy-hieu')
+const userMenu = fs.readFileSync(path.join(root, 'components/layout/UserMenu.tsx'), 'utf8')
+ok(userMenu.includes('href="/huy-hieu"') && userMenu.includes('Huy hiệu của tôi'), 'lối vào: menu tài khoản có mục Huy hiệu của tôi')
+const toolsPage = fs.readFileSync(path.join(root, 'app/tools/page.tsx'), 'utf8')
+ok(toolsPage.includes('Medal,'), 'lối vào: iconMap trang công cụ có Medal cho thẻ Huy hiệu')
+
 console.log(`test-badge-engine: ${checks} kiểm chứng PASS`)

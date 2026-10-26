@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { useState, useEffect, Suspense } from 'react'
-import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, ArrowLeft, DollarSign, Lock, Settings, Layout, Loader2, Share2, Copy, X, Globe, Wallet, Tag, Calendar } from 'lucide-react'
+import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, ArrowLeft, DollarSign, Lock, Settings, Layout, Loader2, Share2, Copy, X, Globe, Wallet, Tag, Calendar, Medal } from 'lucide-react'
 import { YoutubeBrandIcon as Youtube } from '@/components/icons/brands'
 import { Role } from '@prisma/client'
 
@@ -46,6 +46,7 @@ const iconMap: Record<string, any> = {
   Wallet,
   Tag,
   Calendar,
+  Medal,
 }
 
 const colorMap: Record<string, string> = {

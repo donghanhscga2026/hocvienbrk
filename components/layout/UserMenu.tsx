@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { signOutPushCleanup } from '@/lib/web-push-client'
 import { signOut, useSession } from 'next-auth/react'
-import { Settings, LogOut, ChevronDown, LogIn, Check, Wallet } from 'lucide-react'
+import { Settings, LogOut, ChevronDown, LogIn, Check, Wallet, Award } from 'lucide-react'
 import { presetThemes, ThemeId, getThemeById, generateThemeCSS, getTextColorForBg, isDarkTheme } from '@/app/contexts/theme-config'
 import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
 import { InstallAppButton } from '@/components/pwa/PwaInstallProvider'
@@ -143,6 +143,14 @@ export default function UserMenu() {
                     >
                         <Settings className="h-4 w-4" />
                         Cài đặt tài khoản
+                    </Link>
+                    <Link
+                        href="/huy-hieu"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-brk-on-surface hover:bg-brk-background transition-colors"
+                    >
+                        <Award className="h-4 w-4" />
+                        Huy hiệu của tôi
                     </Link>
                     {/* Đóng menu avatar trước khi mở cửa sổ Ví MBW. */}
                     <button
