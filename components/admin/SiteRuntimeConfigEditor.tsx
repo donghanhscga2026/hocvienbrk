@@ -6,6 +6,18 @@ import {updateSiteProfileRuntime} from '@/app/actions/site-profile-actions'
 
 type ProfileLike={id:number;slug?:string;siteConfig?:unknown;communityAvailable?:boolean}
 type Props={profile:ProfileLike;onSaved?:()=>void|Promise<void>}
+// Công tắc giao diện theo từng trang (siteConfig.ui.pages): các khóa trang
+// chính; khóa còn lại trong cấu hình đã lưu được giữ nguyên khi lưu.
+const PAGE_UI_OPTIONS=[
+  {key:'courses',label:'Khóa học (danh mục)'},
+  {key:'teachers',label:'Giảng viên (danh sách)'},
+  {key:'products',label:'Sản phẩm'},
+  {key:'services',label:'Dịch vụ'},
+  {key:'about',label:'Giới thiệu'},
+  {key:'partners',label:'Đăng ký đối tác'},
+  {key:'projects',label:'Dự án'},
+  {key:'my-space',label:'Không gian của tôi'},
+] as const
 function record(value:unknown) {
   return value && typeof value==='object' && !Array.isArray(value)?value as Record<string,unknown>:{}
 }
@@ -13,6 +25,8 @@ function record(value:unknown) {
 /** Chỉ gửi thông tin được chỉnh tại đây; giữ các thiết lập ở khu vực khác. */
 export default function SiteRuntimeConfigEditor({profile,onSaved}:Props) {
   const config=record(profile.siteConfig),branding=record(config.branding),homepage=record(config.homepage),modules=record(config.modules)
+  const ui=record(config.ui),uiPages=record(ui.pages)
+  const [pageUi,setPageUi]=useState<Record<string,string>>(()=>Object.fromEntries(PAGE_UI_OPTIONS.map(option=>[option.key,uiPages[option.key]==='classic'||uiPages[option.key]==='wi300'?String(uiPages[option.key]):''])))
   const [brandName,setBrandName]=useState(String(branding.name || ''))
   const [logoUrl,setLogoUrl]=useState(String(branding.logoUrl || ''))
   const [faviconUrl,setFaviconUrl]=useState(String(branding.faviconUrl || ''))
@@ -25,10 +39,18 @@ export default function SiteRuntimeConfigEditor({profile,onSaved}:Props) {
     setSaving(true);setMessage(null)
     try {
       // Giữ nguyên trang chủ, bộ màu, nguồn khóa học và các quyền đã lưu.
+      // Giữ các khóa trang ngoài danh sách chọn ở đây (vd teacher-detail).
+      const nextUiPages={...uiPages}
+      for(const option of PAGE_UI_OPTIONS) {
+        const value=pageUi[option.key]
+        if(value==='classic'||value==='wi300') nextUiPages[option.key]=value
+        else delete nextUiPages[option.key]
+      }
       const result=await updateSiteProfileRuntime(profile.id,{
         siteConfig:{
           branding:{...branding,name:brandName.trim(),logoUrl:logoUrl.trim(),faviconUrl:faviconUrl.trim()},
           ...(profile.communityAvailable?{modules:{...modules,community}}:{}),
+          ui:{...ui,pages:nextUiPages},
         },
       })
       if(result.error)setMessage({type:'error',text:result.error})
@@ -57,6 +79,13 @@ export default function SiteRuntimeConfigEditor({profile,onSaved}:Props) {
       </div>
       <p className="text-sm text-gray-500">Thông tin thương hiệu dùng cho khung website trên tên miền riêng. Ảnh bìa và nội dung được sửa trong mẫu có sẵn.</p>
       {profile.communityAvailable && <label className="flex min-h-11 items-center gap-3 rounded-xl border p-3 text-sm"><input type="checkbox" checked={community} onChange={e=>setCommunity(e.target.checked)} className="h-4 w-4 accent-emerald-600"/>Hiển thị bảng tin cộng đồng</label>}
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-gray-700">Giao diện theo trang</p>
+        <p className="text-sm text-gray-500">Mặc định: theo bản triển khai của website (giautoandien dùng bản classic, wi300 dùng bản wi300). Chỉ chọn riêng khi muốn một trang dùng giao diện khác mặc định; công tắc chỉ đổi phần nội dung trang, khung trang toàn site vẫn theo bản triển khai.</p>
+        <div className="grid gap-4 md:grid-cols-2">
+          {PAGE_UI_OPTIONS.map(option=><label key={option.key} className="text-sm font-medium text-gray-700">{option.label}<select value={pageUi[option.key]||''} onChange={e=>setPageUi(prev=>({...prev,[option.key]:e.target.value}))} className={field}><option value="">Mặc định</option><option value="classic">Classic (giautoandien)</option><option value="wi300">Wi300</option></select></label>)}
+        </div>
+      </div>
       <button type="button" onClick={saveRuntime} disabled={saving} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white disabled:opacity-50"><Save className="h-4 w-4"/>{saving?'Đang lưu...':'Lưu thông tin website'}</button>
     </fieldset>
   </section>

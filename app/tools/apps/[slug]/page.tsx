@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation'
-import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
-import { getPagePresentation } from '@/lib/site-profile/presentation'
+import { getPagePresentation, getPresentationBrand } from '@/lib/site-profile/presentation'
 import { findExternalApp } from '@/lib/wi300/external-apps'
 import { ExternalAppViewer } from '@/components/wi300/Wi300ExternalApps'
 
@@ -11,6 +10,6 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
   // Trình xem ứng dụng ngoài dùng chung cho cả hai giao diện; bản wi300
   // giữ nguyên điều kiện brand như cũ.
   if (await getPagePresentation('external-app') === 'classic') return <ExternalAppViewer key={app.slug} app={app} />
-  if (!await getCurrentDeploymentBrand()) notFound()
+  if (!await getPresentationBrand('external-app')) notFound()
   return <ExternalAppViewer key={app.slug} app={app} />
 }

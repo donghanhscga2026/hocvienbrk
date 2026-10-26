@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
-import { getPagePresentation } from '@/lib/site-profile/presentation'
+import { getPagePresentation, getPresentationBrand } from '@/lib/site-profile/presentation'
 import { getSession } from '@/lib/get-session'
 import Wi300Home from '@/components/wi300/Wi300Home'
 
@@ -15,7 +14,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
     const status = typeof params.status === 'string' ? params.status : undefined
     return <ClassicMySpace session={session} tab={tab} status={status} />
   }
-  const brand = await getCurrentDeploymentBrand()
+  const brand = await getPresentationBrand('my-space')
   if (!brand) redirect('/')
   return <Wi300Home brand={brand} session={session} view="space" />
 }

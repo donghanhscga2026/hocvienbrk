@@ -119,6 +119,7 @@ async function run() {
   const DirectoryPage = load('app/giang-vien/page.tsx', {
     'next/navigation': { notFound: () => { throw Error('404') } },
     '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => directoryBrand },
+    '@/lib/site-profile/presentation': { getPagePresentation: async () => directoryBrand ? 'wi300' : 'classic', getPresentationBrand: async () => directoryBrand },
     '@/lib/get-session': { getSession: async () => null },
     '@/components/wi300/Wi300Home': { __esModule: true, default: () => null },
     // GĐ2: không có brand thì trang rẽ sang bản classic (mock module classic).
@@ -222,6 +223,7 @@ async function run() {
     '@/lib/prisma': { __esModule: true, default: {} },
     '@/lib/wi300/project-service': { readProjects: async () => source },
     '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => brand },
+    '@/lib/site-profile/presentation': { getPresentationBrand: async () => brand },
   }).default
   await assert.rejects(() => Catalog({ kind: 'PRODUCT' }), /404/)
   brand = { name: 'WI300' }
