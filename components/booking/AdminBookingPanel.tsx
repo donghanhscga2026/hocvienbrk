@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMin, type FormField } from '@/lib/booking/slots'
+import CopyLinkButton from '@/components/booking/CopyLinkButton'
 import {
   changeBookingStatus,
   changeWaitlistStatus,
@@ -302,6 +303,23 @@ export default function AdminBookingPanel(props: AdminBookingPanelProps) {
         <div className="space-y-4">
           {!editing && (
             <>
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="text-sm">
+                  <p className="font-semibold text-slate-800">Hồ sơ đặt lịch của bạn</p>
+                  <p className="text-xs text-slate-500">Một link duy nhất để gửi học viên: họ xem các phiên công khai và lịch làm việc theo tuần, rồi chọn phiên để đặt.</p>
+                </div>
+                <div className="flex gap-2">
+                  <a
+                    href={`/dat-lich/giang-vien/${props.meId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700"
+                  >
+                    Xem hồ sơ
+                  </a>
+                  <CopyLinkButton path={`/dat-lich/giang-vien/${props.meId}`} label="Sao chép link hồ sơ" />
+                </div>
+              </div>
               <div className="flex justify-end">
                 <button type="button" className={primaryBtn} onClick={() => setEditing(blankSession())}>+ Tạo phiên hẹn mới</button>
               </div>
