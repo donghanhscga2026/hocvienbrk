@@ -4,6 +4,7 @@ import { useId, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { FolderKanban } from 'lucide-react'
+import { useWi300Brand } from '@/components/wi300/Wi300BrandContext'
 
 export type CourseProjectBadge = { slug: string; name: string; logo: string }
 
@@ -18,6 +19,8 @@ function ProjectLogo({ logo }: { logo: string }) {
 /** Nhãn dưới ảnh bìa; mở rộng tại chỗ để dùng được cả cảm ứng và bàn phím. */
 export default function CourseProjectBadges({ projects, showAll = false, compact = false }: { projects: CourseProjectBadge[]; showAll?: boolean; compact?: boolean }) {
   const [expanded, setExpanded] = useState(false)
+  // Trang dự án /du-an chỉ tồn tại ở wi300; ngoài wi300 chỉ hiện nhãn, không gắn link chết.
+  const brand = useWi300Brand()
   const listId = useId()
   if (!projects.length) return null
   const shown = showAll || expanded ? projects : projects.slice(0, 2)
@@ -26,9 +29,11 @@ export default function CourseProjectBadges({ projects, showAll = false, compact
     <div className="min-w-0 flex-1">
       <ul id={listId} aria-label="Dự án liên kết với khóa học" className="flex min-w-0 flex-wrap gap-1.5">
         {shown.map(project => <li key={project.slug} className="min-w-0 max-w-full">
-          <Link href={`/du-an/${encodeURIComponent(project.slug)}`} prefetch={false} className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-xl border border-brk-primary/20 bg-brk-primary/5 px-2 py-1 text-xs font-semibold text-brk-primary transition-colors hover:bg-brk-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brk-primary">
+          {brand ? <Link href={`/du-an/${encodeURIComponent(project.slug)}`} prefetch={false} className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-xl border border-brk-primary/20 bg-brk-primary/5 px-2 py-1 text-xs font-semibold text-brk-primary transition-colors hover:bg-brk-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brk-primary">
             <ProjectLogo logo={project.logo} /><span className="min-w-0 break-words [overflow-wrap:anywhere]">{project.name}</span>
-          </Link>
+          </Link> : <span className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-xl border border-brk-primary/20 bg-brk-primary/5 px-2 py-1 text-xs font-semibold text-brk-primary">
+            <ProjectLogo logo={project.logo} /><span className="min-w-0 break-words [overflow-wrap:anywhere]">{project.name}</span>
+          </span>}
         </li>)}
         {!showAll && projects.length > 2 && <li><button type="button" aria-controls={listId} aria-expanded={expanded} aria-label={expanded ? 'Thu gọn danh sách dự án' : `Xem thêm ${projects.length - 2} dự án`} onClick={() => setExpanded(value => !value)} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-brk-outline bg-brk-surface px-2 text-xs font-semibold text-brk-primary hover:bg-brk-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brk-primary">{expanded ? 'Thu gọn' : `+${projects.length - 2}`}</button></li>}
       </ul>

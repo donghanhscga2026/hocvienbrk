@@ -74,7 +74,7 @@ export default function MediaManager() {
   const visible = items.filter(item => item.folder || type === 'all' || (type === 'images' ? item.mime.startsWith('image/') : !item.mime.startsWith('image/')))
   const canProcess = (item: Usage) => !item.unchecked.length && (action !== 'purge' || !item.references.length)
   return <main className="mx-auto max-w-7xl space-y-5 p-4 text-slate-900 sm:p-6">
-    <nav className="flex flex-wrap gap-4 text-sm text-emerald-800"><Link href="/tools/wi-website">← Quản trị website</Link><Link href="/tools/courses/templates/legacy" className="underline">Mẫu cũ</Link><Link href="/tools/courses/templates/history" className="underline">Lịch sử trang</Link></nav>
+    <nav className="flex flex-wrap gap-4 text-sm text-emerald-800"><Link href="/tools">← Công cụ quản lý</Link><Link href="/tools/courses/templates/legacy" className="underline">Mẫu cũ</Link><Link href="/tools/courses/templates/history" className="underline">Lịch sử trang</Link></nav>
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold">Thư viện media</h1><p className="mt-2 text-sm text-slate-600">Ảnh và file trong kho uploads dùng chung của hệ thống. Chỉ Admin được quản lý.</p></div>
       <label className={button + ' relative cursor-pointer bg-emerald-700 text-white'}>Thêm ảnh / file<input aria-label="Thêm ảnh hoặc file" disabled={busy} className="absolute inset-0 w-full cursor-pointer opacity-0" type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,application/zip,.zip,text/plain" onChange={async event => {
         const file = event.target.files?.[0]; event.target.value = ''; if (!file) return

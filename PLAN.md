@@ -2229,3 +2229,33 @@ Thiết lập quy trình an toàn để nhiều developer/AI phát triển song 
 - Nghiệm thu đầu-cuối trên production ngày 2026-10-25: đăng nhập tài khoản #3773, tạo phiên kiểm tra `77TKN43UGD`, đặt thành công lịch `BK-BRKNBF` (Thứ 2, 26/10/2026, 09:00–09:30), trạng thái Đã xác nhận hiện đúng ở trang quản trị; phiên kiểm tra đã tạm dừng sau nghiệm thu.
 - File: `prisma/schema.prisma`, `lib/booking/`, `app/dat-lich/[code]/`, `app/tools/dat-lich/`, `app/api/booking/`, `components/booking/`, `scripts/test-booking.cjs` (58 kiểm chứng đạt), `prisma/migrations/20261023235900_add_booking_dat_lich/`.
 - Trạng thái: Giai đoạn 1 hoàn thành, đang chạy trên giautoandien.io.vn. Giai đoạn 2 (cổng tra cứu/đổi/hủy `/tra-cuu-hen`, danh sách chờ, cron nhắc hẹn 24 giờ/1 giờ, bài Trợ lý hướng dẫn) triển khai tiếp theo.
+
+## ✅ Tách giao diện giautoandien / wi300 — Giai đoạn 1: chặn rò và hết 404 oan (2026-10-26)
+
+### Mục tiêu
+Chức năng dùng chung logic xử lý và dữ liệu, giao diện hiển thị riêng từng web (gốc là giautoandien). Giai đoạn 1 chỉ chặn rò giao diện wi300 sang giautoandien và gỡ các 404/link chết trên đường đi của giautoandien; chưa dựng giao diện classic mới (đó là giai đoạn 2).
+
+### Các file đã sửa
+#### `app/my-space/page.tsx`
+- Vấn đề: trang kiểm tra brand trước cả phiên đăng nhập; project không bật `SITE_VARIANT=wi300` (giautoandien) luôn nhận `notFound()` — người dùng thấy 404 dù đã đăng nhập.
+- Fix: kiểm tra phiên trước — chưa đăng nhập chuyển về `/login?callbackUrl=%2Fmy-space`; đã đăng nhập mà không có brand wi300 thì chuyển về `/` (trang chủ giautoandien hiển thị khóa học của tôi); có brand giữ nguyên `Wi300Home` view "space".
+
+#### `components/layout/ManagementWorkspace.tsx`
+- Vấn đề: sidebar độc lập (chỉ render ngoài khung quản lý wi300) gắn cứng link `/my-space` và `/du-an/quan-ly` — cả hai là route chỉ có ở wi300, chết trên giautoandien; màu nền dự phòng của gradient là màu nền wi300 `#f3f7df`.
+- Fix: mục "Không gian của tôi" trỏ về `/`; bỏ mục "Dự án" khỏi sidebar độc lập (trên wi300 mục này nằm trong `Wi300ManagementFrame`, không qua nhánh này); màu nền dự phòng đổi sang màu classic của giautoandien `#FAE0C7`.
+
+#### `app/tools/courses/new/page.tsx`
+- Vấn đề: dùng biến thể `appearance="forest"` của khung quản lý (sidebar in chữ Wi300) mà không phân biệt web, hiện trên cả giautoandien.
+- Fix: bỏ `appearance="forest"`, dùng giao diện mặc định.
+
+#### `components/course/CourseProjectBadges.tsx`
+- Vấn đề: nhãn dự án trên trang chi tiết khóa học luôn gắn link `/du-an/<slug>` — route chỉ có ở wi300, bấm vào trên giautoandien là 404.
+- Fix: chỉ gắn link khi có brand wi300 (`useWi300Brand`); ngoài wi300 chỉ hiện nhãn dạng text, giữ nguyên thông tin.
+
+#### `app/tools/posts/page.tsx` và `components/admin/MediaManager.tsx`
+- Vấn đề: link quay lại "Quản trị website" trỏ tới `/tools/wi-website` — trang chỉ có ở wi300, chết trên giautoandien.
+- Fix: trỏ về `/tools` với nhãn "Công cụ quản lý" (hub công cụ tồn tại trên cả hai web).
+
+### Trạng thái
+- ⏳ Đã sửa và kiểm tra cục bộ (tsc + test liên quan); chờ người dùng test sau khi deploy (deploy chưa được duyệt riêng).
+- Giai đoạn 2 sẽ xử lý tiếp: dựng bản classic cho các trang công khai đang gated wi300 (`/khoa-hoc`, `/giang-vien`, `/san-pham`, `/dich-vu`, `/gioi-thieu`, `/doi-tac`, `/kham-pha`) và trang cá nhân classic cho `/my-space` thay cho chuyển hướng tạm về `/`.
