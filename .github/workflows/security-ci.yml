@@ -57,6 +57,9 @@ jobs:
       - name: Site presentation split guard tests
         run: node scripts/test-site-presentation-guard.cjs
 
+      - name: Site presentation per-page toggle tests
+        run: node scripts/test-presentation-toggle.cjs
+
       - name: Booking feature invariant tests
         run: node scripts/test-booking.cjs
 
