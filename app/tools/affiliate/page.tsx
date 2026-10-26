@@ -121,6 +121,16 @@ function DashboardTab() {
                 </div>
             </div>
 
+            <Link
+                href="/vinh-danh"
+                className="flex items-center justify-between bg-white rounded-xl border border-amber-200 p-4 shadow-sm hover:bg-amber-50 transition-colors"
+            >
+                <span className="text-sm text-gray-700">
+                    🏆 <b className="text-gray-900">Bảng vinh danh Cộng tác viên</b> — xem Top doanh số và Top hoa hồng của tháng
+                </span>
+                <span className="text-amber-600 font-bold text-sm shrink-0 ml-3">Xem →</span>
+            </Link>
+
             {myLink && (
                 <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
                     <h3 className="font-bold text-gray-900 mb-3">Link Affiliate của bạn</h3>
