@@ -20,6 +20,12 @@ interface RegistrationFlowModalProps {
   userPhone: string | null
   userId: number | null
   initialEnrollment?: any
+  // Thông tin khách đã điền trên form của trang bán nhập ngoài (không lưu DB).
+  // Modal hiện không có ô nhập họ tên/SĐT/email riêng: bước auth uỷ quyền cho
+  // AccountAssistantModal/trang đăng nhập, các bước sau dùng tài khoản đã đăng
+  // nhập. Vì vậy initialContact chỉ được hiển thị lại ở hộp thoại auth dự phòng
+  // để khách đối chiếu, không ghi đè dữ liệu tài khoản.
+  initialContact?: { fullName?: string; phone?: string; email?: string }
   onClose: () => void
   onEnrolled?: (enrollment: any) => void
 }
@@ -30,6 +36,7 @@ export default function RegistrationFlowModal({
   userPhone,
   userId,
   initialEnrollment,
+  initialContact,
   onClose,
   onEnrolled,
 }: RegistrationFlowModalProps) {
@@ -226,6 +233,14 @@ export default function RegistrationFlowModal({
           /> : <div role="dialog" aria-modal="true" aria-labelledby="wi300-registration-auth" className="w-full max-w-md rounded-2xl bg-white p-6 text-brk-on-surface">
             <div className="flex items-center justify-between gap-3"><h2 id="wi300-registration-auth" className="text-xl font-bold">Đăng nhập để tham gia khóa học</h2><button type="button" onClick={onClose} aria-label="Đóng" className="flex h-11 w-11 shrink-0 items-center justify-center"><X className="h-5 w-5" /></button></div>
             <p className="mt-3 text-sm leading-6 text-brk-muted">Đăng nhập hoặc tạo tài khoản để tiếp tục đăng ký {course.name_lop}.</p>
+            {initialContact && (initialContact.fullName || initialContact.phone || initialContact.email) && (
+              <div className="mt-3 rounded-xl bg-brk-background p-3 text-sm leading-6">
+                <p className="font-semibold">Thông tin bạn vừa điền trên trang:</p>
+                {initialContact.fullName && <p>Họ tên: {initialContact.fullName}</p>}
+                {initialContact.phone && <p>Số điện thoại: {initialContact.phone}</p>}
+                {initialContact.email && <p>Email: {initialContact.email}</p>}
+              </div>
+            )}
             <Link href={`/login?callbackUrl=${encodeURIComponent(`/khoa-hoc/${encodeURIComponent(course.id_khoa)}`)}`} className="mt-5 flex min-h-12 items-center justify-center rounded-xl bg-brk-primary px-4 font-semibold text-white">Đăng nhập</Link>
             <Link href={`/register?redirect=${encodeURIComponent(`khoa-hoc/${course.id_khoa}`)}`} className="mt-3 flex min-h-12 items-center justify-center rounded-xl border border-brk-outline px-4 font-semibold">Tạo tài khoản</Link>
           </div>}

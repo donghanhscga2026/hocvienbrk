@@ -11,9 +11,11 @@ import { COURSE_TEMPLATE_LIBRARY, createCoursePageFromTemplate } from '@/lib/cou
 import { checkRateLimit } from '@/lib/rate-limit'
 import { zipSelectedBlockKeys } from '@/lib/course-page/importer/source-url'
 import { CrmError } from '@/lib/crm/service'
-import { CourseCodeError } from '@/lib/course-page/course-code'
+import { CourseCodeError, compileCourseCode } from '@/lib/course-page/course-code'
 import { prepareCourseCode } from '@/lib/course-page/course-code-server'
 import { isMissingTemplateSource } from '@/lib/course-page/missing-template-source'
+import { assertSafeUrl, fetchRemoteHtml } from '@/lib/course-page/importer/fetch-html'
+import { prepareStandaloneHtml } from '@/lib/course-page/importer/prepare-html'
 
 const json = (value: unknown, status = 200) => NextResponse.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } })
 function failure(error: unknown) { return json({ error: error instanceof z.ZodError ? error.issues[0]?.message : error instanceof CrmError || error instanceof CourseCodeError ? error.message : 'Không xử lý được giao diện. Nội dung đang sửa được giữ lại.' }, error instanceof CrmError || error instanceof CourseCodeError ? error.status : 400) }
@@ -59,11 +61,35 @@ export async function GET(request: Request) {
     return json({ templates: [], admin: actor.role === 'ADMIN' })
   } catch (error) { return failure(error) }
 }
+const blockKeysSchema = z.array(z.string().min(1).max(200)).max(200)
 const inputSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('preview-course-code'), slug: z.string().min(1).max(200), html: z.string().min(1).max(1024 * 1024) }).strict(),
-  z.object({ action: z.literal('save-course-code'), slug: z.string().min(1).max(200), name: z.string().min(1).max(200), html: z.string().min(1).max(1024 * 1024), revision: z.object({ id: z.string().nullable(), updatedAt: z.string().datetime().nullable() }).strict() }).strict(),
+  z.object({ action: z.literal('save-course-code'), slug: z.string().min(1).max(200), name: z.string().min(1).max(200), html: z.string().min(1).max(1024 * 1024), revision: z.object({ id: z.string().nullable(), updatedAt: z.string().datetime().nullable() }).strict(), selectedBlockKeys: blockKeysSchema.nullable().optional(), registrationBlockKeys: blockKeysSchema.optional() }).strict(),
   z.object({ action: z.literal('apply'), id: z.string(), system: z.boolean(), slug: z.string().min(1).max(200), name: z.string().min(1).max(200) }).strict(),
+  z.object({ action: z.literal('import-url'), slug: z.string().min(1).max(200), url: z.string().min(1).max(2000) }).strict(),
+  z.object({ action: z.literal('check-image-urls'), slug: z.string().min(1).max(200), urls: z.array(z.string().min(1).max(2000)).min(1).max(30) }).strict(),
 ])
+
+async function checkImageUrl(raw: string) {
+  const base = { url: raw, ok: false, status: 0, contentType: null as string | null, isImage: false }
+  try {
+    if (!raw.startsWith('https://')) return base
+    const url = await assertSafeUrl(raw)
+    const attempt = async (method: 'HEAD' | 'GET') => {
+      const response = await fetch(url, { method, redirect: 'manual', signal: AbortSignal.timeout(5000), headers: method === 'GET' ? { Range: 'bytes=0-0' } : undefined })
+      const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() || null
+      try { await response.body?.cancel() } catch {}
+      return { status: response.status, contentType }
+    }
+    let result = await attempt('HEAD').catch(() => null)
+    if (!result || result.status === 405 || result.status === 501) result = await attempt('GET').catch(() => null)
+    if (!result) return base
+    const isImage = !!result.contentType && result.contentType.startsWith('image/')
+    return { url: raw, ok: result.status >= 200 && result.status < 300, status: result.status, contentType: result.contentType, isImage }
+  } catch {
+    return base
+  }
+}
 export async function POST(request: Request) {
   try {
     const actor = await courseEditorActor()
@@ -76,8 +102,22 @@ export async function POST(request: Request) {
     const bytes = Buffer.concat(chunks)
     const text = request.headers.get('content-type')?.includes('gzip') ? gunzipSync(bytes, { maxOutputLength: 10 * 1024 * 1024 }).toString('utf8') : bytes.toString('utf8')
     const raw = JSON.parse(text)
-    if (!['save-course-code', 'preview-course-code', 'apply'].includes(raw?.action)) throw new CrmError('Đã ngừng nhập và lưu mẫu riêng. Hãy mở khóa học để chỉnh giao diện bằng code.', 410)
+    if (!['save-course-code', 'preview-course-code', 'apply', 'import-url', 'check-image-urls'].includes(raw?.action)) throw new CrmError('Đã ngừng nhập và lưu mẫu riêng. Hãy mở khóa học để chỉnh giao diện bằng code.', 410)
     const input = inputSchema.parse(raw)
+    if (input.action === 'import-url') {
+      await assertCourseEditor(prisma, actor, { slug: input.slug })
+      let remote: { html: string; finalUrl: string }
+      try { remote = await fetchRemoteHtml(input.url) } catch (error) { throw new CourseCodeError(error instanceof Error ? error.message : 'Không thể tải trang nguồn.') }
+      let prepared: Awaited<ReturnType<typeof prepareStandaloneHtml>>
+      try { prepared = await prepareStandaloneHtml(remote.html, remote.finalUrl) } catch (error) { throw new CourseCodeError(error instanceof Error ? error.message : 'Không xử lý được trang nguồn.') }
+      // Chạy thử bộ biên dịch hiện hành: lỗi Base64/kích thước được báo nguyên văn.
+      compileCourseCode(prepared.html)
+      return json({ html: prepared.html, warnings: prepared.warnings })
+    }
+    if (input.action === 'check-image-urls') {
+      await assertCourseEditor(prisma, actor, { slug: input.slug })
+      return json({ results: await Promise.all(input.urls.map(checkImageUrl)) })
+    }
     if (input.action === 'preview-course-code') {
       await assertCourseEditor(prisma, actor, { slug: input.slug })
       return json(await prepareCourseCode(input.html))
@@ -85,7 +125,7 @@ export async function POST(request: Request) {
     if (input.action === 'save-course-code') {
       await assertCourseEditor(prisma, actor, { slug: input.slug })
       const compiled = await prepareCourseCode(input.html)
-      const snapshot = { theme: { importedLayout: true }, navigation: { shortName: input.name, ctaText: 'Đăng ký khóa học', sticky: false }, checkoutConfig: { enabled: true, provider: 'vietqr', currency: 'VND' }, sections: [{ sectionKey: 'course-code', type: 'rich_content', variant: 'zip-source-v1', enabled: true, sortOrder: 0, visibility: 'all', content: { exactSource: { html: compiled.html, entryPath: 'index.html' } } }] }
+      const snapshot = { theme: { importedLayout: true }, navigation: { shortName: input.name, ctaText: 'Đăng ký khóa học', sticky: false }, checkoutConfig: { enabled: true, provider: 'vietqr', currency: 'VND' }, sections: [{ sectionKey: 'course-code', type: 'rich_content', variant: 'zip-source-v1', enabled: true, sortOrder: 0, visibility: 'all', content: { exactSource: { html: compiled.html, entryPath: 'index.html' }, ...(input.selectedBlockKeys !== undefined ? { selectedBlockKeys: input.selectedBlockKeys } : {}), ...(input.registrationBlockKeys !== undefined ? { registrationBlockKeys: input.registrationBlockKeys } : {}) } }] }
       const page = await stageTemplate(prisma, actor, input.slug, input.name, snapshot, 'course-code', { revision: input.revision, codeOnly: true })
       revalidatePath('/tools/courses')
       return json({ success: true, revision: { id: page.id, updatedAt: page.updatedAt.toISOString() }, warnings: compiled.warnings })

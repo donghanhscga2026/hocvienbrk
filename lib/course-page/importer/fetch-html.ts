@@ -16,7 +16,7 @@ function isPrivateIp(address: string): boolean {
   return false
 }
 
-async function assertSafeUrl(value: string): Promise<URL> {
+export async function assertSafeUrl(value: string): Promise<URL> {
   let url: URL
   try {
     url = new URL(value)
