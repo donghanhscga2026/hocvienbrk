@@ -10,6 +10,7 @@ import CrmRequestButton from '@/components/crm/CrmRequestButton'
 import { CoursePage } from '@/lib/course-page/types'
 import { checkEnrollmentStatusAction } from '@/app/actions/course-actions'
 import { useDomainBrand } from '@/components/website/DomainShell'
+import { mapFormDataToContact } from '@/lib/course-page/import-review'
 
 // Nội dung trang vẫn SSR; chỉ các cửa sổ tương tác được tải theo nhu cầu.
 const modalLoading = () => <div role="status" className="fixed bottom-4 left-1/2 z-[250] -translate-x-1/2 rounded-xl bg-white px-5 py-3 text-sm shadow-lg">Đang mở…</div>
@@ -51,6 +52,7 @@ export default function CoursePageView({
   // ── Modal state ──────────────────────────────────────────────────────────
   const [showShare, setShowShare] = React.useState(false)
   const [showRegistration, setShowRegistration] = React.useState(false)
+  const [registrationPrefill, setRegistrationPrefill] = React.useState<{ fullName?: string; phone?: string; email?: string } | null>(null)
 
   // ── Enrollment / activation state ────────────────────────────────────────
   const [localEnrollment, setLocalEnrollment] = React.useState<any>(null)
@@ -91,11 +93,16 @@ export default function CoursePageView({
   }, [course?.id, hasActivated, isEnrolled, showRegistration, router])
 
   // ── Action handler (called by sections) ──────────────────────────────────
-  const handleAction = (actionType: string, target?: string) => {
+  const handleAction = (actionType: string, target?: string, extra?: Record<string, string>) => {
     if (actionType === 'open_registration') {
       if (isEnrolled) {
         router.push(`/courses/${course.id_khoa}/learn`)
         return
+      }
+      // Dữ liệu khách đã điền trên form của trang nhập: giữ để điền sẵn, không lưu DB.
+      if (extra && Object.keys(extra).length) {
+        const contact = mapFormDataToContact(extra)
+        if (Object.keys(contact).length) setRegistrationPrefill(contact)
       }
       setShowRegistration(true)
     } else if (actionType === 'open_share') {
@@ -229,7 +236,8 @@ export default function CoursePageView({
           userPhone={userPhone}
           userId={userId}
           initialEnrollment={effectiveEnrollment}
-          onClose={() => setShowRegistration(false)}
+          initialContact={registrationPrefill || undefined}
+          onClose={() => { setShowRegistration(false); setRegistrationPrefill(null) }}
           onEnrolled={(enr) => {
             setLocalEnrollment(enr)
             if (enr?.status === 'ACTIVE') setHasActivated(true)

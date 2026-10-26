@@ -53,8 +53,8 @@ async function run() {
     denied = true; assert.equal((await api.POST(request())).status, 401); denied = false
     actor = { id: 2, role: 'TEACHER' }; assert.equal((await api.POST(request())).status, 403)
     actor = { id: 1, role: 'TEACHER' }
-    for (const action of ['save', 'import-url', 'prepare-html', 'policy']) {
-      const bodies = { save: { action, name: 'Private', source: { entryPath: 'index.html', files: [{ path: 'index.html', kind: 'html', content: html }] } }, 'import-url': { action, url: 'https://example.com' }, 'prepare-html': { action, html }, policy: { action, policy: {} } }
+    for (const action of ['save', 'prepare-html', 'policy']) {
+      const bodies = { save: { action, name: 'Private', source: { entryPath: 'index.html', files: [{ path: 'index.html', kind: 'html', content: html }] } }, 'prepare-html': { action, html }, policy: { action, policy: {} } }
       assert.equal((await api.POST(request(bodies[action]))).status, 410)
     }
     assert.equal((await api.POST(request({ ...input(), html: '<img src="data:image/png;base64,aGVsbG8=">' }))).status, 400)

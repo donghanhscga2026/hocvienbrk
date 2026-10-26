@@ -10,7 +10,7 @@ import { templateViewportHtml } from '@/lib/course-page/template-viewport'
 type Props = {
   id?: string
   content: any
-  onAction?: (actionType: string, target?: string) => void
+  onAction?: (actionType: string, target?: string, extra?: Record<string, string>) => void
 }
 
 function safeExternal(value: unknown) {
@@ -90,8 +90,9 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
         const actionType = typeof data.actionType === 'string' ? data.actionType : 'open_registration'
         if (actionType === 'course_link') {
           const allowedTargets = Object.values(zipCourseLinks(window.location.pathname))
-          if (typeof data.target === 'string' && allowedTargets.includes(data.target)) {
-            window.location.assign(data.target)
+          const target = typeof data.target === 'string' ? data.target : ''
+          if (/^\/khoa-hoc\/[A-Za-z0-9_-]+$/.test(target) || allowedTargets.includes(target)) {
+            window.location.assign(target)
           }
           return
         }
@@ -100,13 +101,21 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
           if (target) onAction?.('external_link', target)
           return
         }
-        if (['open_registration', 'open_share'].includes(actionType)) {
-          if (actionType === 'open_registration' && data.updateHash !== false && typeof data.anchor === 'string') {
+        if (actionType === 'open_share') {
+          onAction?.('open_share')
+          return
+        }
+        if (actionType === 'open_registration') {
+          if (data.updateHash !== false && typeof data.anchor === 'string') {
             const url = new URL(window.location.href)
             url.hash = data.anchor
             if (url.hash !== window.location.hash) window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
           }
-          onAction?.(actionType)
+          const formData: Record<string, string> = {}
+          if (data.formData && typeof data.formData === 'object') {
+            for (const [key, value] of Object.entries(data.formData)) if (typeof value === 'string') formData[key] = value
+          }
+          onAction?.('open_registration', undefined, Object.keys(formData).length ? formData : undefined)
         }
         return
       }

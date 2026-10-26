@@ -12,6 +12,8 @@ import { compileTemplateSource, type TemplateSource } from '@/lib/course-page/te
 import { templateWorkspaceRequest } from '@/lib/course-page/template-workspace-client'
 import type { PageRevision } from '@/lib/course-page/stage-template'
 import type { CourseEditorControls } from '@/lib/course-page/editor-controls'
+import SalesPageImportWizard, { type ImportBlockKeys } from './SalesPageImportWizard'
+import { prepareWebsiteZip } from '@/lib/course-page/importer/zip-browser'
 
 const CodeEditor = dynamic(() => import('@/components/website/TemplateCodeEditor'), { ssr: false, loading: () => <p className="p-4 text-sm">Đang tải trình sửa code…</p> })
 const endpoint = '/api/course-templates'
@@ -30,6 +32,9 @@ export default function CourseTemplateWorkspace({ embedded = false, workflow = f
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(Boolean(courseSlug)), [error, setError] = useState(''), [notice, setNotice] = useState('')
   const [device, setDevice] = useState(1280), [mobilePanel, setMobilePanel] = useState<'code' | 'preview'>('code'), [auto, setAuto] = useState(true), [rendered, setRendered] = useState(''), [compileError, setCompileError] = useState(''), [warnings, setWarnings] = useState<string[]>([])
   const [preview, setPreview] = useState<Preview | null>(null)
+  const [importSource, setImportSource] = useState<{ html: string; label: string } | null>(null)
+  const [pendingBlockKeys, setPendingBlockKeys] = useState<ImportBlockKeys | null>(null)
+  const [importUrl, setImportUrl] = useState('')
   const [retry, setRetry] = useState(0)
   const [sourceMissing, setSourceMissing] = useState(false)
   const dialog = useRef<HTMLDialogElement>(null), request = useRef<AbortController | null>(null)
@@ -99,13 +104,42 @@ export default function CourseTemplateWorkspace({ embedded = false, workflow = f
     } catch (error) { setError(error instanceof Error ? error.message : 'Không áp dụng được mẫu.') }
     finally { setBusy(false) }
   }
+  async function importFromUrl() {
+    if (!importUrl.trim() || busy || !courseSlug) return
+    setBusy(true); setError('')
+    try {
+      const data = await templateWorkspaceRequest(endpoint, { action: 'import-url', slug: courseSlug, url: importUrl.trim() })
+      if (Array.isArray(data.warnings) && data.warnings.length) setWarnings(data.warnings)
+      setImportSource({ html: data.html, label: importUrl.trim() })
+    } catch (error) { setError(error instanceof Error ? error.message : 'Không tải được trang từ URL.') }
+    finally { setBusy(false) }
+  }
+  async function importHtmlFile(file: File) {
+    if (file.size > 8 * 1024 * 1024) { setError('File HTML vượt 8 MB.'); return }
+    setError('')
+    try { setImportSource({ html: await file.text(), label: file.name }) } catch { setError('Không đọc được file HTML.') }
+  }
+  async function importZipFile(file: File) {
+    setBusy(true); setError('')
+    try {
+      const prepared = await prepareWebsiteZip(file)
+      if (prepared.warnings.length) setWarnings(prepared.warnings)
+      setImportSource({ html: prepared.html, label: `${file.name} (${prepared.entryPath})` })
+    } catch (error) { setError(error instanceof Error ? error.message : 'Không đọc được file ZIP.') }
+    finally { setBusy(false) }
+  }
+  function applyImport(nextHtml: string, blockKeys: ImportBlockKeys) {
+    setHtml(nextHtml); setPendingBlockKeys(blockKeys); setImportSource(null); setMobilePanel('code')
+    setNotice('Đã đưa trang nhập vào trình sửa code. Kiểm tra bản xem trước rồi bấm Lưu nháp.')
+  }
   async function save() {
     if (html === null || busy || loading || !courseSlug || !revision) return false
     if (!dirty && revision.id) return true
     setBusy(true); setError(''); setNotice(''); const controller = new AbortController(); request.current = controller
     try {
       compileCourseCode(html)
-      const result = await templateWorkspaceRequest(endpoint, { action: 'save-course-code', slug: courseSlug, name: courseName, html, revision }, controller.signal)
+      const result = await templateWorkspaceRequest(endpoint, { action: 'save-course-code', slug: courseSlug, name: courseName, html, revision, ...(pendingBlockKeys ? { selectedBlockKeys: pendingBlockKeys.selectedBlockKeys, registrationBlockKeys: pendingBlockKeys.registrationBlockKeys } : {}) }, controller.signal)
+      setPendingBlockKeys(null)
       setSourceMissing(false)
       setBaseline(html); setRevision(result.revision); setWarnings(result.warnings || []); setNotice('Đã lưu bản nháp vào khóa học. Bấm Xuất bản để cập nhật trang công khai.'); onApplied?.()
       return true
@@ -141,6 +175,19 @@ export default function CourseTemplateWorkspace({ embedded = false, workflow = f
       {courseSlug && <button type="button" disabled={busy || loading || !revision} onClick={() => openCode(starter, true)} className={button}><Code2 size={17} />Dán code riêng</button>}
     </> : <>
       <p className="rounded-xl bg-brk-background p-3 text-sm">Dán toàn bộ HTML từ Gemini Canvas vào một ô, không cần tách CSS/JavaScript. Tự xử lý Tailwind từ cdn.tailwindcss.com và hiệu ứng cuộn AOS; giữ nguyên link ảnh HTTPS bên ngoài. Mã tối đa 1 MB, hỗ trợ họa tiết SVG nhỏ. Nút <code>#dang-ky</code> hoặc <code>#register</code> mở đăng ký khóa học của hệ thống.</p>
+      <section className="space-y-3 rounded-2xl border border-brk-outline bg-white p-4" aria-label="Nhập trang có sẵn">
+        <h2 className="font-bold">Nhập trang có sẵn</h2>
+        <p className="text-sm text-brk-muted">Nhập từ URL, file HTML hoặc file ZIP rồi rà soát ảnh (link ngoài), sự kiện và khối trước khi đưa vào ô code. Ảnh trong trang nhập phải là link HTTPS từ nền tảng bên ngoài.</p>
+        <div className="flex flex-wrap gap-2">
+          <input aria-label="URL trang nguồn" value={importUrl} onChange={event => setImportUrl(event.target.value)} placeholder="https://trang-nguon.example/…" className="min-h-11 min-w-0 flex-1 rounded-xl border border-brk-outline bg-white px-3 text-sm" />
+          <button type="button" disabled={busy || disabled || !importUrl.trim() || !courseSlug} onClick={() => void importFromUrl()} className={button}>Tải từ URL</button>
+        </div>
+        <div className="flex flex-wrap gap-4 text-sm">
+          <label className="flex min-h-11 items-center gap-2">File HTML<input type="file" accept=".html,.htm,text/html" disabled={busy || disabled} onChange={event => { const file = event.target.files?.[0]; if (file) void importHtmlFile(file); event.target.value = '' }} /></label>
+          <label className="flex min-h-11 items-center gap-2">File ZIP<input type="file" accept=".zip,application/zip" disabled={busy || disabled} onChange={event => { const file = event.target.files?.[0]; if (file) void importZipFile(file); event.target.value = '' }} /></label>
+        </div>
+      </section>
+      {importSource && <SalesPageImportWizard sourceHtml={importSource.html} sourceLabel={importSource.label} onCheckImageUrls={async urls => (await templateWorkspaceRequest(endpoint, { action: 'check-image-urls', slug: courseSlug, urls })).results} onApply={applyImport} onClose={() => setImportSource(null)} />}
       <div className="flex gap-2 xl:hidden">{(['code', 'preview'] as const).map(value => <button key={value} type="button" onClick={() => setMobilePanel(value)} aria-pressed={mobilePanel === value} className={button}>{value === 'code' ? 'Code' : 'Xem trước'}</button>)}</div>
       <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2">
         <section className={`${mobilePanel === 'preview' ? 'hidden xl:block' : ''} min-w-0 space-y-3 rounded-2xl border border-brk-outline bg-white p-4`}>

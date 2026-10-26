@@ -240,7 +240,19 @@ export const BRIDGE = `
   function targetForAnchor(anchor){
     var decoded=anchor||'';
     try{decoded=decodeURIComponent(decoded);}catch(err){}
-    return document.getElementById(decoded) || document.getElementById(anchor||'');
+    return document.getElementById(decoded) || document.getElementById(anchor||'') || document.querySelector('[data-mfc-block="'+(window.CSS && CSS.escape ? CSS.escape(decoded) : decoded)+'"]');
+  }
+  function handleExplicitAction(el,e){
+    var action=el.getAttribute('data-mfc-action');
+    if(!action)return false;
+    if(action==='none')return true;
+    e.preventDefault();e.stopImmediatePropagation();
+    if(action==='register'){post({type:'action',actionType:'open_registration'});return true;}
+    if(action==='share'){post({type:'action',actionType:'open_share'});return true;}
+    if(action==='scroll'){navigateAnchor(el.getAttribute('data-mfc-target')||'',true);return true;}
+    if(action==='external'){post({type:'action',actionType:'external_link',target:el.getAttribute('href')||el.getAttribute('data-mfc-target')||''});return true;}
+    if(action==='course'){post({type:'action',actionType:'course_link',target:el.getAttribute('data-mfc-target')||''});return true;}
+    return false;
   }
   function configureLinks(data){
     var page;
@@ -291,6 +303,8 @@ export const BRIDGE = `
     }
   });
   document.addEventListener('submit', function(e){
+    var formAction=e.target && e.target.getAttribute ? e.target.getAttribute('data-mfc-action') : null;
+    if(formAction && formAction!=='register')return;
     e.preventDefault();
     e.stopImmediatePropagation();
     var data={};
@@ -300,6 +314,8 @@ export const BRIDGE = `
     post({type:'action',actionType:'open_registration',formData:data});
   }, true);
   document.addEventListener('click', function(e){
+    var explicit=e.target && e.target.closest ? e.target.closest('[data-mfc-action]') : null;
+    if(explicit && handleExplicitAction(explicit,e))return;
     var el=e.target && e.target.closest ? e.target.closest('a[href],button[data-mfc-register],[data-mfc-action="register"]') : null;
     if(!el)return;
     var courseLink=el.getAttribute('data-mfc-course-link');

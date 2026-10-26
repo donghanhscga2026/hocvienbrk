@@ -50,7 +50,7 @@ interface SectionRendererProps {
   activeStudentCount?: number
   course?: any
   session?: any
-  onAction?: (actionType: string, target?: string) => void
+  onAction?: (actionType: string, target?: string, extra?: Record<string, string>) => void
   projectLabels?: React.ReactNode
 }
 
