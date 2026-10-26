@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight, Inbox, RefreshCw, UserPlus, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Inbox, RefreshCw, UserPlus, Users } from 'lucide-react'
 import { formatCrmDate, REQUEST_STATUSES } from '@/lib/crm/shared'
 
 type TodayData = {
@@ -18,11 +18,41 @@ type TodayData = {
   generatedAt: string
 }
 
+function vietnamDayLabel(offsetDays = 0) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(Date.now() - offsetDays * 86400000))
+}
+
 export default function CrmToday({ revision, isAdmin, onOpen }: { revision: number; isAdmin?: boolean; onOpen: (id: number) => void }) {
   const [data, setData] = useState<TodayData | null>(null)
   const [error, setError] = useState('')
   const [refresh, setRefresh] = useState(0)
   const [page, setPage] = useState(1)
+  const [exportFrom, setExportFrom] = useState(() => vietnamDayLabel(29))
+  const [exportTo, setExportTo] = useState(() => vietnamDayLabel())
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
+  const [exportNote, setExportNote] = useState('')
+  async function downloadExport() {
+    setExporting(true); setExportError(''); setExportNote('')
+    try {
+      const response = await fetch('/api/crm/export-accounts?from=' + exportFrom + '&to=' + exportTo, { cache: 'no-store' })
+      if (!response.ok) {
+        const result = await response.json().catch(() => null)
+        throw new Error(result?.error || 'Không xuất được danh sách.')
+      }
+      const total = response.headers.get('X-Export-Total')
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'tai-khoan-moi-' + exportFrom + '-' + exportTo + '.csv'
+      link.click()
+      URL.revokeObjectURL(url)
+      setExportNote('Đã tải danh sách' + (total ? ' ' + total : '') + ' tài khoản. Mở bằng Google Sheets hoặc Excel đều đọc đúng.')
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : 'Không xuất được danh sách.')
+    } finally { setExporting(false) }
+  }
   useEffect(() => {
     const abort = new AbortController()
     setError(''); setData(null)
@@ -66,6 +96,17 @@ export default function CrmToday({ revision, isAdmin, onOpen }: { revision: numb
       <div className="mb-3 flex items-center justify-between"><h3 className="font-semibold">Tài khoản website tạo hôm nay</h3><Link href="/tools/students" className="text-xs font-medium text-emerald-800">Mở danh sách thành viên</Link></div>
       <p className="mb-2 text-xs text-slate-500">{isAdmin ? 'Toàn bộ tài khoản mới trên website.' : 'Chỉ tính tài khoản đã ghi danh vào khóa của bạn.'} Tối đa 20 tài khoản mới nhất trong tổng số {data.newUsersTotal}.</p>
       <div className="divide-y divide-slate-100">{data.newUsers.map(user => <div key={user.id} className="space-y-1 py-3"><div className="flex flex-wrap justify-between gap-2"><strong className="min-w-0 break-words text-sm">{user.name || 'Thành viên #' + user.id}</strong><span className="shrink-0 text-xs text-slate-400">{formatCrmDate(user.createdAt)}</span></div><p className="break-all text-sm text-slate-600">{[user.email, user.phone].filter(Boolean).join(' · ')}</p><p className="text-xs text-slate-400">Mã thành viên #{user.id}{user.referrerId != null ? ' · Người giới thiệu #' + user.referrerId : ''}</p></div>)}{!data.newUsers.length && <p className="py-5 text-sm text-slate-500">Hôm nay chưa có tài khoản mới phù hợp phạm vi.</p>}</div>
+      <div className="mt-4 border-t border-slate-100 pt-4">
+        <h4 className="text-sm font-semibold">Xuất danh sách tài khoản mới theo khoảng ngày</h4>
+        <p className="mt-1 text-xs text-slate-500">File CSV gồm họ tên, email, số điện thoại, ngày đăng ký (giờ Việt Nam), người giới thiệu và trạng thái xác minh email — mở bằng Google Sheets hoặc Excel đều đọc đúng. {isAdmin ? 'Quản trị viên xuất toàn bộ tài khoản mới trên website.' : 'Chỉ xuất tài khoản đã ghi danh vào khóa của bạn.'} Tối đa 366 ngày và 5.000 tài khoản mỗi lần xuất.</p>
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <label className="text-xs text-slate-500">Từ ngày<input type="date" value={exportFrom} onChange={event => setExportFrom(event.target.value)} className="mt-1 block min-h-11 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" /></label>
+          <label className="text-xs text-slate-500">Đến ngày<input type="date" value={exportTo} onChange={event => setExportTo(event.target.value)} className="mt-1 block min-h-11 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" /></label>
+          <button onClick={downloadExport} disabled={exporting} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50"><Download size={16} />{exporting ? 'Đang xuất…' : 'Tải file CSV'}</button>
+        </div>
+        {exportError && <p role="alert" className="mt-2 text-sm text-red-600">{exportError}</p>}
+        {exportNote && <p role="status" className="mt-2 text-sm text-emerald-800">{exportNote}</p>}
+      </div>
     </section>
   </div>
 }
