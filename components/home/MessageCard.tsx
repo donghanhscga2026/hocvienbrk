@@ -100,15 +100,18 @@ export default function MessageCard({
                             alt={`${displayLine1} Background`}
                             fill
                             priority
-                            quality={70}
+                            quality={90}
                             className="object-cover object-center transition-transform duration-1000 group-hover:scale-105"
                             sizes="100vw"
                         />
                     ) : (
                         <div className="w-full h-full bg-gradient-to-br from-brk-background via-brk-surface to-brk-primary/50" />
                     )}
-                    <div 
-                        className="absolute inset-0 bg-brk-surface/30 backdrop-blur-[1px] transition-colors duration-500 group-hover:bg-brk-surface/33"
+                    {/* Lớp phủ chỉ ở chân ảnh để chữ nổi, không phủ mờ toàn ảnh:
+                        bản cũ dùng backdrop-blur-[1px] + bg phủ kín khiến hero
+                        luôn mờ/bệt dù ảnh gốc nét (báo cáo 26/10/2026). */}
+                    <div
+                        className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/30 to-transparent"
                         style={{ opacity: 1 - heroOverlay }}
                     />
                 </div>

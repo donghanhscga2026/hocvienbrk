@@ -36,10 +36,11 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Kiểm tra kích thước ảnh (Giới hạn 2MB)
-        if (file.size > 2 * 1024 * 1024) {
+        // Giới hạn 4MB: đủ cho ảnh bìa gốc độ nét cao (PNG thường 2–4MB) mà vẫn
+        // dưới trần 4,5MB của Vercel function; file ra vẫn được nén WebP bên dưới.
+        if (file.size > 4 * 1024 * 1024) {
             return NextResponse.json(
-                { error: 'Kích thước ảnh quá lớn (vui lòng chọn ảnh < 2MB)' },
+                { error: 'Kích thước ảnh quá lớn (vui lòng chọn ảnh < 4MB)' },
                 { status: 400 }
             )
         }
@@ -50,12 +51,14 @@ export async function POST(request: NextRequest) {
         // Course artwork is public and requested frequently. Normalize raster uploads
         // to a bounded WebP so repeated CDN hits consume far less Storage egress.
         // Animated GIFs are preserved to avoid silently removing animation.
+        // Bounds raised 1600/q80 -> 1920/q90 (26/10/2026): covers are text-dense
+        // designs and q80 visibly softened small text on profile/course grids.
         const shouldOptimize = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
         const buffer = shouldOptimize
             ? await sharp(inputBuffer)
                 .rotate()
-                .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
-                .webp({ quality: 80 })
+                .resize({ width: 1920, height: 1920, fit: 'inside', withoutEnlargement: true })
+                .webp({ quality: 90 })
                 .toBuffer()
             : inputBuffer
 
