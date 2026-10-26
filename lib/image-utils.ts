@@ -129,7 +129,9 @@ export async function saveBase64Image(base64Data: string, subDir: string = 'avat
 
 const EXTERNAL_IMAGE_FETCH_TIMEOUT_MS = 8000;
 const EXTERNAL_IMAGE_MAX_BYTES = 8 * 1024 * 1024; // 8MB
-const EXTERNAL_IMAGE_MAX_DIMENSION = 1600;
+// 1920 khớp chuẩn upload bìa ở app/api/upload/course (nới từ 1600 ngày 26/10/2026
+// vì bìa nhiều chữ nhỏ bị mềm nét ở chuẩn cũ).
+const EXTERNAL_IMAGE_MAX_DIMENSION = 1920;
 
 function isAlreadyStoredUrl(url: string): boolean {
     if (url.startsWith('/uploads/') || url.startsWith('data:')) return true;
@@ -192,7 +194,7 @@ export async function resolveImageUrl(
 
         const optimized = await sharp(Buffer.from(arrayBuffer))
             .resize({ width: EXTERNAL_IMAGE_MAX_DIMENSION, withoutEnlargement: true })
-            .webp({ quality: 80 })
+            .webp({ quality: 90 })
             .toBuffer();
 
         const filename = `img_${Date.now()}_${Math.random().toString(36).substring(7)}.webp`;
