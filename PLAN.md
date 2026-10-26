@@ -2291,3 +2291,4 @@ Mọi trang công khai và trang cá nhân có hai bản hiển thị dùng chun
 ### Trạng thái
 - ⏳ Đã sửa và kiểm tra cục bộ (tsc + test liên quan + test gác cổng mới); chờ deploy riêng theo phê duyệt của người dùng (deploy/migration/env không thuộc giai đoạn này).
 - Điểm cần lưu ý: CSP frame-src cho ứng dụng ngoài trong `next.config` đang gắn với biến môi trường phía wi300; bản classic nhúng iframe app ngoài trên project giautoandien có thể bị CSP chặn tùy cấu hình project — viewer có nút "Mở riêng" dự phòng. Giai đoạn 3 sẽ cài công tắc chọn giao diện theo từng trang trong siteConfig tại điểm nối đã chừa trong helper.
+- PR của giai đoạn này: #279 (nhánh `feat/site-ui-split-gd2`).
