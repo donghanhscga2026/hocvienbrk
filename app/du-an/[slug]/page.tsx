@@ -4,14 +4,19 @@ import { auth } from '@/auth'
 import { notFound } from 'next/navigation'
 import prisma from '@/lib/prisma'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
+import { getPagePresentation } from '@/lib/site-profile/presentation'
 import { getCurrentSiteProfile, getCourseWhereForProfile } from '@/lib/site-profile/runtime'
 import { wi300CoursePreferences, wi300CourseWhere } from '@/lib/wi300/course-visibility'
 import { readProjects } from '@/lib/wi300/project-service'
 import { canManageProject } from '@/lib/wi300/projects'
 
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
-  if (!await getCurrentDeploymentBrand()) notFound()
   const { slug } = await params
+  if (await getPagePresentation('project-detail') === 'classic') {
+    const { ClassicProjectDetailPage } = await import('@/components/classic/ClassicProjects')
+    return <ClassicProjectDetailPage slug={slug} />
+  }
+  if (!await getCurrentDeploymentBrand()) notFound()
   const project = (await readProjects(prisma)).find(item => item.slug === slug && item.published)
   if (!project) notFound()
   const profile = await getCurrentSiteProfile()

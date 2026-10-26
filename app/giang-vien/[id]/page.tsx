@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import prisma from '@/lib/prisma'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
+import { getPagePresentation } from '@/lib/site-profile/presentation'
 import { getCurrentSiteProfile, getCourseWhereForProfile } from '@/lib/site-profile/runtime'
 import { wi300CoursePreferences, wi300CourseWhere } from '@/lib/wi300/course-visibility'
 import { teacherProfileKey, teacherProfileSchema } from '@/lib/wi300/teacher-profile'
@@ -28,11 +29,21 @@ const readTeacher = cache(async (raw: string) => {
 })
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
-  const data = await readTeacher((await params).id)
+  const { id } = await params
+  if (await getPagePresentation('teacher-detail') === 'classic') {
+    const { loadClassicTeacher } = await import('@/components/classic/ClassicTeachers')
+    const data = await loadClassicTeacher(id)
+    return data ? { title: `${data.user.name || 'Giảng viên'} | Giảng viên`, description: data.profile.headline || 'Giới thiệu giảng viên và các khóa học công khai.' } : { title: 'Không tìm thấy giảng viên', robots: { index: false } }
+  }
+  const data = await readTeacher(id)
   return data ? { title: `${data.user.name || 'Giảng viên'} | Giảng viên`, description: data.profile.headline || 'Giới thiệu giảng viên và các khóa học công khai.' } : { title: 'Không tìm thấy giảng viên', robots: { index: false } }
 }
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  if (await getPagePresentation('teacher-detail') === 'classic') {
+    const { ClassicTeacherDetailPage } = await import('@/components/classic/ClassicTeachers')
+    return <ClassicTeacherDetailPage id={id} />
+  }
   const data = await readTeacher(id)
   if (!data) notFound()
   const { user, courses, profile } = data

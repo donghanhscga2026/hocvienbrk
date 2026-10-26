@@ -3,11 +3,16 @@ import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import prisma from '@/lib/prisma'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
+import { getPagePresentation } from '@/lib/site-profile/presentation'
 import { readProjects } from '@/lib/wi300/project-service'
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
-  if (!await getCurrentDeploymentBrand()) notFound()
   const { id } = await params
+  if (await getPagePresentation('project-owner') === 'classic') {
+    const { ClassicProjectOwnerPage } = await import('@/components/classic/ClassicProjects')
+    return <ClassicProjectOwnerPage id={id} />
+  }
+  if (!await getCurrentDeploymentBrand()) notFound()
   if (!/^\d+$/.test(id) || !Number.isSafeInteger(Number(id))) notFound()
   const ownerId = Number(id)
   const projects = (await readProjects(prisma)).filter(project => project.published && project.ownerId === ownerId)

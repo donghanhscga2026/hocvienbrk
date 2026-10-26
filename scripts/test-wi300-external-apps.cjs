@@ -36,7 +36,7 @@ async function run(){
   const click=name=>[...document.querySelectorAll('button')].find(b=>b.textContent===name).click()
   let brand={name:'WI300'}
   const missing=()=>{throw Error('not-found')}
-  const overrides={'next/navigation':{notFound:missing},'@/lib/site-profile/deployment-runtime':{getCurrentDeploymentBrand:async()=>brand},'@/lib/wi300/external-apps':registry,'@/components/wi300/Wi300ExternalApps':ui}
+  const overrides={'next/navigation':{notFound:missing},'@/lib/site-profile/deployment-runtime':{getCurrentDeploymentBrand:async()=>brand},'@/lib/site-profile/presentation':{getPagePresentation:async()=>brand?'wi300':'classic'},'@/lib/wi300/external-apps':registry,'@/components/wi300/Wi300ExternalApps':ui}
   const page=load('app/tools/apps/[slug]/page.tsx',overrides).default
   const catalogPage=load('app/tools/apps/page.tsx',overrides).default
   try{
@@ -68,11 +68,14 @@ async function run(){
     await act(async()=>click('Thử mở trong WI300'))
     assert.equal(document.querySelector('iframe').src,'https://digital-biz-scan.lovable.app/')
     await assert.rejects(page({params:Promise.resolve({slug:'unknown'})}),/not-found/)
+    // GĐ2: không có brand wi300, ứng dụng ngoài vẫn mở với bản classic.
     brand=null
-    await assert.rejects(page({params:Promise.resolve({slug:'cleanimage'})}),/not-found/)
-    await assert.rejects(catalogPage(),/not-found/)
+    await act(async()=>root.render(await catalogPage()))
+    assert.equal(document.querySelectorAll('a[href^="/tools/apps/"]').length,2,'Classic catalog lists the same external apps')
+    await act(async()=>root.render(await page({params:Promise.resolve({slug:'cleanimage'})})))
+    assert.equal(document.querySelector('iframe').src,'https://cleanimage.vercel.app/','Classic viewer embeds the same app')
     await act(async()=>root.unmount())
   }finally{dom.window.close()}
-  console.log('WI300 external apps: fixed registry, no database, exact-host WI300-only CSP, legacy headers retained, cards without iframe loading, dedicated pages/404, safe new-tab links, optional embedding/download/clipboard and preserved frame on resize passed. Third-party iframe functions need live-browser testing.')
+  console.log('WI300 external apps: fixed registry, no database, exact-host WI300-only CSP, legacy headers retained, cards without iframe loading, dedicated pages/404, classic fallback without brand, safe new-tab links, optional embedding/download/clipboard and preserved frame on resize passed. Third-party iframe functions need live-browser testing.')
 }
 run().catch(e=>{console.error(e);process.exitCode=1})

@@ -25,6 +25,8 @@ async function run() {
     '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => brand },
     '@/lib/site-profile/runtime': { getCurrentSiteProfile: async () => ({ userId: 0 }), getCourseWhereForProfile: () => ({ id: { in: [1] } }) },
     '@/lib/wi300/course-visibility': { wi300CoursePreferences: async () => new Map([[1, true]]), wi300CourseWhere: where => where },
+    // GĐ2: không có brand thì trang rẽ sang bản classic (mock module classic).
+    '@/components/classic/ClassicTeachers': { ClassicTeacherDetailPage: ({ id }) => React.createElement('div', { 'data-classic-teacher': id }), loadClassicTeacher: async () => null },
   }).default
   const html = renderToStaticMarkup(await page({ params: Promise.resolve({ id: '8' }) }))
   assert.ok(html.includes('/khoa-hoc/OWN'))
@@ -39,8 +41,11 @@ async function run() {
   visible = false
   await assert.rejects(() => page({ params: Promise.resolve({ id: '8' }) }), /404/)
   visible = true; brand = null
-  await assert.rejects(() => page({ params: Promise.resolve({ id: '8' }) }), /404/)
+  // GĐ2: không có brand wi300 không còn 404 — trang dùng bản classic.
+  const classicElement = await page({ params: Promise.resolve({ id: '8' }) })
+  assert.ok(renderToStaticMarkup(classicElement).includes('data-classic-teacher="8"'), 'Classic teacher detail renders when there is no wi300 brand')
+  brand = { appearance: { hiddenPages: [] } }
   await assert.rejects(() => page({ params: Promise.resolve({ id: '../8' }) }), /404/)
-  console.log('PASS teacher profiles: owner/admin access, CSRF, safe links, profile content, scoped courses, bounded selection, no private fields and hidden teacher rejection.')
+  console.log('PASS teacher profiles: owner/admin access, CSRF, safe links, profile content, scoped courses, bounded selection, no private fields, hidden teacher rejection and classic fallback without brand.')
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })
