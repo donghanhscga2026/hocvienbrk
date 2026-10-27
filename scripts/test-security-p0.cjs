@@ -83,13 +83,15 @@ async function run() {
   ok(shared.domainRoute('/api/csp-report', off) === 'system', 'domainRoute: /api/csp-report là system trên domain riêng')
   ok(shared.domainRoute('/api/new-module', off) === 'deny', 'domainRoute: /api lạ vẫn deny')
 
-  // 4) vercel.json không còn mật khẩu Zoom
+  // 4) vercel.json: redirect Zoom dùng link mời chính thức có nhúng mật khẩu
+  // Chủ phòng chốt ngày 27/10/2026: chấp nhận đánh đổi bảo mật P0 để học viên
+  // bấm 1 lần vào thẳng phòng. Khóa cứng đích đến — mọi thay đổi link Zoom
+  // đều phải sửa test này một cách có chủ đích.
   const vercelRaw = fs.readFileSync(path.join(root, 'vercel.json'), 'utf8')
-  ok(!vercelRaw.includes('pwd='), 'vercel.json không chứa pwd=')
   const vercel = JSON.parse(vercelRaw)
   const zoomRedirect = (vercel.redirects || []).find((r) => (r.has || []).some((h) => h.value === 'zoom.giautoandien.io.vn'))
   ok(zoomRedirect, 'vercel.json vẫn giữ redirect cho zoom.giautoandien.io.vn')
-  ok(zoomRedirect.destination === 'https://us06web.zoom.us/j/9789413193', 'Redirect Zoom trỏ phòng họp, không kèm mật khẩu')
+  ok(zoomRedirect.destination === 'https://us06web.zoom.us/j/9789413193?pwd=LQDzDDqOWgb5pLk3RhCmFw3KuDUoIR.1', 'Redirect Zoom trỏ đúng link mời chính thức có nhúng mật khẩu (chủ phòng duyệt 27/10/2026)')
 
   // 5) Route nhận báo cáo CSP tồn tại và trả 204
   const routeSource = fs.readFileSync(path.join(root, 'app/api/csp-report/route.ts'), 'utf8')
