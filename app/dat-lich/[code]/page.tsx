@@ -2,6 +2,7 @@ import { auth } from '@/auth'
 import MainHeader from '@/components/layout/MainHeader'
 import BookingWizard from '@/components/booking/BookingWizard'
 import { getPublicSession } from '@/lib/booking/service'
+import { getMemberPrefill } from '@/lib/booking/member'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,9 +39,12 @@ export default async function DatLichPage({
   }
 
   const authSession = await auth()
-  const prefill = authSession?.user
-    ? { name: authSession.user.name || '', email: authSession.user.email || '' }
-    : { name: '', email: '' }
+  const memberId = authSession?.user?.id ? Number(authSession.user.id) : NaN
+  const member = Number.isInteger(memberId) ? await getMemberPrefill(memberId) : null
+  const prefill = member
+    ? { name: member.name, email: member.email, phone: member.phone }
+    : { name: '', email: '', phone: '' }
+  const viewer = { isMember: !!member, hasPhone: !!member?.hasPhone }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -51,6 +55,7 @@ export default async function DatLichPage({
           source={query.trk || ''}
           tags={query.tags || ''}
           prefill={prefill}
+          viewer={viewer}
         />
       </main>
     </div>

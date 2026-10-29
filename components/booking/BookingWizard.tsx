@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { addDaysVN, formatMin, vnDateString, type DaySlot } from '@/lib/booking/slots'
 import type { PublicSession } from '@/lib/booking/service'
+import MemberOffer from '@/components/booking/MemberOffer'
 
 interface BookingWizardProps {
   session: PublicSession
   source: string
   tags: string
-  prefill: { name: string; email: string }
+  prefill: { name: string; email: string; phone: string }
+  viewer: { isMember: boolean; hasPhone: boolean }
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -44,7 +46,7 @@ function formatVnLong(dateVN: string): string {
   }).format(new Date(Date.UTC(y, m - 1, d, 12)))
 }
 
-export default function BookingWizard({ session, source, tags, prefill }: BookingWizardProps) {
+export default function BookingWizard({ session, source, tags, prefill, viewer }: BookingWizardProps) {
   const todayVN = useMemo(() => vnDateString(new Date()), [])
   const maxDateVN = useMemo(() => addDaysVN(todayVN, session.maxDaysAhead), [todayVN, session.maxDaysAhead])
 
@@ -63,7 +65,7 @@ export default function BookingWizard({ session, source, tags, prefill }: Bookin
 
   const [name, setName] = useState(prefill.name)
   const [email, setEmail] = useState(prefill.email)
-  const [phone, setPhone] = useState('')
+  const [phone, setPhone] = useState(prefill.phone)
   const [website, setWebsite] = useState('')
   const [answers, setAnswers] = useState<Record<string, string>>({})
 
@@ -211,6 +213,13 @@ export default function BookingWizard({ session, source, tags, prefill }: Bookin
         {done.meetingUrl && (
           <p className="mt-3 text-sm">Link buổi gặp: <a className="font-semibold text-emerald-800 underline" href={done.meetingUrl} target="_blank" rel="noreferrer">{done.meetingUrl}</a></p>
         )}
+        <MemberOffer
+          bookingCode={done.bookingCode}
+          email={email}
+          phone={phone}
+          isMemberViewer={viewer.isMember}
+          memberHasPhone={viewer.hasPhone}
+        />
       </section>
     )
   }

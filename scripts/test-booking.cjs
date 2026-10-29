@@ -259,4 +259,31 @@ const policy = loadModule('lib/booking/policy.ts')
   ok(wizard3.includes('countByPeriod'), 'filter: trang dat lich van giu chip loc buoi kem so slot')
 }
 
+// 11. Tự điền SĐT + gợi ý đăng ký thành viên sau khi đặt lịch (phương án A)
+{
+  const member = fs.readFileSync(path.join(root, 'lib/booking/member.ts'), 'utf8')
+  for (const fn of ['getMemberPrefill', 'checkBookingEmailMember', 'registerMemberFromBooking', 'saveMemberPhone']) {
+    ok(member.includes(`function ${fn}`), `member: co ham ${fn}`)
+  }
+  ok(member.includes("booking.status === 'CANCELLED'") && member.includes('booking.guestEmail.toLowerCase()'), 'member: tao tai khoan bat buoc ma dat lich that + email khop + lich chua huy')
+  ok(member.includes('alreadyMember: true') && member.includes('prisma.user.findUnique'), 'member: email da la thanh vien thi khong tao trung')
+  ok(member.includes('phoneSkipped = true') && member.includes('phoneToSave'), 'member: SDT trung tai khoan khac thi bo qua SDT, van tao tai khoan')
+  ok(member.includes('passwordReset.create') && member.includes('/reset-password/'), 'member: gui link dat mat khau dung co che PasswordReset san co')
+  ok(member.includes('userId: user.id') && member.includes('guestEmail: { equals'), 'member: gan moi lich trung email vao tai khoan moi')
+  ok(member.includes("action: 'SYSTEM_JOIN'"), 'member: ghi nhat ky SYSTEM_JOIN khi tao tai khoan')
+  ok(member.includes("reason: 'PHONE_TAKEN'") && member.includes("reason: 'HAS_PHONE'"), 'member: luu SDT chan ghi de va chan chiem so nguoi khac')
+  for (const route of ['member-status', 'register-member', 'save-phone']) {
+    ok(fs.existsSync(path.join(root, `app/api/booking/${route}/route.ts`)), `member: co route /api/booking/${route}`)
+  }
+  const savePhoneRoute = fs.readFileSync(path.join(root, 'app/api/booking/save-phone/route.ts'), 'utf8')
+  ok(savePhoneRoute.includes('await auth()'), 'member: route luu SDT bat buoc dang nhap')
+  const page3 = fs.readFileSync(path.join(root, 'app/dat-lich/[code]/page.tsx'), 'utf8')
+  ok(page3.includes('getMemberPrefill') && page3.includes('phone: member.phone'), 'member: trang dat lich tu dien SDT cua thanh vien')
+  const wizard4 = fs.readFileSync(path.join(root, 'components/booking/BookingWizard.tsx'), 'utf8')
+  ok(wizard4.includes('useState(prefill.phone)') && wizard4.includes('MemberOffer'), 'member: wizard khoi tao SDT tu prefill + hien khoi goi y sau khi dat')
+  const offer = fs.readFileSync(path.join(root, 'components/booking/MemberOffer.tsx'), 'utf8')
+  ok(offer.includes('/api/booking/register-member') && offer.includes('/api/booking/save-phone') && offer.includes('/api/booking/member-status'), 'member: khoi goi y goi du 3 API trang thai/dang ky/luu SDT')
+  ok(offer.includes('Tạo tài khoản thành viên miễn phí?') && offer.includes('Email này đã có tài khoản thành viên'), 'member: goi y co ca nhanh tao moi va nhanh da la thanh vien')
+}
+
 console.log(`test-booking: ${checks} checks PASS`)
