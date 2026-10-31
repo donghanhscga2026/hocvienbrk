@@ -54,6 +54,11 @@ const customAdapter = {
     }
 }
 
+// How often the jwt callback re-reads role/phone from the database per token.
+// Refreshing on every JWT evaluation made this query the system's largest
+// database load and contributed to the 2026-11-01 EMAXCONN pool exhaustion.
+const CLAIMS_REFRESH_TTL_MS = 5 * 60 * 1000;
+
 export const authOptions: NextAuthConfig = {
     ...authConfig,
     trustHost: true,
@@ -295,12 +300,20 @@ export const authOptions: NextAuthConfig = {
                 token.affiliateCode = (user as any).affiliateCode;
                 token.phone = (user as any).phone;
                 token.isTempLogin = (user as any).isTempLogin;
+                // Claims were just populated from the fresh sign-in, so stamp the
+                // check time: the refresh below then skips its query on this pass.
+                token.claimsCheckedAt = Date.now();
             }
 
-            // Authorization-sensitive claims must be refreshed from the database on every
-            // JWT evaluation. This prevents a demoted/deleted admin from retaining stale
-            // privileges until the JWT naturally expires.
-            if (token.sub != null) {
+            // Authorization-sensitive claims must be refreshed from the database so a
+            // demoted/deleted admin does not retain stale privileges until the JWT
+            // naturally expires. The refresh is cached for CLAIMS_REFRESH_TTL_MS per
+            // token (see token.claimsCheckedAt): querying on every JWT evaluation was
+            // the system's largest database load. Trade-off: a demotion or deletion
+            // now takes effect within up to 5 minutes instead of on the next request.
+            const claimsCheckedAt = token.claimsCheckedAt;
+            const claimsStale = typeof claimsCheckedAt !== "number" || Date.now() - claimsCheckedAt >= CLAIMS_REFRESH_TTL_MS;
+            if (token.sub != null && claimsStale) {
                 try {
                     const dbUser = await prisma.user.findUnique({
                         where: { id: parseInt(token.sub as string) },
@@ -314,6 +327,9 @@ export const authOptions: NextAuthConfig = {
                         token.sub = undefined;
                         token.role = undefined;
                     }
+                    // Only a successful query (user found or confirmed deleted) earns
+                    // a fresh stamp; on error the next request retries the refresh.
+                    token.claimsCheckedAt = Date.now();
                 } catch (e) {
                     console.error("[Auth] Error fetching user in JWT:", e);
                 }
