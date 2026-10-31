@@ -34,5 +34,6 @@ declare module "next-auth/jwt" {
         id: string
         role: Role
         isTempLogin?: boolean
+        claimsCheckedAt?: number
     }
 }
