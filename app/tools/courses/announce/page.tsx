@@ -18,6 +18,7 @@ function AnnounceForm() {
     const [error, setError] = useState('')
     const [courseName, setCourseName] = useState('')
     const [recipientCount, setRecipientCount] = useState(0)
+    const [emailStatus, setEmailStatus] = useState<{ senderEmail: string | null; dailyLimit: number; sentToday: number; remaining: number } | null>(null)
     const [history, setHistory] = useState<AnnouncementItem[]>([])
 
     const [title, setTitle] = useState('')
@@ -36,6 +37,7 @@ function AnnounceForm() {
         if (res.success) {
             setCourseName(res.course.name)
             setRecipientCount(res.recipientCount)
+            setEmailStatus(res.emailStatus ?? null)
             setHistory(res.announcements)
             setError('')
         } else {
@@ -133,6 +135,22 @@ function AnnounceForm() {
                         />
                         Gửi kèm qua email cho học viên (qua hệ thống Email MKT)
                     </label>
+                    {emailStatus && (
+                        emailStatus.senderEmail ? (
+                            <p className="text-xs text-gray-500">
+                                Email sẽ gửi từ Gmail của bạn: <strong>{emailStatus.senderEmail}</strong> — hôm nay đã gửi{' '}
+                                {emailStatus.sentToday}/{emailStatus.dailyLimit} email (còn {emailStatus.remaining}).
+                            </p>
+                        ) : (
+                            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                Bạn chưa kết nối Gmail cá nhân nên chưa gửi kèm email được.{' '}
+                                <Link href="/tools/email-mkt/mailbox" className="font-semibold underline">
+                                    Kết nối Gmail của bạn
+                                </Link>{' '}
+                                để gửi email từ hộp thư của chính mình.
+                            </p>
+                        )
+                    )}
                     <button
                         type="button"
                         disabled={sending || recipientCount === 0}
