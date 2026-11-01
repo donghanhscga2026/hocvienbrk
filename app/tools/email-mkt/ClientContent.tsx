@@ -578,6 +578,7 @@ export default function ClientContent({ initialCampaigns, isTeacher }: { initial
     <>
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 mb-6 flex flex-wrap gap-y-1">
         <button onClick={() => setActiveTab('campaigns')} className={`flex-1 min-w-[80px] py-3 rounded-xl font-bold text-xs ${activeTab === 'campaigns' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>📋 Chiến dịch</button>
+        <Link href="/tools/email-mkt/mailbox" className="flex-1 min-w-[80px] py-3 rounded-xl font-bold text-xs text-gray-500 text-center">📬 Hộp thư của tôi</Link>
         {!isTeacher && (
           <>
             <button onClick={() => setActiveTab('senders')} className={`flex-1 min-w-[80px] py-3 rounded-xl font-bold text-xs ${activeTab === 'senders' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>📡 Tài Khoản</button>
