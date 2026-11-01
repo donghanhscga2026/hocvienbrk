@@ -28,11 +28,16 @@ export default async function CourseAnnouncementsPage({
 
     let announcements: { id: number; title: string; body: string; createdAt: Date }[] = []
     try {
-        announcements = await prisma.courseAnnouncement.findMany({
+        const rows = await prisma.courseAnnouncement.findMany({
             where: { courseId: course.id },
             orderBy: { createdAt: 'desc' },
             take: 50,
-            select: { id: true, title: true, body: true, createdAt: true },
+            select: { id: true, title: true, body: true, createdAt: true, recipientUserIds: true },
+        })
+        // Thông báo gửi chọn lọc chỉ hiện với học viên nằm trong danh sách nhận
+        announcements = rows.filter(r => {
+            if (!Array.isArray(r.recipientUserIds)) return true
+            return (r.recipientUserIds as number[]).includes(userId)
         })
     } catch {
         // Bảng CourseAnnouncement chưa được tạo (chưa chạy migration) — hiện danh sách trống.
