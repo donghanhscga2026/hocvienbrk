@@ -256,19 +256,71 @@ function decodeQuotedPrintable(str: string): string {
 /**
  * Gửi 1 email duy nhất từ 1 sender cụ thể 
  */ 
-export async function sendGmailFromSender( 
-  sender: { email: string; refreshToken: string }, 
-  to: string, 
-  subject: string, 
-  html: string 
-) { 
+/** Rút bản chữ thuần từ HTML để làm phần text/plain đi kèm (giảm điểm spam). */
+export function htmlToPlainText(html: string): string {
+  return String(html || '')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|tr|h[1-6])>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '\n• ')
+    .replace(/<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, '$2 ($1)')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function escapeHtmlText(v: string) {
+  return v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** Khung email TRUNG TÍNH cho thông báo khóa học (không bọc thương hiệu MFC). */
+export function announcementEmailHtml(
+  rawHtml: string,
+  unsubscribeUrl: string,
+  courseName: string | null,
+  creatorName: string | null
+) {
+  const courseLine = courseName ? `khóa học <b>${escapeHtmlText(courseName)}</b>` : 'khóa học của bạn';
+  const teacherLine = creatorName ? ` · Giảng viên: ${escapeHtmlText(creatorName)}` : '';
+  return `
+        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333333; max-width: 600px; margin: 0 auto;">
+          <div style="padding: 28px 24px; background-color: #ffffff;">
+            <div style="font-size: 16px; color: #333333;">
+              ${rawHtml}
+            </div>
+          </div>
+          <div style="padding: 18px 24px; border-top: 1px solid #eeeeee; text-align: center;">
+            <p style="font-size: 11px; color: #999999; margin: 0; line-height: 1.8;">
+              Bạn nhận được email này vì đang học ${courseLine} trên wi300.vn${teacherLine}.<br>
+              Nếu không muốn nhận email thông báo của khóa học, bạn có thể <a href="${unsubscribeUrl}" style="color: #000000; text-decoration: underline;">hủy đăng ký tại đây</a>.
+            </p>
+          </div>
+        </div>
+      `;
+}
+
+export async function sendGmailFromSender(
+  sender: { email: string; refreshToken: string },
+  to: string,
+  subject: string,
+  html: string,
+  fromNameOverride?: string
+) {
   const oauth2Client = getOAuth2Client(); 
   oauth2Client.setCredentials({ 
     refresh_token: tryDecrypt(sender.refreshToken), 
   });
 
   const gmail = google.gmail({ version: "v1", auth: oauth2Client });
-  const fromName = 'Cộng đồng MFC';
+  const fromName = fromNameOverride || 'Cộng đồng MFC';
 
   const encodeHeader = (str: string) => { 
     if (!str) return ""; 
@@ -302,42 +354,76 @@ export async function sendGmailFromSender(
   }
 
   const boundary = `----=_Part_${Math.random().toString(36).substring(2)}`;
+  const altBoundary = `----=_Alt_${Math.random().toString(36).substring(2)}`;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn';
   const unsubUrl = `${appUrl}/api/unsubscribe?email=${encodeURIComponent(to)}`;
 
-  // KHỞI TẠO CẤU TRÚC MULTIPART/RELATED (Dành cho Email có nội dung kèm ảnh nội khối)
-  const messageParts = [
+  // Phần nội dung luôn có CẢ bản chữ thuần lẫn bản HTML (multipart/alternative):
+  // email chỉ có HTML rất dễ bị bộ lọc chấm điểm spam.
+  const plainText = htmlToPlainText(updatedHtml);
+  const encodePart = (content: string) =>
+    Buffer.from(content, 'utf-8').toString('base64').match(/.{1,76}/g)?.join('\r\n') || '';
+  const alternativeParts = [
+    `--${altBoundary}`,
+    `Content-Type: text/plain; charset=utf-8`,
+    `Content-Transfer-Encoding: base64`,
+    ``,
+    encodePart(plainText),
+    `--${altBoundary}`,
+    `Content-Type: text/html; charset=utf-8`,
+    `Content-Transfer-Encoding: base64`,
+    ``,
+    encodePart(updatedHtml),
+    `--${altBoundary}--`,
+  ];
+
+  const headers = [
     `From: "${encodeHeader(fromName)}" <${sender.email}>`,
     `To: ${to}`,
     `Subject: ${encodeHeader(subject)}`,
     `MIME-Version: 1.0`,
-    `Content-Type: multipart/related; boundary="${boundary}"`,
     `Date: ${new Date().toUTCString()}`,
     `Reply-To: ${sender.email}`,
     `List-Unsubscribe: <${unsubUrl}>`,
     `List-Unsubscribe-Post: List-Unsubscribe=One-Click`,
-    ``,
-    `--${boundary}`,
-    `Content-Type: text/html; charset=utf-8`,
-    `Content-Transfer-Encoding: base64`,
-    ``,
-    Buffer.from(updatedHtml, 'utf-8').toString('base64').match(/.{1,76}/g)?.join('\r\n') || '',
   ];
 
-  // CHÈN CÁC PHẦN ĐÍNH KÈM ẢNH (INLINE ATTACHMENTS)
-  for (const img of images) {
-    messageParts.push(
-      `--${boundary}`,
-      `Content-Type: ${img.type}`,
-      `Content-Transfer-Encoding: base64`,
-      `Content-ID: <${img.cid}>`,
-      `Content-Disposition: inline; filename="${img.cid}"`,
+  let messageParts: string[];
+  if (images.length === 0) {
+    // Không có ảnh nội khối: gửi thẳng multipart/alternative
+    messageParts = [
+      ...headers,
+      `Content-Type: multipart/alternative; boundary="${altBoundary}"`,
       ``,
-      img.base64.match(/.{1,76}/g)?.join('\r\n') || ''
-    );
-  }
+      ...alternativeParts,
+    ];
+  } else {
+    // Có ảnh nội khối: multipart/related bọc ngoài, alternative nằm trong
+    messageParts = [
+      ...headers,
+      `Content-Type: multipart/related; boundary="${boundary}"`,
+      ``,
+      `--${boundary}`,
+      `Content-Type: multipart/alternative; boundary="${altBoundary}"`,
+      ``,
+      ...alternativeParts,
+    ];
 
-  messageParts.push(`--${boundary}--`);
+    // CHÈN CÁC PHẦN ĐÍNH KÈM ẢNH (INLINE ATTACHMENTS)
+    for (const img of images) {
+      messageParts.push(
+        `--${boundary}`,
+        `Content-Type: ${img.type}`,
+        `Content-Transfer-Encoding: base64`,
+        `Content-ID: <${img.cid}>`,
+        `Content-Disposition: inline; filename="${img.cid}"`,
+        ``,
+        img.base64.match(/.{1,76}/g)?.join('\r\n') || ''
+      );
+    }
+
+    messageParts.push(`--${boundary}--`);
+  }
 
   const rawMessage = messageParts.join('\r\n');
 
@@ -389,6 +475,7 @@ export async function sendViaBrevo(
     to: [{ email: to }],
     subject,
     htmlContent: html,
+    textContent: htmlToPlainText(html),
     sender: {
       name: sender.senderName || process.env.BREVO_SENDER_NAME || 'Cộng đồng MFC',
       email: senderEmail,
@@ -933,6 +1020,23 @@ export async function processCampaignBatch(campaignId: number, batchSize: number
     return { success: false, finished: false, notFound: true, error: "Campaign not found" };
   }
 
+  // Email thông báo khóa học (tạo từ trang Gửi thông báo) dùng khung trung tính
+  // riêng, không bọc thương hiệu MFC — tránh học viên thấy thư lạ và báo spam.
+  const isAnnouncement = (campaign.recipientFilter as any)?.viaAnnouncement === true;
+  const campaignCreator = await prisma.user.findUnique({
+    where: { id: campaign.createdBy },
+    select: { name: true },
+  });
+  const campaignCreatorName = campaignCreator?.name || null;
+  let announcementCourseName: string | null = null;
+  if (isAnnouncement) {
+    const announcementCourse = await prisma.course.findUnique({
+      where: { id: Number((campaign.recipientFilter as any)?.courseId) || 0 },
+      select: { name_lop: true },
+    });
+    announcementCourseName = announcementCourse?.name_lop || null;
+  }
+
   let allRecipients = recipientsCache.get(campaignId);
   if (!allRecipients || isCrmCampaign(campaign.recipientFilter)) {
     allRecipients = await resolveRecipients(campaignId);
@@ -1076,14 +1180,16 @@ export async function processCampaignBatch(campaignId: number, batchSize: number
         rawHtml = rawHtml.replace(/\n/g, '<br/>');
       }
 
-      if (config.enableRandomMessageFooter) {
+      if (config.enableRandomMessageFooter && !isAnnouncement) {
         const footer = await getRandomMessageFooter();
         rawHtml = injectFooter(rawHtml, footer);
       }
 
       const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'}/api/unsubscribe?email=${encodeURIComponent(recipient.email)}`;
 
-      const finalHtml = `
+      const finalHtml = isAnnouncement
+        ? announcementEmailHtml(rawHtml, unsubscribeUrl, announcementCourseName, campaignCreatorName)
+        : `
         <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333333; max-width: 600px; margin: 0 auto; border: 1px solid #eeeeee; border-radius: 20px; overflow: hidden;">
           <div style="background-color: #000000; padding: 30px; text-align: center;">
             <a href="https://giautoandien.io.vn" style="text-decoration: none;">
@@ -1108,7 +1214,13 @@ export async function processCampaignBatch(campaignId: number, batchSize: number
       if (sender.provider === 'brevo') {
         await sendViaBrevo(sender, recipient.email, subject, finalHtml);
       } else {
-        await sendGmailFromSender(sender as any, recipient.email, subject, finalHtml);
+        await sendGmailFromSender(
+          sender as any,
+          recipient.email,
+          subject,
+          finalHtml,
+          (sender as any).ownerId ? campaignCreatorName || undefined : undefined
+        );
       }
 
       await prisma.emailCampaignLog.create({
