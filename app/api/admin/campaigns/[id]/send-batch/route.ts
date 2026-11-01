@@ -32,8 +32,17 @@ export async function POST(
       if (campaign.createdBy !== userId) {
         return new NextResponse("Không có quyền gửi chiến dịch này", { status: 403 });
       }
-      if (campaign.recipientSource === "DB_ALL") {
+      if (campaign.recipientSource === "DB_ALL" || campaign.recipientSource === "DB_ALL_INCLUDING_UNVERIFIED") {
         return new NextResponse("Không có quyền gửi đến tất cả thành viên", { status: 403 });
+      }
+      if (campaign.recipientSource === "DB_ACTIVE") {
+        const courseId = Number((campaign.recipientFilter as any)?.courseId);
+        const ownCourse = courseId
+          ? await prisma.course.findFirst({ where: { id: courseId, teacherId: userId }, select: { id: true } })
+          : null;
+        if (!ownCourse) {
+          return new NextResponse("Bạn chỉ được gửi email cho học viên trong khóa học của mình", { status: 403 });
+        }
       }
     }
 
