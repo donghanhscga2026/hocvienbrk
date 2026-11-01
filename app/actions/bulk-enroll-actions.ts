@@ -450,6 +450,18 @@ export async function revertBulkEnrollAction(batchId: string) {
         if (!log) return { success: false, error: 'Không tìm thấy lịch sử import.' }
         if (log.revertedAt) return { success: false, error: 'Thao tác này đã được hoàn tác trước đó.' }
 
+        // Giảng viên chỉ được hoàn tác lô nhập của khóa học do mình phụ trách
+        if (isTeacher) {
+            const teacherId = parseInt(session.user.id)
+            const batchCourse = await prisma.course.findUnique({
+                where: { id: log.courseId },
+                select: { teacherId: true }
+            })
+            if (!batchCourse || batchCourse.teacherId !== teacherId) {
+                return { success: false, error: 'Bạn chỉ có thể hoàn tác lần nhập của khóa học do mình phụ trách.' }
+            }
+        }
+
         const summary: BulkImportSummary = typeof log.summary === 'string' ? JSON.parse(log.summary) : log.summary
 
         await prisma.$transaction(async (tx) => {
