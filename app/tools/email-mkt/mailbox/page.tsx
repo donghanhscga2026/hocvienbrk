@@ -96,7 +96,7 @@ function MailboxContent() {
                         <div className="space-y-3 text-sm">
                             <p>Bạn chưa kết nối Gmail cá nhân. Hãy kết nối để bắt đầu gửi email cho học viên từ hộp thư của mình.</p>
                             <a
-                                href="/api/admin/auth/google"
+                                href="/api/admin/auth/google?own=1"
                                 className="flex min-h-11 items-center justify-center rounded-xl bg-brk-primary px-4 font-semibold text-white"
                             >
                                 Kết nối Gmail của tôi

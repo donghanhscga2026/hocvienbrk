@@ -40,9 +40,11 @@ export async function GET(req: Request) {
     const encryptedRefreshToken = encrypt(tokens.refresh_token);
 
     // GĐ3: giảng viên nối Gmail của CHÍNH MÌNH (ownerId = userId);
-    // admin nối hộp thư HỆ THỐNG (ownerId = null) như trước.
+    // admin nối hộp thư HỆ THỐNG (ownerId = null) như trước — TRỪ KHI luồng bắt đầu
+    // từ trang "Hộp thư của tôi" (?own=1 → state=own): khi đó admin cũng nối RIÊNG.
     const isTeacher = session.user.role === "TEACHER";
-    const ownerId = isTeacher ? Number(session.user.id) : null;
+    const own = isTeacher || searchParams.get("state") === "own";
+    const ownerId = own ? Number(session.user.id) : null;
 
     // Tìm sender Gmail hiện tại theo email + provider + chủ sở hữu
     const existing = await prisma.emailSender.findFirst({
@@ -58,7 +60,7 @@ export async function GET(req: Request) {
           isActive: true,
         },
       })
-    } else if (isTeacher) {
+    } else if (own) {
       // Hộp thư của giảng viên: hạn mức khởi điểm = hạn mức email/ngày của giảng viên (mặc định 200)
       const { getTeacherDailyEmailLimit } = await import("@/lib/teacher-email");
       const teacherLimit = await getTeacherDailyEmailLimit();
@@ -85,8 +87,8 @@ export async function GET(req: Request) {
       })
     }
 
-    // Admin quay lại Email MKT; giảng viên quay lại trang Hộp thư của tôi
-    return NextResponse.redirect(new URL(isTeacher ? "/tools/email-mkt/mailbox?connected=1" : "/tools/email-mkt", req.url));
+    // Nối riêng → quay lại trang Hộp thư của tôi; nối hệ thống → quay lại Email MKT
+    return NextResponse.redirect(new URL(own ? "/tools/email-mkt/mailbox?connected=1" : "/tools/email-mkt", req.url));
 
   } catch (error: any) {
     console.error("OAuth Callback Error:", error);
