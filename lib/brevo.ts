@@ -52,6 +52,7 @@ export interface SendEmailParams {
   to: BrevoRecipient[]
   subject: string
   htmlContent: string
+  textContent?: string
   sender?: { name: string; email: string }
   bcc?: BrevoRecipient[]
   replyTo?: BrevoRecipient
@@ -74,6 +75,7 @@ export async function sendTransactionalEmail(
     to: params.to,
     subject: params.subject,
     htmlContent: params.htmlContent,
+    ...(params.textContent ? { textContent: params.textContent } : {}),
     ...(params.bcc && params.bcc.length > 0 ? { bcc: params.bcc } : {}),
     ...(params.replyTo ? { replyTo: params.replyTo } : {}),
     ...(params.tags && params.tags.length > 0 ? { tags: params.tags } : {}),
