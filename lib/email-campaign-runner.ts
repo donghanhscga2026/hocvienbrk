@@ -95,11 +95,22 @@ export async function getAvailableSender(campaignId?: number): Promise<{
   if (campaignId) {
     const camp = await prisma.emailCampaign.findUnique({
       where: { id: campaignId },
-      select: { createdBy: true, creator: { select: { role: true } } },
+      select: { createdBy: true, recipientFilter: true, creator: { select: { role: true } } },
     });
     if (camp && String((camp.creator as any)?.role) === "TEACHER") {
       isTeacherCampaign = true;
       ownerScope = { ownerId: camp.createdBy };
+    } else if (camp && (camp.recipientFilter as any)?.viaAnnouncement === true) {
+      // Thông báo khóa học do ADMIN gửi, mà admin đó đã nối hộp thư riêng:
+      // gửi từ hộp thư riêng của admin (như giảng viên), không đi hộp thư hệ thống.
+      const ownSender = await prisma.emailSender.findFirst({
+        where: { ownerId: camp.createdBy, isActive: true },
+        select: { id: true },
+      });
+      if (ownSender) {
+        isTeacherCampaign = true;
+        ownerScope = { ownerId: camp.createdBy };
+      }
     }
   }
 
