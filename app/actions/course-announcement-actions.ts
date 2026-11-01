@@ -25,6 +25,103 @@ function bodyToHtml(body: string) {
     return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#222">${paragraphs}</div>`
 }
 
+/**
+ * Lọc HTML từ ô soạn có định dạng của giảng viên: chỉ giữ các thẻ định dạng cơ bản
+ * (đoạn văn, đậm, nghiêng, gạch chân, danh sách, link http/https/mailto), bỏ mọi
+ * thuộc tính nguy hiểm (onclick, style chứa mã...), bỏ thẻ script/style kèm nội dung.
+ * Chuỗi đã lọc mới được lưu vào CourseAnnouncement.body và đưa vào email.
+ */
+const RICH_ALLOWED_TAGS = new Set([
+    'p', 'br', 'div', 'strong', 'b', 'em', 'i', 'u', 'ul', 'ol', 'li', 'a', 'span',
+])
+const RICH_DROP_WITH_CONTENT = new Set(['script', 'style', 'iframe', 'object', 'embed', 'textarea', 'title', 'noscript'])
+
+function escapeTextNode(text: string) {
+    return text
+        .replace(/&(?!(amp|lt|gt|quot|#\d+|nbsp);)/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+}
+
+function sanitizeAnnouncementHtml(input: string): string {
+    const html = String(input || '')
+    let out = ''
+    let i = 0
+    let skipDepth = 0
+    while (i < html.length) {
+        const lt = html.indexOf('<', i)
+        if (lt === -1) {
+            if (skipDepth === 0) out += escapeTextNode(html.slice(i))
+            break
+        }
+        if (lt > i && skipDepth === 0) out += escapeTextNode(html.slice(i, lt))
+        const gt = html.indexOf('>', lt)
+        if (gt === -1) {
+            if (skipDepth === 0) out += escapeTextNode(html.slice(lt))
+            break
+        }
+        const rawTag = html.slice(lt, gt + 1)
+        const m = rawTag.match(/^<\s*(\/?)\s*([a-zA-Z][a-zA-Z0-9]*)/)
+        if (!m) {
+            // Không phải thẻ hợp lệ (ví dụ dấu < trong văn bản) — coi là chữ thường
+            if (skipDepth === 0) out += escapeTextNode('<')
+            i = lt + 1
+            continue
+        }
+        const isClose = m[1] === '/'
+        const tag = m[2].toLowerCase()
+        i = gt + 1
+        if (RICH_DROP_WITH_CONTENT.has(tag)) {
+            if (isClose) skipDepth = Math.max(0, skipDepth - 1)
+            else if (!rawTag.endsWith('/>')) skipDepth += 1
+            continue
+        }
+        if (skipDepth > 0) continue
+        if (!RICH_ALLOWED_TAGS.has(tag)) continue // bỏ thẻ lạ, giữ lại phần chữ bên trong
+        if (tag === 'br') {
+            out += '<br>'
+            continue
+        }
+        if (isClose) {
+            out += `</${tag}>`
+            continue
+        }
+        if (tag === 'a') {
+            const hrefMatch = rawTag.match(/href\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i)
+            const href = (hrefMatch?.[2] ?? hrefMatch?.[3] ?? hrefMatch?.[4] ?? '').trim()
+            if (/^(https?:\/\/|mailto:)/i.test(href)) {
+                const safeHref = href.replace(/"/g, '&quot;')
+                out += `<a href="${safeHref}" target="_blank" rel="noopener noreferrer">`
+            } else {
+                out += '<a>'
+            }
+            continue
+        }
+        out += `<${tag}>`
+    }
+    return out.trim()
+}
+
+/** Chữ thuần nhìn thấy được của một đoạn HTML (để kiểm tra rỗng / đếm ký tự). */
+function htmlToVisibleText(html: string): string {
+    return String(html || '')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
+/** HTML hoàn chỉnh cho email: giữ định dạng giảng viên đã soạn, bọc khung chữ như cũ. */
+function richBodyToEmailHtml(sanitizedHtml: string, visibleText: string) {
+    if (/<(p|div|li|br)[\s>]/i.test(sanitizedHtml)) {
+        return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#222">${sanitizedHtml}</div>`
+    }
+    return bodyToHtml(visibleText)
+}
+
 type SendOptions = {
     /** Gửi thông báo trong hệ thống (chuông + web push) */
     notify: boolean
@@ -201,11 +298,12 @@ export async function sendCourseAnnouncementAction(
 ) {
     try {
         const cleanTitle = (title || '').trim()
-        const cleanBody = (body || '').trim()
+        const cleanBody = sanitizeAnnouncementHtml(body || '')
+        const visibleBody = htmlToVisibleText(cleanBody)
         if (!cleanTitle) return { success: false as const, error: 'Hãy nhập tiêu đề thông báo' }
-        if (!cleanBody) return { success: false as const, error: 'Hãy nhập nội dung thông báo' }
+        if (!visibleBody) return { success: false as const, error: 'Hãy nhập nội dung thông báo' }
         if (cleanTitle.length > TITLE_MAX) return { success: false as const, error: `Tiêu đề tối đa ${TITLE_MAX} ký tự` }
-        if (cleanBody.length > BODY_MAX) return { success: false as const, error: `Nội dung tối đa ${BODY_MAX} ký tự` }
+        if (visibleBody.length > BODY_MAX) return { success: false as const, error: `Nội dung tối đa ${BODY_MAX} ký tự` }
         if (!options.notify && !options.email) {
             return { success: false as const, error: 'Hãy chọn ít nhất một kênh gửi: Thông báo hoặc Email' }
         }
@@ -323,7 +421,7 @@ export async function sendCourseAnnouncementAction(
                                   )
                                 : undefined,
                             subject: cleanTitle,
-                            htmlContent: bodyToHtml(cleanBody),
+                            htmlContent: richBodyToEmailHtml(cleanBody, visibleBody),
                             createdBy: ctx.userId,
                             status: 'DRAFT',
                         },
