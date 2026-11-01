@@ -73,6 +73,7 @@ model User {
   userVouchers                 UserVoucher[]
   appNotifications             AppNotification[]
   courseAnnouncements          CourseAnnouncement[]   @relation("CourseAnnouncementTeacher")
+  ownedEmailSenders            EmailSender[]          @relation("EmailSenderOwner")
   pushSubscriptions            WebPushSubscription[]
   crmContacts                  CrmContact[]
   crmForms                     CrmForm[]
@@ -131,8 +132,12 @@ model EmailSender {
   staggerDelayMax  Int                   @default(15)
   staggerDelayMin  Int                   @default(5)
   warmupPhase      Int                   @default(0)
+  ownerId          Int?
+  owner            User?                 @relation("EmailSenderOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   campaigns        EmailCampaignSender[]
   senderLogs       EmailSenderLog[]
+
+  @@index([ownerId])
 }
 
 model EmailCampaign {

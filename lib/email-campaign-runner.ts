@@ -86,9 +86,26 @@ export async function getAvailableSender(campaignId?: number): Promise<{
 } | null> {
   const now = new Date();
 
+  // GĐ3: phạm vi hộp thư theo người tạo chiến dịch.
+  // - Chiến dịch của GIẢNG VIÊN: chỉ dùng hộp thư của chính giảng viên đó
+  //   (ownerId = createdBy) — không đụng vào hộp thư hệ thống.
+  // - Chiến dịch của ADMIN/hệ thống: chỉ dùng hộp thư hệ thống (ownerId = null).
+  let ownerScope: { ownerId: number | null } = { ownerId: null };
+  let isTeacherCampaign = false;
+  if (campaignId) {
+    const camp = await prisma.emailCampaign.findUnique({
+      where: { id: campaignId },
+      select: { createdBy: true, creator: { select: { role: true } } },
+    });
+    if (camp && String((camp.creator as any)?.role) === "TEACHER") {
+      isTeacherCampaign = true;
+      ownerScope = { ownerId: camp.createdBy };
+    }
+  }
+
   // 1. Brevo pool — round-robin theo sentToday (thấp nhất trước)
   const brevoSenders = await prisma.emailSender.findMany({
-    where: { isActive: true, provider: 'brevo' },
+    where: { isActive: true, provider: 'brevo', ...ownerScope },
     orderBy: { id: 'asc' },
   });
   const brevoWithQuota = brevoSenders.filter(s => s.sentToday < s.dailyLimit);
@@ -101,6 +118,7 @@ export async function getAvailableSender(campaignId?: number): Promise<{
   const gmailSenders = await prisma.emailSender.findMany({
     where: {
       isActive: true,
+      ...ownerScope,
       provider: { not: 'brevo' },
       OR: [
         { cooldownUntil: null },
@@ -110,6 +128,9 @@ export async function getAvailableSender(campaignId?: number): Promise<{
     orderBy: { id: 'asc' },
   });
   const gmailWithQuota = gmailSenders.filter(s => {
+    // Hộp thư cá nhân của giảng viên: dùng thẳng dailyLimit, không áp thang
+    // warmup (thang đó dành cho hộp thư vệ tinh của hệ thống).
+    if (isTeacherCampaign) return s.sentToday < s.dailyLimit;
     const limit = getEffectiveDailyLimit({
       createdAt: s.createdAt,
       dailyLimit: s.dailyLimit,

@@ -5,8 +5,8 @@ import { NextResponse } from "next/server";
 export async function GET() {
   const session = await auth();
 
-  // Kiểm tra quyền Admin
-  if (session?.user?.role !== "ADMIN") {
+  // Admin nối hộp thư hệ thống; Giảng viên nối Gmail của chính mình (GĐ3)
+  if (session?.user?.role !== "ADMIN" && session?.user?.role !== "TEACHER") {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 

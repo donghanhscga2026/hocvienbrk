@@ -10,7 +10,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
 
-  if (session?.user?.role !== "ADMIN") {
+  if (session?.user?.role !== "ADMIN" && session?.user?.role !== "TEACHER") {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
@@ -39,9 +39,14 @@ export async function GET(req: Request) {
     // Mã hóa refresh_token
     const encryptedRefreshToken = encrypt(tokens.refresh_token);
 
-    // Tìm sender Gmail hiện tại theo email + provider
+    // GĐ3: giảng viên nối Gmail của CHÍNH MÌNH (ownerId = userId);
+    // admin nối hộp thư HỆ THỐNG (ownerId = null) như trước.
+    const isTeacher = session.user.role === "TEACHER";
+    const ownerId = isTeacher ? Number(session.user.id) : null;
+
+    // Tìm sender Gmail hiện tại theo email + provider + chủ sở hữu
     const existing = await prisma.emailSender.findFirst({
-      where: { email, provider: 'gmail' },
+      where: { email, provider: 'gmail', ownerId },
     })
 
     if (existing) {
@@ -51,6 +56,20 @@ export async function GET(req: Request) {
           refreshToken: encryptedRefreshToken,
           clientId: process.env.GMAIL_CLIENT_ID || "",
           isActive: true,
+        },
+      })
+    } else if (isTeacher) {
+      // Hộp thư của giảng viên: hạn mức khởi điểm = hạn mức email/ngày của giảng viên (mặc định 200)
+      const { getTeacherDailyEmailLimit } = await import("@/lib/teacher-email");
+      const teacherLimit = await getTeacherDailyEmailLimit();
+      await prisma.emailSender.create({
+        data: {
+          email,
+          label: `Gmail của ${email.split('@')[0]}`,
+          refreshToken: encryptedRefreshToken,
+          clientId: process.env.GMAIL_CLIENT_ID || "",
+          dailyLimit: teacherLimit,
+          ownerId,
         },
       })
     } else {
@@ -66,8 +85,8 @@ export async function GET(req: Request) {
       })
     }
 
-    // Quay lại trang quản lý (trang này sẽ được tạo ở bước sau)
-    return NextResponse.redirect(new URL("/tools/email-mkt", req.url));
+    // Admin quay lại Email MKT; giảng viên quay lại trang Hộp thư của tôi
+    return NextResponse.redirect(new URL(isTeacher ? "/tools/email-mkt/mailbox?connected=1" : "/tools/email-mkt", req.url));
 
   } catch (error: any) {
     console.error("OAuth Callback Error:", error);
