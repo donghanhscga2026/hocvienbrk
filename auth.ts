@@ -200,12 +200,16 @@ export const authOptions: NextAuthConfig = {
                     // MFA remains mandatory for administrators regardless of login method.
                     if (!user.emailVerified || !/^\d{6}$/.test(loginOtp)) {
                         isLoginFailed = true;
+                        failReason = "Mã OTP không hợp lệ hoặc email chưa xác minh";
+                        errorCode = "INVALID_OTP";
                     } else if (user.role === "ADMIN" && user.mfaEnabled &&
                         (!user.mfaSecret || !otp || !verifyTotp(decryptMfaSecret(user.mfaSecret), otp.trim()))) {
                         // Ném MFA_REQUIRED (thay vì fail chung) để client hiện ô nhập mã Authenticator
                         throw new CustomLoginError("Cần mã xác thực quản trị viên hợp lệ.", "MFA_REQUIRED");
                     } else if (!(await consumeLoginOtp(user.id, loginOtp))) {
                         isLoginFailed = true;
+                        failReason = "Mã OTP không đúng hoặc đã hết hạn";
+                        errorCode = "INVALID_OTP";
                     }
                 } else if (!user.password) {
                     isLoginFailed = true;
@@ -222,6 +226,19 @@ export const authOptions: NextAuthConfig = {
 
                 if (isLoginFailed || !user) {
                     console.warn(`⚠️ [Auth] Đăng nhập thất bại (${errorCode || "INVALID_CREDENTIALS"}${failReason ? ` — ${failReason}` : ""}).`);
+                    // Giữ mã lỗi cụ thể cho các trường hợp tài khoản ĐÃ xác nhận tồn tại ở bước 1
+                    // (trang đăng nhập đã công khai mã thành viên + email che), để client hiển thị
+                    // đúng hướng dẫn thay vì thông báo chung chung gây hiểu lầm.
+                    // Riêng "không tìm thấy tài khoản" vẫn giữ mã chung INVALID_CREDENTIALS.
+                    if (errorCode === "INVALID_PASSWORD") {
+                        throw new CustomLoginError("Mật khẩu không chính xác.", "INVALID_PASSWORD");
+                    }
+                    if (errorCode === "NO_PASSWORD") {
+                        throw new CustomLoginError("Tài khoản chưa thiết lập mật khẩu.", "NO_PASSWORD");
+                    }
+                    if (errorCode === "INVALID_OTP") {
+                        throw new CustomLoginError("Mã OTP không đúng hoặc đã hết hạn.", "INVALID_OTP");
+                    }
                     throw new CustomLoginError("Thông tin đăng nhập không chính xác.", "INVALID_CREDENTIALS");
                 }
 
