@@ -44,6 +44,20 @@ export async function requireCourseAccessAction(
 }
 
 /**
+ * Guard CHỈ ADMIN — dùng cho Server Actions ('use server').
+ * Dùng: const { denied, ctx } = await requireAdminAction()
+ *       if (denied) return denied
+ */
+export async function requireAdminAction(): Promise<{ denied: { success: false; error: string } | null; ctx: CourseAuthContext | null }> {
+    const ctx = await getCourseAuthContext()
+    if (!ctx) return { denied: { success: false, error: 'Unauthorized' }, ctx: null }
+    if (!ctx.isAdmin) {
+        return { denied: { success: false, error: 'Chỉ ADMIN mới được thực hiện thao tác này' }, ctx }
+    }
+    return { denied: null, ctx }
+}
+
+/**
  * Guard dùng cho API routes — trả về NextResponse khi bị chặn.
  * Dùng: const { denied, ctx } = await requireCourseAccessApi(course.teacherId)
  *       if (denied) return denied

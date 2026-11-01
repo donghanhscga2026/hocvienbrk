@@ -58,3 +58,19 @@ export async function queueAnnouncementPush(tx: Prisma.TransactionClient, batchI
     WHERE n."eventKey" LIKE ${'lesson-announcement:' + batchId + ':%'} AND s.origin=${origin!}`)
   return { pushRecipientCount: Number(rows[0].users), pushDeviceCount: Number(rows[0].devices) }
 }
+
+export async function queueCourseAnnouncementPush(tx: Prisma.TransactionClient, announcementId: number, origin?: string, enqueue = true) {
+  const config = pushConfig(origin)
+  if (!config) return { pushRecipientCount: 0, pushDeviceCount: 0 }
+  if (enqueue) await tx.$executeRaw(Prisma.sql`
+    INSERT INTO public."WebPushDelivery" ("notificationId","subscriptionId","subscriptionVersion")
+    SELECT n.id,s.id,s.version FROM public."AppNotification" n JOIN public."WebPushSubscription" s ON s."userId"=n."recipientId"
+    WHERE n.kind='COURSE_ANNOUNCEMENT' AND n."eventKey" LIKE ${'course-announcement:' + announcementId + ':%'}
+      AND s.origin=${origin!} AND s."vapidPublicKey"=${config.publicKey}
+    ON CONFLICT ("notificationId","subscriptionId") DO NOTHING`)
+  const rows = await tx.$queryRaw<{ users: bigint; devices: bigint }[]>(Prisma.sql`
+    SELECT count(DISTINCT n."recipientId") AS users,count(*) AS devices FROM public."WebPushDelivery" d
+    JOIN public."AppNotification" n ON n.id=d."notificationId" JOIN public."WebPushSubscription" s ON s.id=d."subscriptionId"
+    WHERE n."eventKey" LIKE ${'course-announcement:' + announcementId + ':%'} AND s.origin=${origin!}`)
+  return { pushRecipientCount: Number(rows[0].users), pushDeviceCount: Number(rows[0].devices) }
+}

@@ -41,6 +41,9 @@ export function visibleNotifications(actor: Actor) {
           SELECT 1 FROM public."Lesson" al JOIN public."Enrollment" ae ON ae."courseId"=al."courseId"
           WHERE al.id=n."lessonId" AND al."courseId"=n."courseId" AND ae."userId"=${actor.id} AND ae.status='ACTIVE'
         ))
+        OR (n.kind = 'COURSE_ANNOUNCEMENT' AND n."courseId" IS NOT NULL AND EXISTS (
+          SELECT 1 FROM public."Enrollment" ce WHERE ce."courseId"=n."courseId" AND ce."userId"=${actor.id} AND ce.status='ACTIVE'
+        ))
         OR (n.kind = 'COMMENT_REPLY' AND lc.id IS NOT NULL AND EXISTS (
           SELECT 1 FROM public."LessonComment" p WHERE p.id = lc."parentId" AND p."userId" = ${actor.id}
         ) AND (${admin} OR c."teacherId" = ${actor.id} OR EXISTS (
@@ -63,6 +66,7 @@ export function notificationHref(row: NotificationRow) {
   if (row.kind === 'TASK_DUE') return '/tools/crm?view=tasks'
   if (row.slug && row.kind === 'COMMENT_REPLY') return '/courses/' + encodeURIComponent(row.slug) + '/learn?lesson=' + encodeURIComponent(row.commentLessonId!)
   if (row.slug && row.kind === 'LESSON_ANNOUNCEMENT' && row.lessonId) return '/courses/' + encodeURIComponent(row.slug) + '/learn?lesson=' + encodeURIComponent(row.lessonId)
+  if (row.slug && row.kind === 'COURSE_ANNOUNCEMENT') return '/courses/' + encodeURIComponent(row.slug) + '/announcements'
   return row.slug ? '/khoa-hoc/' + encodeURIComponent(row.slug) : '/tools'
 }
 export async function readNotifications(actor: Actor, page: number) {

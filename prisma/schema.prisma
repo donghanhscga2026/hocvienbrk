@@ -72,6 +72,7 @@ model User {
   closureAsDescendant          UserClosure[]         @relation("ClosureDescendant")
   userVouchers                 UserVoucher[]
   appNotifications             AppNotification[]
+  courseAnnouncements          CourseAnnouncement[]   @relation("CourseAnnouncementTeacher")
   pushSubscriptions            WebPushSubscription[]
   crmContacts                  CrmContact[]
   crmForms                     CrmForm[]
@@ -406,6 +407,7 @@ model Course {
   libAccesses                 CourseLibAccess[]
   testimonials                CourseTestimonial[]
   enrollments                 Enrollment[]
+  announcements               CourseAnnouncement[]
   landingPages                LandingPage[]
   lessons                     Lesson[]
   autoVerifyConfig            AutoVerifyConfig?
@@ -2896,4 +2898,18 @@ model BookingWaitlist {
 
   @@index([sessionId, date, status])
   @@index([email])
+}
+
+model CourseAnnouncement {
+  id        Int      @id @default(autoincrement())
+  courseId  Int
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  teacherId Int
+  teacher   User     @relation("CourseAnnouncementTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([courseId, createdAt])
+  @@index([teacherId])
 }

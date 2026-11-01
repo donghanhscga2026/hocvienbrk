@@ -13,7 +13,7 @@ import { resolveBankBin } from "@/lib/bank-bin"
 import { resolveRefToUserId } from "@/lib/affiliate/resolve-ref-helper"
 import { toTitleCase } from "@/lib/utils/text-format"
 import { computeLessonDeadlineUTC, toVnMidnightUTC } from "@/lib/course/deadline"
-import { getCourseAuthContext, requireCourseAccessAction } from "@/lib/course/permissions"
+import { getCourseAuthContext, requireCourseAccessAction, requireAdminAction } from "@/lib/course/permissions"
 import { resolveCourseCategoryName } from "@/lib/course/category"
 import { canPinAnotherCourse, PIN_LIMIT_ERROR } from "@/lib/course/pin-limit"
 import { formatCourseSaveError } from "@/lib/course/errors"
@@ -1075,11 +1075,15 @@ export async function createCourseAction(formData: FormData) {
 }
 
 // ==========================================
-// DELETE COURSE - Xóa khóa học (Check quyền)
+// DELETE COURSE - Xóa khóa học (Chỉ ADMIN, chặn khi đã có học viên)
 // ==========================================
 export async function deleteCourseAction(courseId: number) {
     try {
-        // ✅ Check course tồn tại + quyền xóa
+        // 🔒 Chỉ ADMIN mới được xóa khóa học (giảng viên không được xóa, kể cả khóa của mình)
+        const { denied } = await requireAdminAction()
+        if (denied) return denied
+
+        // ✅ Check course tồn tại
         const course = await prisma.course.findUnique({
             where: { id: courseId },
             select: { teacherId: true, name_lop: true }
@@ -1087,10 +1091,15 @@ export async function deleteCourseAction(courseId: number) {
 
         if (!course) return { success: false, error: "Không tìm thấy khóa học" }
 
-        const { denied } = await requireCourseAccessAction(course.teacherId)
-        if (denied) return denied
+        // 🚫 Chặn xóa khi khóa đã có học viên ghi danh (đang chờ duyệt hoặc đang học)
+        const studentCount = await prisma.enrollment.count({
+            where: { courseId, status: { in: ['PENDING', 'ACTIVE'] } }
+        })
+        if (studentCount > 0) {
+            return { success: false, error: `Khóa học đã có ${studentCount} học viên ghi danh nên không thể xóa. Hãy dùng chức năng Ẩn khóa học thay thế.` }
+        }
 
-        // ✅ Xóa course (cascade xóa lessons, enrollments...)
+        // ✅ Xóa course (cascade xóa lessons...)
         await prisma.course.delete({ where: { id: courseId } })
 
         revalidatePath('/tools/courses')
