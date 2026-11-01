@@ -6,6 +6,7 @@ import prisma from '@/lib/prisma'
 import { requireCourseAccessAction } from '@/lib/course/permissions'
 import { queueCourseAnnouncementPush } from '@/lib/web-push-subscriptions'
 import { resolveRecipients, processCampaignBatch } from '@/lib/email-campaign-runner'
+import { getTeacherEmailStatus } from '@/lib/teacher-email'
 
 // Giới hạn chống spam: mỗi giảng viên gửi tối đa 5 thông báo / khóa / ngày.
 const DAILY_LIMIT_PER_COURSE = 5
@@ -37,7 +38,7 @@ export async function getCourseAnnouncementContextAction(courseId: number) {
         })
         if (!course) return { success: false as const, error: 'Không tìm thấy khóa học' }
 
-        const { denied } = await requireCourseAccessAction(course.teacherId)
+        const { denied, ctx } = await requireCourseAccessAction(course.teacherId)
         if (denied) return { success: false as const, error: denied.error }
 
         const [recipientCount, announcements] = await Promise.all([
@@ -50,10 +51,23 @@ export async function getCourseAnnouncementContextAction(courseId: number) {
             }),
         ])
 
+        // GĐ3: trạng thái hộp thư cá nhân (chỉ giảng viên mới cần)
+        let emailStatus: { senderEmail: string | null; dailyLimit: number; sentToday: number; remaining: number } | null = null
+        if (ctx?.isTeacher) {
+            const st = await getTeacherEmailStatus(ctx.userId)
+            emailStatus = {
+                senderEmail: st.sender?.email ?? null,
+                dailyLimit: st.dailyLimit,
+                sentToday: st.sentToday,
+                remaining: st.remaining,
+            }
+        }
+
         return {
             success: true as const,
             course: { id: course.id, name: course.name_lop, slug: course.id_khoa },
             recipientCount,
+            emailStatus,
             announcements: announcements.map(a => ({
                 id: a.id,
                 title: a.title,
@@ -146,6 +160,14 @@ export async function sendCourseAnnouncementAction(
         let emailNote: string | null = null
         if (sendEmail) {
             try {
+                // GĐ3: giảng viên phải có Gmail riêng và còn hạn mức email hôm nay
+                let kickBatchSize = 20
+                if (ctx.isTeacher) {
+                    const emailStatus = await getTeacherEmailStatus(ctx.userId)
+                    if (!emailStatus.sender) throw new Error('__NO_SENDER__')
+                    if (emailStatus.remaining <= 0) throw new Error('__QUOTA__')
+                    kickBatchSize = Math.min(20, emailStatus.remaining)
+                }
                 const campaign = await prisma.emailCampaign.create({
                     data: {
                         title: `[Thông báo khóa học] ${cleanTitle}`.slice(0, 190),
@@ -165,7 +187,7 @@ export async function sendCourseAnnouncementAction(
                     data: { totalRecipients: recipients.length },
                 })
                 if (recipients.length > 0) {
-                    const kick = await processCampaignBatch(campaign.id, 20)
+                    const kick = await processCampaignBatch(campaign.id, kickBatchSize)
                     emailNote = kick && (kick as any).success === false
                         ? 'Đã tạo chiến dịch email, hệ thống sẽ gửi qua Email MKT trong ít phút tới.'
                         : `Đã bắt đầu gửi email tới ${recipients.length} học viên (theo dõi tiến độ ở Email MKT).`
@@ -173,7 +195,13 @@ export async function sendCourseAnnouncementAction(
                     emailNote = 'Đã tạo chiến dịch email nhưng chưa có địa chỉ email hợp lệ nào để gửi.'
                 }
             } catch (emailError: any) {
-                emailNote = `Thông báo trong hệ thống đã gửi, nhưng phần email gặp lỗi: ${emailError.message || 'không rõ'}. Hãy tạo lại từ Email MKT.`
+                if (emailError.message === '__NO_SENDER__') {
+                    emailNote = 'Thông báo trong hệ thống đã gửi. Phần email chưa gửi: bạn chưa kết nối Gmail cá nhân — vào Email MKT → Hộp thư của tôi để kết nối Gmail rồi gửi lại.'
+                } else if (emailError.message === '__QUOTA__') {
+                    emailNote = 'Thông báo trong hệ thống đã gửi. Phần email chưa gửi: bạn đã đạt hạn mức email của hôm nay — hãy gửi tiếp vào ngày mai.'
+                } else {
+                    emailNote = `Thông báo trong hệ thống đã gửi, nhưng phần email gặp lỗi: ${emailError.message || 'không rõ'}. Hãy tạo lại từ Email MKT.`
+                }
             }
         }
 
