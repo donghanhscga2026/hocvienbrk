@@ -25,10 +25,19 @@ function bodyToHtml(body: string) {
     return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#222">${paragraphs}</div>`
 }
 
+type SendOptions = {
+    /** Gửi thông báo trong hệ thống (chuông + web push) */
+    notify: boolean
+    /** Gửi kèm qua email */
+    email: boolean
+    /** null = tất cả học viên đang học; mảng = chỉ những userId được chọn */
+    userIds: number[] | null
+}
+
 /**
- * Lấy bối cảnh cho trang gửi thông báo: thông tin khóa, số học viên đang học
- * (ACTIVE) và lịch sử thông báo đã gửi của khóa. Chỉ ADMIN hoặc giảng viên
- * sở hữu khóa mới xem được.
+ * Bối cảnh cho trang gửi thông báo: thông tin khóa, số học viên đang học,
+ * trạng thái hộp thư cá nhân của giảng viên (GĐ3) và LỊCH SỬ GỬI gộp
+ * (thông báo trong hệ thống + các chiến dịch email của khóa này) để giảng viên theo dõi.
  */
 export async function getCourseAnnouncementContextAction(courseId: number) {
     try {
@@ -41,19 +50,37 @@ export async function getCourseAnnouncementContextAction(courseId: number) {
         const { denied, ctx } = await requireCourseAccessAction(course.teacherId)
         if (denied) return { success: false as const, error: denied.error }
 
-        const [recipientCount, announcements] = await Promise.all([
+        const [recipientCount, announcements, campaigns] = await Promise.all([
             prisma.enrollment.count({ where: { courseId, status: 'ACTIVE' } }),
             prisma.courseAnnouncement.findMany({
                 where: { courseId },
                 orderBy: { createdAt: 'desc' },
                 take: 20,
-                select: { id: true, title: true, body: true, createdAt: true },
+                select: { id: true, title: true, body: true, createdAt: true, recipientUserIds: true },
+            }),
+            prisma.emailCampaign.findMany({
+                where: {
+                    createdBy: ctx?.userId ?? -1,
+                    recipientFilter: { path: ['courseId'], equals: courseId },
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 20,
+                select: {
+                    id: true,
+                    subject: true,
+                    status: true,
+                    totalRecipients: true,
+                    sentCount: true,
+                    failedCount: true,
+                    createdAt: true,
+                    recipientSource: true,
+                },
             }),
         ])
 
         // GĐ3: trạng thái hộp thư cá nhân (chỉ giảng viên mới cần)
         let emailStatus: { senderEmail: string | null; dailyLimit: number; sentToday: number; remaining: number } | null = null
-        if (ctx?.isTeacher) {
+        if (ctx && ctx.isTeacher) {
             const st = await getTeacherEmailStatus(ctx.userId)
             emailStatus = {
                 senderEmail: st.sender?.email ?? null,
@@ -63,11 +90,41 @@ export async function getCourseAnnouncementContextAction(courseId: number) {
             }
         }
 
+        const history = [
+            ...announcements.map(a => ({
+                kind: 'ANNOUNCEMENT' as const,
+                id: a.id,
+                title: a.title,
+                body: a.body,
+                createdAt: a.createdAt.toISOString(),
+                scope: Array.isArray(a.recipientUserIds)
+                    ? `Chọn lọc: ${(a.recipientUserIds as number[]).length} học viên`
+                    : 'Tất cả học viên đang học',
+                status: null as string | null,
+                sentCount: null as number | null,
+                totalRecipients: null as number | null,
+                failedCount: null as number | null,
+            })),
+            ...campaigns.map(c => ({
+                kind: 'EMAIL' as const,
+                id: c.id,
+                title: c.subject,
+                body: '',
+                createdAt: c.createdAt.toISOString(),
+                scope: c.recipientSource === 'SELECTED_LIST' ? 'Chọn lọc theo danh sách' : 'Tất cả học viên đang học',
+                status: c.status as string,
+                sentCount: c.sentCount,
+                totalRecipients: c.totalRecipients,
+                failedCount: c.failedCount,
+            })),
+        ].sort((x, y) => (x.createdAt < y.createdAt ? 1 : -1))
+
         return {
             success: true as const,
             course: { id: course.id, name: course.name_lop, slug: course.id_khoa },
             recipientCount,
             emailStatus,
+            history,
             announcements: announcements.map(a => ({
                 id: a.id,
                 title: a.title,
@@ -80,19 +137,57 @@ export async function getCourseAnnouncementContextAction(courseId: number) {
     }
 }
 
+/** Danh sách học viên của khóa (mọi trạng thái ghi danh) để giảng viên tick chọn người nhận. */
+export async function getCourseStudentsAction(courseId: number) {
+    try {
+        const course = await prisma.course.findUnique({
+            where: { id: courseId },
+            select: { id: true, teacherId: true },
+        })
+        if (!course) return { success: false as const, error: 'Không tìm thấy khóa học' }
+
+        const { denied } = await requireCourseAccessAction(course.teacherId)
+        if (denied) return { success: false as const, error: denied.error }
+
+        const enrollments = await prisma.enrollment.findMany({
+            where: { courseId },
+            orderBy: { createdAt: 'desc' },
+            take: 500,
+            select: {
+                userId: true,
+                status: true,
+                user: { select: { name: true, email: true } },
+            },
+        })
+
+        return {
+            success: true as const,
+            students: enrollments.map(e => ({
+                userId: e.userId,
+                name: e.user.name || '',
+                email: e.user.email || '',
+                status: e.status as string,
+            })),
+        }
+    } catch (error: any) {
+        return { success: false as const, error: error.message || 'Lỗi khi tải danh sách học viên' }
+    }
+}
+
 /**
- * Gửi thông báo của giảng viên tới toàn bộ học viên đang học (ACTIVE) của khóa:
- * - Tạo bản ghi CourseAnnouncement (nội dung đầy đủ để học viên xem lại).
- * - Tạo AppNotification cho từng học viên (kind COURSE_ANNOUNCEMENT) + xếp hàng web push.
- * - Nếu sendEmail = true: tạo thêm EmailCampaign nguồn DB_ACTIVE cho chính khóa này
- *   và kích hoạt gửi batch đầu (phần còn lại do cron process-email-campaigns chạy tiếp).
- * Quyền: ADMIN mọi khóa; TEACHER chỉ khóa của chính mình (requireCourseAccessAction).
+ * Gửi thông báo/email của giảng viên tới học viên của khóa:
+ * - options.notify: tạo CourseAnnouncement + AppNotification (kind COURSE_ANNOUNCEMENT) + web push.
+ * - options.email: tạo EmailCampaign (DB_ACTIVE khi gửi tất cả; SELECTED_LIST khi chọn lọc)
+ *   và kích hoạt gửi batch đầu; giảng viên chỉ gửi từ Gmail của chính mình (GĐ3) + hạn mức ngày.
+ * - options.userIds: null = mọi học viên ACTIVE; mảng = chỉ các học viên được chọn
+ *   (thông báo chỉ tới người ACTIVE trong nhóm chọn; email tới người có email hợp lệ).
+ * Quyền: ADMIN mọi khóa; TEACHER chỉ khóa của chính mình.
  */
 export async function sendCourseAnnouncementAction(
     courseId: number,
     title: string,
     body: string,
-    sendEmail: boolean
+    options: SendOptions
 ) {
     try {
         const cleanTitle = (title || '').trim()
@@ -101,6 +196,16 @@ export async function sendCourseAnnouncementAction(
         if (!cleanBody) return { success: false as const, error: 'Hãy nhập nội dung thông báo' }
         if (cleanTitle.length > TITLE_MAX) return { success: false as const, error: `Tiêu đề tối đa ${TITLE_MAX} ký tự` }
         if (cleanBody.length > BODY_MAX) return { success: false as const, error: `Nội dung tối đa ${BODY_MAX} ký tự` }
+        if (!options.notify && !options.email) {
+            return { success: false as const, error: 'Hãy chọn ít nhất một kênh gửi: Thông báo hoặc Email' }
+        }
+
+        const selectedIds = Array.isArray(options.userIds)
+            ? [...new Set(options.userIds.map(n => Number(n)).filter(n => Number.isFinite(n) && n > 0))]
+            : null
+        if (selectedIds && selectedIds.length === 0) {
+            return { success: false as const, error: 'Hãy chọn ít nhất một học viên để gửi' }
+        }
 
         const course = await prisma.course.findUnique({
             where: { id: courseId },
@@ -112,95 +217,133 @@ export async function sendCourseAnnouncementAction(
         if (denied) return { success: false as const, error: denied.error }
         if (!ctx) return { success: false as const, error: 'Unauthorized' }
 
-        // Chống spam: tối đa DAILY_LIMIT_PER_COURSE thông báo / khóa / ngày / người gửi
-        const startOfDay = new Date()
-        startOfDay.setHours(0, 0, 0, 0)
-        const sentToday = await prisma.courseAnnouncement.count({
-            where: { courseId, teacherId: ctx.userId, createdAt: { gte: startOfDay } },
-        })
-        if (sentToday >= DAILY_LIMIT_PER_COURSE) {
-            return {
-                success: false as const,
-                error: `Đã đạt giới hạn ${DAILY_LIMIT_PER_COURSE} thông báo cho khóa này trong hôm nay. Hãy gửi tiếp vào ngày mai.`,
+        // Chống spam: giới hạn số thông báo / khóa / ngày (chỉ tính kênh thông báo)
+        if (options.notify) {
+            const startOfDay = new Date()
+            startOfDay.setHours(0, 0, 0, 0)
+            const sentToday = await prisma.courseAnnouncement.count({
+                where: { courseId, teacherId: ctx.userId, createdAt: { gte: startOfDay } },
+            })
+            if (sentToday >= DAILY_LIMIT_PER_COURSE) {
+                return {
+                    success: false as const,
+                    error: `Đã đạt giới hạn ${DAILY_LIMIT_PER_COURSE} thông báo cho khóa này trong hôm nay. Hãy gửi tiếp vào ngày mai.`,
+                }
             }
         }
 
-        const enrollments = await prisma.enrollment.findMany({
-            where: { courseId, status: 'ACTIVE' },
-            select: { id: true, userId: true },
+        // Tập học viên đích: theo lựa chọn (mọi ACTIVE của khóa, hoặc nhóm được tick chọn)
+        const baseEnrollments = await prisma.enrollment.findMany({
+            where: selectedIds
+                ? { courseId, userId: { in: selectedIds } }
+                : { courseId, status: 'ACTIVE' },
+            select: { id: true, userId: true, status: true, user: { select: { email: true, name: true } } },
         })
-        if (enrollments.length === 0) {
-            return { success: false as const, error: 'Khóa học chưa có học viên đang học (ACTIVE) để gửi thông báo' }
+        const notifyTargets = baseEnrollments.filter(e => e.status === 'ACTIVE')
+        const emailTargets = baseEnrollments.filter(e => e.user?.email && e.user.email.includes('@'))
+
+        if (options.notify && notifyTargets.length === 0) {
+            return { success: false as const, error: 'Không có học viên đang học (ACTIVE) nào trong nhóm đã chọn để nhận thông báo' }
+        }
+        if (options.email && !options.notify && emailTargets.length === 0) {
+            return { success: false as const, error: 'Không có học viên nào trong nhóm đã chọn có email hợp lệ' }
         }
 
-        const origin = (await headers()).get('origin') || undefined
-        const notifTitle = `${course.name_lop} — ${cleanTitle}`.slice(0, 180)
-
-        const announcement = await prisma.$transaction(async tx => {
-            const created = await tx.courseAnnouncement.create({
-                data: { courseId, teacherId: ctx.userId, title: cleanTitle, body: cleanBody },
-            })
-            await tx.appNotification.createMany({
-                data: enrollments.map(e => ({
-                    eventKey: `course-announcement:${created.id}:${e.userId}`,
-                    recipientId: e.userId,
-                    kind: 'COURSE_ANNOUNCEMENT',
-                    title: notifTitle,
-                    courseId,
-                    enrollmentId: e.id,
-                })),
-                skipDuplicates: true,
-            })
-            await queueCourseAnnouncementPush(tx, created.id, origin)
-            return created
-        })
-
-        // Kênh email (tùy chọn): tạo chiến dịch DB_ACTIVE cho chính khóa này rồi kích hoạt gửi.
-        let emailCampaignId: number | null = null
-        let emailNote: string | null = null
-        if (sendEmail) {
-            try {
-                // GĐ3: giảng viên phải có Gmail riêng và còn hạn mức email hôm nay
-                let kickBatchSize = 20
-                if (ctx.isTeacher) {
-                    const emailStatus = await getTeacherEmailStatus(ctx.userId)
-                    if (!emailStatus.sender) throw new Error('__NO_SENDER__')
-                    if (emailStatus.remaining <= 0) throw new Error('__QUOTA__')
-                    kickBatchSize = Math.min(20, emailStatus.remaining)
-                }
-                const campaign = await prisma.emailCampaign.create({
+        // ── Kênh thông báo trong hệ thống ──────────────────────────────
+        let announcementId: number | null = null
+        if (options.notify) {
+            const origin = (await headers()).get('origin') || undefined
+            const notifTitle = `${course.name_lop} — ${cleanTitle}`.slice(0, 180)
+            const announcement = await prisma.$transaction(async tx => {
+                const created = await tx.courseAnnouncement.create({
                     data: {
-                        title: `[Thông báo khóa học] ${cleanTitle}`.slice(0, 190),
-                        notificationType: 'THONG_BAO',
-                        recipientSource: 'DB_ACTIVE',
-                        recipientFilter: { courseId },
-                        subject: cleanTitle,
-                        htmlContent: bodyToHtml(cleanBody),
-                        createdBy: ctx.userId,
-                        status: 'DRAFT',
+                        courseId,
+                        teacherId: ctx.userId,
+                        title: cleanTitle,
+                        body: cleanBody,
+                        recipientUserIds: selectedIds ?? undefined,
                     },
                 })
-                emailCampaignId = campaign.id
-                const recipients = await resolveRecipients(campaign.id)
-                await prisma.emailCampaign.update({
-                    where: { id: campaign.id },
-                    data: { totalRecipients: recipients.length },
+                await tx.appNotification.createMany({
+                    data: notifyTargets.map(e => ({
+                        eventKey: `course-announcement:${created.id}:${e.userId}`,
+                        recipientId: e.userId,
+                        kind: 'COURSE_ANNOUNCEMENT',
+                        title: notifTitle,
+                        courseId,
+                        enrollmentId: e.id,
+                    })),
+                    skipDuplicates: true,
                 })
-                if (recipients.length > 0) {
-                    const kick = await processCampaignBatch(campaign.id, kickBatchSize)
-                    emailNote = kick && (kick as any).success === false
-                        ? 'Đã tạo chiến dịch email, hệ thống sẽ gửi qua Email MKT trong ít phút tới.'
-                        : `Đã bắt đầu gửi email tới ${recipients.length} học viên (theo dõi tiến độ ở Email MKT).`
-                } else {
-                    emailNote = 'Đã tạo chiến dịch email nhưng chưa có địa chỉ email hợp lệ nào để gửi.'
-                }
-            } catch (emailError: any) {
-                if (emailError.message === '__NO_SENDER__') {
-                    emailNote = 'Thông báo trong hệ thống đã gửi. Phần email chưa gửi: bạn chưa kết nối Gmail cá nhân — vào Email MKT → Hộp thư của tôi để kết nối Gmail rồi gửi lại.'
-                } else if (emailError.message === '__QUOTA__') {
-                    emailNote = 'Thông báo trong hệ thống đã gửi. Phần email chưa gửi: bạn đã đạt hạn mức email của hôm nay — hãy gửi tiếp vào ngày mai.'
-                } else {
-                    emailNote = `Thông báo trong hệ thống đã gửi, nhưng phần email gặp lỗi: ${emailError.message || 'không rõ'}. Hãy tạo lại từ Email MKT.`
+                await queueCourseAnnouncementPush(tx, created.id, origin)
+                return created
+            })
+            announcementId = announcement.id
+        }
+
+        // ── Kênh email ──────────────────────────────────────────────────
+        let emailCampaignId: number | null = null
+        let emailNote: string | null = null
+        if (options.email) {
+            if (emailTargets.length === 0) {
+                emailNote = 'Phần email: không có học viên nào trong nhóm đã chọn có email hợp lệ.'
+            } else {
+                try {
+                    // GĐ3: giảng viên phải có Gmail riêng và còn hạn mức email hôm nay
+                    let kickBatchSize = 20
+                    if (ctx.isTeacher) {
+                        const emailStatus = await getTeacherEmailStatus(ctx.userId)
+                        if (!emailStatus.sender) throw new Error('__NO_SENDER__')
+                        if (emailStatus.remaining <= 0) throw new Error('__QUOTA__')
+                        kickBatchSize = Math.min(20, emailStatus.remaining)
+                    }
+                    const campaign = await prisma.emailCampaign.create({
+                        data: {
+                            title: `[Thông báo khóa học] ${cleanTitle}`.slice(0, 190),
+                            notificationType: 'THONG_BAO',
+                            recipientSource: selectedIds ? 'SELECTED_LIST' : 'DB_ACTIVE',
+                            recipientFilter: { courseId },
+                            recipientCsvData: selectedIds
+                                ? JSON.stringify(
+                                      emailTargets.map(e => ({
+                                          email: e.user!.email,
+                                          name: e.user?.name || '',
+                                          userId: e.userId,
+                                      }))
+                                  )
+                                : undefined,
+                            subject: cleanTitle,
+                            htmlContent: bodyToHtml(cleanBody),
+                            createdBy: ctx.userId,
+                            status: 'DRAFT',
+                        },
+                    })
+                    emailCampaignId = campaign.id
+                    const recipients = await resolveRecipients(campaign.id)
+                    await prisma.emailCampaign.update({
+                        where: { id: campaign.id },
+                        data: { totalRecipients: recipients.length },
+                    })
+                    if (recipients.length > 0) {
+                        const kick = await processCampaignBatch(campaign.id, kickBatchSize)
+                        emailNote = kick && (kick as any).success === false
+                            ? 'Đã tạo chiến dịch email, hệ thống sẽ gửi qua Email MKT trong ít phút tới.'
+                            : `Đã bắt đầu gửi email tới ${recipients.length} học viên (theo dõi tiến độ ở mục Lịch sử bên dưới hoặc Email MKT).`
+                    } else {
+                        emailNote = 'Đã tạo chiến dịch email nhưng chưa có địa chỉ email hợp lệ nào để gửi.'
+                    }
+                } catch (emailError: any) {
+                    if (emailError.message === '__NO_SENDER__') {
+                        emailNote = 'Phần email chưa gửi: bạn chưa kết nối Gmail cá nhân — vào Email MKT → Hộp thư của tôi để kết nối Gmail rồi gửi lại.'
+                    } else if (emailError.message === '__QUOTA__') {
+                        emailNote = 'Phần email chưa gửi: bạn đã đạt hạn mức email của hôm nay — hãy gửi tiếp vào ngày mai.'
+                    } else {
+                        emailNote = `Phần email gặp lỗi: ${emailError.message || 'không rõ'}. Hãy tạo lại từ Email MKT.`
+                    }
+                    // Nếu chỉ gửi email (không kèm thông báo) mà email lỗi thì báo thất bại hẳn
+                    if (!options.notify && (emailError.message === '__NO_SENDER__' || emailError.message === '__QUOTA__')) {
+                        return { success: false as const, error: emailNote }
+                    }
                 }
             }
         }
@@ -208,13 +351,19 @@ export async function sendCourseAnnouncementAction(
         revalidatePath('/tools/courses')
         revalidatePath(`/courses/${course.id_khoa}/announcements`)
 
+        const parts: string[] = []
+        if (options.notify) parts.push(`thông báo tới ${notifyTargets.length} học viên`)
+        if (options.email && emailCampaignId) parts.push(`email tới ${emailTargets.length} học viên`)
+
         return {
             success: true as const,
-            announcementId: announcement.id,
-            recipientCount: enrollments.length,
+            announcementId,
+            recipientCount: notifyTargets.length,
             emailCampaignId,
             emailNote,
-            message: `Đã gửi thông báo tới ${enrollments.length} học viên đang học của khóa "${course.name_lop}"`,
+            message:
+                `Đã gửi ${parts.join(' và ')} của khóa "${course.name_lop}".` +
+                (emailNote ? ` ${emailNote}` : ''),
         }
     } catch (error: any) {
         return { success: false as const, error: error.message || 'Lỗi khi gửi thông báo' }
