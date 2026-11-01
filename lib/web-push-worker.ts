@@ -7,7 +7,7 @@ import { pushConfig, safePushEndpoint } from './web-push-config'
 type Job = {
   id: string; notificationId: string; subscriptionId: string; subscriptionVersion: string; attempts: number;
   origin: string; endpoint: string; p256dh: string; auth: string; vapidPublicKey: string; version: string;
-  recipientId: number; title: string; slug: string; lessonId: string; eligible: boolean; fresh: boolean
+  recipientId: number; title: string; slug: string; lessonId: string; kind: string; eligible: boolean; fresh: boolean
 }
 // Mặc định chỉ xem số lượt đang chờ; execute=true mới gọi dịch vụ push.
 export async function processWebPush(options: { execute?: boolean; origin?: string; milliseconds?: number } = {}) {
@@ -34,10 +34,13 @@ export async function processWebPush(options: { execute?: boolean; origin?: stri
         WHERE d.id IN (SELECT id FROM candidates) RETURNING d.*
       )
       SELECT d.id,d."notificationId",d."subscriptionId",d."subscriptionVersion",d.attempts,
-        s.origin,s.endpoint,s.p256dh,s.auth,s."vapidPublicKey",s.version,n."recipientId",n.title,c.id_khoa AS slug,n."lessonId",
-        (n.kind='LESSON_ANNOUNCEMENT' AND n."notBefore"<=CURRENT_TIMESTAMP AND l.id IS NOT NULL AND EXISTS (
+        s.origin,s.endpoint,s.p256dh,s.auth,s."vapidPublicKey",s.version,n."recipientId",n.title,n.kind,c.id_khoa AS slug,n."lessonId",
+        ((n.kind='LESSON_ANNOUNCEMENT' AND n."notBefore"<=CURRENT_TIMESTAMP AND l.id IS NOT NULL AND EXISTS (
           SELECT 1 FROM public."Enrollment" e WHERE e."userId"=s."userId" AND e."courseId"=n."courseId" AND e.status='ACTIVE'
-        ) AND n."recipientId"=s."userId") AS eligible,
+        ) AND n."recipientId"=s."userId")
+        OR (n.kind='COURSE_ANNOUNCEMENT' AND n."notBefore"<=CURRENT_TIMESTAMP AND n."courseId" IS NOT NULL AND EXISTS (
+          SELECT 1 FROM public."Enrollment" e WHERE e."userId"=s."userId" AND e."courseId"=n."courseId" AND e.status='ACTIVE'
+        ) AND n."recipientId"=s."userId")) AS eligible,
         (d."createdAt">CURRENT_TIMESTAMP-interval '1 day') AS fresh
       FROM claimed d JOIN public."WebPushSubscription" s ON s.id=d."subscriptionId"
       JOIN public."AppNotification" n ON n.id=d."notificationId"
@@ -53,8 +56,8 @@ export async function processWebPush(options: { execute?: boolean; origin?: stri
         try {
           await webPush.sendNotification({ endpoint:job.endpoint,keys:{p256dh:job.p256dh,auth:job.auth} },
             JSON.stringify({ id:job.notificationId,userId:String(job.recipientId),
-              title:'Bài học mới',body:job.title.slice(0,180),
-              url:'/courses/' + encodeURIComponent(job.slug) + '/learn?lesson=' + encodeURIComponent(job.lessonId) }),
+              title: job.kind==='COURSE_ANNOUNCEMENT' ? 'Thông báo từ giảng viên' : 'Bài học mới', body:job.title.slice(0,180),
+              url: job.kind==='COURSE_ANNOUNCEMENT' ? '/courses/' + encodeURIComponent(job.slug) + '/announcements' : '/courses/' + encodeURIComponent(job.slug) + '/learn?lesson=' + encodeURIComponent(job.lessonId) }),
             { vapidDetails:{subject:config.subject,publicKey:config.publicKey,privateKey:config.privateKey},
               TTL:86400,timeout:5000,urgency:'normal',topic:createHash('sha256').update(job.notificationId).digest('base64url').slice(0,32) })
           state='SENT'; reason=null; summary.sent++
