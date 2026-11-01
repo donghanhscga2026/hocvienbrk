@@ -26,9 +26,24 @@ export async function POST(req: Request) {
       htmlContent 
     } = data;
 
-    // TEACHER không được dùng DB_ALL
-    if (role === "TEACHER" && recipientSource === "DB_ALL") {
+    // TEACHER không được dùng DB_ALL hoặc DB_ALL_INCLUDING_UNVERIFIED
+    if (role === "TEACHER" && (recipientSource === "DB_ALL" || recipientSource === "DB_ALL_INCLUDING_UNVERIFIED")) {
       return new NextResponse("Không có quyền gửi đến tất cả thành viên", { status: 403 });
+    }
+
+    // TEACHER dùng nguồn DB_ACTIVE phải chọn khóa học của chính mình
+    if (role === "TEACHER" && recipientSource === "DB_ACTIVE") {
+      const courseId = Number((recipientFilter as any)?.courseId);
+      if (!courseId) {
+        return new NextResponse("Hãy chọn khóa học để gửi email", { status: 400 });
+      }
+      const ownCourse = await prisma.course.findFirst({
+        where: { id: courseId, teacherId: userId },
+        select: { id: true },
+      });
+      if (!ownCourse) {
+        return new NextResponse("Bạn chỉ được gửi email cho học viên trong khóa học của mình", { status: 403 });
+      }
     }
 
     // Tạo chiến dịch DRAFT trước để lấy ID
