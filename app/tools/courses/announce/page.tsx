@@ -278,6 +278,9 @@ function AnnounceForm() {
                         >
                             {disconnecting ? 'Đang ngắt…' : 'Ngắt kết nối'}
                         </button>
+                        <Link href="/tools/email-mkt/mailbox" className="mt-1 block text-xs font-semibold text-brk-primary">
+                            Hộp thư của tôi →
+                        </Link>
                     </div>
                 </div>
             )}
@@ -308,12 +311,12 @@ function AnnounceForm() {
                     <p className="min-w-0 flex-1 text-sm text-gray-600">
                         Hộp thư hệ thống — email được gửi từ hộp thư hệ thống của học viện.
                     </p>
-                    <a
-                        href="/api/admin/auth/google?own=1"
+                    <Link
+                        href="/tools/email-mkt/mailbox"
                         className="flex min-h-9 items-center rounded-lg border border-brk-outline bg-white px-3 text-xs font-semibold text-brk-primary"
                     >
-                        Kết nối Gmail riêng của tôi
-                    </a>
+                        Hộp thư của tôi →
+                    </Link>
                 </div>
             )}
 
