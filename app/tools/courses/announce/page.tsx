@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -34,6 +34,18 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
 }
 const STATUS_ORDER = ['ACTIVE', 'PENDING', 'REJECTED', 'CANCELLED']
 
+const RICH_HTML_RE = /<(p|br|div|strong|b|em|i|u|ul|ol|li|a|span)[\s>]/i
+function isRichHtml(text: string) {
+    return RICH_HTML_RE.test(text)
+}
+function stripHtmlText(html: string) {
+    return html
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
 function AnnounceForm() {
     const params = useSearchParams()
     const courseId = Number(params.get('courseId') || 0)
@@ -49,6 +61,8 @@ function AnnounceForm() {
 
     const [title, setTitle] = useState('')
     const [body, setBody] = useState('')
+    const [bodyText, setBodyText] = useState('')
+    const editorRef = useRef<HTMLDivElement>(null)
     const [notifyChannel, setNotifyChannel] = useState(true)
     const [emailChannel, setEmailChannel] = useState(false)
     const [mode, setMode] = useState<'ALL' | 'SELECTED'>('ALL')
@@ -144,13 +158,42 @@ function AnnounceForm() {
 
     const targetCount = mode === 'ALL' ? recipientCount : selected.size
 
+    const syncEditor = () => {
+        const html = editorRef.current?.innerHTML ?? ''
+        setBody(html)
+        setBodyText(stripHtmlText(html))
+    }
+
+    const runFormat = (command: string, value?: string) => {
+        document.execCommand(command, false, value)
+        syncEditor()
+    }
+
+    const insertLink = () => {
+        const raw = window.prompt('Dán địa chỉ link (ví dụ https://…):')
+        if (!raw || !raw.trim()) return
+        const trimmed = raw.trim()
+        const url = /^(https?:\/\/|mailto:)/i.test(trimmed) ? trimmed : `https://${trimmed}`
+        runFormat('createLink', url)
+    }
+
+    const handleEditorPaste = (e: React.ClipboardEvent) => {
+        e.preventDefault()
+        const text = e.clipboardData.getData('text/plain')
+        document.execCommand('insertText', false, text)
+    }
+
     const handleSend = async () => {
         if (!title.trim()) {
             alert('Hãy nhập tiêu đề')
             return
         }
-        if (!body.trim()) {
+        if (!bodyText) {
             alert('Hãy nhập nội dung')
+            return
+        }
+        if (bodyText.length > 5000) {
+            alert('Nội dung tối đa 5000 ký tự')
             return
         }
         if (!notifyChannel && !emailChannel) {
@@ -181,6 +224,8 @@ function AnnounceForm() {
             setResult(res.message)
             setTitle('')
             setBody('')
+            setBodyText('')
+            if (editorRef.current) editorRef.current.innerHTML = ''
             await loadContext()
         } else {
             alert(res.error || 'Có lỗi xảy ra khi gửi')
@@ -276,17 +321,68 @@ function AnnounceForm() {
                             className="block min-h-11 w-full rounded-xl border border-brk-outline px-3 text-sm"
                         />
                     </label>
-                    <label className="block space-y-1 text-sm">
+                    <div className="space-y-1 text-sm">
                         <span className="font-medium">Nội dung</span>
-                        <textarea
-                            value={body}
-                            onChange={e => setBody(e.target.value)}
-                            maxLength={5000}
-                            rows={7}
-                            placeholder="Nhập nội dung gửi tới học viên…"
-                            className="block w-full rounded-xl border border-brk-outline px-3 py-2 text-sm"
-                        />
-                    </label>
+                        <div className="overflow-hidden rounded-xl border border-brk-outline">
+                            <div className="flex flex-wrap items-center gap-1 border-b border-brk-outline bg-brk-background px-2 py-1.5">
+                                <button
+                                    type="button"
+                                    title="Chữ đậm"
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={() => runFormat('bold')}
+                                    className="min-h-9 min-w-9 rounded-lg px-2 font-bold hover:bg-white"
+                                >
+                                    B
+                                </button>
+                                <button
+                                    type="button"
+                                    title="Chữ nghiêng"
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={() => runFormat('italic')}
+                                    className="min-h-9 min-w-9 rounded-lg px-2 italic hover:bg-white"
+                                >
+                                    I
+                                </button>
+                                <button
+                                    type="button"
+                                    title="Chèn link vào chữ đã bôi đen"
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={insertLink}
+                                    className="min-h-9 rounded-lg px-2 text-brk-primary underline hover:bg-white"
+                                >
+                                    Chèn link
+                                </button>
+                                <button
+                                    type="button"
+                                    title="Danh sách gạch đầu dòng"
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={() => runFormat('insertUnorderedList')}
+                                    className="min-h-9 rounded-lg px-2 hover:bg-white"
+                                >
+                                    • Danh sách
+                                </button>
+                                <span className="ml-1 hidden text-xs text-gray-400 md:inline">
+                                    Bôi đen chữ rồi bấm nút để định dạng
+                                </span>
+                            </div>
+                            <div
+                                ref={editorRef}
+                                contentEditable
+                                suppressContentEditableWarning
+                                role="textbox"
+                                aria-label="Nội dung thông báo"
+                                onInput={syncEditor}
+                                onPaste={handleEditorPaste}
+                                className="min-h-36 px-3 py-2 text-sm outline-none [&_a]:text-brk-primary [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5"
+                            />
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs text-gray-400">
+                                Định dạng giữ nguyên khi tới email và trang thông báo của học viên.
+                            </p>
+                            <p className="shrink-0 text-xs text-gray-400">{bodyText.length}/5000</p>
+                        </div>
+                    </div>
 
                     <fieldset className="text-sm">
                         <legend className="font-medium">Kênh gửi</legend>
@@ -496,9 +592,15 @@ function AnnounceForm() {
                                         ` · Trạng thái: ${item.status} · Đã gửi ${item.sentCount ?? 0}/${item.totalRecipients ?? 0}` +
                                             ((item.failedCount ?? 0) > 0 ? ` · Lỗi ${item.failedCount}` : '')}
                                 </p>
-                                {item.body && (
-                                    <p className="mt-2 whitespace-pre-line text-sm text-gray-700">{item.body}</p>
-                                )}
+                                {item.body &&
+                                    (isRichHtml(item.body) ? (
+                                        <div
+                                            className="mt-2 text-sm text-gray-700 [&_a]:text-brk-primary [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5"
+                                            dangerouslySetInnerHTML={{ __html: item.body }}
+                                        />
+                                    ) : (
+                                        <p className="mt-2 whitespace-pre-line text-sm text-gray-700">{item.body}</p>
+                                    ))}
                             </article>
                         ))}
                     </div>

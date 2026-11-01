@@ -3,6 +3,8 @@ import prisma from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 
+const RICH_HTML_RE = /<(p|br|div|strong|b|em|i|u|ul|ol|li|a|span)[\s>]/i
+
 export default async function CourseAnnouncementsPage({
     params,
 }: {
@@ -65,7 +67,14 @@ export default async function CourseAnnouncementsPage({
                                 <p className="mt-0.5 text-xs text-gray-500">
                                     {new Date(item.createdAt).toLocaleString('vi-VN')}
                                 </p>
-                                <p className="mt-2 whitespace-pre-line text-sm text-gray-700">{item.body}</p>
+                                {RICH_HTML_RE.test(item.body) ? (
+                                    <div
+                                        className="mt-2 text-sm leading-relaxed text-gray-700 [&_a]:text-brk-primary [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5"
+                                        dangerouslySetInnerHTML={{ __html: item.body }}
+                                    />
+                                ) : (
+                                    <p className="mt-2 whitespace-pre-line text-sm text-gray-700">{item.body}</p>
+                                )}
                             </article>
                         ))}
                     </div>
