@@ -180,15 +180,18 @@ export async function getCourseAnnouncementContextAction(courseId: number) {
             }),
         ])
 
-        // GĐ3: trạng thái hộp thư cá nhân (chỉ giảng viên mới cần)
+        // GĐ3: trạng thái hộp thư cá nhân. Giảng viên: luôn có (để hiện thẻ kết nối).
+        // Admin: chỉ khi đã nối hộp thư riêng — chưa nối thì trang giữ thẻ hệ thống.
         let emailStatus: { senderEmail: string | null; dailyLimit: number; sentToday: number; remaining: number } | null = null
-        if (ctx && ctx.isTeacher) {
+        if (ctx && (ctx.isTeacher || ctx.isAdmin)) {
             const st = await getTeacherEmailStatus(ctx.userId)
-            emailStatus = {
-                senderEmail: st.sender?.email ?? null,
-                dailyLimit: st.dailyLimit,
-                sentToday: st.sentToday,
-                remaining: st.remaining,
+            if (ctx.isTeacher || st.sender) {
+                emailStatus = {
+                    senderEmail: st.sender?.email ?? null,
+                    dailyLimit: st.dailyLimit,
+                    sentToday: st.sentToday,
+                    remaining: st.remaining,
+                }
             }
         }
 
@@ -397,20 +400,25 @@ export async function sendCourseAnnouncementAction(
                 emailNote = 'Phần email: không có học viên nào trong nhóm đã chọn có email hợp lệ.'
             } else {
                 try {
-                    // GĐ3: giảng viên phải có Gmail riêng và còn hạn mức email hôm nay
+                    // GĐ3: giảng viên phải có Gmail riêng và còn hạn mức email hôm nay.
+                    // Admin có hộp thư riêng thì cũng gửi từ hộp thư riêng (kèm hạn mức);
+                    // admin chưa nối riêng thì gửi qua hộp thư hệ thống như cũ.
                     let kickBatchSize = 20
+                    const ownEmailStatus = await getTeacherEmailStatus(ctx.userId)
                     if (ctx.isTeacher) {
-                        const emailStatus = await getTeacherEmailStatus(ctx.userId)
-                        if (!emailStatus.sender) throw new Error('__NO_SENDER__')
-                        if (emailStatus.remaining <= 0) throw new Error('__QUOTA__')
-                        kickBatchSize = Math.min(20, emailStatus.remaining)
+                        if (!ownEmailStatus.sender) throw new Error('__NO_SENDER__')
+                        if (ownEmailStatus.remaining <= 0) throw new Error('__QUOTA__')
+                        kickBatchSize = Math.min(20, ownEmailStatus.remaining)
+                    } else if (ownEmailStatus.sender) {
+                        if (ownEmailStatus.remaining <= 0) throw new Error('__QUOTA__')
+                        kickBatchSize = Math.min(20, ownEmailStatus.remaining)
                     }
                     const campaign = await prisma.emailCampaign.create({
                         data: {
                             title: `[Thông báo khóa học] ${cleanTitle}`.slice(0, 190),
                             notificationType: 'THONG_BAO',
                             recipientSource: selectedIds ? 'SELECTED_LIST' : 'DB_ACTIVE',
-                            recipientFilter: { courseId },
+                            recipientFilter: { courseId, viaAnnouncement: true },
                             recipientCsvData: selectedIds
                                 ? JSON.stringify(
                                       emailTargets.map(e => ({
