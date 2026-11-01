@@ -50,7 +50,9 @@ export async function getCourseAnnouncementContextAction(courseId: number) {
         const { denied, ctx } = await requireCourseAccessAction(course.teacherId)
         if (denied) return { success: false as const, error: denied.error }
 
-        const [recipientCount, announcements, campaigns] = await Promise.all([
+        const startOfDay = new Date()
+        startOfDay.setHours(0, 0, 0, 0)
+        const [recipientCount, announcements, campaigns, notifySentToday] = await Promise.all([
             prisma.enrollment.count({ where: { courseId, status: 'ACTIVE' } }),
             prisma.courseAnnouncement.findMany({
                 where: { courseId },
@@ -75,6 +77,9 @@ export async function getCourseAnnouncementContextAction(courseId: number) {
                     createdAt: true,
                     recipientSource: true,
                 },
+            }),
+            prisma.courseAnnouncement.count({
+                where: { courseId, teacherId: ctx?.userId ?? -1, createdAt: { gte: startOfDay } },
             }),
         ])
 
@@ -123,6 +128,11 @@ export async function getCourseAnnouncementContextAction(courseId: number) {
             success: true as const,
             course: { id: course.id, name: course.name_lop, slug: course.id_khoa },
             recipientCount,
+            notifyStatus: {
+                sentToday: notifySentToday,
+                limit: DAILY_LIMIT_PER_COURSE,
+                remaining: Math.max(0, DAILY_LIMIT_PER_COURSE - notifySentToday),
+            },
             emailStatus,
             history,
             announcements: announcements.map(a => ({

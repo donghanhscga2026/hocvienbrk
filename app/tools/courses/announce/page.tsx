@@ -8,6 +8,7 @@ import {
     getCourseStudentsAction,
     sendCourseAnnouncementAction,
 } from '@/app/actions/course-announcement-actions'
+import { disconnectMyEmailSenderAction } from '@/app/actions/teacher-email-actions'
 
 type StudentItem = { userId: number; name: string; email: string; status: string }
 type HistoryItem = {
@@ -23,6 +24,15 @@ type HistoryItem = {
     failedCount: number | null
 }
 type EmailStatus = { senderEmail: string | null; dailyLimit: number; sentToday: number; remaining: number }
+type NotifyStatus = { sentToday: number; limit: number; remaining: number }
+
+const STATUS_LABELS: Record<string, { label: string; className: string }> = {
+    ACTIVE: { label: 'Đã kích hoạt', className: 'text-green-600' },
+    PENDING: { label: 'Chờ kích hoạt', className: 'text-amber-600' },
+    REJECTED: { label: 'Chưa được duyệt', className: 'text-red-500' },
+    CANCELLED: { label: 'Đã hủy', className: 'text-gray-400' },
+}
+const STATUS_ORDER = ['ACTIVE', 'PENDING', 'REJECTED', 'CANCELLED']
 
 function AnnounceForm() {
     const params = useSearchParams()
@@ -33,7 +43,9 @@ function AnnounceForm() {
     const [courseName, setCourseName] = useState('')
     const [recipientCount, setRecipientCount] = useState(0)
     const [emailStatus, setEmailStatus] = useState<EmailStatus | null>(null)
+    const [notifyStatus, setNotifyStatus] = useState<NotifyStatus | null>(null)
     const [history, setHistory] = useState<HistoryItem[]>([])
+    const [disconnecting, setDisconnecting] = useState(false)
 
     const [title, setTitle] = useState('')
     const [body, setBody] = useState('')
@@ -44,6 +56,7 @@ function AnnounceForm() {
     const [students, setStudents] = useState<StudentItem[] | null>(null)
     const [studentsLoading, setStudentsLoading] = useState(false)
     const [search, setSearch] = useState('')
+    const [statusFilter, setStatusFilter] = useState<string>('ALL')
     const [selected, setSelected] = useState<Set<number>>(new Set())
 
     const [sending, setSending] = useState(false)
@@ -60,6 +73,7 @@ function AnnounceForm() {
             setCourseName(res.course.name)
             setRecipientCount(res.recipientCount)
             setEmailStatus(res.emailStatus ?? null)
+            setNotifyStatus(res.notifyStatus ?? null)
             setHistory(res.history as HistoryItem[])
             setError('')
         } else {
@@ -73,6 +87,19 @@ function AnnounceForm() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [courseId])
 
+    const handleDisconnect = async () => {
+        if (!confirm('Ngắt kết nối Gmail này? Sau khi ngắt, bạn sẽ không gửi email cho học viên được cho tới khi kết nối lại.'))
+            return
+        setDisconnecting(true)
+        const res = await disconnectMyEmailSenderAction()
+        if (res.success) {
+            await loadContext()
+        } else {
+            alert(res.error || 'Không ngắt kết nối được, hãy thử lại')
+        }
+        setDisconnecting(false)
+    }
+
     const loadStudents = async () => {
         if (students !== null || studentsLoading) return
         setStudentsLoading(true)
@@ -82,14 +109,21 @@ function AnnounceForm() {
         setStudentsLoading(false)
     }
 
+    const statusCounts = useMemo(() => {
+        const counts: Record<string, number> = {}
+        for (const st of students ?? []) counts[st.status] = (counts[st.status] ?? 0) + 1
+        return counts
+    }, [students])
+
     const visibleStudents = useMemo(() => {
         if (!students) return []
+        const byStatus = statusFilter === 'ALL' ? students : students.filter(st => st.status === statusFilter)
         const q = search.trim().toLowerCase()
-        if (!q) return students
-        return students.filter(
+        if (!q) return byStatus
+        return byStatus.filter(
             st => st.name.toLowerCase().includes(q) || st.email.toLowerCase().includes(q)
         )
-    }, [students, search])
+    }, [students, search, statusFilter])
 
     const toggleStudent = (userId: number) => {
         setSelected(prev => {
@@ -154,6 +188,12 @@ function AnnounceForm() {
         setSending(false)
     }
 
+    const emailFootnote = !emailStatus
+        ? 'Gửi từ hộp thư hệ thống'
+        : emailStatus.senderEmail
+          ? `Còn ${emailStatus.remaining} email hôm nay`
+          : 'Chưa kết nối Gmail — hãy kết nối ở thẻ phía trên'
+
     if (loading) return <p className="py-12 text-center text-sm text-gray-500">Đang tải…</p>
 
     return (
@@ -174,8 +214,130 @@ function AnnounceForm() {
                 </div>
             )}
 
+            {!error && emailStatus && emailStatus.senderEmail && (
+                <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-green-300 bg-green-50 p-4">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-green-600" aria-hidden="true" />
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold">Hộp thư gửi của bạn</p>
+                        <p className="truncate text-xs text-gray-600">Đang kết nối: {emailStatus.senderEmail}</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-xs text-gray-500">
+                            Hôm nay đã gửi {emailStatus.sentToday} / {emailStatus.dailyLimit}
+                        </p>
+                        <button
+                            type="button"
+                            disabled={disconnecting}
+                            onClick={() => void handleDisconnect()}
+                            className="mt-1 min-h-9 rounded-lg border border-red-200 bg-white px-3 text-xs font-semibold text-red-600 disabled:opacity-50"
+                        >
+                            {disconnecting ? 'Đang ngắt…' : 'Ngắt kết nối'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {!error && emailStatus && !emailStatus.senderEmail && (
+                <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4">
+                    <span
+                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white"
+                        aria-hidden="true"
+                    >
+                        !
+                    </span>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-amber-900">Chưa kết nối Gmail</p>
+                        <p className="text-xs text-amber-800">Kết nối để gửi email cho học viên từ hộp thư của bạn</p>
+                    </div>
+                    <a
+                        href="/api/admin/auth/google"
+                        className="flex min-h-11 items-center rounded-xl bg-brk-primary px-4 text-sm font-semibold text-white"
+                    >
+                        Kết nối Gmail của tôi
+                    </a>
+                </div>
+            )}
+
+            {!error && !emailStatus && (
+                <div className="mt-4 rounded-2xl border border-brk-outline bg-white px-4 py-3 text-sm text-gray-600">
+                    Hộp thư hệ thống — email được gửi từ hộp thư hệ thống của học viện.
+                </div>
+            )}
+
             {!error && (
-                <div className="mt-5 space-y-4 rounded-2xl border border-brk-outline bg-white p-4">
+                <div className="mt-4 space-y-4 rounded-2xl border border-brk-outline bg-white p-4">
+                    <label className="block space-y-1 text-sm">
+                        <span className="font-medium">Tiêu đề</span>
+                        <input
+                            value={title}
+                            onChange={e => setTitle(e.target.value)}
+                            maxLength={150}
+                            placeholder="Ví dụ: Lịch học tuần này thay đổi"
+                            className="block min-h-11 w-full rounded-xl border border-brk-outline px-3 text-sm"
+                        />
+                    </label>
+                    <label className="block space-y-1 text-sm">
+                        <span className="font-medium">Nội dung</span>
+                        <textarea
+                            value={body}
+                            onChange={e => setBody(e.target.value)}
+                            maxLength={5000}
+                            rows={7}
+                            placeholder="Nhập nội dung gửi tới học viên…"
+                            className="block w-full rounded-xl border border-brk-outline px-3 py-2 text-sm"
+                        />
+                    </label>
+
+                    <fieldset className="text-sm">
+                        <legend className="font-medium">Kênh gửi</legend>
+                        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                            <label
+                                className={`block cursor-pointer rounded-xl border p-3 ${
+                                    notifyChannel ? 'border-green-400 bg-green-50' : 'border-brk-outline bg-white'
+                                }`}
+                            >
+                                <span className="flex min-h-6 items-center gap-2 font-medium">
+                                    <input
+                                        type="checkbox"
+                                        checked={notifyChannel}
+                                        onChange={e => setNotifyChannel(e.target.checked)}
+                                        className="h-4 w-4"
+                                    />
+                                    Thông báo trong hệ thống
+                                </span>
+                                <span className="mt-1 block text-xs text-gray-500">
+                                    Học viên nhận chuông + thông báo đẩy
+                                </span>
+                                <span className="mt-2 block text-xs font-semibold text-green-700">
+                                    {notifyStatus
+                                        ? `Hôm nay còn ${notifyStatus.remaining}/${notifyStatus.limit} lượt`
+                                        : ' '}
+                                </span>
+                            </label>
+                            <label
+                                className={`block cursor-pointer rounded-xl border p-3 ${
+                                    emailChannel ? 'border-green-400 bg-green-50' : 'border-brk-outline bg-white'
+                                }`}
+                            >
+                                <span className="flex min-h-6 items-center gap-2 font-medium">
+                                    <input
+                                        type="checkbox"
+                                        checked={emailChannel}
+                                        onChange={e => setEmailChannel(e.target.checked)}
+                                        className="h-4 w-4"
+                                    />
+                                    Email cho học viên
+                                </span>
+                                <span className="mt-1 block text-xs text-gray-500">
+                                    {emailStatus?.senderEmail
+                                        ? `Gửi từ Gmail của bạn: ${emailStatus.senderEmail}`
+                                        : 'Email gửi tới địa chỉ của học viên'}
+                                </span>
+                                <span className="mt-2 block text-xs font-semibold text-green-700">{emailFootnote}</span>
+                            </label>
+                        </div>
+                    </fieldset>
+
                     <fieldset className="space-y-2 text-sm">
                         <legend className="font-medium">Người nhận</legend>
                         <label className="flex min-h-11 items-center gap-2">
@@ -203,6 +365,33 @@ function AnnounceForm() {
                         </label>
                         {mode === 'SELECTED' && (
                             <div className="space-y-2 rounded-xl border border-brk-outline p-3">
+                                <div className="flex flex-wrap gap-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => setStatusFilter('ALL')}
+                                        className={
+                                            statusFilter === 'ALL'
+                                                ? 'min-h-9 rounded-full bg-brk-primary px-3 text-xs font-semibold text-white'
+                                                : 'min-h-9 rounded-full border border-brk-outline bg-white px-3 text-xs'
+                                        }
+                                    >
+                                        Tất cả ({students?.length ?? 0})
+                                    </button>
+                                    {STATUS_ORDER.filter(st => (statusCounts[st] ?? 0) > 0).map(st => (
+                                        <button
+                                            key={st}
+                                            type="button"
+                                            onClick={() => setStatusFilter(st)}
+                                            className={
+                                                statusFilter === st
+                                                    ? 'min-h-9 rounded-full bg-brk-primary px-3 text-xs font-semibold text-white'
+                                                    : 'min-h-9 rounded-full border border-brk-outline bg-white px-3 text-xs'
+                                            }
+                                        >
+                                            {STATUS_LABELS[st]?.label ?? st} ({statusCounts[st]})
+                                        </button>
+                                    ))}
+                                </div>
                                 <input
                                     value={search}
                                     onChange={e => setSearch(e.target.value)}
@@ -240,13 +429,9 @@ function AnnounceForm() {
                                                     <span className="font-medium">{st.name || '(chưa có tên)'}</span>
                                                     <span className="text-gray-500">{st.email}</span>
                                                     <span
-                                                        className={
-                                                            st.status === 'ACTIVE'
-                                                                ? 'ml-auto text-xs text-green-600'
-                                                                : 'ml-auto text-xs text-gray-400'
-                                                        }
+                                                        className={`ml-auto text-xs font-medium ${STATUS_LABELS[st.status]?.className ?? 'text-gray-400'}`}
                                                     >
-                                                        {st.status}
+                                                        {STATUS_LABELS[st.status]?.label ?? st.status}
                                                     </span>
                                                 </label>
                                             </li>
@@ -261,66 +446,6 @@ function AnnounceForm() {
                                     email gửi tới học viên có email hợp lệ.
                                 </p>
                             </div>
-                        )}
-                    </fieldset>
-
-                    <label className="block space-y-1 text-sm">
-                        <span className="font-medium">Tiêu đề</span>
-                        <input
-                            value={title}
-                            onChange={e => setTitle(e.target.value)}
-                            maxLength={150}
-                            placeholder="Ví dụ: Lịch học tuần này thay đổi"
-                            className="block min-h-11 w-full rounded-xl border border-brk-outline px-3 text-sm"
-                        />
-                    </label>
-                    <label className="block space-y-1 text-sm">
-                        <span className="font-medium">Nội dung</span>
-                        <textarea
-                            value={body}
-                            onChange={e => setBody(e.target.value)}
-                            maxLength={5000}
-                            rows={7}
-                            placeholder="Nhập nội dung gửi tới học viên…"
-                            className="block w-full rounded-xl border border-brk-outline px-3 py-2 text-sm"
-                        />
-                    </label>
-
-                    <fieldset className="space-y-1 text-sm">
-                        <legend className="font-medium">Kênh gửi</legend>
-                        <label className="flex min-h-11 items-center gap-2">
-                            <input
-                                type="checkbox"
-                                checked={notifyChannel}
-                                onChange={e => setNotifyChannel(e.target.checked)}
-                                className="h-4 w-4"
-                            />
-                            Thông báo trong hệ thống (chuông + thông báo đẩy)
-                        </label>
-                        <label className="flex min-h-11 items-center gap-2">
-                            <input
-                                type="checkbox"
-                                checked={emailChannel}
-                                onChange={e => setEmailChannel(e.target.checked)}
-                                className="h-4 w-4"
-                            />
-                            Email
-                        </label>
-                        {emailStatus && (
-                            emailStatus.senderEmail ? (
-                                <p className="text-xs text-gray-500">
-                                    Email sẽ gửi từ Gmail của bạn: <strong>{emailStatus.senderEmail}</strong> — hôm nay đã gửi{' '}
-                                    {emailStatus.sentToday}/{emailStatus.dailyLimit} email (còn {emailStatus.remaining}).
-                                </p>
-                            ) : (
-                                <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                                    Bạn chưa kết nối Gmail cá nhân nên chưa gửi email được.{' '}
-                                    <Link href="/tools/email-mkt/mailbox" className="font-semibold underline">
-                                        Kết nối Gmail của bạn
-                                    </Link>{' '}
-                                    để gửi email từ hộp thư của chính mình.
-                                </p>
-                            )
                         )}
                     </fieldset>
 
@@ -344,11 +469,15 @@ function AnnounceForm() {
             )}
 
             {history.length > 0 && (
-                <div className="mt-8">
-                    <h2 className="text-base font-semibold">Lịch sử đã gửi</h2>
-                    <div className="mt-3 space-y-3">
+                <details className="mt-6 rounded-2xl border border-brk-outline bg-white">
+                    <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 py-3 [&::-webkit-details-marker]:hidden">
+                        <span className="text-base font-semibold">Lịch sử đã gửi</span>
+                        <span className="text-xs text-gray-500">· {history.length} mục gần nhất</span>
+                        <span className="ml-auto text-xs text-gray-400">Bấm để xem ▾</span>
+                    </summary>
+                    <div className="space-y-3 border-t border-brk-outline p-4">
                         {history.map(item => (
-                            <article key={`${item.kind}-${item.id}`} className="rounded-2xl border border-brk-outline bg-white p-4">
+                            <article key={`${item.kind}-${item.id}`} className="rounded-2xl border border-brk-outline bg-brk-background p-4">
                                 <div className="flex items-center gap-2">
                                     <span
                                         className={
@@ -373,7 +502,7 @@ function AnnounceForm() {
                             </article>
                         ))}
                     </div>
-                </div>
+                </details>
             )}
         </div>
     )
