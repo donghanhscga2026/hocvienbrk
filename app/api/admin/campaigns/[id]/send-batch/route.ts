@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { processCampaignBatch } from "@/lib/email-campaign-runner";
+import { getTeacherEmailStatus } from "@/lib/teacher-email";
 import { NextResponse } from "next/server";
 
 // [OPTIMIZE] Gửi 1 batch email lặp tuần tự qua nhiều người nhận + nhiều nhà
@@ -46,7 +47,20 @@ export async function POST(
       }
     }
 
-    const result = await processCampaignBatch(campaignId, batchSize);
+    // GĐ3: giảng viên chỉ gửi từ Gmail của chính mình + hạn mức email/ngày
+    let effectiveBatchSize = batchSize;
+    if (role === "TEACHER") {
+      const emailStatus = await getTeacherEmailStatus(userId);
+      if (!emailStatus.sender) {
+        return new NextResponse("Bạn chưa kết nối Gmail cá nhân nên chưa gửi được email. Hãy vào Email MKT → Hộp thư của tôi để kết nối Gmail của bạn.", { status: 400 });
+      }
+      if (emailStatus.remaining <= 0) {
+        return new NextResponse(`Bạn đã đạt hạn mức ${emailStatus.dailyLimit} email trong hôm nay. Hãy gửi tiếp vào ngày mai.`, { status: 429 });
+      }
+      effectiveBatchSize = Math.min(batchSize, emailStatus.remaining);
+    }
+
+    const result = await processCampaignBatch(campaignId, effectiveBatchSize);
 
     if (result.notFound) {
       return new NextResponse("Campaign not found", { status: 404 });
