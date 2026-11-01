@@ -2913,6 +2913,7 @@ model CourseAnnouncement {
   teacher   User     @relation("CourseAnnouncementTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
   title     String
   body      String
+  recipientUserIds Json?
   createdAt DateTime @default(now())
 
   @@index([courseId, createdAt])
