@@ -354,7 +354,7 @@ export default function TCASyncAdminPage() {
             <div className="p-4 border-b">
               <h2 className="text-xl font-bold text-gray-900">Lịch sử Sync</h2>
             </div>
-            <div className="p-4 max-h-96 overflow-y-auto">
+            <div className="p-4 max-h-96 overflow-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>

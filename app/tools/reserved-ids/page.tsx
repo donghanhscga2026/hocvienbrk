@@ -20,7 +20,7 @@ export default async function ReservedIdsPage() {
 
                 <div>
                     <h3 className="text-lg font-bold mb-3 text-gray-800">Danh sách ID Đã giữ ({reservedIds.length})</h3>
-                    <div className="bg-white border rounded-lg overflow-hidden shadow-sm">
+                    <div className="bg-white border rounded-lg overflow-x-auto shadow-sm">
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
