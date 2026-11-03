@@ -66,6 +66,8 @@ function SurveysInner() {
     const [questions, setQuestions] = useState<QuestionDraft[]>([newQuestion()])
     const [saving, setSaving] = useState(false)
     const [busyId, setBusyId] = useState<number | null>(null)
+    const [courseCode, setCourseCode] = useState('')
+    const [copiedId, setCopiedId] = useState<number | null>(null)
     const [notice, setNotice] = useState('')
 
     const loadContext = async () => {
@@ -77,6 +79,7 @@ function SurveysInner() {
         const res = await getCourseSurveyContextAction(courseId)
         if (res.success) {
             setCourseName(res.course.name)
+            setCourseCode(res.course.code || '')
             setStudentCount(res.studentCount)
             setSurveys(res.surveys as SurveyItem[])
             setError('')
@@ -177,6 +180,17 @@ function SurveysInner() {
         await loadContext()
     }
 
+    const copySurveyLink = async (survey: SurveyItem) => {
+        const url = `${window.location.origin}/courses/${courseCode}/surveys/${survey.id}`
+        try {
+            await navigator.clipboard.writeText(url)
+            setCopiedId(survey.id)
+            window.setTimeout(() => setCopiedId(cur => (cur === survey.id ? null : cur)), 2000)
+        } catch {
+            window.prompt('Sao chép link khảo sát bên dưới:', url)
+        }
+    }
+
     const handleStatus = async (survey: SurveyItem, status: string) => {
         setBusyId(survey.id)
         const res = await setCourseSurveyStatusAction(survey.id, status)
@@ -265,9 +279,16 @@ function SurveysInner() {
                                             </>
                                         )}
                                         {s.status === 'OPEN' && (
-                                            <button type="button" disabled={busyId === s.id} onClick={() => void handleStatus(s, 'CLOSED')} className="min-h-9 rounded-lg border border-brk-outline bg-white px-3 text-xs font-semibold disabled:opacity-50">
-                                                Đóng khảo sát
-                                            </button>
+                                            <>
+                                                <button type="button" disabled={busyId === s.id} onClick={() => void handleStatus(s, 'CLOSED')} className="min-h-9 rounded-lg border border-brk-outline bg-white px-3 text-xs font-semibold disabled:opacity-50">
+                                                    Đóng khảo sát
+                                                </button>
+                                                {courseCode && (
+                                                    <button type="button" onClick={() => void copySurveyLink(s)} className="min-h-9 rounded-lg border border-brk-outline bg-white px-3 text-xs font-semibold text-brk-primary">
+                                                        {copiedId === s.id ? 'Đã chép link ✓' : 'Sao chép link khảo sát'}
+                                                    </button>
+                                                )}
+                                            </>
                                         )}
                                         {s.status === 'CLOSED' && (
                                             <button type="button" disabled={busyId === s.id} onClick={() => void handleStatus(s, 'OPEN')} className="min-h-9 rounded-lg border border-brk-outline bg-white px-3 text-xs font-semibold disabled:opacity-50">
