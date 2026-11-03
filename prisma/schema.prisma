@@ -73,6 +73,8 @@ model User {
   userVouchers                 UserVoucher[]
   appNotifications             AppNotification[]
   courseAnnouncements          CourseAnnouncement[]   @relation("CourseAnnouncementTeacher")
+  courseSurveys                CourseSurvey[]        @relation("CourseSurveyTeacher")
+  courseSurveyResponses        CourseSurveyResponse[]  @relation("CourseSurveyRespondent")
   ownedEmailSenders            EmailSender[]          @relation("EmailSenderOwner")
   pushSubscriptions            WebPushSubscription[]
   crmContacts                  CrmContact[]
@@ -413,6 +415,7 @@ model Course {
   testimonials                CourseTestimonial[]
   enrollments                 Enrollment[]
   announcements               CourseAnnouncement[]
+  surveys                     CourseSurvey[]
   landingPages                LandingPage[]
   lessons                     Lesson[]
   autoVerifyConfig            AutoVerifyConfig?
@@ -2918,4 +2921,64 @@ model CourseAnnouncement {
 
   @@index([courseId, createdAt])
   @@index([teacherId])
+}
+
+model CourseSurvey {
+  id          Int                    @id @default(autoincrement())
+  courseId    Int
+  course      Course                 @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  teacherId   Int
+  teacher     User                   @relation("CourseSurveyTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  status      String                 @default("DRAFT")
+  anonymous   Boolean                @default(false)
+  deadline    DateTime?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  questions   CourseSurveyQuestion[]
+  responses   CourseSurveyResponse[]
+
+  @@index([courseId, createdAt])
+  @@index([teacherId])
+}
+
+model CourseSurveyQuestion {
+  id        Int                  @id @default(autoincrement())
+  surveyId  Int
+  survey    CourseSurvey         @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  sortOrder Int                  @default(0)
+  type      String
+  label     String
+  required  Boolean              @default(false)
+  options   Json?
+  answers   CourseSurveyAnswer[]
+
+  @@index([surveyId, sortOrder])
+}
+
+model CourseSurveyResponse {
+  id          Int                  @id @default(autoincrement())
+  surveyId    Int
+  survey      CourseSurvey         @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  userId      Int
+  user        User                 @relation("CourseSurveyRespondent", fields: [userId], references: [id], onDelete: Cascade)
+  submittedAt DateTime             @default(now())
+  answers     CourseSurveyAnswer[]
+
+  @@unique([surveyId, userId])
+  @@index([surveyId])
+}
+
+model CourseSurveyAnswer {
+  id         Int                  @id @default(autoincrement())
+  responseId Int
+  response   CourseSurveyResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  questionId Int
+  question   CourseSurveyQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  value      Json?
+  textValue  String?
+
+  @@index([responseId])
+  @@index([questionId])
 }
