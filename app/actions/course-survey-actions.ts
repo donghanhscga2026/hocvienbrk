@@ -397,3 +397,210 @@ export async function submitCourseSurveyAction(input: {
         return { success: false as const, error: 'Không gửi được câu trả lời. Có thể bạn đã trả lời rồi, hãy tải lại trang.' }
     }
 }
+
+// ─── Kết quả khảo sát (phía giảng viên) ─────────────────────────────────────
+
+export async function getCourseSurveyResultsAction(surveyId: number) {
+    try {
+        const found = await loadManagedSurvey(surveyId)
+        if ('error' in found) return { success: false as const, error: found.error }
+
+        const survey = await prisma.courseSurvey.findUnique({
+            where: { id: surveyId },
+            select: {
+                id: true,
+                courseId: true,
+                title: true,
+                description: true,
+                status: true,
+                anonymous: true,
+                deadline: true,
+                course: { select: { name_lop: true } },
+                questions: {
+                    orderBy: { sortOrder: 'asc' },
+                    select: { id: true, type: true, label: true, required: true, options: true },
+                },
+            },
+        })
+        if (!survey) return { success: false as const, error: 'Không tìm thấy khảo sát' }
+
+        const [studentCount, responses, activeEnrollments] = await Promise.all([
+            prisma.enrollment.count({ where: { courseId: survey.courseId, status: 'ACTIVE' } }),
+            prisma.courseSurveyResponse.findMany({
+                where: { surveyId },
+                orderBy: { submittedAt: 'asc' },
+                select: {
+                    id: true,
+                    userId: true,
+                    submittedAt: true,
+                    user: { select: { name: true, email: true } },
+                    answers: { select: { questionId: true, value: true, textValue: true } },
+                },
+            }),
+            prisma.enrollment.findMany({
+                where: { courseId: survey.courseId, status: 'ACTIVE' },
+                select: { userId: true, user: { select: { name: true, email: true } } },
+            }),
+        ])
+
+        const answersByQuestion = new Map<number, { value: unknown; textValue: string | null; userName: string | null }[]>()
+        for (const r of responses) {
+            for (const a of r.answers) {
+                const list = answersByQuestion.get(a.questionId) || []
+                list.push({ value: a.value, textValue: a.textValue, userName: survey.anonymous ? null : r.user?.name || r.user?.email || null })
+                answersByQuestion.set(a.questionId, list)
+            }
+        }
+
+        const questions = survey.questions.map(q => {
+            const options = Array.isArray(q.options) ? (q.options as string[]) : []
+            const answers = answersByQuestion.get(q.id) || []
+            if (q.type === 'SINGLE' || q.type === 'MULTI') {
+                const counts = new Map<string, number>(options.map(o => [o, 0]))
+                for (const a of answers) {
+                    if (q.type === 'SINGLE' && typeof a.value === 'string') {
+                        counts.set(a.value, (counts.get(a.value) || 0) + 1)
+                    }
+                    if (q.type === 'MULTI' && Array.isArray(a.value)) {
+                        for (const v of a.value as string[]) counts.set(v, (counts.get(v) || 0) + 1)
+                    }
+                }
+                return {
+                    id: q.id,
+                    type: q.type,
+                    label: q.label,
+                    totalAnswers: answers.length,
+                    options: options.map(o => ({ label: o, count: counts.get(o) || 0 })),
+                    average: null as number | null,
+                    ratingCounts: null as { star: number; count: number }[] | null,
+                    textAnswers: null as { text: string; author: string | null }[] | null,
+                }
+            }
+            if (q.type === 'RATING') {
+                const dist = [1, 2, 3, 4, 5].map(star => ({ star, count: 0 }))
+                let sum = 0
+                for (const a of answers) {
+                    const n = typeof a.value === 'number' ? a.value : Number(a.value)
+                    if (n >= 1 && n <= 5) {
+                        dist[n - 1].count++
+                        sum += n
+                    }
+                }
+                return {
+                    id: q.id,
+                    type: q.type,
+                    label: q.label,
+                    totalAnswers: answers.length,
+                    options: null as { label: string; count: number }[] | null,
+                    average: answers.length ? Math.round((sum / answers.length) * 10) / 10 : null,
+                    ratingCounts: dist,
+                    textAnswers: null as { text: string; author: string | null }[] | null,
+                }
+            }
+            return {
+                id: q.id,
+                type: q.type,
+                label: q.label,
+                totalAnswers: answers.length,
+                options: null as { label: string; count: number }[] | null,
+                average: null as number | null,
+                ratingCounts: null as { star: number; count: number }[] | null,
+                textAnswers: answers
+                    .filter(a => a.textValue)
+                    .map(a => ({ text: a.textValue as string, author: a.userName })),
+            }
+        })
+
+        const respondedIds = new Set(responses.map(r => r.userId))
+        const nonRespondents = activeEnrollments
+            .filter(e => !respondedIds.has(e.userId))
+            .map(e => ({ name: e.user?.name || '', email: e.user?.email || '' }))
+
+        return {
+            success: true as const,
+            survey: {
+                id: survey.id,
+                courseId: survey.courseId,
+                courseName: survey.course.name_lop,
+                title: survey.title,
+                description: survey.description,
+                status: survey.status,
+                anonymous: survey.anonymous,
+                deadline: survey.deadline ? survey.deadline.toISOString() : null,
+            },
+            studentCount,
+            responseCount: responses.length,
+            questions,
+            nonRespondents,
+        }
+    } catch {
+        return { success: false as const, error: 'Không tải được kết quả khảo sát' }
+    }
+}
+
+function csvEscape(v: string) {
+    return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
+}
+
+export async function exportCourseSurveyCsvAction(surveyId: number) {
+    try {
+        const found = await loadManagedSurvey(surveyId)
+        if ('error' in found) return { success: false as const, error: found.error }
+
+        const survey = await prisma.courseSurvey.findUnique({
+            where: { id: surveyId },
+            select: {
+                id: true,
+                title: true,
+                anonymous: true,
+                questions: {
+                    orderBy: { sortOrder: 'asc' },
+                    select: { id: true, type: true, label: true },
+                },
+            },
+        })
+        if (!survey) return { success: false as const, error: 'Không tìm thấy khảo sát' }
+
+        const responses = await prisma.courseSurveyResponse.findMany({
+            where: { surveyId },
+            orderBy: { submittedAt: 'asc' },
+            select: {
+                submittedAt: true,
+                user: { select: { name: true, email: true } },
+                answers: { select: { questionId: true, value: true, textValue: true } },
+            },
+        })
+
+        const header = [
+            'Thời gian gửi',
+            ...(survey.anonymous ? [] : ['Họ tên', 'Email']),
+            ...survey.questions.map(q => q.label),
+        ]
+        const lines = [header.map(csvEscape).join(',')]
+        for (const r of responses) {
+            const byQuestion = new Map<number, { value: unknown; textValue: string | null }>()
+            for (const a of r.answers) byQuestion.set(a.questionId, a)
+            const cells = [
+                r.submittedAt.toLocaleString('vi-VN'),
+                ...(survey.anonymous ? [] : [r.user?.name || '', r.user?.email || '']),
+                ...survey.questions.map(q => {
+                    const a = byQuestion.get(q.id)
+                    if (!a) return ''
+                    if (q.type === 'TEXT') return a.textValue || ''
+                    if (q.type === 'MULTI') return Array.isArray(a.value) ? (a.value as string[]).join('; ') : ''
+                    if (a.value === null || a.value === undefined) return ''
+                    return String(a.value)
+                }),
+            ]
+            lines.push(cells.map(csvEscape).join(','))
+        }
+
+        return {
+            success: true as const,
+            filename: `ket-qua-khao-sat-${surveyId}.csv`,
+            csv: '﻿' + lines.join('\n'),
+        }
+    } catch {
+        return { success: false as const, error: 'Không xuất được file kết quả' }
+    }
+}
