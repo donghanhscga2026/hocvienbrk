@@ -37,6 +37,7 @@ type ResultsData = {
     nonRespondents: { name: string; email: string }[]
 }
 
+// Trang tổng hợp kết quả khảo sát cho giảng viên (đợt 2): tỉ lệ từng đáp án, điểm trung bình, câu trả lời tự do, học viên chưa trả lời, tải CSV.
 const STATUS_LABEL: Record<string, string> = { DRAFT: 'NHÁP', OPEN: 'ĐANG MỞ', CLOSED: 'ĐÃ ĐÓNG' }
 
 function Bar({ count, total }: { count: number; total: number }) {
