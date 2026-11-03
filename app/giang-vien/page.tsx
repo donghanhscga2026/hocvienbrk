@@ -6,7 +6,7 @@ import Wi300Home from '@/components/wi300/Wi300Home'
 
 export async function generateMetadata() {
   const brand = await getPresentationBrand('teachers')
-  return brand ? pageMetadata(brand, 'teachers') : { title: 'Đội ngũ giảng viên' }
+  return brand ? pageMetadata(brand, 'teachers') : { title: 'Đội ngũ giảng viên', alternates: { canonical: '/giang-vien' } }
 }
 export default async function Page() {
   if (await getPagePresentation('teachers') === 'classic') {

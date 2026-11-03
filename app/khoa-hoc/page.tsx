@@ -10,7 +10,7 @@ import Wi300Home from '@/components/wi300/Wi300Home'
 
 export async function generateMetadata() {
   const brand = await getPresentationBrand('courses')
-  return brand ? pageMetadata(brand, 'courses') : { title: 'Khám phá khóa học' }
+  return brand ? pageMetadata(brand, 'courses') : { title: 'Khám phá khóa học', alternates: { canonical: '/khoa-hoc' } }
 }
 export default async function Page() {
   if (await getPagePresentation('courses') === 'classic') {

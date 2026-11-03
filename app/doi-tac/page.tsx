@@ -7,7 +7,7 @@ import Wi300PartnerForm from '@/components/wi300/Wi300PartnerForm'
 import { systemPageContent, systemPageMetadata, systemPageHidden } from '@/lib/wi300/managed-page-runtime'
 import WiContentPage from '@/components/wi300/WiContentPage'
 
-export async function generateMetadata() { const brand = await getPresentationBrand('partners'); return brand ? systemPageMetadata(brand, 'partners') : { title: 'Đăng ký đối tác' } }
+export async function generateMetadata() { const brand = await getPresentationBrand('partners'); return brand ? systemPageMetadata(brand, 'partners') : { title: 'Đăng ký đối tác', alternates: { canonical: '/doi-tac' } } }
 export default async function Page() {
   if (await getPagePresentation('partners') === 'classic') {
     const { default: ClassicPartnerPage } = await import('@/components/classic/ClassicPartner')

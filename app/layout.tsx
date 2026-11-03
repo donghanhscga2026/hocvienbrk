@@ -26,6 +26,9 @@ import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime
 import { Wi300BrandProvider } from '@/components/wi300/Wi300BrandContext'
 import Wi300Shell from '@/components/wi300/Wi300Shell'
 import { websiteMetadata } from '@/lib/wi300/website-config'
+import { siteJsonLd, externalUrls } from '@/lib/seo/json-ld'
+import JsonLdScript from '@/components/seo/JsonLdScript'
+import { requestHostname } from '@/lib/website/domain-shared'
 
 // [OPTIMIZE] font-thin/extralight/light (100/200/300) không có class Tailwind
 // nào trong toàn bộ codebase dùng tới (đã kiểm bằng grep) — bỏ để giảm số file
@@ -60,7 +63,7 @@ export async function generateMetadata(): Promise<Metadata> {
     const doc=await domainWebsite(domain.profile)
     const config=getSiteRuntimeConfig(domain.profile)
     const name=config.branding.name || doc?.name || domain.profile.title || domain.hostname
-    return {metadataBase:new URL('https://'+domain.hostname),title:{default:name,template:'%s | '+name},description:doc?.description || '',applicationName:name,icons:config.branding.faviconUrl?{icon:config.branding.faviconUrl,apple:config.branding.faviconUrl}:undefined,openGraph:{title:name,description:doc?.description || '',siteName:name,url:'https://'+domain.hostname,type:'website'}}
+    return {metadataBase:new URL('https://'+domain.hostname),alternates:{canonical:'/'},title:{default:name,template:'%s | '+name},description:doc?.description || '',applicationName:name,icons:config.branding.faviconUrl?{icon:config.branding.faviconUrl,apple:config.branding.faviconUrl}:undefined,openGraph:{title:name,description:doc?.description || '',siteName:name,url:'https://'+domain.hostname,type:'website',images:config.branding.logoUrl?[config.branding.logoUrl]:undefined}}
   }
   const brand = await getCurrentDeploymentBrand()
   if (brand) return {
@@ -82,8 +85,13 @@ export async function generateMetadata(): Promise<Metadata> {
   const primaryDomain = profile?.domains.find(domain => domain.isPrimary)?.hostname
     || profile?.domains[0]?.hostname
   const url = primaryDomain ? `https://${primaryDomain}` : undefined
+  // metadataBase theo đúng host của request để canonical/og tương đối tự
+  // tham chiếu về tên miền đang mở (không trỏ chéo giữa các tên miền nền tảng).
+  const requestHost = requestHostname((await headers()).get('host') || '')
+  const metadataBase = requestHost ? new URL(`https://${requestHost}`) : url ? new URL(url) : undefined
 
   return {
+    metadataBase,
     title: { default: title, template: `%s | ${title}` },
     applicationName: brandName,
     appleWebApp: { capable: true, title: brandName, statusBarStyle: 'default' },
@@ -155,7 +163,7 @@ export default async function RootLayout({
     const config=getSiteRuntimeConfig(domain.profile)
     const brand={palette:domain.profile.theme?.colors,logoUrl:config.branding.logoUrl,tools:config.modules.tools,name:config.branding.name || doc?.name || domain.profile.title || domain.hostname,color:doc?.color || '#7c3aed',background:doc?.background || '#ffffff',ownerId:domain.profile.userId,footerText:domain.profile.footerText,courses:domain.courses,crm:domain.crm,affiliate:domain.affiliate}
     const theme=websiteTheme(brand.color,brand.background,brand.palette)
-    return <html lang="vi" data-website-theme={theme.dark ? 'dark' : 'light'} style={theme.style}><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website attentionHighlight={{config:DEFAULT_ATTENTION_CONFIG,items:[]}}><DomainShell brand={brand} navigation={doc.navigation} pages={doc?.pages.map(p=>({title:p.title,slug:p.slug}))} path={path} importedHome={importedHome}>{children}{domain.affiliate && <AffiliateTracker />}</DomainShell></Providers></body></html>
+    return <html lang="vi" data-website-theme={theme.dark ? 'dark' : 'light'} style={theme.style}><body className={`${beVietnamPro.variable} antialiased`}><JsonLdScript data={siteJsonLd({name:brand.name,url:'https://'+domain.hostname,description:doc?.description || undefined,logoUrl:config.branding.logoUrl || undefined,sameAs:externalUrls(domain.profile.footerLinks)})} /><Providers session={session} website attentionHighlight={{config:DEFAULT_ATTENTION_CONFIG,items:[]}}><DomainShell brand={brand} navigation={doc.navigation} pages={doc?.pages.map(p=>({title:p.title,slug:p.slug}))} path={path} importedHome={importedHome}>{children}{domain.affiliate && <AffiliateTracker />}</DomainShell></Providers></body></html>
   }
   const brand = await getCurrentDeploymentBrand()
   if (brand) {
@@ -164,8 +172,9 @@ export default async function RootLayout({
     const path = (await headers()).get('x-wi300-pathname')
     const session = path === '/' || path === '/khoa-hoc' ? undefined : await getSession()
     const theme = websiteTheme(brand.palette.primary, brand.palette.background, brand.palette)
+    const brandHost = requestHostname((await headers()).get('host') || '') || 'wi300.vn'
     // Bảng màu riêng lấy từ server, không dùng lựa chọn theme đã lưu của web cũ.
-    return <html lang="vi" data-website-theme="light" data-site-variant="wi300" style={{ ...theme.style, ...appearanceStyle(brand.appearance || defaultAppearance) }}><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website accountAssistant={false} assistantToast={false} attentionHighlight={{ config: DEFAULT_ATTENTION_CONFIG, items: [] }}><Wi300BrandProvider brand={brand}><PwaInstallProvider><Wi300Shell>{children}</Wi300Shell></PwaInstallProvider></Wi300BrandProvider></Providers></body></html>
+    return <html lang="vi" data-website-theme="light" data-site-variant="wi300" style={{ ...theme.style, ...appearanceStyle(brand.appearance || defaultAppearance) }}><body className={`${beVietnamPro.variable} antialiased`}><JsonLdScript data={siteJsonLd({name:brand.name,url:`https://${brandHost}`,description:brand.description,logoUrl:brand.logoUrl,sameAs:externalUrls(brand.appearance?.footer.socials)})} /><Providers session={session} website accountAssistant={false} assistantToast={false} attentionHighlight={{ config: DEFAULT_ATTENTION_CONFIG, items: [] }}><Wi300BrandProvider brand={brand}><PwaInstallProvider><Wi300Shell>{children}</Wi300Shell></PwaInstallProvider></Wi300BrandProvider></Providers></body></html>
   }
   const [siteProfile, themeRows] = await Promise.all([
     getCurrentSiteProfile(),
@@ -181,6 +190,7 @@ export default async function RootLayout({
   if (usePlatformDefault) palettes.default = profilePalette
   const session = await getSession()
   const attentionHighlight = await getAttentionHighlightSettings()
+  const profileHost = requestHostname((await headers()).get('host') || '') || 'giautoandien.io.vn'
 
   const INITIAL_SCRIPT = `
 (function(){
@@ -216,6 +226,7 @@ export default async function RootLayout({
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: INITIAL_SCRIPT }}
         />
+        <JsonLdScript data={siteJsonLd({name:runtimeConfig?.branding.name || siteProfile?.title || 'MFC',url:`https://${profileHost}`,description:siteProfile?.metaDescription || siteProfile?.subtitle || undefined,logoUrl:siteProfile?.metaImage || runtimeConfig?.branding.logoUrl || '/og-image.png',sameAs:externalUrls(siteProfile?.footerLinks)})} />
         <Providers session={session} attentionHighlight={attentionHighlight}>
           <PwaInstallProvider>
           {children}

@@ -8,7 +8,7 @@ import { systemPageContent, systemPageMetadata, systemPageHidden } from '@/lib/w
 import WiContentPage from '@/components/wi300/WiContentPage'
 import { notFound } from 'next/navigation'
 export const dynamic = 'force-dynamic'
-export async function generateMetadata() { const brand = await getCurrentDeploymentBrand(); return brand ? systemPageMetadata(brand, 'articles') : { title: 'Bài viết' } }
+export async function generateMetadata() { const brand = await getCurrentDeploymentBrand(); return brand ? systemPageMetadata(brand, 'articles') : { title: 'Bài viết', alternates: { canonical: '/bai-viet' } } }
 export default async function Page({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const brand = await getCurrentDeploymentBrand()
   if (brand && systemPageHidden(brand, 'articles')) notFound()
