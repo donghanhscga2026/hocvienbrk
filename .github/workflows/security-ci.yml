@@ -146,6 +146,9 @@ jobs:
       - name: Sales page import GĐ1 regression checks
         run: node scripts/test-sales-import-gd1.cjs
 
+      - name: Course font vietnamese subset checks
+        run: node scripts/test-course-font-vietnamese.cjs
+
       - name: Template save regression checks
         run: node scripts/test-template-save.cjs
 

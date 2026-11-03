@@ -54,12 +54,17 @@ export default function CourseThemeProvider({ theme, children }: CourseThemeProv
       '--radius-card':   theme.borderRadius  || '16px',
       '--radius-button': theme.buttonRadius  || '8px',
       '--container':     theme.containerWidth || '1180px',
+      // Font tự host chính chỉ có subset latin: chèn subset vietnamese cùng
+      // họ font ngay sau nó để ký tự tiếng Việt không rơi xuống Georgia/
+      // system (nguyên nhân dấu tách rời ở tiêu đề). @font-face khai
+      // unicode-range ở khối style bên dưới; next/font/local không hỗ trợ
+      // unicodeRange nên không gộp chung vào localFont được.
       '--course-heading-font': theme.headingFont
-        ? `"${theme.headingFont}", var(--font-course-serif), Georgia, serif`
-        : 'var(--font-course-serif), Georgia, serif',
+        ? `"${theme.headingFont}", var(--font-course-serif), 'Cormorant Garamond VN', Georgia, serif`
+        : `var(--font-course-serif), 'Cormorant Garamond VN', Georgia, serif`,
       '--course-body-font': theme.bodyFont
-        ? `"${theme.bodyFont}", var(--font-course-sans), system-ui, sans-serif`
-        : 'var(--font-course-sans), system-ui, sans-serif',
+        ? `"${theme.bodyFont}", var(--font-course-sans), 'Inter VN', system-ui, sans-serif`
+        : `var(--font-course-sans), 'Inter VN', system-ui, sans-serif`,
       '--section-space': '120px',
       '--transition':    '.3s ease',
 
@@ -81,6 +86,33 @@ export default function CourseThemeProvider({ theme, children }: CourseThemeProv
   return (
     <div style={styleVars} className={`min-h-screen bg-[var(--bg-dark)] text-[var(--text-body)] antialiased ${cormorantGaramond.variable} ${coursePageInter.variable}`}>
       <style dangerouslySetInnerHTML={{ __html: `
+        /* Subset vietnamese cho font trang bán (file trong public/fonts,
+           tải từ Google Fonts; unicode-range khớp bản Google công bố) */
+        @font-face {
+          font-family: 'Cormorant Garamond VN';
+          font-style: normal;
+          font-weight: 300 700;
+          font-display: swap;
+          src: url('/fonts/cormorant-garamond-vietnamese-variable-normal.woff2') format('woff2');
+          unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+        }
+        @font-face {
+          font-family: 'Cormorant Garamond VN';
+          font-style: italic;
+          font-weight: 300 700;
+          font-display: swap;
+          src: url('/fonts/cormorant-garamond-vietnamese-variable-italic.woff2') format('woff2');
+          unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+        }
+        @font-face {
+          font-family: 'Inter VN';
+          font-style: normal;
+          font-weight: 100 900;
+          font-display: swap;
+          src: url('/fonts/inter-vietnamese-variable-normal.woff2') format('woff2');
+          unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+        }
+
         /* Typography base */
         .course-page, .course-page * {
           box-sizing: border-box;
