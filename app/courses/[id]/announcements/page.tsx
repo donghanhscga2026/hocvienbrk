@@ -54,6 +54,12 @@ export default async function CourseAnnouncementsPage({
                 </Link>
                 <h1 className="mt-3 text-xl font-bold">Thông báo từ giảng viên</h1>
                 <p className="mt-1 text-sm text-gray-600">Khóa: {course.name_lop}</p>
+                <Link
+                    href={`/courses/${course.id_khoa}/surveys`}
+                    className="mt-3 inline-flex min-h-9 items-center rounded-lg border border-brk-outline bg-white px-3 text-xs font-semibold text-brk-primary"
+                >
+                    Khảo sát trong khóa học →
+                </Link>
 
                 {announcements.length === 0 ? (
                     <p className="mt-8 rounded-2xl border border-brk-outline bg-white p-6 text-center text-sm text-gray-500">
