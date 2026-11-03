@@ -72,7 +72,7 @@ async function loadManagedSurvey(surveyId: number) {
             teacherId: true,
             title: true,
             status: true,
-            course: { select: { teacherId: true } },
+            course: { select: { teacherId: true, name_lop: true } },
         },
     })
     if (!survey) return { error: 'Không tìm thấy khảo sát' as const }
@@ -279,6 +279,33 @@ export async function setCourseSurveyStatusAction(surveyId: number, status: stri
             if (questionCount === 0) return { success: false as const, error: 'Khảo sát chưa có câu hỏi nào' }
         }
         await prisma.courseSurvey.update({ where: { id: surveyId }, data: { status } })
+        if (current === 'DRAFT' && status === 'OPEN') {
+            // Lần mở đầu tiên: báo vào chuông thông báo của toàn bộ học viên đang học (ACTIVE).
+            // Dùng lại kind COURSE_ANNOUNCEMENT (đã có trong danh sách được phép của bảng AppNotification).
+            // Lỗi ở bước báo tin (nếu có) không được làm hỏng việc mở khảo sát nên bọc try/catch riêng.
+            try {
+                const enrollments = await prisma.enrollment.findMany({
+                    where: { courseId: found.survey.courseId, status: 'ACTIVE' },
+                    select: { id: true, userId: true },
+                })
+                if (enrollments.length > 0) {
+                    const notifTitle = `${found.survey.course.name_lop} — Khảo sát mới: ${found.survey.title}`.slice(0, 180)
+                    await prisma.appNotification.createMany({
+                        data: enrollments.map(e => ({
+                            eventKey: `course-survey-open:${surveyId}:${e.userId}`,
+                            recipientId: e.userId,
+                            kind: 'COURSE_ANNOUNCEMENT',
+                            title: notifTitle,
+                            courseId: found.survey.courseId,
+                            enrollmentId: e.id,
+                        })),
+                        skipDuplicates: true,
+                    })
+                }
+            } catch {
+                // Bỏ qua lỗi báo tin: khảo sát vẫn mở bình thường.
+            }
+        }
         return { success: true as const }
     } catch {
         return { success: false as const, error: 'Không đổi được trạng thái khảo sát' }
