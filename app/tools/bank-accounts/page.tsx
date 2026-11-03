@@ -284,15 +284,15 @@ export default function AdminBankAccountsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="text-left px-4 py-3 text-[10px] font-black uppercase text-gray-400">Người dùng</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-black uppercase text-gray-400">Loại</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-black uppercase text-gray-400">Chủ TK</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-black uppercase text-gray-400">Số TK</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-black uppercase text-gray-400">Ngân hàng</th>
-                  <th className="text-center px-4 py-3 text-[10px] font-black uppercase text-gray-400">Key webhook</th>
-                  <th className="text-center px-4 py-3 text-[10px] font-black uppercase text-gray-400">Mặc định</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-black uppercase text-gray-400">Ngày tạo</th>
-                  <th className="text-center px-4 py-3 text-[10px] font-black uppercase text-gray-400">Thao tác</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-black uppercase text-gray-400">Người dùng</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-black uppercase text-gray-400">Loại</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-black uppercase text-gray-400">Chủ TK</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-black uppercase text-gray-400">Số TK</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-black uppercase text-gray-400">Ngân hàng</th>
+                  <th className="text-center px-4 py-3 text-[11px] font-black uppercase text-gray-400">Key webhook</th>
+                  <th className="text-center px-4 py-3 text-[11px] font-black uppercase text-gray-400">Mặc định</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-black uppercase text-gray-400">Ngày tạo</th>
+                  <th className="text-center px-4 py-3 text-[11px] font-black uppercase text-gray-400">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -319,7 +319,7 @@ export default function AdminBankAccountsPage() {
                           <button
                             onClick={() => handleRevokeKey(acc)}
                             disabled={keyLoading === acc.id}
-                            className="text-[11px] text-red-600 hover:underline disabled:opacity-50"
+                            className="text-xs text-red-600 hover:underline disabled:opacity-50"
                           >
                             Thu hồi
                           </button>
@@ -329,7 +329,7 @@ export default function AdminBankAccountsPage() {
                           data-help-id="btn-gen-key"
                           onClick={() => handleGenerateKey(acc)}
                           disabled={keyLoading === acc.id}
-                          className="text-[11px] font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded px-2 py-1 hover:bg-blue-100 disabled:opacity-50"
+                          className="text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded px-2 py-2 hover:bg-blue-100 disabled:opacity-50"
                         >
                           {keyLoading === acc.id ? '...' : '+ Tạo key'}
                         </button>
@@ -380,7 +380,7 @@ export default function AdminBankAccountsPage() {
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               {!editingAccount && (
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Người dùng *</label>
+                  <label className="text-[11px] font-black uppercase text-gray-400 ml-1">Người dùng *</label>
                   <input
                     type="text"
                     value={formUserSearch}
@@ -411,7 +411,7 @@ export default function AdminBankAccountsPage() {
               )}
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại tài khoản</label>
+                <label className="text-[11px] font-black uppercase text-gray-400 ml-1">Loại tài khoản</label>
                 <select
                   value={formAccountType}
                   onChange={(e) => setFormAccountType(e.target.value)}
@@ -424,17 +424,17 @@ export default function AdminBankAccountsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Chủ tài khoản *</label>
+                <label className="text-[11px] font-black uppercase text-gray-400 ml-1">Chủ tài khoản *</label>
                 <input type="text" value={formAccountHolder} onChange={(e) => setFormAccountHolder(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Số tài khoản *</label>
+                <label className="text-[11px] font-black uppercase text-gray-400 ml-1">Số tài khoản *</label>
                 <input data-help-id="input-account-number" type="text" value={formAccountNumber} onChange={(e) => setFormAccountNumber(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ngân hàng</label>
+                <label className="text-[11px] font-black uppercase text-gray-400 ml-1">Ngân hàng</label>
                 {formAccountType === 'BANK' ? (
                   <select
                     value={formBankName}
@@ -452,7 +452,7 @@ export default function AdminBankAccountsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link QR Code</label>
+                <label className="text-[11px] font-black uppercase text-gray-400 ml-1">Link QR Code</label>
                 <input type="url" value={formQrCodeUrl} onChange={(e) => setFormQrCodeUrl(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
               </div>
 

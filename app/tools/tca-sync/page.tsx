@@ -71,7 +71,7 @@ function TestPanel() {
     <div className="space-y-4">
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
         <h3 className="font-bold text-yellow-800 mb-2">Dữ liệu Test (Staging)</h3>
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <div className="text-2xl font-bold text-green-600">{testData?.users || 0}</div>
             <div className="text-sm text-gray-500">UserTest</div>

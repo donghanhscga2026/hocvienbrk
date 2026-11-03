@@ -156,10 +156,10 @@ export default async function AffiliateConversionsPage() {
                     {/* Thành viên */}
                     <td className="px-3 py-2">
                       <div className="font-bold text-gray-800 text-[12px]">
-                        {row.customer.name} <span className="text-gray-400 text-[10px] font-normal">#{row.customer.id}</span>
+                        {row.customer.name} <span className="text-gray-400 text-[11px] font-normal">#{row.customer.id}</span>
                       </div>
                       {row.customer.phone && (
-                        <div className="text-[10px] text-gray-500 mt-0.5">
+                        <div className="text-[11px] text-gray-500 mt-0.5">
                           📞 {row.customer.phone}
                         </div>
                       )}
@@ -179,7 +179,7 @@ export default async function AffiliateConversionsPage() {
 
                     {/* Link Ref */}
                     <td className="px-3 py-2 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-gray-100 text-gray-700 text-[10px] font-mono font-medium">
+                      <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-gray-100 text-gray-700 text-[11px] font-mono font-medium">
                         🔗 ?ref={row.linkCode}
                       </span>
                     </td>
@@ -189,16 +189,16 @@ export default async function AffiliateConversionsPage() {
                       {row.referrer ? (
                         <div>
                           <div className="font-semibold text-gray-800">
-                            {row.referrer.name} <span className="text-gray-400 text-[10px] font-normal">#{row.referrer.id}</span>
+                            {row.referrer.name} <span className="text-gray-400 text-[11px] font-normal">#{row.referrer.id}</span>
                           </div>
                           {row.referrer.phone && (
-                            <div className="text-[10px] text-gray-500 mt-0.5">
+                            <div className="text-[11px] text-gray-500 mt-0.5">
                               📞 {row.referrer.phone}
                             </div>
                           )}
                         </div>
                       ) : (
-                        <span className="text-gray-400 italic text-[10px]">N/A</span>
+                        <span className="text-gray-400 italic text-[11px]">N/A</span>
                       )}
                     </td>
 
@@ -210,12 +210,12 @@ export default async function AffiliateConversionsPage() {
                           <p className="text-[9px] text-gray-400 mt-0.5 font-mono">ID: #{row.course.id}</p>
                         </div>
                       ) : (
-                        <span className="text-gray-400 italic text-[10px]">Chưa đăng ký</span>
+                        <span className="text-gray-400 italic text-[11px]">Chưa đăng ký</span>
                       )}
                     </td>
 
                     {/* Trạng thái kích hoạt */}
-                    <td className="px-3 py-2 whitespace-nowrap text-center text-[10px]">
+                    <td className="px-3 py-2 whitespace-nowrap text-center text-[11px]">
                       {row.status === 'ACTIVE' && (
                         <div className="space-y-0.5">
                           <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">

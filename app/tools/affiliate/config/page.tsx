@@ -342,12 +342,12 @@ function ConfigRow({ course, minRate, saving, onSave, onRerun }: {
     <tr className="hover:bg-gray-50/50">
       <td className="px-3 py-2">
         <div className="font-semibold text-gray-800">{course.name}</div>
-        <div className="text-[10px] text-gray-400 font-mono">{course.id_khoa} · #{course.id}</div>
+        <div className="text-[11px] text-gray-400 font-mono">{course.id_khoa} · #{course.id}</div>
         {course.startDate && (
-          <div className="text-[10px] text-gray-400">Khai giảng: {formatDateVN(course.startDate)}</div>
+          <div className="text-[11px] text-gray-400">Khai giảng: {formatDateVN(course.startDate)}</div>
         )}
         {locked && (
-          <div className="text-[10px] font-semibold text-amber-600">🔒 Đã khai giảng — đã khóa cấu hình</div>
+          <div className="text-[11px] font-semibold text-amber-600">🔒 Đã khai giảng — đã khóa cấu hình</div>
         )}
       </td>
       <td className="px-3 py-2 text-right text-gray-600">{course.listedPrice.toLocaleString('vi-VN')}đ</td>

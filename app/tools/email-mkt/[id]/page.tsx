@@ -420,24 +420,24 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-center">
             <div className="bg-green-50 rounded-xl p-3">
               <div className="text-lg font-black text-green-600">{campaign.sentCount}</div>
-              <div className="text-[10px] font-bold text-green-500 uppercase">Đã gửi</div>
+              <div className="text-[11px] font-bold text-green-500 uppercase">Đã gửi</div>
             </div>
             <div className="bg-red-50 rounded-xl p-3">
               <div className="text-lg font-black text-red-600">{campaign.failedCount}</div>
-              <div className="text-[10px] font-bold text-red-500 uppercase">Thất bại</div>
+              <div className="text-[11px] font-bold text-red-500 uppercase">Thất bại</div>
             </div>
             <div className="bg-gray-50 rounded-xl p-3">
               <div className="text-lg font-black text-gray-600">{campaign.totalRecipients}</div>
-              <div className="text-[10px] font-bold text-gray-400 uppercase">Tổng</div>
+              <div className="text-[11px] font-bold text-gray-400 uppercase">Tổng</div>
             </div>
           </div>
 
           {logSummary && (
             <div className="bg-gray-50 rounded-xl p-3 space-y-1">
-              <p className="text-[10px] font-black uppercase text-gray-400">Thống kê gửi</p>
+              <p className="text-[11px] font-black uppercase text-gray-400">Thống kê gửi</p>
               <div className="flex gap-4 text-xs font-bold">
                 <span className="text-blue-600">✓ {logSummary.sent} sent</span>
                 <span className="text-yellow-600">↻ {logSummary.bounced} bounced</span>
@@ -449,7 +449,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
 
           {senderStats.length > 0 && (
             <div className="bg-gray-50 rounded-xl p-3 space-y-2">
-              <p className="text-[10px] font-black uppercase text-gray-400">Theo sender</p>
+              <p className="text-[11px] font-black uppercase text-gray-400">Theo sender</p>
               {senderStats.map(s => (
                 <div key={s.id} className="flex justify-between text-xs">
                   <span className="font-bold text-gray-600">{s.label}</span>
@@ -561,7 +561,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
             <h2 className="font-black text-gray-900 uppercase tracking-tight text-sm">Bổ sung email</h2>
             <p className="text-[11px] text-gray-400">Chọn nguồn giống lúc tạo chiến dịch. Email đã có trong chiến dịch sẽ tự bỏ qua, không gửi trùng.</p>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nguồn</label>
+              <label className="text-[11px] font-black uppercase text-gray-400 ml-1">Nguồn</label>
               <select value={addSource} onChange={e => { setAddSource(e.target.value); setAddPreview(null); setExtraEmails(''); setAddResult('') }}
                 className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none">
                 {!isTeacher && <option value="DB_ALL">Tất cả thành viên (đã xác thực email)</option>}
@@ -574,7 +574,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
 
             {addSource === 'DB_ACTIVE' && (
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Chọn khóa học *</label>
+                <label className="text-[11px] font-black uppercase text-gray-400 ml-1">Chọn khóa học *</label>
                 <select value={addCourseId} onChange={e => setAddCourseId(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none">
                   <option value="">-- Chọn khóa --</option>
@@ -640,7 +640,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                 <div key={log.id} className="flex items-start justify-between gap-2 bg-gray-50 rounded-xl p-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-bold text-gray-900 truncate">{log.toEmail}</p>
-                    <p className="text-[10px] text-gray-500 mt-0.5 space-x-2">
+                    <p className="text-[11px] text-gray-500 mt-0.5 space-x-2">
                       {log.userId ? (
                         <span className="font-bold text-orange-600">#{log.userId} — {log.userName || 'Không tên'}</span>
                       ) : (
@@ -651,7 +651,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                       </span>
                     </p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
+                      <span className={`text-[11px] font-black px-1.5 py-0.5 rounded ${
                         log.status === 'FAILED' ? 'bg-red-100 text-red-600'
                         : log.status === 'BOUNCED' ? 'bg-yellow-100 text-yellow-700'
                         : 'bg-gray-200 text-gray-500'
@@ -659,20 +659,20 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                         {log.status === 'FAILED' ? 'Lỗi' : log.status === 'BOUNCED' ? 'Bounce' : 'Bỏ qua'}
                       </span>
                       {log.errorType && (
-                        <span className="text-[10px] text-gray-400">{log.errorType}</span>
+                        <span className="text-[11px] text-gray-400">{log.errorType}</span>
                       )}
                       {log.errorCode && (
-                        <span className="text-[10px] text-gray-400 truncate">{log.errorCode}</span>
+                        <span className="text-[11px] text-gray-400 truncate">{log.errorCode}</span>
                       )}
                     </div>
-                    <p className="text-[10px] text-gray-300 mt-0.5">
+                    <p className="text-[11px] text-gray-300 mt-0.5">
                       {new Date(log.sentAt).toLocaleString('vi-VN')}
                     </p>
                   </div>
                   {log.errorType === 'BLACKLISTED' && (
                     <button
                       onClick={() => handleRemoveFromBlacklist(log.toEmail)}
-                      className="shrink-0 text-[10px] font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-1 rounded-lg transition-colors"
+                      className="shrink-0 text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-2 rounded-lg transition-colors"
                     >
                       Bỏ chặn
                     </button>
@@ -686,17 +686,17 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
         <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-3">
           <h2 className="font-black text-gray-900 uppercase tracking-tight text-sm">Nội dung email</h2>
           <div>
-            <p className="text-[10px] font-black uppercase text-gray-400 mb-1">Tiêu đề</p>
+            <p className="text-[11px] font-black uppercase text-gray-400 mb-1">Tiêu đề</p>
             <p className="text-sm font-bold text-gray-900">{campaign.subject}</p>
           </div>
           <div>
-            <p className="text-[10px] font-black uppercase text-gray-400 mb-1">Nội dung</p>
+            <p className="text-[11px] font-black uppercase text-gray-400 mb-1">Nội dung</p>
             <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-600 max-h-60 overflow-y-auto font-mono whitespace-pre-wrap break-all">
               {campaign.htmlContent}
             </div>
           </div>
           <div>
-            <p className="text-[10px] font-black uppercase text-gray-400 mb-1">Nguồn người nhận</p>
+            <p className="text-[11px] font-black uppercase text-gray-400 mb-1">Nguồn người nhận</p>
             <p className="text-sm font-bold text-gray-900">{campaign.recipientSource}</p>
           </div>
         </div>

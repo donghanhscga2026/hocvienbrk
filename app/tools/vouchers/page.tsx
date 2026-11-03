@@ -170,7 +170,7 @@ export default function VouchersPage() {
                 {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-red-700 text-sm"><AlertTriangle className="h-4 w-4 shrink-0" /> {error}</div>}
                 {successMsg && <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl flex items-center gap-2 text-green-700 text-sm"><Check className="h-4 w-4 shrink-0" /> {successMsg}</div>}
 
-                <div className="grid grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     {[
                         { label: 'Tổng', value: stats.total, color: 'bg-gray-100 text-gray-700' },
                         { label: 'VIP', value: stats.vip, color: 'bg-amber-100 text-amber-700' },

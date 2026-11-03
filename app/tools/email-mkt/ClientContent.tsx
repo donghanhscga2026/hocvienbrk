@@ -528,7 +528,7 @@ function SenderPerformanceTab() {
                 <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${Math.min(deliverabilityNum, 100)}%` }} />
               </div>
 
-              <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-center">
                 <div className="bg-gray-50 rounded-lg p-2">
                   <div className="text-lg font-bold text-gray-900">{s.totalSent}</div>
                   <div className="text-xs text-gray-500">Đã gửi</div>
