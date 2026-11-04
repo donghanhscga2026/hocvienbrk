@@ -219,6 +219,8 @@ async function run() {
     { slug: 'private', name: 'Private', published: false, offerings: [{ kind: 'PRODUCT', name: 'Nội dung riêng', url: 'https://example.com/private' }] },
   ]
   const Catalog = load('components/wi300/WiOfferingCatalog.tsx', {
+    '@/lib/offerings/server': { getOfferingCatalog: async () => [] },
+    '@/components/offerings/OfferingCatalog': { __esModule: true, default: () => null },
     'next/link': link, 'next/navigation': { notFound: () => { throw Error('404') } },
     '@/lib/prisma': { __esModule: true, default: {} },
     '@/lib/wi300/project-service': { readProjects: async () => source },
