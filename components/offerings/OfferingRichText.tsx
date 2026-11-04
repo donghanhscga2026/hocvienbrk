@@ -25,7 +25,13 @@ const allowed = new Set([
   'th',
 ])
 const blocked = new Set(['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'button'])
-export default function OfferingRichText({ text }: { text?: string | null }) {
+export default function OfferingRichText({
+  text,
+  onOpenLink,
+}: {
+  text?: string | null
+  onOpenLink?: (url: string, title: string) => void
+}) {
   if (!text) return null
   const fragment = parseFragment(text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>'))
   function render(node: DefaultTreeAdapterMap['childNode'], index: number): ReactNode {
@@ -35,9 +41,21 @@ export default function OfferingRichText({ text }: { text?: string | null }) {
     if (!allowed.has(node.tagName)) return children
     const href = node.attrs.find((attr) => attr.name === 'href')?.value
     const safeHref =
-      href && (/^https:\/\//i.test(href) || (href.startsWith('/') && !href.startsWith('//') && !/[\\\s]/.test(href)))
+      href &&
+      (/^https:\/\//i.test(href) || (href.startsWith('/') && !href.startsWith('//') && !/[\\\s]/.test(href)))
         ? href
         : undefined
+    if (node.tagName === 'a' && safeHref && onOpenLink)
+      return createElement(
+        'button',
+        {
+          key: index,
+          type: 'button',
+          className: 'min-h-11 text-left font-semibold text-brk-primary underline',
+          onClick: () => onOpenLink(safeHref, 'Nội dung liên quan'),
+        },
+        ...children,
+      )
     return createElement(
       node.tagName,
       {

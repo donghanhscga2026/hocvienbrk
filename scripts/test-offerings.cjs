@@ -96,6 +96,7 @@ async function run() {
   let html = renderToStaticMarkup(await Detail({ slug: 'EBOOK-5', expectedGroup: 'DIGITAL' }))
   assert.ok(!html.includes(secret) && !html.includes('PRIVATE INSTRUCTIONS'), 'Unpaid page and purchase props contain no protected data')
   assert.ok(!html.includes('PROTECTED LEGACY CONTENT'))
+  assert.ok(html.includes('Private resource'), 'Unpaid visitors can read resource titles without receiving the URLs or paid body')
   enrollment = { status: 'PENDING' }
   html = renderToStaticMarkup(await Detail({ slug: 'EBOOK-5' }))
   assert.ok(!html.includes(secret), 'A pending payment does not grant access')

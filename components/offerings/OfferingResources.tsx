@@ -1,11 +1,23 @@
 'use client'
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { BookOpen, FolderOpen, ArrowUpRight, Layers, LockKeyhole } from 'lucide-react'
+import { BookOpen, FolderOpen, Layers, LockKeyhole } from 'lucide-react'
 import { resourceLabels } from '@/lib/offerings/shared'
+import OfferingViewer from './OfferingViewer'
 
-export type OfferingResource = { title: string; kind: keyof typeof resourceLabels; url?: string; body?: ReactNode }
-export default function OfferingResources({ resources, active }: { resources: OfferingResource[]; active: boolean }) {
+export type OfferingResource = {
+  title: string
+  kind: keyof typeof resourceLabels
+  url?: string
+  body?: ReactNode
+}
+export default function OfferingResources({
+  resources,
+  active,
+}: {
+  resources: OfferingResource[]
+  active: boolean
+}) {
   const [filter, setFilter] = useState('ALL')
   const visible = resources.filter((item) => filter === 'ALL' || item.kind === filter)
   return (
@@ -49,14 +61,12 @@ export default function OfferingResources({ resources, active }: { resources: Of
                     <p className="text-sm text-brk-muted">{resourceLabels[resource.kind]}</p>
                   </div>
                   {resource.url && (
-                    <a
-                      href={resource.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-brk-primary px-4 text-sm font-semibold text-brk-primary"
-                    >
-                      Mở <ArrowUpRight className="h-4 w-4" />
-                    </a>
+                    <details className="w-full">
+                      <summary className="min-h-11 cursor-pointer py-3 font-semibold text-brk-primary">
+                        Xem tại đây
+                      </summary>
+                      <OfferingViewer url={resource.url} title={resource.title} kind={resource.kind} />
+                    </details>
                   )}
                 </div>
                 {resource.body && (

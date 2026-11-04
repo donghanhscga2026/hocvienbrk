@@ -34,7 +34,8 @@ async function run() {
   await act(async () => root.render(React.createElement(Resources, { active: true, resources: [{ title: 'PDF', kind: 'EBOOK', url: 'https://example.com/pdf' }, { title: 'App', kind: 'APP', url: 'https://example.com/app' }] })))
   await act(async () => [...document.querySelectorAll('button')].find(b => b.textContent.includes('Ebook')).click())
   assert.equal(document.querySelectorAll('article').length, 1)
-  assert.equal(document.querySelector('article a').href, 'https://example.com/pdf')
+  assert.equal(document.querySelector('article iframe').src, 'https://example.com/pdf')
+  assert.equal(document.querySelectorAll('article a[target="_blank"]').length, 0)
   await act(async () => root.render(React.createElement(Resources, { active: false, resources: [] })))
   assert.ok(document.body.textContent.includes('Kích hoạt sản phẩm'))
   const RichText = load('components/offerings/OfferingRichText.tsx').default

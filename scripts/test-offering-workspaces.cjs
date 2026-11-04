@@ -82,6 +82,15 @@ async function run() {
   Object.defineProperty(global, 'navigator', { configurable: true, value: dom.window.navigator })
   const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
   const Library = load('components/offerings/OfferingLibrary.tsx', { 'next/link': link }).default
+  const { embeddedSource, default: Viewer } = load('components/offerings/OfferingViewer.tsx')
+  assert.equal(embeddedSource('javascript:alert(1)'), null)
+  assert.equal(embeddedSource('https://'), null)
+  assert.equal(embeddedSource('//evil.example'), null)
+  assert.equal(embeddedSource('https://youtu.be/dQw4w9WgXcQ', 'VIDEO').src, 'https://www.youtube.com/embed/dQw4w9WgXcQ')
+  assert.equal(embeddedSource('https://drive.google.com/file/d/abc_123/view').src, 'https://drive.google.com/file/d/abc_123/preview')
+  assert.equal(embeddedSource('https://files.example/movie.mp4?token=123', 'VIDEO').video, true)
+  const viewerHtml = renderToStaticMarkup(React.createElement(Viewer, { url: 'https://files.example/book.pdf', title: 'PDF' }))
+  assert.ok(viewerHtml.includes('<iframe') && !viewerHtml.includes('target="_blank"') && !viewerHtml.includes('allow-popups') && !viewerHtml.includes('allow-top-navigation'))
   const originalFetch = global.fetch, calls = []
   global.fetch = async url => { calls.push(url); return { ok: true, json: async () => ({ title: url.includes('resource%3A1') ? 'Second body' : 'First body', kind: 'EBOOK', content: 'Only selected content' }) } }
   const root = require('react-dom/client').createRoot(document.getElementById('root'))
@@ -90,6 +99,14 @@ async function run() {
   await React.act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === 'Second').click())
   assert.equal(calls.length, 2); assert.ok(document.body.textContent.includes('Second body'))
   assert.ok(!document.body.textContent.includes('First body'))
+  global.fetch = async () => ({ ok: true, json: async () => ({ title: 'Video and guide', kind: 'VIDEO', content: '<a href="https://files.example/guide.pdf">Read guide</a>', links: [{ title: 'Part one', url: 'https://youtu.be/dQw4w9WgXcQ' }, { title: 'Part two', url: 'https://files.example/part2.mp4' }] }) })
+  await React.act(async () => root.render(React.createElement(Library, { key: 'video', slug: 'VIDEO', resources: [{ id: 'resource:2', title: 'Video', kind: 'VIDEO' }] })))
+  assert.equal(document.querySelector('iframe').src, 'https://www.youtube.com/embed/dQw4w9WgXcQ')
+  await React.act(async () => [...document.querySelectorAll('button')].find(button => button.textContent.includes('Part two')).click())
+  assert.equal(document.querySelector('video').getAttribute('src'), 'https://files.example/part2.mp4')
+  await React.act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === 'Read guide').click())
+  assert.equal(document.querySelector('iframe').src, 'https://files.example/guide.pdf')
+  assert.equal(document.querySelectorAll('a[target="_blank"]').length, 0)
   await React.act(async () => root.unmount()); global.fetch = originalFetch; dom.window.close()
 
   let selectedLayout = 'LIBRARY'

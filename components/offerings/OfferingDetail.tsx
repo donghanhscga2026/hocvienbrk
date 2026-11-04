@@ -3,7 +3,11 @@ import { notFound } from 'next/navigation'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/get-session'
 import { requireDomainCourse } from '@/lib/website/domain-context'
-import { canProfileAccessCourse, getCurrentSiteProfile, getCourseWhereForProfile } from '@/lib/site-profile/runtime'
+import {
+  canProfileAccessCourse,
+  getCurrentSiteProfile,
+  getCourseWhereForProfile,
+} from '@/lib/site-profile/runtime'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import Wi300Header from '@/components/wi300/Wi300Header'
 import Wi300Footer from '@/components/wi300/Wi300Footer'
@@ -55,7 +59,13 @@ export default async function OfferingDetail({
         referralActivationThreshold: true,
         teacher: { select: { name: true } },
         teacherBankAccount: {
-          select: { id: true, accountHolder: true, accountNumber: true, bankName: true, qrCodeUrl: true },
+          select: {
+            id: true,
+            accountHolder: true,
+            accountNumber: true,
+            bankName: true,
+            qrCodeUrl: true,
+          },
         },
       },
     }),
@@ -70,17 +80,29 @@ export default async function OfferingDetail({
     userId != null
       ? prisma.enrollment.findUnique({
           where: { userId_courseId: { userId, courseId: course.id } },
-          include: { payment: { select: { verifiedAt: true, status: true } } },
+          include: {
+            payment: { select: { verifiedAt: true, status: true } },
+          },
         })
       : null,
-    userId != null ? prisma.user.findUnique({ where: { id: userId }, select: { phone: true } }) : null,
+    userId != null
+      ? prisma.user.findUnique({
+          where: { id: userId },
+          select: { phone: true },
+        })
+      : null,
     readOfferingDetails(course.id),
   ])
   if (profile) {
     if (enrollment) {
       const { status: _status, ...scope } = getCourseWhereForProfile(profile)
       void _status
-      if (!(await prisma.course.findFirst({ where: { AND: [scope, { id: course.id }] }, select: { id: true } })))
+      if (
+        !(await prisma.course.findFirst({
+          where: { AND: [scope, { id: course.id }] },
+          select: { id: true },
+        }))
+      )
         notFound()
     } else if (!(await canProfileAccessCourse(profile, course.id))) notFound()
   }
@@ -213,7 +235,11 @@ export default async function OfferingDetail({
               )}
               <div className="grid grid-cols-2 gap-3 border-t border-brk-outline pt-4">
                 <OfferingShare
-                  course={{ id_khoa: course.id_khoa, name_lop: course.name_lop, productGroup: course.productGroup }}
+                  course={{
+                    id_khoa: course.id_khoa,
+                    name_lop: course.name_lop,
+                    productGroup: course.productGroup,
+                  }}
                   userId={userId}
                   siteName={brand?.name || profile?.title || 'Cộng đồng'}
                 />
@@ -255,12 +281,42 @@ export default async function OfferingDetail({
           <section id="tong-quan" className="scroll-mt-36 rounded-2xl border bg-white p-5 sm:p-7">
             <h2 className="mb-4 text-2xl font-bold text-green-950">Tổng quan</h2>
             <OfferingRichText
-              text={course.mo_ta_dai || course.mo_ta_ngan || 'Thông tin chi tiết đang được đơn vị cung cấp cập nhật.'}
+              text={
+                course.mo_ta_dai ||
+                course.mo_ta_ngan ||
+                'Thông tin chi tiết đang được đơn vị cung cấp cập nhật.'
+              }
             />
           </section>
           {group === 'DIGITAL' ? (
             <section id="noi-dung" className="scroll-mt-36 rounded-2xl border bg-green-50 p-6">
-              <h2 className="text-2xl font-bold text-green-950">Không gian sử dụng riêng</h2>
+              <h2 className="text-2xl font-bold text-green-950">Nội dung sản phẩm</h2>
+              {details.agenda.length > 0 ? (
+                <div className="mt-4 divide-y rounded-xl bg-white px-5">
+                  {details.agenda.map((item, index) => (
+                    <details key={index} className="py-2">
+                      <summary className="cursor-pointer py-4 text-lg font-semibold">
+                        {index + 1}. {item.title}
+                      </summary>
+                      <OfferingRichText text={item.description} />
+                    </details>
+                  ))}
+                </div>
+              ) : details.resources.length > 0 ? (
+                <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {details.resources.map((item, index) => (
+                    <li key={index} className="flex items-start gap-3 rounded-xl bg-white p-4">
+                      <CheckCircle2 className="h-5 w-5 shrink-0 text-brk-primary" />
+                      <span>{item.title}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-3 text-brk-muted">
+                  {course.mo_ta_ngan ||
+                    'Đơn vị cung cấp đang cập nhật danh sách nội dung. Bạn có thể gửi yêu cầu để tìm hiểu trước khi đăng ký.'}
+                </p>
+              )}
               <p className="my-3 text-brk-muted">
                 Tài nguyên và hướng dẫn được mở tại khu vực riêng sau khi kích hoạt sản phẩm.
               </p>
@@ -289,8 +345,8 @@ export default async function OfferingDetail({
                 </div>
               ) : (
                 <p className="rounded-2xl border bg-white p-6">
-                  Nội dung cụ thể được thống nhất với chuyên gia theo nhu cầu của bạn. Gửi yêu cầu hỗ trợ để trao đổi
-                  trước khi đăng ký.
+                  Nội dung cụ thể được thống nhất với chuyên gia theo nhu cầu của bạn. Gửi yêu cầu hỗ trợ để
+                  trao đổi trước khi đăng ký.
                 </p>
               )}
             </section>
@@ -304,7 +360,10 @@ export default async function OfferingDetail({
                 ? [
                     ['Kích hoạt sản phẩm', 'Đăng nhập và hoàn tất đăng ký để lưu quyền truy cập.'],
                     ['Chọn tài nguyên', 'Mở nội dung sản phẩm, chọn tài nguyên phù hợp và xem hướng dẫn.'],
-                    ['Bắt đầu áp dụng', 'Mở liên kết hoặc tải về theo hình thức đơn vị cung cấp đã công bố.'],
+                    [
+                      'Bắt đầu áp dụng',
+                      'Xem tài liệu, video và hướng dẫn trực tiếp trong không gian sử dụng.',
+                    ],
                   ]
                 : [
                     ['Đăng ký dịch vụ', 'Hoàn tất đăng ký để kích hoạt quyền đồng hành.'],

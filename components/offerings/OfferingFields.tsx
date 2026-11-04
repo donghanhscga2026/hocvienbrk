@@ -25,7 +25,9 @@ export default function OfferingFields({
   return (
     <section className="mt-6 space-y-4 rounded-2xl border border-brk-outline bg-brk-background p-4">
       <OfferingWorkspaceFields group={group} value={value} onChange={onChange} courseId={courseId} />
-      <h3 className="text-lg font-bold">{group === 'DIGITAL' ? 'Nội dung & quyền sử dụng' : 'Thông tin đồng hành'}</h3>
+      <h3 className="text-lg font-bold">
+        {group === 'DIGITAL' ? 'Nội dung & quyền sử dụng' : 'Thông tin đồng hành'}
+      </h3>
       <label className="block text-sm font-semibold">
         Loại
         <select
@@ -43,7 +45,7 @@ export default function OfferingFields({
       {group === 'DIGITAL' ? (
         <>
           <label className="block text-sm font-semibold">
-            Link mở App / tải tài nguyên
+            Nguồn App / tài liệu xem trực tiếp
             <input
               type="text"
               maxLength={2000}
@@ -54,8 +56,8 @@ export default function OfferingFields({
             />
           </label>
           <p className="text-sm text-brk-muted">
-            Chỉ hiển thị cho khách đã được kích hoạt. App bên ngoài cần có cơ chế cấp quyền riêng; một đường dẫn không
-            tự tạo tài khoản App.
+            Chỉ hiển thị cho khách đã được kích hoạt. App bên ngoài cần có cơ chế cấp quyền riêng; một đường
+            dẫn không tự tạo tài khoản App.
           </p>
           <label className="block text-sm font-semibold">
             Thời hạn sử dụng (ngày)
@@ -69,8 +71,7 @@ export default function OfferingFields({
             />
           </label>
           <p className="text-sm text-brk-muted">
-            0 = không giới hạn. Hệ thống giới hạn thời gian mở link tại website; file khách đã tải về vẫn nằm trên thiết
-            bị của khách.
+            0 = không giới hạn. Thời hạn được tính từ khi kích hoạt quyền sử dụng trên website.
           </p>
         </>
       ) : (
@@ -123,8 +124,8 @@ export default function OfferingFields({
             />
           </label>
           <p className="text-sm text-brk-muted">
-            Chọn mã lịch của đúng chuyên gia và gắn lịch đó với dịch vụ này. Để trống nếu tiếp nhận qua mục Yêu cầu của
-            tôi.
+            Chọn mã lịch của đúng chuyên gia và gắn lịch đó với dịch vụ này. Để trống nếu tiếp nhận qua mục
+            Yêu cầu của tôi.
           </p>
         </>
       )}
@@ -202,8 +203,8 @@ export default function OfferingFields({
         <section className="space-y-3 border-t border-brk-outline pt-4">
           <h4 className="font-bold">Danh sách tài nguyên sau kích hoạt</h4>
           <p className="text-sm text-brk-muted">
-            Tài nguyên chỉ được gửi tới khách có quyền truy cập. Các bài học cũ cũng tự xuất hiện trong mục Nội dung sản
-            phẩm.
+            Tài nguyên chỉ được gửi tới khách có quyền truy cập. Các bài học cũ cũng tự xuất hiện trong mục
+            Nội dung sản phẩm.
           </p>
           {value.resources.map((resource, index) => (
             <div key={index} className="space-y-3 rounded-xl border bg-white p-3">
@@ -245,7 +246,14 @@ export default function OfferingFields({
                   onChange={(e) =>
                     update(
                       'resources',
-                      value.resources.map((item, i) => (i === index ? { ...item, title: e.target.value } : item)),
+                      value.resources.map((item, i) =>
+                        i === index
+                          ? {
+                              ...item,
+                              title: e.target.value,
+                            }
+                          : item,
+                      ),
                     )
                   }
                 />
@@ -259,7 +267,12 @@ export default function OfferingFields({
                     update(
                       'resources',
                       value.resources.map((item, i) =>
-                        i === index ? { ...item, kind: e.target.value as typeof resource.kind } : item,
+                        i === index
+                          ? {
+                              ...item,
+                              kind: e.target.value as typeof resource.kind,
+                            }
+                          : item,
                       ),
                     )
                   }
@@ -289,13 +302,20 @@ export default function OfferingFields({
                   onChange={(e) =>
                     update(
                       'resources',
-                      value.resources.map((item, i) => (i === index ? { ...item, url: e.target.value } : item)),
+                      value.resources.map((item, i) =>
+                        i === index
+                          ? {
+                              ...item,
+                              url: e.target.value,
+                            }
+                          : item,
+                      ),
                     )
                   }
                 />
               </label>
               <label className="block text-sm">
-                Cách mở
+                Trình xem bên trong website
                 <select
                   className={field}
                   value={resource.viewer}
@@ -303,12 +323,17 @@ export default function OfferingFields({
                     update(
                       'resources',
                       value.resources.map((item, i) =>
-                        i === index ? { ...item, viewer: e.target.value as 'LINK' | 'PDF' } : item,
+                        i === index
+                          ? {
+                              ...item,
+                              viewer: e.target.value as 'LINK' | 'PDF',
+                            }
+                          : item,
                       ),
                     )
                   }
                 >
-                  <option value="LINK">Mở tại nơi lưu tài nguyên</option>
+                  <option value="LINK">Tự nhận diện video / tài liệu / App</option>
                   <option value="PDF">Xem PDF bên trong trang (nếu nơi lưu hỗ trợ)</option>
                 </select>
               </label>
@@ -318,71 +343,98 @@ export default function OfferingFields({
             type="button"
             disabled={value.resources.length >= 100}
             onClick={() =>
-              update('resources', [...value.resources, { title: '', kind: 'RESOURCE', viewer: 'LINK', url: '' }])
+              update('resources', [
+                ...value.resources,
+                {
+                  title: '',
+                  kind: 'RESOURCE',
+                  viewer: 'LINK',
+                  url: '',
+                },
+              ])
             }
             className="min-h-12 rounded-xl border border-brk-primary px-4 font-semibold text-brk-primary disabled:opacity-40"
           >
             + Thêm tài nguyên
           </button>
         </section>
-      ) : (
-        <section className="space-y-3 border-t border-brk-outline pt-4">
-          <h4 className="font-bold">Nội dung đồng hành công khai</h4>
-          {value.agenda.map((item, index) => (
-            <div key={index} className="rounded-xl border bg-white p-3">
-              <label className="block text-sm">
-                Tiêu đề mục
-                <input
-                  maxLength={160}
-                  className={field}
-                  value={item.title}
-                  onChange={(e) =>
-                    update(
-                      'agenda',
-                      value.agenda.map((entry, i) => (i === index ? { ...entry, title: e.target.value } : entry)),
-                    )
-                  }
-                />
-              </label>
-              <label className="mt-3 block text-sm">
-                Nội dung
-                <textarea
-                  maxLength={2000}
-                  rows={3}
-                  className={field + ' py-3'}
-                  value={item.description}
-                  onChange={(e) =>
-                    update(
-                      'agenda',
-                      value.agenda.map((entry, i) => (i === index ? { ...entry, description: e.target.value } : entry)),
-                    )
-                  }
-                />
-              </label>
-              <button
-                type="button"
-                className="min-h-11 px-3 text-sm text-red-700"
-                onClick={() =>
+      ) : null}
+      <section className="space-y-3 border-t border-brk-outline pt-4">
+        <h4 className="font-bold">
+          {group === 'DIGITAL' ? 'Nội dung sản phẩm công khai' : 'Nội dung đồng hành công khai'}
+        </h4>
+        <p className="text-sm text-brk-muted">
+          Giới thiệu các nội dung và quyền lợi để khách xem trước khi mua. Không nhập đường dẫn tài nguyên trả
+          phí ở đây.
+        </p>
+        {value.agenda.map((item, index) => (
+          <div key={index} className="rounded-xl border bg-white p-3">
+            <label className="block text-sm">
+              Tiêu đề mục
+              <input
+                maxLength={160}
+                className={field}
+                value={item.title}
+                onChange={(e) =>
                   update(
                     'agenda',
-                    value.agenda.filter((_, i) => i !== index),
+                    value.agenda.map((entry, i) =>
+                      i === index
+                        ? {
+                            ...entry,
+                            title: e.target.value,
+                          }
+                        : entry,
+                    ),
                   )
                 }
-              >
-                Xóa mục
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            disabled={value.agenda.length >= 30}
-            className="min-h-12 rounded-xl border border-brk-primary px-4 font-semibold text-brk-primary disabled:opacity-40"
-            onClick={() => update('agenda', [...value.agenda, { title: '', description: '' }])}
-          >
-            + Thêm mục đồng hành
-          </button>
-        </section>
-      )}
+              />
+            </label>
+            <label className="mt-3 block text-sm">
+              Nội dung
+              <textarea
+                maxLength={2000}
+                rows={3}
+                className={field + ' py-3'}
+                value={item.description}
+                onChange={(e) =>
+                  update(
+                    'agenda',
+                    value.agenda.map((entry, i) =>
+                      i === index
+                        ? {
+                            ...entry,
+                            description: e.target.value,
+                          }
+                        : entry,
+                    ),
+                  )
+                }
+              />
+            </label>
+            <button
+              type="button"
+              className="min-h-11 px-3 text-sm text-red-700"
+              onClick={() =>
+                update(
+                  'agenda',
+                  value.agenda.filter((_, i) => i !== index),
+                )
+              }
+            >
+              Xóa mục
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          disabled={value.agenda.length >= 30}
+          className="min-h-12 rounded-xl border border-brk-primary px-4 font-semibold text-brk-primary disabled:opacity-40"
+          onClick={() => update('agenda', [...value.agenda, { title: '', description: '' }])}
+        >
+          + Thêm mục giới thiệu
+        </button>
+      </section>
       <label className="block text-sm font-semibold">
         {group === 'DIGITAL' ? 'Hướng dẫn sau mua' : 'Chuẩn bị trước buổi hẹn'}
         <textarea

@@ -1,12 +1,28 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { BookOpen, Search, ArrowUpRight, Loader2, FileText } from 'lucide-react'
+import { Search, Loader2, FileText, PlayCircle } from 'lucide-react'
 import { resourceLabels } from '@/lib/offerings/shared'
 import type { ResourceSummary, WorkspaceResource } from '@/lib/offerings/workspace'
 import OfferingRichText from './OfferingRichText'
+import OfferingViewer from './OfferingViewer'
+import OfferingInlineContent from './OfferingInlineContent'
 
-export default function OfferingLibrary({ slug, resources }: { slug: string; resources: ResourceSummary[] }) {
+export default function OfferingLibrary({
+  slug,
+  resources,
+  instructions,
+  compact = false,
+}: {
+  slug: string
+  resources: ResourceSummary[]
+  instructions?: string
+  compact?: boolean
+}) {
+  const [openedLink, setOpenedLink] = useState<{
+    url: string
+    title: string
+  } | null>(null)
   const [query, setQuery] = useState(''),
     [kind, setKind] = useState('ALL')
   const [selected, setSelected] = useState<string | null>(null),
@@ -26,6 +42,7 @@ export default function OfferingLibrary({ slug, resources }: { slug: string; res
   const currentId = current?.id
   useEffect(() => {
     if (!currentId) return
+    setOpenedLink(null)
     const controller = new AbortController()
     fetch(`/api/offerings/${encodeURIComponent(slug)}/resources/${encodeURIComponent(currentId)}`, {
       signal: controller.signal,
@@ -37,26 +54,44 @@ export default function OfferingLibrary({ slug, resources }: { slug: string; res
           setResult(
             response.ok
               ? { id: currentId, data }
-              : { id: currentId, error: data.error || 'Không tải được nội dung.', status: response.status },
+              : {
+                  id: currentId,
+                  error: data.error || 'Không tải được nội dung.',
+                  status: response.status,
+                },
           )
       })
       .catch(() => {
-        if (!controller.signal.aborted) setResult({ id: currentId, error: 'Mất kết nối. Vui lòng thử lại.' })
+        if (!controller.signal.aborted)
+          setResult({
+            id: currentId,
+            error: 'Mất kết nối. Vui lòng thử lại.',
+          })
       })
     return () => controller.abort()
   }, [slug, currentId, retry])
   const loaded = result?.id === currentId ? result : null
   if (!resources.length)
     return (
-      <p className="rounded-2xl border bg-white p-6 text-brk-muted">
-        Tài nguyên đang được đơn vị cung cấp cập nhật. Bạn có thể gửi yêu cầu hỗ trợ ở bên dưới.
-      </p>
+      <section id="tai-nguyen" className="space-y-5 rounded-2xl border bg-white p-6">
+        <p className="text-brk-muted">
+          Tài nguyên đang được đơn vị cung cấp cập nhật. Bạn có thể gửi yêu cầu hỗ trợ ở bên dưới.
+        </p>
+        {instructions && (
+          <section id="huong-dan" className="scroll-mt-28">
+            <h3 className="mb-3 text-xl font-bold">Hướng dẫn sử dụng</h3>
+            <OfferingInlineContent text={instructions} />
+          </section>
+        )}
+      </section>
     )
   return (
     <section id="tai-nguyen" className="scroll-mt-28">
       <h2 className="mb-5 text-2xl font-bold text-green-950">Tài nguyên của bạn</h2>
-      <div className="grid items-start gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <aside className="min-w-0 rounded-2xl border bg-white p-4">
+      <div className={compact ? 'space-y-4' : 'grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]'}>
+        <aside
+          className={`min-w-0 rounded-2xl border bg-white p-4 ${compact ? '' : 'lg:order-2 lg:sticky lg:top-28'}`}
+        >
           <label className="flex items-center gap-2 rounded-xl border px-3">
             <Search className="h-4 w-4 shrink-0 text-brk-primary" />
             <input
@@ -90,10 +125,17 @@ export default function OfferingLibrary({ slug, resources }: { slug: string; res
                 key={item.id}
                 type="button"
                 aria-pressed={currentId === item.id}
-                onClick={() => setSelected(item.id)}
+                onClick={() => {
+                  setSelected(item.id)
+                  setOpenedLink(null)
+                }}
                 className={`flex min-h-14 w-full items-start gap-3 rounded-xl p-3 text-left text-sm ${currentId === item.id ? 'bg-green-50 font-semibold text-green-950' : 'hover:bg-stone-50'}`}
               >
-                <FileText className="h-5 w-5 shrink-0 text-brk-primary" />
+                {item.kind === 'VIDEO' ? (
+                  <PlayCircle className="h-5 w-5 shrink-0 text-brk-primary" />
+                ) : (
+                  <FileText className="h-5 w-5 shrink-0 text-brk-primary" />
+                )}
                 <span className="min-w-0 break-words">{item.title}</span>
               </button>
             ))}
@@ -131,31 +173,16 @@ export default function OfferingLibrary({ slug, resources }: { slug: string; res
                     <h3 className="text-xl font-bold sm:text-2xl">{loaded.data.title}</h3>
                     <p className="mt-2 text-sm text-brk-muted">{resourceLabels[loaded.data.kind]}</p>
                   </div>
-                  {loaded.data.url && (
-                    <a
-                      href={loaded.data.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-brk-primary px-4 font-semibold text-white"
-                    >
-                      {loaded.data.kind === 'APP' ? 'Mở ứng dụng' : 'Mở tài nguyên'}
-                      <ArrowUpRight className="h-4 w-4" />
-                    </a>
-                  )}
                 </div>
-                {loaded.data.viewer === 'PDF' && loaded.data.url && (
-                  <>
-                    <iframe
-                      key={loaded.data.url}
-                      src={loaded.data.url}
-                      title={loaded.data.title}
-                      referrerPolicy="no-referrer"
-                      className="mb-4 h-[65dvh] w-full rounded-xl border"
-                    />
-                    <p className="mb-4 text-sm text-brk-muted">
-                      Nếu trình duyệt hoặc nơi lưu file không hỗ trợ xem tại đây, hãy bấm Mở tài nguyên.
-                    </p>
-                  </>
+                {(openedLink || loaded.data.url || loaded.data.links?.[0]) && (
+                  <OfferingViewer
+                    key={
+                      currentId + ':' + (openedLink?.url || loaded.data.url || loaded.data.links?.[0]?.url)
+                    }
+                    url={openedLink?.url || loaded.data.url || loaded.data.links![0].url}
+                    title={openedLink?.title || loaded.data.title}
+                    kind={loaded.data.kind}
+                  />
                 )}
                 {loaded.data.imageUrl && (
                   <img
@@ -165,34 +192,36 @@ export default function OfferingLibrary({ slug, resources }: { slug: string; res
                     className="mb-5 max-h-96 max-w-full rounded-xl object-contain"
                   />
                 )}
-                <OfferingRichText text={loaded.data.content} />
+                <OfferingRichText
+                  text={loaded.data.content}
+                  onOpenLink={(url, title) => setOpenedLink({ url, title })}
+                />
                 {loaded.data.links?.length ? (
                   <ul className="mt-4 space-y-3">
                     {loaded.data.links.map((link, index) => (
                       <li key={index}>
-                        <a
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => setOpenedLink(link)}
                           className="flex min-h-12 items-center justify-between gap-3 rounded-xl border p-3 font-semibold text-brk-primary"
                         >
                           <span>{link.title}</span>
-                          <ArrowUpRight className="h-4 w-4 shrink-0" />
-                        </a>
+                          <span className="text-sm">Xem tại đây</span>
+                        </button>
                       </li>
                     ))}
                   </ul>
                 ) : !loaded.data.url && !loaded.data.content && !loaded.data.imageUrl ? (
                   <p className="text-brk-muted">Nội dung tài nguyên đang được cập nhật.</p>
                 ) : null}
-                {loaded.data.url && loaded.data.viewer !== 'PDF' && (
-                  <p className="mt-5 flex items-center gap-2 rounded-xl bg-green-50 p-4 text-sm text-brk-muted">
-                    <BookOpen className="h-5 w-5 shrink-0" />
-                    Tài nguyên này được mở tại nơi đơn vị cung cấp lưu trữ.
-                  </p>
-                )}
               </article>
             )
+          )}
+          {instructions && (
+            <section id="huong-dan" className="mt-6 scroll-mt-28 border-t pt-5">
+              <h3 className="mb-3 text-lg font-bold">Hướng dẫn sử dụng</h3>
+              <OfferingInlineContent text={instructions} />
+            </section>
           )}
         </div>
       </div>

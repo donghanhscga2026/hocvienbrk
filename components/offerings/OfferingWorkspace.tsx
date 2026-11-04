@@ -4,7 +4,12 @@ import { ArrowUpRight, CheckCircle2, CalendarDays, Package, LifeBuoy, FileText }
 import prisma from '@/lib/prisma'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import { getPublicProjects } from '@/lib/wi300/public-projects'
-import { requireOfferingWorkspace, readDelivery, workspaceResources, WorkspaceError } from '@/lib/offerings/workspace'
+import {
+  requireOfferingWorkspace,
+  readDelivery,
+  workspaceResources,
+  WorkspaceError,
+} from '@/lib/offerings/workspace'
 import {
   offeringHref,
   offeringWorkspaceHref,
@@ -21,7 +26,8 @@ import FooterSection from '@/components/home/FooterSection'
 import CourseProjectBadges from '@/components/course/CourseProjectBadges'
 import CrmRequestButton from '@/components/crm/CrmRequestButton'
 import OfferingLibrary from './OfferingLibrary'
-import OfferingRichText from './OfferingRichText'
+import OfferingViewer from './OfferingViewer'
+import OfferingInlineContent from './OfferingInlineContent'
 
 const panel = 'rounded-2xl border border-brk-outline bg-white p-5 sm:p-6'
 const action =
@@ -38,7 +44,8 @@ export default async function OfferingWorkspace({
     context = await requireOfferingWorkspace(slug, group)
   } catch (error) {
     if (!(error instanceof WorkspaceError)) throw error
-    if (error.status === 401) redirect('/login?callbackUrl=' + encodeURIComponent(offeringWorkspaceHref(group, slug)))
+    if (error.status === 401)
+      redirect('/login?callbackUrl=' + encodeURIComponent(offeringWorkspaceHref(group, slug)))
     if (error.status === 403) redirect(offeringHref(group, slug))
     notFound()
   }
@@ -54,15 +61,28 @@ export default async function OfferingWorkspace({
           where: {
             userId,
             session: { courseId: course.id },
-            status: { in: ['PENDING', 'CONFIRMED', 'COMPLETED', 'NO_SHOW', 'CANCELLED'] },
+            status: {
+              in: ['PENDING', 'CONFIRMED', 'COMPLETED', 'NO_SHOW', 'CANCELLED'],
+            },
           },
-          select: { id: true, startsAt: true, status: true, session: { select: { title: true, meetingUrl: true } } },
+          select: {
+            id: true,
+            startsAt: true,
+            status: true,
+            session: {
+              select: { title: true, meetingUrl: true },
+            },
+          },
           orderBy: { startsAt: 'asc' },
         })
       : [],
     has('bookings') && group === 'SERVICE' && details.bookingCode
       ? prisma.bookingSession.findFirst({
-          where: { courseId: course.id, code: details.bookingCode, status: 'ACTIVE' },
+          where: {
+            courseId: course.id,
+            code: details.bookingCode,
+            status: 'ACTIVE',
+          },
           select: { code: true },
         })
       : null,
@@ -72,7 +92,10 @@ export default async function OfferingWorkspace({
     .filter((project) => project.courseIds.includes(course.id))
     .map(({ slug, name, logo }) => ({ slug, name, logo }))
   const appUrl = details.accessUrl || details.resources.find((resource) => resource.kind === 'APP')?.url
-  const visibleResources = layout === 'APP' ? resources.filter((resource) => resource.kind !== 'APP') : resources
+  const visibleResources =
+    layout === 'APP'
+      ? resources.filter((resource) => resource.kind !== 'APP' && resource.id !== 'main')
+      : resources
   const showLibrary = has('resources') && (layout === 'LIBRARY' || visibleResources.length > 0)
   const showBookings = has('bookings') && group === 'SERVICE'
   const showDelivery = has('delivery') && group === 'SERVICE' && (layout === 'DELIVERY' || !!delivery)
@@ -81,7 +104,9 @@ export default async function OfferingWorkspace({
     ...(showLibrary ? [['tai-nguyen', 'Tài nguyên']] : []),
     ...(showBookings ? [['lich-hen', 'Lịch hẹn']] : []),
     ...(showDelivery ? [['ban-giao', 'Tiến độ & Bàn giao']] : []),
-    ...(has('instructions') ? [['huong-dan', group === 'SERVICE' ? 'Chuẩn bị & Hướng dẫn' : 'Hướng dẫn']] : []),
+    ...(has('instructions')
+      ? [['huong-dan', group === 'SERVICE' ? 'Chuẩn bị & Hướng dẫn' : 'Hướng dẫn']]
+      : []),
     ...(has('conversation') ? [['trao-doi', 'Trao đổi & Hỗ trợ']] : []),
   ]
   const bookingLabels: Record<string, string> = {
@@ -106,7 +131,9 @@ export default async function OfferingWorkspace({
           <header className="flex flex-wrap items-start justify-between gap-5">
             <div className="space-y-3">
               <CourseProjectBadges projects={badges} compact />
-              <h1 className="text-3xl font-bold tracking-tight text-green-950 sm:text-4xl">{course.name_lop}</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-green-950 sm:text-4xl">
+                {course.name_lop}
+              </h1>
               <p className="text-sm text-brk-muted">
                 {workspaceLayouts[layout]}
                 {course.teacher?.name ? ' · ' + course.teacher.name : ''}
@@ -126,7 +153,10 @@ export default async function OfferingWorkspace({
               </Link>
             </div>
           </header>
-          <nav aria-label="Các mục sử dụng" className="flex gap-2 overflow-x-auto rounded-2xl border bg-white p-2">
+          <nav
+            aria-label="Các mục sử dụng"
+            className="flex gap-2 overflow-x-auto rounded-2xl border bg-white p-2"
+          >
             {navigation.map(([id, label]) => (
               <a
                 key={id}
@@ -138,32 +168,59 @@ export default async function OfferingWorkspace({
             ))}
           </nav>
           {layout === 'APP' && (
-            <section id="ung-dung" className={panel + ' scroll-mt-28'}>
-              <div className="flex flex-wrap items-center justify-between gap-5">
-                <div>
-                  <Package className="mb-3 h-9 w-9 text-brk-primary" />
-                  <h2 className="text-2xl font-bold">Ứng dụng của bạn</h2>
-                  <p className="mt-2 text-sm text-brk-muted">
-                    {details.accessDays
-                      ? `Quyền mở trên Wi300: ${details.accessDays} ngày từ khi kích hoạt.`
-                      : 'Quyền mở trên Wi300 không giới hạn thời gian.'}
-                  </p>
-                  {details.platform && <p className="mt-2 text-sm text-brk-muted">Nền tảng: {details.platform}</p>}
+            <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
+              <section id="ung-dung" className={panel + ' scroll-mt-28'}>
+                <div className="flex flex-wrap items-center justify-between gap-5">
+                  <div>
+                    <Package className="mb-3 h-9 w-9 text-brk-primary" />
+                    <h2 className="text-2xl font-bold">Ứng dụng của bạn</h2>
+                    <p className="mt-2 text-sm text-brk-muted">
+                      {details.accessDays
+                        ? `Quyền mở trên Wi300: ${details.accessDays} ngày từ khi kích hoạt.`
+                        : 'Quyền mở trên Wi300 không giới hạn thời gian.'}
+                    </p>
+                    {details.platform && (
+                      <p className="mt-2 text-sm text-brk-muted">Nền tảng: {details.platform}</p>
+                    )}
+                  </div>
+                  {appUrl ? (
+                    <span className="rounded-full bg-green-50 px-3 py-2 text-sm font-semibold text-green-900">
+                      Mở ứng dụng tại đây
+                    </span>
+                  ) : (
+                    <p className="text-sm text-brk-muted">Đơn vị cung cấp đang cập nhật cách truy cập App.</p>
+                  )}
                 </div>
-                {appUrl ? (
-                  <a href={appUrl} target="_blank" rel="noopener noreferrer" className={action}>
-                    Mở ứng dụng
-                    <ArrowUpRight className="h-4 w-4" />
-                  </a>
-                ) : (
-                  <p className="text-sm text-brk-muted">Đơn vị cung cấp đang cập nhật cách truy cập App.</p>
+                {appUrl && (
+                  <div className="mt-5">
+                    <OfferingViewer key={appUrl} url={appUrl} title={course.name_lop} kind="APP" />
+                  </div>
                 )}
-              </div>
-              <p className="mt-5 rounded-xl bg-stone-50 p-4 text-sm text-brk-muted">
-                Ứng dụng mở theo cơ chế truy cập của nhà cung cấp. Nếu cần tài khoản hoặc mã bản quyền riêng, hãy xem
-                hướng dẫn hoặc gửi yêu cầu hỗ trợ.
-              </p>
-            </section>
+              </section>
+              {(has('instructions') || showLibrary) && (
+                <aside className="min-w-0 space-y-5 xl:sticky xl:top-28">
+                  {has('instructions') && (
+                    <section id="huong-dan" className={panel + ' scroll-mt-28'}>
+                      <h2 className="mb-4 text-xl font-bold text-green-950">Hướng dẫn ngay tại đây</h2>
+                      <OfferingInlineContent
+                        text={
+                          details.instructions ||
+                          'Sử dụng ứng dụng bên cạnh. Gửi yêu cầu hỗ trợ nếu cần hướng dẫn thêm.'
+                        }
+                      />
+                    </section>
+                  )}
+                  {showLibrary && (
+                    <OfferingLibrary
+                      key={course.id + ':' + userId}
+                      slug={slug}
+                      resources={visibleResources}
+                      compact
+                    />
+                  )}
+                </aside>
+              )}
+            </div>
           )}
           {showBookings && (
             <section id="lich-hen" className="scroll-mt-28 space-y-4">
@@ -180,7 +237,10 @@ export default async function OfferingWorkspace({
                 {[
                   ['Hình thức', modeLabels[details.mode]],
                   ['Thời lượng', `${details.sessions} buổi · ${details.durationMin} phút/buổi`],
-                  ['Đã hoàn thành', `${bookings.filter((booking) => booking.status === 'COMPLETED').length} buổi`],
+                  [
+                    'Đã hoàn thành',
+                    `${bookings.filter((booking) => booking.status === 'COMPLETED').length} buổi`,
+                  ],
                 ].map(([label, value]) => (
                   <div key={label} className={panel}>
                     <p className="text-sm text-brk-muted">{label}</p>
@@ -199,17 +259,18 @@ export default async function OfferingWorkspace({
                             {formatVnDateTime(booking.startsAt)} · {bookingLabels[booking.status]}
                           </p>
                         </div>
-                        {booking.status === 'CONFIRMED' && /^https:\/\//i.test(booking.session.meetingUrl || '') && (
-                          <a
-                            href={booking.session.meetingUrl!}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={action}
-                          >
-                            Vào buổi hẹn
-                            <ArrowUpRight className="h-4 w-4" />
-                          </a>
-                        )}
+                        {booking.status === 'CONFIRMED' &&
+                          /^https:\/\//i.test(booking.session.meetingUrl || '') && (
+                            <a
+                              href={booking.session.meetingUrl!}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={action}
+                            >
+                              Vào buổi hẹn
+                              <ArrowUpRight className="h-4 w-4" />
+                            </a>
+                          )}
                       </li>
                     ))}
                   </ul>
@@ -247,7 +308,7 @@ export default async function OfferingWorkspace({
                   {delivery.note && (
                     <div className={panel}>
                       <h3 className="mb-3 font-bold">Cập nhật từ người phụ trách</h3>
-                      <OfferingRichText text={delivery.note} />
+                      <OfferingInlineContent text={delivery.note} />
                     </div>
                   )}
                   <div className={panel}>
@@ -256,18 +317,15 @@ export default async function OfferingWorkspace({
                       <ul className="space-y-3">
                         {delivery.files.map((file, index) => (
                           <li key={index}>
-                            <a
-                              href={file.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex min-h-12 items-center justify-between gap-3 rounded-xl border p-3 font-semibold text-brk-primary"
-                            >
-                              <span className="flex min-w-0 items-center gap-2">
-                                <FileText className="h-5 w-5 shrink-0" />
-                                {file.title}
-                              </span>
-                              <ArrowUpRight className="h-4 w-4 shrink-0" />
-                            </a>
+                            <details className="rounded-xl border p-3">
+                              <summary className="min-h-12 cursor-pointer py-3 font-semibold text-brk-primary">
+                                <span className="flex min-w-0 items-center gap-2">
+                                  <FileText className="h-5 w-5 shrink-0" />
+                                  {file.title}
+                                </span>
+                              </summary>
+                              <OfferingViewer url={file.url} title={file.title} />
+                            </details>
                           </li>
                         ))}
                       </ul>
@@ -278,19 +336,26 @@ export default async function OfferingWorkspace({
                 </>
               ) : (
                 <p className={panel + ' text-brk-muted'}>
-                  Người phụ trách chưa cập nhật tiến độ riêng cho bạn. Các thông tin bàn giao sẽ xuất hiện tại đây khi
-                  được cung cấp.
+                  Người phụ trách chưa cập nhật tiến độ riêng cho bạn. Các thông tin bàn giao sẽ xuất hiện tại
+                  đây khi được cung cấp.
                 </p>
               )}
             </section>
           )}
-          {showLibrary && <OfferingLibrary key={course.id + ':' + userId} slug={slug} resources={visibleResources} />}
-          {has('instructions') && (
+          {showLibrary && layout !== 'APP' && (
+            <OfferingLibrary
+              key={course.id + ':' + userId}
+              slug={slug}
+              resources={visibleResources}
+              instructions={has('instructions') ? details.instructions : undefined}
+            />
+          )}
+          {has('instructions') && layout !== 'APP' && !(showLibrary && details.instructions) && (
             <section id="huong-dan" className={panel + ' scroll-mt-28'}>
               <h2 className="mb-4 text-2xl font-bold text-green-950">
                 {group === 'SERVICE' ? 'Chuẩn bị & Hướng dẫn' : 'Hướng dẫn sử dụng'}
               </h2>
-              <OfferingRichText
+              <OfferingInlineContent
                 text={
                   details.instructions ||
                   'Chọn tài nguyên hoặc mở ứng dụng để bắt đầu. Nếu cần hướng dẫn thêm, hãy liên hệ người phụ trách.'
@@ -301,7 +366,7 @@ export default async function OfferingWorkspace({
                   {details.agenda.map((item, index) => (
                     <details key={index} className="py-2">
                       <summary className="min-h-12 cursor-pointer py-3 font-semibold">{item.title}</summary>
-                      <OfferingRichText text={item.description} />
+                      <OfferingInlineContent text={item.description} />
                     </details>
                   ))}
                 </div>
@@ -317,7 +382,8 @@ export default async function OfferingWorkspace({
                     Trao đổi với người phụ trách
                   </h2>
                   <p className="mt-2 text-sm text-brk-muted">
-                    Gửi thông tin chuẩn bị, phản hồi hoặc yêu cầu hỗ trợ gắn với {groupInfo[group].singular} này.
+                    Gửi thông tin chuẩn bị, phản hồi hoặc yêu cầu hỗ trợ gắn với {groupInfo[group].singular}{' '}
+                    này.
                   </p>
                 </div>
                 <CrmRequestButton
