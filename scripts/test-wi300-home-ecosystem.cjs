@@ -224,6 +224,10 @@ async function run() {
     '@/lib/wi300/project-service': { readProjects: async () => source },
     '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => brand },
     '@/lib/site-profile/presentation': { getPresentationBrand: async () => brand },
+    // Nhóm mục hàng của giảng viên trên trang Sản phẩm/Dịch vụ (Cách 3 — GĐ1) cần thêm 2 module
+    // phía máy chủ; trong môi trường kiểm tra chúng được giả lập để danh sách nhóm rỗng.
+    '@/lib/site-profile/runtime': { getCurrentSiteProfile: async () => null, getCourseWhereForProfile: () => ({}) },
+    '@/lib/wi300/course-visibility': { wi300CoursePreferences: async () => new Map(), wi300CourseWhere: () => ({}) },
   }).default
   await assert.rejects(() => Catalog({ kind: 'PRODUCT' }), /404/)
   brand = { name: 'WI300' }
