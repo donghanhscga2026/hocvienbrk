@@ -42,7 +42,7 @@ export default function OfferingCatalog({
   const Icon = group === 'DIGITAL' ? Package : BriefcaseBusiness
   const kinds =
     group === 'DIGITAL'
-      ? (['APP', 'EBOOK', 'TEMPLATE', 'RESOURCE', 'OTHER'] as const)
+      ? (['COMBO', 'APP', 'EBOOK', 'TEMPLATE', 'RESOURCE', 'OTHER'] as const)
       : (['COACHING', 'CONSULTING', 'IMPLEMENTATION', 'OTHER'] as const)
   const projects = Array.from(
     new Map(items.flatMap((item) => item.projects.map((value) => [value.slug, value] as const))).values(),

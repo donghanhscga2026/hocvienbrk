@@ -86,6 +86,7 @@ export async function enrollInCourseAction(
         ])
 
         if (!course) throw new Error("Khóa học không tồn tại.")
+        if (existing && course.productGroup === 'DIGITAL') await (await import('@/lib/offerings/combo')).syncComboPurchase(existing.id)
 
         // Xử lý riêng cho loại khóa học LIB
         let effectivePhiCoc = course.phi_coc
@@ -190,6 +191,8 @@ export async function enrollInCourseAction(
                     }
                 })
                 await markBenefitUsed()
+
+                if (course.productGroup === 'DIGITAL') await (await import('@/lib/offerings/combo')).syncComboPurchase(updatedEnrollment.id)
 
                 if (isAutoActiveExisting) {
                     const { sendTelegram, sendActivationEmail } = await import("@/lib/notifications")
@@ -420,6 +423,7 @@ export async function enrollInCourseAction(
         }
 
         // Award voucher từ course
+        if (course.productGroup === 'DIGITAL' && newEnrollment) await (await import('@/lib/offerings/combo')).syncComboPurchase(newEnrollment.id)
         const { awardVoucher } = await import('@/lib/voucher/voucher-service')
         const awards = await prisma.courseVoucherAward.findMany({
             where: { courseId },

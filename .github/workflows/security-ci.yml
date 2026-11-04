@@ -103,6 +103,7 @@ jobs:
           node scripts/test-offerings.cjs
           node scripts/test-offerings-ui.cjs
           node scripts/test-offering-workspaces.cjs
+          node scripts/test-offering-combos.cjs
           node scripts/test-wi300-home-ecosystem.cjs
           node scripts/test-wi300-public-streaming.cjs
           node scripts/test-wi300-appearance.cjs

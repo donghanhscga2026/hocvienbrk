@@ -70,7 +70,7 @@ function CreateCourseContent() {
     const [categoryId, setCategoryId] = useState<number | null>(null)
     const [type, setType] = useState('NORMAL')
     const [productGroup, setProductGroup] = useState<ProductGroup>(normalizeProductGroup(searchParams.get('group')))
-    const [offeringDetails, setOfferingDetails] = useState<OfferingDetails>({ ...emptyOfferingDetails })
+    const [offeringDetails, setOfferingDetails] = useState<OfferingDetails>({ ...emptyOfferingDetails, ...(searchParams.get('kind') === 'COMBO' && searchParams.get('group') === 'DIGITAL' ? { kind: 'COMBO' as const } : {}) })
     const group = groupInfo[productGroup]
     const [status, setStatus] = useState(true)
     const [pin, setPin] = useState(0)
@@ -549,7 +549,7 @@ function CreateCourseContent() {
                         </div>
 
                 </div>
-                </div><div data-info-group="offering" hidden={isEditMode && infoGroup !== 'basic'}><OfferingFields group={productGroup} value={offeringDetails} onChange={setOfferingDetails} courseId={courseId || undefined} /></div><div data-info-group="voucher" hidden={isEditMode && infoGroup !== 'voucher'} className="rounded-2xl border border-brk-outline bg-white p-5"><h2 className="text-lg font-bold">Voucher</h2>
+                </div><div data-info-group="offering" hidden={isEditMode && infoGroup !== 'basic'}><OfferingFields group={productGroup} value={offeringDetails} onChange={setOfferingDetails} courseId={courseId || undefined} teacherId={teacherId} /></div><div data-info-group="voucher" hidden={isEditMode && infoGroup !== 'voucher'} className="rounded-2xl border border-brk-outline bg-white p-5"><h2 className="text-lg font-bold">Voucher</h2>
                         <div className="space-y-4 mt-4">
                             <div>
                                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Voucher áp dụng cho khóa này</label>

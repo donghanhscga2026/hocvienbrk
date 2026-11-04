@@ -14,8 +14,13 @@ export async function readOfferingDetails(id: number, db: Pick<Prisma.Transactio
 }
 export async function saveOfferingDetails(db: Prisma.TransactionClient, id: number, group: string, value: unknown, teacherId: number | null) {
   const details = offeringDetailsSchema.parse(value)
-  const allowed = group === 'DIGITAL' ? ['APP', 'EBOOK', 'TEMPLATE', 'RESOURCE', 'OTHER'] : ['COACHING', 'CONSULTING', 'IMPLEMENTATION', 'OTHER']
+  const allowed = group === 'DIGITAL' ? ['COMBO', 'APP', 'EBOOK', 'TEMPLATE', 'RESOURCE', 'OTHER'] : ['COACHING', 'CONSULTING', 'IMPLEMENTATION', 'OTHER']
   if (group !== 'COURSE' && !allowed.includes(details.kind)) throw new Error('Loại nội dung không thuộc nhóm đã chọn.')
+  if (details.kind === 'COMBO') await (await import('./combo')).validateCombo(db, id, group, details, teacherId)
+  else {
+    const previous = await readOfferingDetails(id, db)
+    if (previous.kind === 'COMBO') await (await import('./combo')).validateCombo(db, id, group, details, teacherId)
+  }
   if (group === 'SERVICE' && details.bookingCode) {
     const session = await db.bookingSession.findUnique({ where: { code: details.bookingCode } })
     if (!session || session.expertId !== teacherId || session.status !== 'ACTIVE' || (session.courseId != null && session.courseId !== id)) throw new Error('Mã lịch hẹn phải đang hoạt động, thuộc chuyên gia phụ trách và chưa gắn với dịch vụ khác.')

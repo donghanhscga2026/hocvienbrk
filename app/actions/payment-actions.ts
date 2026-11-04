@@ -262,22 +262,19 @@ export async function rejectPaymentAction(enrollmentId: number, reason: string) 
 
     if (isAdmin) {
       // ADMIN: xóa luôn Payment + LessonProgress + Enrollment
-      await prisma.$transaction([
-        prisma.payment.deleteMany({ where: { enrollmentId } }),
-        prisma.lessonProgress.deleteMany({ where: { enrollmentId } }),
-        prisma.enrollment.delete({ where: { id: enrollmentId } })
-      ])
+      await prisma.$transaction(async tx => {
+        await tx.payment.deleteMany({ where: { enrollmentId } })
+        await tx.lessonProgress.deleteMany({ where: { enrollmentId } })
+        await tx.enrollment.delete({ where: { id: enrollmentId } })
+        if (enrollment.course.productGroup === 'DIGITAL') await (await import('@/lib/offerings/combo')).syncComboInTransaction(tx, enrollmentId)
+      }, { timeout: 20000 })
     } else {
       // TEACHER: chỉ đổi Enrollment -> REJECTED + xóa Payment
-      await prisma.$transaction([
-        prisma.enrollment.update({
-          where: { id: enrollmentId },
-          data: { status: 'REJECTED' }
-        }),
-        prisma.payment.delete({
-          where: { enrollmentId }
-        })
-      ])
+      await prisma.$transaction(async tx => {
+        await tx.enrollment.update({ where: { id: enrollmentId }, data: { status: 'REJECTED' } })
+        await tx.payment.delete({ where: { enrollmentId } })
+        if (enrollment.course.productGroup === 'DIGITAL') await (await import('@/lib/offerings/combo')).syncComboInTransaction(tx, enrollmentId)
+      }, { timeout: 20000 })
     }
 
     revalidatePath('/')
@@ -480,7 +477,7 @@ export async function revertToPendingAction(enrollmentIds: number[]) {
     for (const enrollmentId of enrollmentIds) {
       const enrollment = await prisma.enrollment.findUnique({
         where: { id: enrollmentId },
-        include: { course: { select: { name_lop: true, type: true, id_khoa: true } } }
+        include: { course: { select: { name_lop: true, type: true, id_khoa: true, productGroup: true } } }
       })
       if (!enrollment) continue
 
@@ -514,17 +511,11 @@ export async function revertToPendingAction(enrollmentIds: number[]) {
       }
 
       // Giữ nguyên updatedAt cũ (Prisma @updatedAt sẽ ghi đè bằng now nếu không truyền)
-      await prisma.$transaction([
-        prisma.enrollment.update({
-          where: { id: enrollmentId },
-          data: { status: 'PENDING', updatedAt: enrollment.updatedAt }
-        }),
-        prisma.payment.updateMany({
-          where: { enrollmentId, status: 'VERIFIED' },
-          data: { status: 'PENDING', verifiedAt: null, verifyMethod: null }
-        })
-      ])
-
+      await prisma.$transaction(async tx => {
+        await tx.enrollment.update({ where: { id: enrollmentId }, data: { status: 'PENDING', updatedAt: enrollment.updatedAt } })
+        await tx.payment.updateMany({ where: { enrollmentId, status: 'VERIFIED' }, data: { status: 'PENDING', verifiedAt: null, verifyMethod: null } })
+        if (enrollment.course.productGroup === 'DIGITAL') await (await import('@/lib/offerings/combo')).syncComboInTransaction(tx, enrollmentId)
+      }, { timeout: 20000 })
       count++
     }
 
@@ -682,21 +673,15 @@ export async function cancelEnrollmentAction(enrollmentIds: number[]) {
     for (const enrollmentId of enrollmentIds) {
       const enrollment = await prisma.enrollment.findUnique({
         where: { id: enrollmentId },
-        include: { course: { select: { name_lop: true } } }
+        include: { course: { select: { name_lop: true, productGroup: true } } }
       })
       if (!enrollment) continue
 
-      await prisma.$transaction([
-        prisma.enrollment.update({
-          where: { id: enrollmentId },
-          data: { status: 'CANCELLED' }
-        }),
-        prisma.payment.updateMany({
-          where: { enrollmentId },
-          data: { status: 'CANCELLED' }
-        })
-      ])
-
+      await prisma.$transaction(async tx => {
+        await tx.enrollment.update({ where: { id: enrollmentId }, data: { status: 'CANCELLED' } })
+        await tx.payment.updateMany({ where: { enrollmentId }, data: { status: 'CANCELLED' } })
+        if (enrollment.course.productGroup === 'DIGITAL') await (await import('@/lib/offerings/combo')).syncComboInTransaction(tx, enrollmentId)
+      }, { timeout: 20000 })
       const { logActivity } = await import('@/lib/activity-logger')
       await logActivity({
         userId: enrollment.userId,

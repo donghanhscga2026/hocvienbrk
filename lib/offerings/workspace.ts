@@ -40,6 +40,7 @@ export async function requireOfferingWorkspace(slug: string, group?: Exclude<Pro
   const details = await readOfferingDetails(course.id)
   if (!offeringAccess(enrollment, course.productGroup === 'DIGITAL' ? details.accessDays : 0))
     throw new WorkspaceError('Tài khoản chưa có quyền sử dụng hoặc đã hết hạn.', 403)
+  if (details.kind === 'COMBO') await (await import('./combo')).syncComboPurchase(enrollment!.id)
   return { course, userId, details, session, profile }
 }
 export type ResourceSummary = { id: string; title: string; kind: keyof typeof import('./shared').resourceLabels }

@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
         id_khoa: true,
         name_lop: true,
         type: true,
+        productGroup: true,
         teacherId: true,
         noidung_email: true,
         requiresReferralActivation: true,
@@ -87,6 +88,7 @@ export async function POST(request: NextRequest) {
         userId: userIdNum,
         courseId: course.id,
         status: isAutoActive ? "ACTIVE" : "PENDING",
+        ...(isAutoActive && course.productGroup === 'DIGITAL' ? { activatedAt: new Date() } : {}),
         studyMode,
         phi_coc: effectivePhiCoc,
         referrerId: websiteDomain && !websiteDomain.affiliate ? null : user?.referrerId || null,
@@ -94,6 +96,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Award voucher từ course
+    if (course.productGroup === 'DIGITAL') await (await import('@/lib/offerings/combo')).syncComboPurchase(newEnrollment.id)
     const { awardVoucher } = await import('@/lib/voucher/voucher-service')
     const awards = await prisma.courseVoucherAward.findMany({
       where: { courseId: course.id },

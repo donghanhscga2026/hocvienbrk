@@ -129,7 +129,13 @@ export async function processEnrollmentActivation(options: ActivationOptions): P
     })
   }
 
-  const [payment, updatedEnrollment] = await prisma.$transaction([
+  const combo = enrollment.course.productGroup === 'DIGITAL' && (await (await import('@/lib/offerings/server')).readOfferingDetails(enrollment.courseId)).kind === 'COMBO'
+  const [payment, updatedEnrollment] = combo ? await prisma.$transaction(async tx => {
+    const payment = await tx.payment.upsert({ where: { enrollmentId }, create: { enrollmentId, ...paymentData }, update: paymentData })
+    const updatedEnrollment = await tx.enrollment.update({ where: { id: enrollmentId }, data: { status: 'ACTIVE', activatedAt: finalActivatedAt } })
+    await (await import('@/lib/offerings/combo')).syncComboInTransaction(tx, enrollmentId)
+    return [payment, updatedEnrollment] as const
+  }, { timeout: 20000 }) : await prisma.$transaction([
     prisma.payment.upsert({
       where: { enrollmentId },
       create: { enrollmentId, ...paymentData },

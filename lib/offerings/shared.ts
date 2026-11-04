@@ -10,7 +10,7 @@ export const groupInfo = {
   DIGITAL: { label: 'Sản phẩm số', singular: 'sản phẩm số', catalog: '/san-pham', manager: '/tools/products', description: 'App, Ebook, Template và tài nguyên sử dụng ngay.' },
   SERVICE: { label: 'Dịch vụ', singular: 'dịch vụ', catalog: '/dich-vu', manager: '/tools/services', description: 'Coaching, tư vấn và đồng hành cùng chuyên gia.' },
 } as const
-export const offeringKinds = { APP: 'App', EBOOK: 'Ebook', TEMPLATE: 'Template', RESOURCE: 'Bộ tài nguyên', COACHING: 'Coaching', CONSULTING: 'Tư vấn', IMPLEMENTATION: 'Hỗ trợ triển khai', OTHER: 'Khác' } as const
+export const offeringKinds = { COMBO: 'Combo', APP: 'App', EBOOK: 'Ebook', TEMPLATE: 'Template', RESOURCE: 'Bộ tài nguyên', COACHING: 'Coaching', CONSULTING: 'Tư vấn', IMPLEMENTATION: 'Hỗ trợ triển khai', OTHER: 'Khác' } as const
 const safeUrl = z.string().trim().max(2000).refine(value => !value || (value.startsWith('/') && !value.startsWith('//') && !/[\\\s]/.test(value)) || (() => { try { return new URL(value).protocol === 'https:' } catch { return false } })(), 'Dùng đường dẫn nội bộ hoặc URL https hợp lệ.')
 export const workspaceLayouts = { AUTO: 'Tự chọn theo loại', LIBRARY: 'Thư viện tài nguyên', APP: 'Không gian App', SESSIONS: 'Dịch vụ theo buổi', DELIVERY: 'Triển khai & Bàn giao' } as const
 export const workspaceModules = { resources: 'Tài nguyên', instructions: 'Hướng dẫn / Chuẩn bị', bookings: 'Lịch hẹn', conversation: 'Trao đổi & Hỗ trợ', delivery: 'Tiến độ & Bàn giao' } as const
@@ -18,7 +18,8 @@ export const deliveryStateSchema = z.object({ version: z.number().int().min(0).d
 export const deliveryLabels = { ONLINE: 'Trực tuyến', DOWNLOAD: 'Tải về', BOTH: 'Trực tuyến / tải về' }
 export const deliveryPhaseLabels = { NEW: 'Tiếp nhận', IN_PROGRESS: 'Đang thực hiện', REVIEW: 'Chờ khách duyệt', COMPLETED: 'Đã bàn giao' }
 export const offeringDetailsSchema = z.object({
-  kind: z.enum(['APP', 'EBOOK', 'TEMPLATE', 'RESOURCE', 'COACHING', 'CONSULTING', 'IMPLEMENTATION', 'OTHER']).default('OTHER'),
+  kind: z.enum(['COMBO', 'APP', 'EBOOK', 'TEMPLATE', 'RESOURCE', 'COACHING', 'CONSULTING', 'IMPLEMENTATION', 'OTHER']).default('OTHER'),
+  bundleItems: z.array(z.object({ courseId: z.number().int().positive(), gift: z.boolean().default(false) })).max(50).default([]).refine(items => new Set(items.map(item => item.courseId)).size === items.length, 'Mỗi món chỉ được chọn một lần.'),
   accessUrl: safeUrl.default(''),
   accessDays: z.number().int().min(0).max(36500).default(0),
   instructions: z.string().trim().max(5000).default(''),
@@ -53,6 +54,7 @@ export const resourceLabels = { EBOOK: 'Ebook', APP: 'Công cụ / App', TEMPLAT
 export function offeringWorkspaceHref(group: unknown, slug: string) { return offeringHref(group, slug) + '/su-dung' }
 export function resolvedWorkspace(group: string, details: OfferingDetails) { return details.workspaceLayout !== 'AUTO' ? details.workspaceLayout : group === 'SERVICE' ? details.kind === 'IMPLEMENTATION' ? 'DELIVERY' : 'SESSIONS' : details.kind === 'APP' ? 'APP' : 'LIBRARY' }
 export function offeringFacts(group: string, details: ReturnType<typeof publicOfferingDetails>) {
+  if (details.kind === 'COMBO') return [['Bao gồm', details.format || 'Các món trong gói'], ['Thời hạn', 'Theo từng món'], ['Kích hoạt', 'Sau khi combo được kích hoạt']]
   return group === 'SERVICE'
     ? [['Hình thức', modeLabels[details.mode]], ['Đồng hành', details.audience === 'GROUP' ? 'Theo nhóm' : '1:1'], ['Thời lượng', `${details.sessions} buổi · ${details.durationMin} phút/buổi`]]
     : [['Bao gồm', details.format || offeringKinds[details.kind]], ['Truy cập', deliveryLabels[details.delivery]], ['Thời hạn', details.accessDays ? `${details.accessDays} ngày từ khi kích hoạt` : 'Không giới hạn'], ...(details.platform ? [['Nền tảng', details.platform]] : []), ...(details.language ? [['Ngôn ngữ', details.language]] : [])]

@@ -1,6 +1,7 @@
 'use client'
 
 import OfferingWorkspaceFields from './OfferingWorkspaceFields'
+import OfferingComboFields from './OfferingComboFields'
 import { offeringKinds, type OfferingDetails, type ProductGroup } from '@/lib/offerings/shared'
 
 export default function OfferingFields({
@@ -8,8 +9,10 @@ export default function OfferingFields({
   value,
   onChange,
   courseId,
+  teacherId,
 }: {
   courseId?: string
+  teacherId?: string
   group: ProductGroup
   value: OfferingDetails
   onChange: (value: OfferingDetails) => void
@@ -20,7 +23,7 @@ export default function OfferingFields({
   const field = 'mt-2 min-h-12 w-full rounded-xl border border-brk-outline bg-white px-3 text-base'
   const kinds =
     group === 'DIGITAL'
-      ? (['APP', 'EBOOK', 'TEMPLATE', 'RESOURCE', 'OTHER'] as const)
+      ? (['COMBO', 'APP', 'EBOOK', 'TEMPLATE', 'RESOURCE', 'OTHER'] as const)
       : (['COACHING', 'CONSULTING', 'IMPLEMENTATION', 'OTHER'] as const)
   return (
     <section className="mt-6 space-y-4 rounded-2xl border border-brk-outline bg-brk-background p-4">
@@ -33,7 +36,13 @@ export default function OfferingFields({
         <select
           className={field}
           value={value.kind}
-          onChange={(e) => update('kind', e.target.value as OfferingDetails['kind'])}
+          onChange={(e) =>
+            onChange({
+              ...value,
+              kind: e.target.value as OfferingDetails['kind'],
+              ...(e.target.value === 'COMBO' ? { accessDays: 0, workspaceLayout: 'AUTO' as const } : {}),
+            })
+          }
         >
           {kinds.map((kind) => (
             <option key={kind} value={kind}>
@@ -42,6 +51,9 @@ export default function OfferingFields({
           ))}
         </select>
       </label>
+      {value.kind === 'COMBO' && (
+        <OfferingComboFields value={value} onChange={onChange} courseId={courseId} teacherId={teacherId} />
+      )}
       {group === 'DIGITAL' ? (
         <>
           <label className="block text-sm font-semibold">
@@ -67,11 +79,14 @@ export default function OfferingFields({
               max={36500}
               className={field}
               value={value.accessDays}
+              disabled={value.kind === 'COMBO'}
               onChange={(e) => update('accessDays', Number(e.target.value))}
             />
           </label>
           <p className="text-sm text-brk-muted">
-            0 = không giới hạn. Thời hạn được tính từ khi kích hoạt quyền sử dụng trên website.
+            {value.kind === 'COMBO'
+              ? 'Combo không đặt hạn chung. Từng món dùng thời hạn và số buổi đã cấu hình riêng.'
+              : '0 = không giới hạn. Thời hạn được tính từ khi kích hoạt quyền sử dụng trên website.'}
           </p>
         </>
       ) : (

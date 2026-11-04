@@ -126,6 +126,7 @@ export default async function OfferingDetail({
   const button =
     'inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brk-primary px-4 text-center font-semibold text-white'
   const contentTitle = group === 'DIGITAL' ? 'Nội dung sản phẩm' : 'Nội dung đồng hành'
+  const ComboContents = details.kind === 'COMBO' ? (await import('./OfferingComboContents')).default : null
   return (
     <>
       {ownBrandShell ? <Wi300Header /> : !brand ? <MainHeader title={info.label} profile={profile} /> : null}
@@ -288,6 +289,7 @@ export default async function OfferingDetail({
               }
             />
           </section>
+          {ComboContents && <ComboContents details={details} />}
           {group === 'DIGITAL' ? (
             <section id="noi-dung" className="scroll-mt-36 rounded-2xl border bg-green-50 p-6">
               <h2 className="text-2xl font-bold text-green-950">Nội dung sản phẩm</h2>

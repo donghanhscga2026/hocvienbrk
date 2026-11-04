@@ -51,6 +51,7 @@ export default async function OfferingWorkspace({
   }
   const { course, details, userId, profile } = context
   const layout = resolvedWorkspace(group, details)
+  const ComboContents = details.kind === 'COMBO' ? (await import('./OfferingComboContents')).default : null
   const has = (module: (typeof details.modules)[number]) => details.modules.includes(module)
   const [brand, projects, resources, bookings, bookingSession, delivery] = await Promise.all([
     getCurrentDeploymentBrand(),
@@ -93,10 +94,11 @@ export default async function OfferingWorkspace({
     .map(({ slug, name, logo }) => ({ slug, name, logo }))
   const appUrl = details.accessUrl || details.resources.find((resource) => resource.kind === 'APP')?.url
   const visibleResources = resources
-  const showLibrary = has('resources') && (layout === 'LIBRARY' || visibleResources.length > 0)
+  const showLibrary = has('resources') && (details.kind !== 'COMBO' && layout === 'LIBRARY' || visibleResources.length > 0)
   const showBookings = has('bookings') && group === 'SERVICE'
   const showDelivery = has('delivery') && group === 'SERVICE' && (layout === 'DELIVERY' || !!delivery)
   const navigation = [
+    ...(details.kind === 'COMBO' ? [['combo', 'Các món trong combo']] : []),
     ...(layout === 'APP' && appUrl && !showLibrary ? [['ung-dung', 'Ứng dụng của tôi']] : []),
     ...(showLibrary ? [['tai-nguyen', 'Tài nguyên']] : []),
     ...(showBookings ? [['lich-hen', 'Lịch hẹn']] : []),
@@ -132,7 +134,7 @@ export default async function OfferingWorkspace({
                 {course.name_lop}
               </h1>
               <p className="text-sm text-brk-muted">
-                {workspaceLayouts[layout]}
+                {details.kind === 'COMBO' ? 'Combo · Khóa học, Sản phẩm & Dịch vụ' : workspaceLayouts[layout]}
                 {course.teacher?.name ? ' · ' + course.teacher.name : ''}
               </p>
             </div>
@@ -196,6 +198,7 @@ export default async function OfferingWorkspace({
               </section>
             </div>
           )}
+          {ComboContents && <ComboContents details={details} active />}
           {showBookings && (
             <section id="lich-hen" className="scroll-mt-28 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
