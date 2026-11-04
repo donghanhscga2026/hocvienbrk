@@ -3,10 +3,21 @@ import { useEffect, useState } from 'react'
 import { deliveryStateSchema, deliveryPhaseLabels } from '@/lib/offerings/shared'
 import type { z } from 'zod'
 
-export default function OfferingDeliveryEditor({ slug }: { slug: string }) {
+export default function OfferingDeliveryEditor({
+  slug,
+  selectedUserId,
+  embedded = false,
+  onDirtyChange,
+}: {
+  slug: string
+  selectedUserId?: string
+  embedded?: boolean
+  onDirtyChange?: (dirty: boolean) => void
+}) {
   const [customers, setCustomers] = useState<{ id: number; name: string }[]>([])
-  const [selected, setSelected] = useState(''),
+  const [localSelected, setSelected] = useState(''),
     [retry, setRetry] = useState(0)
+  const selected = selectedUserId ?? localSelected
   const [state, setState] = useState<z.infer<typeof deliveryStateSchema>>(deliveryStateSchema.parse({}))
   const [loadedFor, setLoadedFor] = useState<string | null>(null),
     [error, setError] = useState(''),
@@ -14,10 +25,13 @@ export default function OfferingDeliveryEditor({ slug }: { slug: string }) {
     [busy, setBusy] = useState(false)
   useEffect(() => {
     const controller = new AbortController()
-    fetch(`/api/offerings/${encodeURIComponent(slug)}/delivery${selected === '' ? '' : '?userId=' + selected}`, {
-      cache: 'no-store',
-      signal: controller.signal,
-    })
+    fetch(
+      `/api/offerings/${encodeURIComponent(slug)}/delivery${selected === '' ? '' : '?userId=' + selected}`,
+      {
+        cache: 'no-store',
+        signal: controller.signal,
+      },
+    )
       .then(async (response) => {
         const data = await response.json()
         if (!response.ok) throw new Error(data.error || 'Không tải được dữ liệu.')
@@ -50,7 +64,8 @@ export default function OfferingDeliveryEditor({ slug }: { slug: string }) {
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Không lưu được dữ liệu.')
-      setState(data.state)
+      setState(deliveryStateSchema.parse(data.state))
+      onDirtyChange?.(false)
       setMessage('Đã lưu tiến độ và kết quả riêng cho khách này.')
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Không lưu được dữ liệu.')
@@ -61,10 +76,10 @@ export default function OfferingDeliveryEditor({ slug }: { slug: string }) {
   return (
     <section className="mx-auto max-w-4xl space-y-5">
       <p className="text-sm leading-7 text-brk-muted">
-        Chọn khách đã kích hoạt dịch vụ. Tiến độ, ghi chú và liên kết bàn giao chỉ hiển thị cho đúng khách đó khi bật
-        mục Tiến độ & Bàn giao trong cấu hình dịch vụ.
+        Chọn khách đã kích hoạt dịch vụ. Tiến độ, ghi chú và liên kết bàn giao chỉ hiển thị cho đúng khách đó
+        khi bật mục Tiến độ & Bàn giao trong cấu hình dịch vụ.
       </p>
-      <label className="block font-semibold">
+      <label hidden={embedded} className="block font-semibold">
         Khách hàng
         <select
           disabled={busy}
@@ -88,7 +103,11 @@ export default function OfferingDeliveryEditor({ slug }: { slug: string }) {
       {error && (
         <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">
           {error}
-          <button type="button" onClick={() => setRetry((value) => value + 1)} className="ml-3 min-h-11 underline">
+          <button
+            type="button"
+            onClick={() => setRetry((value) => value + 1)}
+            className="ml-3 min-h-11 underline"
+          >
             Tải lại
           </button>
         </p>
@@ -99,7 +118,7 @@ export default function OfferingDeliveryEditor({ slug }: { slug: string }) {
         </p>
       )}
       {selected !== '' && loadedFor === selected && (
-        <form onSubmit={save}>
+        <form onSubmit={save} onChangeCapture={() => onDirtyChange?.(true)}>
           <fieldset disabled={busy} className="space-y-5 rounded-2xl border bg-white p-5">
             <label className="block font-semibold">
               Tiến độ
@@ -123,6 +142,16 @@ export default function OfferingDeliveryEditor({ slug }: { slug: string }) {
                 maxLength={4000}
                 value={state.note}
                 onChange={(e) => setState({ ...state, note: e.target.value })}
+              />
+            </label>
+            <label className="block font-semibold">
+              Yêu cầu đầu vào / Việc khách cần chuẩn bị
+              <textarea
+                rows={5}
+                maxLength={5000}
+                value={state.requirements}
+                onChange={(event) => setState({ ...state, requirements: event.target.value })}
+                className={field + ' py-3'}
               />
             </label>
             <h2 className="text-lg font-bold">Kết quả bàn giao</h2>
@@ -153,7 +182,9 @@ export default function OfferingDeliveryEditor({ slug }: { slug: string }) {
                     onChange={(e) =>
                       setState({
                         ...state,
-                        files: state.files.map((entry, i) => (i === index ? { ...entry, url: e.target.value } : entry)),
+                        files: state.files.map((entry, i) =>
+                          i === index ? { ...entry, url: e.target.value } : entry,
+                        ),
                       })
                     }
                     placeholder="https://… hoặc đường dẫn nội bộ"
@@ -161,7 +192,10 @@ export default function OfferingDeliveryEditor({ slug }: { slug: string }) {
                 </label>
                 <button
                   type="button"
-                  onClick={() => setState({ ...state, files: state.files.filter((_, i) => i !== index) })}
+                  onClick={() => {
+                    setState({ ...state, files: state.files.filter((_, i) => i !== index) })
+                    onDirtyChange?.(true)
+                  }}
                   className="min-h-11 text-sm text-red-700"
                 >
                   Xóa
@@ -172,18 +206,42 @@ export default function OfferingDeliveryEditor({ slug }: { slug: string }) {
               <button
                 type="button"
                 disabled={state.files.length >= 30}
-                onClick={() => setState({ ...state, files: [...state.files, { title: '', url: '' }] })}
+                onClick={() => {
+                  setState({ ...state, files: [...state.files, { title: '', url: '' }] })
+                  onDirtyChange?.(true)
+                }}
                 className="min-h-12 rounded-xl border px-4"
               >
                 + Thêm bản bàn giao
               </button>
-              <button type="submit" className="min-h-12 rounded-xl bg-brk-primary px-5 font-semibold text-white">
+              <button
+                type="submit"
+                className="min-h-12 rounded-xl bg-brk-primary px-5 font-semibold text-white"
+              >
                 {busy ? 'Đang lưu…' : 'Lưu cho khách này'}
               </button>
             </div>
             <p className="text-sm text-brk-muted">
-              Liên kết bên ngoài vẫn chịu cơ chế cấp quyền của nơi lưu trữ. Chưa tự chuyển file sang kho riêng tư.
+              Liên kết bên ngoài vẫn chịu cơ chế cấp quyền của nơi lưu trữ. Chưa tự chuyển file sang kho riêng
+              tư.
             </p>
+            {state.history.length > 0 && (
+              <section className="space-y-3 border-t pt-4">
+                <h3 className="font-bold">Lịch sử cập nhật</h3>
+                <ol className="space-y-2">
+                  {[...state.history].reverse().map((entry, index) => (
+                    <li key={index} className="rounded-xl bg-stone-50 p-3 text-sm">
+                      {new Intl.DateTimeFormat('vi-VN', {
+                        timeZone: 'Asia/Ho_Chi_Minh',
+                        dateStyle: 'short',
+                        timeStyle: 'short',
+                      }).format(new Date(entry.at))}{' '}
+                      · {deliveryPhaseLabels[entry.phase]}
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
           </fieldset>
         </form>
       )}

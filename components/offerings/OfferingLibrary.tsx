@@ -200,6 +200,7 @@ export default function OfferingLibrary({
                   text={loaded.data.content}
                   onOpenLink={(url, title) => setOpenedLink({ url, title })}
                 />
+                {(loaded.data.instructions || loaded.data.guideUrl) && <section className="mt-5 space-y-4 border-t pt-5"><h4 className="text-lg font-bold">Hướng dẫn cho {loaded.data.title}</h4><OfferingInlineContent text={loaded.data.instructions} />{loaded.data.guideUrl && <OfferingViewer key={loaded.data.guideUrl} url={loaded.data.guideUrl} title={'Hướng dẫn: ' + loaded.data.title} />}</section>}
                 {loaded.data.links?.length ? (
                   <ul className="mt-4 space-y-3">
                     {loaded.data.links.map((link, index) => (

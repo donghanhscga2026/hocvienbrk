@@ -72,6 +72,8 @@ export type WorkspaceResource = {
   viewer?: 'LINK' | 'PDF'
   content?: string | null
   imageUrl?: string | null
+  instructions?: string
+  guideUrl?: string
   links?: { title: string; url: string }[]
 }
 export async function readWorkspaceResource(slug: string, id: string): Promise<WorkspaceResource> {
@@ -81,7 +83,12 @@ export async function readWorkspaceResource(slug: string, id: string): Promise<W
     return { title: 'Tài nguyên sản phẩm', kind: details.kind === 'APP' ? 'APP' : 'RESOURCE', url: details.accessUrl }
   if (/^resource:\d+$/.test(id)) {
     const resource = details.resources[Number(id.slice(9))]
-    if (resource) return resource
+    if (resource) {
+      if (details.modules.includes('instructions')) return resource
+      const { instructions: _instructions, guideUrl: _guideUrl, ...content } = resource
+      void _instructions; void _guideUrl
+      return content
+    }
   }
   if (id.startsWith('lesson:') && id.length < 200) {
     const lesson = await prisma.lesson.findFirst({

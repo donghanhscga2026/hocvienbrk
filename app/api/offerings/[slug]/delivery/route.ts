@@ -82,7 +82,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ slug
       const previous = deliveryStateSchema.parse(old?.value || {})
       if (previous.version !== state.version)
         throw new CrmError('Dữ liệu đã thay đổi. Tải lại trước khi sửa tiếp.', 409)
-      const value = { ...state, version: state.version + 1 }
+      const value = { ...state, version: state.version + 1, history: [...previous.history, { at: new Date().toISOString(), phase: state.phase, actorId: actor.id }].slice(-30) }
       await tx.systemConfig.upsert({ where: { key }, create: { key, value }, update: { value } })
       return value
     })

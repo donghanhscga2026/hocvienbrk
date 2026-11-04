@@ -288,6 +288,7 @@ export default async function OfferingWorkspace({
                       <OfferingInlineContent text={delivery.note} />
                     </div>
                   )}
+                  {delivery.requirements && <section className={panel}><h3 className="mb-3 font-bold">Yêu cầu đầu vào & Chuẩn bị</h3><OfferingInlineContent text={delivery.requirements} /></section>}
                   <div className={panel}>
                     <h3 className="mb-4 font-bold">Bản bàn giao cho bạn</h3>
                     {delivery.files.length ? (

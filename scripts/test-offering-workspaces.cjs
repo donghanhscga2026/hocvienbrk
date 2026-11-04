@@ -70,12 +70,16 @@ async function run() {
   active = true
   assert.equal((await api.PUT(request({ userId: 0, state }), params)).status, 200)
   assert.equal(writes, 1); assert.equal(saved.version, 1)
+  assert.equal(saved.history.length, 1); assert.equal(saved.history[0].actorId, 3, 'Delivery history is stamped by the authenticated actor')
   assert.equal((await api.PUT(request({ userId: 0, state }), params)).status, 409)
   assert.equal(writes, 1)
   assert.equal((await api.GET(new Request('https://wi300.test/api/offerings/PRODUCT/delivery?userId=99'), params)).status, 404)
   const own = await api.GET(new Request('https://wi300.test/api/offerings/PRODUCT/delivery?userId=0'), params)
   assert.equal(own.headers.get('cache-control'), 'private, no-store')
   assert.equal((await own.json()).state.note, 'For customer zero')
+  assert.equal((await api.PUT(request({ userId: 0, state: { ...state, version: 1, requirements: 'Prepare the brief', history: [{ at: '2020-01-01T00:00:00Z', phase: 'COMPLETED', actorId: 999 }] } }), params)).status, 200)
+  assert.equal(saved.requirements, 'Prepare the brief')
+  assert.equal(saved.history.length, 2); assert.ok(saved.history.every(event => event.actorId === 3), 'Clients cannot forge delivery history')
 
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://wi300.test' })
   global.window = dom.window; global.document = dom.window.document; global.IS_REACT_ACT_ENVIRONMENT = true

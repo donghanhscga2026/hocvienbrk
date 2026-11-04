@@ -15,7 +15,9 @@ import CourseSalesPagePanel from '@/components/course/CourseSalesPagePanel'
 import CourseRosterWorkspace from '@/components/course/CourseRosterWorkspace'
 import CourseActivityFeedTab from '@/components/course/CourseActivityFeedTab'
 import OfferingFields from '@/components/offerings/OfferingFields'
-import { emptyOfferingDetails, groupInfo, offeringHref, productGroup as normalizeProductGroup, type OfferingDetails, type ProductGroup } from '@/lib/offerings/shared'
+import OfferingServiceOperations from '@/components/offerings/OfferingServiceOperations'
+import OfferingCustomers from '@/components/offerings/OfferingCustomers'
+import { emptyOfferingDetails, offeringDetailsSchema, groupInfo, offeringHref, offeringWorkspaceHref, productGroup as normalizeProductGroup, type OfferingDetails, type ProductGroup } from '@/lib/offerings/shared'
 
 import { ImportLessonsModal } from '@/components/admin/courses/ImportLessonsModal'
 import { LessonEditModal } from '@/components/admin/courses/LessonEditModal'
@@ -39,9 +41,12 @@ function CreateCourseContent() {
     const courseId = searchParams.get('id')
     const isEditMode = !!courseId
     
-    type ManagementTab = 'info' | 'lessons' | 'members' | 'stats' | 'feed' | 'activity' | 'sales'
+    type ManagementTab = 'info' | 'lessons' | 'members' | 'stats' | 'feed' | 'activity' | 'sales' | 'resources' | 'pricing' | 'settings' | 'operations'
     const initialTab = searchParams.get('tab')
-    const [activeTab, setActiveTab] = useState<ManagementTab>((['info', 'lessons', 'members', 'stats', 'feed', 'activity', 'sales'] as string[]).includes(initialTab || '') ? initialTab as ManagementTab : 'info')
+    const [requestedTab, setActiveTab] = useState<ManagementTab>((['info', 'lessons', 'members', 'stats', 'feed', 'activity', 'sales', 'resources', 'pricing', 'settings', 'operations'] as string[]).includes(initialTab || '') ? initialTab as ManagementTab : 'info')
+    const [dirty, setDirty] = useState(false)
+    const [operationsDirty, setOperationsDirty] = useState(false)
+    const [visitedOperations, setVisitedOperations] = useState(initialTab === 'operations')
     const [infoGroup, setInfoGroup] = useState<'basic' | 'description' | 'payment' | 'voucher' | 'email'>('basic')
     const [visitedSales, setVisitedSales] = useState(initialTab === 'sales')
     const [visitedRoster, setVisitedRoster] = useState(initialTab === 'members' || initialTab === 'stats')
@@ -49,6 +54,7 @@ function CreateCourseContent() {
     function selectTab(tab: ManagementTab) {
         if (tab === 'members' || tab === 'stats') setVisitedRoster(true)
         if (tab === 'sales') setVisitedSales(true)
+        if (tab === 'operations') setVisitedOperations(true)
         setActiveTab(tab)
     }
     const [lessons, setLessons] = useState<any[]>([])
@@ -70,7 +76,16 @@ function CreateCourseContent() {
     const [categoryId, setCategoryId] = useState<number | null>(null)
     const [type, setType] = useState('NORMAL')
     const [productGroup, setProductGroup] = useState<ProductGroup>(normalizeProductGroup(searchParams.get('group')))
+    const activeTab = (productGroup === 'COURSE' ? ['info', 'lessons', 'members', 'stats', 'feed', 'activity', 'sales'] : ['info', 'sales', 'resources', 'pricing', 'settings', 'members', 'feed', ...(productGroup === 'SERVICE' ? ['operations'] : [])]).includes(requestedTab) ? requestedTab : 'info'
+    const offeringForm = ['info', 'sales', 'resources', 'pricing', 'settings'].includes(activeTab)
+    const showInfoGroup = (key: 'basic' | 'description' | 'payment' | 'voucher' | 'email') => productGroup === 'COURSE' ? !isEditMode || infoGroup === key : ({ basic: 'info', description: 'sales', payment: 'pricing', voucher: 'settings', email: 'settings' }[key] === activeTab)
     const [offeringDetails, setOfferingDetails] = useState<OfferingDetails>({ ...emptyOfferingDetails, ...(searchParams.get('kind') === 'COMBO' && searchParams.get('group') === 'DIGITAL' ? { kind: 'COMBO' as const } : {}) })
+    useEffect(() => {
+        if ((!dirty && !operationsDirty) || productGroup === 'COURSE') return
+        const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+        window.addEventListener('beforeunload', warn)
+        return () => window.removeEventListener('beforeunload', warn)
+    }, [dirty, operationsDirty, productGroup])
     const group = groupInfo[productGroup]
     const [status, setStatus] = useState(true)
     const [pin, setPin] = useState(0)
@@ -275,9 +290,17 @@ function CreateCourseContent() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (productGroup !== 'COURSE') {
+            const parsed = offeringDetailsSchema.safeParse(offeringDetails)
+            if (!parsed.success) {
+                const issue = parsed.error.issues[0], key = String(issue.path[0] || '')
+                setActiveTab(['resources', 'bundleItems', 'accessUrl', 'instructions', 'modules', 'workspaceLayout'].includes(key) ? 'resources' : ['agenda', 'benefits', 'salesLayout', 'format', 'platform', 'language'].includes(key) ? 'sales' : 'pricing')
+                setMessage({ type: 'error', text: issue.message }); return
+            }
+        }
         setLoading(true)
         setMessage(null)
-        
+        try {
             if (isEditMode && courseId) {
                 // ✅ EDIT MODE: Gọi updateCourseAction (THÊM MỚI)
                 const updateData: any = {
@@ -317,8 +340,9 @@ function CreateCourseContent() {
             const res = await updateCourseAction(parseInt(courseId), updateData)
             
             if (res.success) {
-                setMessage({ type: 'success', text: 'Đã cập nhật khóa học thành công!' })
-                setTimeout(() => router.push(group.manager), 1500)
+                setMessage({ type: 'success', text: 'Đã cập nhật ' + group.singular + ' thành công!' })
+                setDirty(false)
+                if (productGroup === 'COURSE') setTimeout(() => router.push(group.manager), 1500)
             } else {
                 setMessage({ type: 'error', text: res.error || 'Lỗi khi cập nhật.' })
             }
@@ -356,14 +380,17 @@ function CreateCourseContent() {
             const res = await createCourseAction(formData)
             
             if (res.success) {
-                setMessage({ type: 'success', text: res.message || 'Đã tạo khóa học thành công!' })
-                setTimeout(() => router.push(group.manager), 1500)
+                setMessage({ type: 'success', text: 'Đã tạo ' + group.singular + ' thành công!' })
+                setDirty(false)
+                if (productGroup !== 'COURSE' && res.course) router.replace(`/tools/courses/new?id=${res.course.id}&group=${productGroup}`)
+                else setTimeout(() => router.push(group.manager), 1500)
             } else {
                 setMessage({ type: 'error', text: res.error || 'Lỗi khi tạo khóa học' })
             }
         }
         
-        setLoading(false)
+        } catch (error) { setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Không lưu được dữ liệu. Vui lòng thử lại.' }) }
+        finally { setLoading(false) }
     }
 
     const handleDeleteLesson = async (lessonId: string) => {
@@ -380,14 +407,15 @@ function CreateCourseContent() {
     }
     
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gray-50" onClickCapture={event => { if ((!dirty && !operationsDirty) || productGroup === 'COURSE') return; const anchor = (event.target as HTMLElement).closest('a'); if (anchor && anchor.target !== '_blank' && anchor.getAttribute('href')?.startsWith('/') && !window.confirm('Bạn có thay đổi chưa lưu. Rời trang này?')) { event.preventDefault(); event.stopPropagation() } }}>
             <MainHeader title={(isEditMode ? 'Quản lý ' : 'Tạo ') + group.singular} toolSlug="courses" />
             <ManagementWorkspace active={productGroup === 'DIGITAL' ? 'products' : productGroup === 'SERVICE' ? 'services' : 'courses'}>
             <nav aria-label="Nhóm nội dung" className="flex flex-wrap gap-2">{Object.entries(groupInfo).map(([key, item]) => <Link key={key} href={item.manager} className="inline-flex min-h-11 items-center rounded-xl border border-brk-outline bg-white px-4 text-base font-semibold text-brk-primary">{item.label}</Link>)}</nav>
             
-            {isEditMode && <div className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-4"><div className="flex min-w-0 items-center gap-4">{linkAnhBia && <img src={linkAnhBia} alt="" className="h-20 w-28 shrink-0 rounded-xl object-cover" />}<div><h1 className="text-2xl font-bold text-brk-primary">{nameLop || group.label}</h1><p className="mt-2 text-base text-gray-500">{idKhoa} · {group.label}{productGroup === 'COURSE' ? ` · ${lessons.length} bài giảng` : ''}</p></div></div><div className="flex flex-wrap gap-2"><Link href={offeringHref(productGroup, idKhoa)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-xl border border-brk-outline bg-white px-4 text-base font-semibold text-brk-primary">Xem {group.singular} ↗</Link><button hidden={activeTab !== 'info'} type="submit" form="course-settings-form" disabled={loading || !idKhoa || !nameLop} className="min-h-11 rounded-xl bg-brk-primary px-4 text-base font-semibold text-white disabled:opacity-50">Lưu thay đổi</button></div></div>
-                <nav aria-label={'Quản lý ' + group.singular} className="flex gap-2 overflow-x-auto pb-2">{([{ id: 'info', label: 'Thông tin' }, { id: 'lessons', label: 'Bài giảng' }, { id: 'members', label: productGroup === 'COURSE' ? 'Học viên' : 'Khách hàng' }, { id: 'stats', label: 'Thống kê' }, { id: 'activity', label: 'Hoạt động học viên' }, { id: 'feed', label: 'Nhật ký' }, { id: 'sales', label: 'Trang bán khóa học' }] as const).filter(tab => productGroup === 'COURSE' || ['info', 'members', 'feed'].includes(tab.id)).map(tab => <button key={tab.id} type="button" aria-current={activeTab === tab.id ? 'page' : undefined} onClick={() => selectTab(tab.id)} className={`min-h-12 shrink-0 border-b-2 px-4 text-base font-semibold ${activeTab === tab.id ? 'border-brk-primary text-brk-primary' : 'border-transparent text-gray-500 hover:bg-white/60'}`}>{tab.label}</button>)}</nav>
+            {(isEditMode || productGroup !== 'COURSE') && <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-4"><div className="flex min-w-0 items-center gap-4">{linkAnhBia && <img src={linkAnhBia} alt="" className="h-20 w-28 shrink-0 rounded-xl object-cover" />}<div><h1 className="text-2xl font-bold text-brk-primary">{nameLop || group.label}</h1><p className="mt-2 text-base text-gray-500">{idKhoa} · {group.label}{productGroup === 'COURSE' ? ` · ${lessons.length} bài giảng` : ''}</p></div></div><div className="flex flex-wrap gap-2">{isEditMode && <Link href={offeringHref(productGroup, idKhoa)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-xl border border-brk-outline bg-white px-4 text-base font-semibold text-brk-primary">{productGroup === 'COURSE' ? 'Xem khóa học' : 'Xem trang giới thiệu'} ↗</Link>}<button hidden={productGroup !== 'COURSE' || activeTab !== 'info'} type="submit" form="course-settings-form" disabled={loading || !idKhoa || !nameLop} className="min-h-11 rounded-xl bg-brk-primary px-4 text-base font-semibold text-white disabled:opacity-50">Lưu thay đổi</button></div></div>
+                <nav aria-label={'Quản lý ' + group.singular} className="flex gap-2 overflow-x-auto pb-2">{(productGroup === 'COURSE' ? [{ id: 'info', label: 'Thông tin' }, { id: 'lessons', label: 'Bài giảng' }, { id: 'members', label: 'Học viên' }, { id: 'stats', label: 'Thống kê' }, { id: 'activity', label: 'Hoạt động học viên' }, { id: 'feed', label: 'Nhật ký' }, { id: 'sales', label: 'Trang bán khóa học' }] : [{ id: 'info', label: 'Thông tin' }, { id: 'sales', label: 'Trang giới thiệu' }, { id: 'resources', label: 'Nội dung sử dụng' }, { id: 'pricing', label: 'Giá & Quyền lợi' }, { id: 'members', label: 'Khách hàng' }, ...(productGroup === 'SERVICE' ? [{ id: 'operations', label: 'Vận hành' }] : []), { id: 'settings', label: 'Cài đặt thêm' }, { id: 'feed', label: 'Nhật ký' }]).map(tab => <button key={tab.id} type="button" disabled={!isEditMode && ['members', 'operations', 'feed'].includes(tab.id)} aria-current={activeTab === tab.id ? 'page' : undefined} onClick={() => selectTab(tab.id as ManagementTab)} className={`min-h-12 shrink-0 border-b-2 px-4 text-base font-semibold disabled:opacity-40 ${activeTab === tab.id ? 'border-brk-primary text-brk-primary' : 'border-transparent text-gray-500 hover:bg-white/60'}`}>{tab.label}</button>)}</nav>
+                {productGroup !== 'COURSE' && <div className="flex flex-wrap items-center gap-3">{dirty && <span className="text-sm font-semibold text-amber-800">Có thay đổi chưa lưu</span>}{isEditMode && <Link href={offeringWorkspaceHref(productGroup, idKhoa)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-xl border bg-white px-4 font-semibold text-brk-primary">Xem không gian sử dụng</Link>}{offeringForm && <button type="submit" form="course-settings-form" disabled={loading || !idKhoa || !nameLop} className="min-h-12 rounded-xl bg-brk-primary px-5 font-semibold text-white disabled:opacity-40">{loading ? 'Đang lưu…' : 'Lưu thay đổi'}</button>}</div>}
             </div>}
             
             <div className="space-y-6 pb-12">
@@ -396,14 +424,16 @@ function CreateCourseContent() {
                 </Link>
                 
                 {isEditMode && activeTab === 'activity' && <CourseManagementActivity courseId={Number(courseId)} onOpenStudent={id => { setInitialStudentId(id); selectTab('members') }} />}
-                {isEditMode && visitedRoster && <div hidden={activeTab !== 'members' && activeTab !== 'stats'}><CourseRosterWorkspace key={courseId} courseId={Number(courseId)} courseName={nameLop} tab={activeTab === 'stats' ? 'stats' : 'members'} initialStudentId={initialStudentId} onActivity={() => selectTab('activity')} /></div>}
+                {isEditMode && visitedRoster && <div hidden={activeTab !== 'members' && activeTab !== 'stats'}>{productGroup === 'COURSE' ? <CourseRosterWorkspace key={courseId} courseId={Number(courseId)} courseName={nameLop} tab={activeTab === 'stats' ? 'stats' : 'members'} initialStudentId={initialStudentId} onActivity={() => selectTab('activity')} /> : <OfferingCustomers key={courseId} slug={idKhoa} legacyPanel={<CourseRosterWorkspace courseId={Number(courseId)} courseName={nameLop} tab="members" />} />}</div>}
                 {isEditMode && activeTab === 'feed' && <div className="rounded-2xl border bg-white"><CourseActivityFeedTab courseId={Number(courseId)} showAllActivity /></div>}
-                {isEditMode && visitedSales && idKhoa && <div hidden={activeTab !== 'sales'}><CourseSalesPagePanel slug={idKhoa} courseName={nameLop} courseId={courseId ? Number(courseId) : undefined} canEdit={isAdmin || isTeacher} /></div>}
-                <div hidden={isEditMode && activeTab !== 'info'} className={isEditMode ? "grid grid-cols-1 items-start gap-4 xl:grid-cols-[160px_minmax(0,1fr)_260px]" : "space-y-5"}>
-                {isEditMode && <nav aria-label="Nhóm thông tin khóa học" className="flex gap-1 overflow-x-auto rounded-2xl border border-brk-outline bg-white p-2 xl:flex-col">{([{ id: 'basic', label: 'Thông tin cơ bản' }, { id: 'description', label: 'Mô tả & hình ảnh' }, { id: 'payment', label: 'Thanh toán & kích hoạt' }, { id: 'voucher', label: 'Voucher' }, { id: 'email', label: 'Email & Zalo' }] as const).map(group => <button key={group.id} type="button" aria-pressed={infoGroup === group.id} onClick={() => setInfoGroup(group.id)} className={`min-h-11 shrink-0 rounded-xl px-3 text-left text-sm ${infoGroup === group.id ? 'bg-brk-background font-bold text-brk-primary' : 'text-gray-500 hover:bg-gray-50'}`}>{group.label}</button>)}</nav>}
-                <form id="course-settings-form" onSubmit={handleSubmit} onInvalid={event => { const group = (event.target as HTMLElement).closest<HTMLElement>('[data-info-group]')?.dataset.infoGroup; if (group === 'offering') { setInfoGroup('basic'); setActiveTab('info') } else if (group === 'basic' || group === 'description' || group === 'payment' || group === 'voucher' || group === 'email') { setInfoGroup(group); setActiveTab('info') } }} className="space-y-8">
+                {isEditMode && visitedSales && idKhoa && (productGroup === 'COURSE' || offeringDetails.salesLayout === 'TEMPLATE') && <div hidden={activeTab !== 'sales'}><CourseSalesPagePanel slug={idKhoa} courseName={nameLop} courseId={courseId ? Number(courseId) : undefined} canEdit={isAdmin || isTeacher} /></div>}
+                {productGroup !== 'COURSE' && message && <p role={message.type === 'error' ? 'alert' : 'status'} className={`rounded-xl border p-4 ${message.type === 'error' ? 'bg-red-50 text-red-900' : 'bg-green-50 text-green-950'}`}>{message.text}</p>}
+                {isEditMode && productGroup === 'SERVICE' && visitedOperations && <div hidden={activeTab !== 'operations'}><OfferingServiceOperations slug={idKhoa} courseId={Number(courseId)} onDirtyChange={setOperationsDirty} preferBookings={['COACHING', 'CONSULTING'].includes(offeringDetails.kind) || offeringDetails.workspaceLayout === 'SESSIONS'} /></div>}
+                <div hidden={productGroup === 'COURSE' ? isEditMode && activeTab !== 'info' : !offeringForm} className={isEditMode && productGroup === 'COURSE' ? "grid grid-cols-1 items-start gap-4 xl:grid-cols-[160px_minmax(0,1fr)_260px]" : "space-y-5"}>
+                {isEditMode && productGroup === 'COURSE' && <nav aria-label="Nhóm thông tin khóa học" className="flex gap-1 overflow-x-auto rounded-2xl border border-brk-outline bg-white p-2 xl:flex-col">{([{ id: 'basic', label: 'Thông tin cơ bản' }, { id: 'description', label: 'Mô tả & hình ảnh' }, { id: 'payment', label: 'Thanh toán & kích hoạt' }, { id: 'voucher', label: 'Voucher' }, { id: 'email', label: 'Email & Zalo' }] as const).map(group => <button key={group.id} type="button" aria-pressed={infoGroup === group.id} onClick={() => setInfoGroup(group.id)} className={`min-h-11 shrink-0 rounded-xl px-3 text-left text-sm ${infoGroup === group.id ? 'bg-brk-background font-bold text-brk-primary' : 'text-gray-500 hover:bg-gray-50'}`}>{group.label}</button>)}</nav>}
+                <form id="course-settings-form" onChangeCapture={event => { if (productGroup !== 'COURSE' && (event.target as unknown as HTMLInputElement).type !== 'search') setDirty(true) }} onSubmit={handleSubmit} onInvalid={event => { if (productGroup !== 'COURSE') { const part = (event.target as HTMLElement).closest<HTMLElement>('[data-offering-section]')?.dataset.offeringSection; const key = (event.target as HTMLElement).closest<HTMLElement>('[data-info-group]')?.dataset.infoGroup; setActiveTab((part || ({ basic: 'info', description: 'sales', payment: 'pricing', voucher: 'settings', email: 'settings' }[key || ''] || 'info')) as ManagementTab); return } const group = (event.target as HTMLElement).closest<HTMLElement>('[data-info-group]')?.dataset.infoGroup; if (group === 'offering') { setInfoGroup('basic'); setActiveTab('info') } else if (group === 'basic' || group === 'description' || group === 'payment' || group === 'voucher' || group === 'email') { setInfoGroup(group); setActiveTab('info') } }} className="space-y-8">
                 {/* Giữ form được mount để không mất dữ liệu khi chuyển nhóm / tab. */}
-                <div data-info-group="basic" hidden={isEditMode && infoGroup !== 'basic'} className="space-y-5">
+                <div data-info-group="basic" hidden={!showInfoGroup('basic')} className="space-y-5">
                 {/* SECTION 1: THÔNG TIN CƠ BẢN */}
                 <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-brk-outline">
                     <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
@@ -549,7 +579,7 @@ function CreateCourseContent() {
                         </div>
 
                 </div>
-                </div><div data-info-group="offering" hidden={isEditMode && infoGroup !== 'basic'}><OfferingFields group={productGroup} value={offeringDetails} onChange={setOfferingDetails} courseId={courseId || undefined} teacherId={teacherId} /></div><div data-info-group="voucher" hidden={isEditMode && infoGroup !== 'voucher'} className="rounded-2xl border border-brk-outline bg-white p-5"><h2 className="text-lg font-bold">Voucher</h2>
+                </div><div data-info-group="offering" hidden={productGroup !== 'COURSE' && !['info', 'sales', 'resources', 'pricing'].includes(activeTab)}><OfferingFields group={productGroup} value={offeringDetails} onChange={value => { setOfferingDetails(value); setDirty(true) }} courseId={courseId || undefined} teacherId={teacherId} section={productGroup === 'COURSE' ? 'all' : (['info', 'sales', 'resources', 'pricing'].includes(activeTab) ? activeTab as 'info' | 'sales' | 'resources' | 'pricing' : 'info')} existing={lessons} onEditExisting={item => setSelectedLesson(item)} /></div><div data-info-group="voucher" hidden={!showInfoGroup('voucher')} className="rounded-2xl border border-brk-outline bg-white p-5"><h2 className="text-lg font-bold">Voucher</h2>
                         <div className="space-y-4 mt-4">
                             <div>
                                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Voucher áp dụng cho khóa này</label>
@@ -631,7 +661,7 @@ function CreateCourseContent() {
                             </div>
                         </div>
 
-                </div><div data-info-group="description" hidden={isEditMode && infoGroup !== 'description'} className="space-y-5">
+                </div><div data-info-group="description" hidden={!showInfoGroup('description')} className="space-y-5">
                 {/* SECTION 2: MÔ TẢ & HÌNH ẢNH */}
                 <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-brk-outline">
                     <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
@@ -692,7 +722,7 @@ function CreateCourseContent() {
                     </div>
                 </div>
                 
-                </div><div data-info-group="payment" hidden={isEditMode && infoGroup !== 'payment'}>
+                </div><div data-info-group="payment" hidden={!showInfoGroup('payment')}>
                 {/* SECTION 3: HỌC PHÍ & THANH TOÁN */}
                 <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-brk-outline">
                     <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
@@ -789,7 +819,7 @@ function CreateCourseContent() {
                     </div>
                 </div>
                 
-                </div><div data-info-group="email" hidden={isEditMode && infoGroup !== 'email'}>
+                </div><div data-info-group="email" hidden={!showInfoGroup('email')}>
                 {/* SECTION 4: EMAIL & ZALO */}
                 <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-brk-outline">
                     <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
@@ -848,7 +878,7 @@ function CreateCourseContent() {
                     {isEditMode ? 'Lưu ' + group.singular : 'Tạo ' + group.singular}
                 </button>
                 </form>
-                {isEditMode && <aside className="space-y-4"><section className="rounded-2xl border border-brk-outline bg-white p-5"><h2 className="font-bold">Hiển thị {group.singular}</h2><label className="mt-4 flex min-h-11 items-center justify-between gap-3 text-base"><span>{status ? 'Đang hiển thị công khai' : 'Đang ẩn'}</span><input type="checkbox" aria-label={'Hiển thị ' + group.singular} checked={status} onChange={event => setStatus(event.target.checked)} className="h-5 w-5 accent-green-700" /></label><p className="mt-2 text-sm leading-5 text-gray-500">Bấm Lưu thay đổi để áp dụng.</p>{productGroup === 'COURSE' && <button type="button" onClick={() => selectTab('sales')} className="mt-4 min-h-11 text-sm font-semibold text-brk-primary">Thiết lập trang bán khóa học →</button>}</section>{productGroup === 'COURSE' && <><WiCourseProjects key={courseId} courseId={courseId!} compact /><CourseSalesPagePanel slug={idKhoa} courseName={nameLop} courseId={Number(courseId)} canEdit={isAdmin || isTeacher} compact active={activeTab === 'info'} onOpen={() => selectTab('sales')} /></>}</aside>}
+                {isEditMode && (productGroup === 'COURSE' || ['info', 'sales'].includes(activeTab)) && <aside className="space-y-4"><section className="rounded-2xl border border-brk-outline bg-white p-5"><h2 className="font-bold">Hiển thị {group.singular}</h2><label className="mt-4 flex min-h-11 items-center justify-between gap-3 text-base"><span>{status ? 'Đang hiển thị công khai' : 'Đang ẩn'}</span><input type="checkbox" aria-label={'Hiển thị ' + group.singular} checked={status} onChange={event => { setStatus(event.target.checked); if (productGroup !== 'COURSE') setDirty(true) }} className="h-5 w-5 accent-green-700" /></label><p className="mt-2 text-sm leading-5 text-gray-500">Bấm Lưu thay đổi để áp dụng.</p>{productGroup === 'COURSE' && <button type="button" onClick={() => selectTab('sales')} className="mt-4 min-h-11 text-sm font-semibold text-brk-primary">Thiết lập trang bán khóa học →</button>}</section>{productGroup === 'COURSE' && <><WiCourseProjects key={courseId} courseId={courseId!} compact /><CourseSalesPagePanel slug={idKhoa} courseName={nameLop} courseId={Number(courseId)} canEdit={isAdmin || isTeacher} compact active={activeTab === 'info'} onOpen={() => selectTab('sales')} /></>}</aside>}
                 </div>
 
                 {isEditMode && activeTab === 'lessons' && (

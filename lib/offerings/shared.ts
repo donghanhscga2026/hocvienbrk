@@ -14,7 +14,7 @@ export const offeringKinds = { COMBO: 'Combo', APP: 'App', EBOOK: 'Ebook', TEMPL
 const safeUrl = z.string().trim().max(2000).refine(value => !value || (value.startsWith('/') && !value.startsWith('//') && !/[\\\s]/.test(value)) || (() => { try { return new URL(value).protocol === 'https:' } catch { return false } })(), 'Dùng đường dẫn nội bộ hoặc URL https hợp lệ.')
 export const workspaceLayouts = { AUTO: 'Tự chọn theo loại', LIBRARY: 'Thư viện tài nguyên', APP: 'Không gian App', SESSIONS: 'Dịch vụ theo buổi', DELIVERY: 'Triển khai & Bàn giao' } as const
 export const workspaceModules = { resources: 'Tài nguyên', instructions: 'Hướng dẫn / Chuẩn bị', bookings: 'Lịch hẹn', conversation: 'Trao đổi & Hỗ trợ', delivery: 'Tiến độ & Bàn giao' } as const
-export const deliveryStateSchema = z.object({ version: z.number().int().min(0).default(0), phase: z.enum(['NEW', 'IN_PROGRESS', 'REVIEW', 'COMPLETED']).default('NEW'), note: z.string().trim().max(4000).default(''), files: z.array(z.object({ title: z.string().trim().min(1).max(200), url: safeUrl.refine(Boolean, 'Nhập liên kết bàn giao.') })).max(30).default([]) }).strict()
+export const deliveryStateSchema = z.object({ version: z.number().int().min(0).default(0), phase: z.enum(['NEW', 'IN_PROGRESS', 'REVIEW', 'COMPLETED']).default('NEW'), note: z.string().trim().max(4000).default(''), requirements: z.string().trim().max(5000).default(''), history: z.array(z.object({ at: z.string().datetime(), phase: z.enum(['NEW', 'IN_PROGRESS', 'REVIEW', 'COMPLETED']), actorId: z.number().int().min(0) })).max(30).default([]), files: z.array(z.object({ title: z.string().trim().min(1).max(200), url: safeUrl.refine(Boolean, 'Nhập liên kết bàn giao.') })).max(30).default([]) }).strict()
 export const deliveryLabels = { ONLINE: 'Trực tuyến', DOWNLOAD: 'Tải về', BOTH: 'Trực tuyến / tải về' }
 export const deliveryPhaseLabels = { NEW: 'Tiếp nhận', IN_PROGRESS: 'Đang thực hiện', REVIEW: 'Chờ khách duyệt', COMPLETED: 'Đã bàn giao' }
 export const offeringDetailsSchema = z.object({
@@ -37,7 +37,7 @@ export const offeringDetailsSchema = z.object({
   audience: z.enum(['INDIVIDUAL', 'GROUP']).default('INDIVIDUAL'),
   benefits: z.array(z.string().trim().max(240)).max(6).default([]).transform(items => items.filter(Boolean)),
   agenda: z.array(z.object({ title: z.string().trim().min(1).max(160), description: z.string().trim().max(2000) })).max(30).default([]),
-  resources: z.array(z.object({ title: z.string().trim().min(1).max(200), kind: z.enum(['EBOOK', 'APP', 'TEMPLATE', 'GUIDE', 'RESOURCE', 'PROMPT', 'VIDEO']), viewer: z.enum(['LINK', 'PDF']).default('LINK'), url: safeUrl.refine(value => !!value, 'Nhập đường dẫn tài nguyên.') })).max(100).default([]),
+  resources: z.array(z.object({ title: z.string().trim().min(1).max(200), kind: z.enum(['EBOOK', 'APP', 'TEMPLATE', 'GUIDE', 'RESOURCE', 'PROMPT', 'VIDEO']), viewer: z.enum(['LINK', 'PDF']).default('LINK'), url: safeUrl.refine(value => !!value, 'Nhập đường dẫn tài nguyên.'), instructions: z.string().trim().max(5000).default(''), guideUrl: safeUrl.default('') })).max(100).default([]),
 }).strict()
 export type OfferingDetails = z.infer<typeof offeringDetailsSchema>
 export const emptyOfferingDetails: OfferingDetails = offeringDetailsSchema.parse({})
