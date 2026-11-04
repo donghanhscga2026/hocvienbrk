@@ -53,7 +53,7 @@ async function run() {
   assert.equal(helpers.toolWorkspace(tools[1]), 'tools')
   assert.equal(helpers.toolWorkspace(tools[2]), 'business')
   assert.equal(helpers.toolWorkspace(tools[3]), 'admin')
-  for (const [slug, workspace] of [['roadmap', 'learning'], ['affiliate', 'affiliate'], ['genealogy', 'affiliate'], ['bank-accounts', 'account'], ['payments', 'business'], ['email-mkt', 'business'], ['dev-flow', 'admin']]) {
+  for (const [slug, workspace] of [['roadmap', 'learning'], ['affiliate', 'business'], ['genealogy', 'business'], ['bank-accounts', 'account'], ['payments', 'business'], ['email-mkt', 'business'], ['dev-flow', 'admin']]) {
     assert.equal(helpers.toolWorkspace({ id: 20, slug, name: slug, url: `/tools/${slug}`, roles: [], isActive: true }), workspace)
   }
 
@@ -99,8 +99,8 @@ async function run() {
     await act(async () => render())
     assert.equal(document.querySelectorAll('article').length, 6)
     assert.ok(document.querySelector('article img[src="https://example.com/course.png"]'))
-    assert.equal(document.querySelector('h1').textContent, 'Học tập')
-    assert.ok(document.querySelector('nav a[href="/my-space?tab=affiliate"]'))
+    assert.equal(document.querySelector('h1').textContent, 'Đã đăng ký & Đã mua')
+    assert.ok(document.querySelector('nav a[href="/my-space?tab=business"]'))
     assert.equal(document.querySelector('nav a[href="/my-space?tab=admin"]'), null)
     assert.match(document.querySelector('[aria-label="Phân trang khóa học"]').textContent, /Trang 1\/2/)
     await act(async () => [...document.querySelectorAll('button')].find(b => b.textContent.includes('Trang sau')).click())

@@ -6,6 +6,7 @@ import { getAdminCoursesAction, bulkToggleCourseStatusAction } from '@/app/actio
 import { getTeachersAction } from '@/app/actions/course-actions'
 import MainHeader from '@/components/layout/MainHeader'
 import ManagementWorkspace from '@/components/layout/ManagementWorkspace'
+import OfferingManagementTabs from '@/components/offerings/OfferingManagementTabs'
 import { groupInfo, offeringHref, type ProductGroup } from '@/lib/offerings/shared'
 
 type Item = { id: number; id_khoa: string; name_lop: string; productGroup?: string; status: boolean; phi_coc: number; link_anh_bia: string | null; teacher?: { name: string | null } | null; _count?: { enrollments: number } }
@@ -48,7 +49,7 @@ export default function OfferingManager({ group }: { group: Exclude<ProductGroup
   }
   return <div className="min-h-screen bg-brk-background text-brk-on-surface"><MainHeader title={'Quản lý ' + info.singular} toolSlug="courses" /><ManagementWorkspace active={group === 'DIGITAL' ? 'products' : 'services'}>
     <div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-3xl font-bold">{info.label}</h1><p className="mt-2 text-base text-brk-muted">{info.description}</p></div><Link href={'/tools/courses/new?group=' + group} className="inline-flex min-h-12 items-center rounded-xl bg-brk-primary px-5 font-semibold text-white">+ Thêm {info.singular}</Link></div>
-    <nav aria-label="Nhóm quản lý" className="flex flex-wrap gap-2">{Object.entries(groupInfo).map(([key, item]) => <Link key={key} href={item.manager} aria-current={group === key ? 'page' : undefined} className={field + ' inline-flex items-center ' + (group === key ? 'font-bold text-brk-primary ring-1 ring-brk-primary' : '')}>{item.label}</Link>)}</nav>
+    <OfferingManagementTabs active={group} />
     <div className="grid gap-3 sm:grid-cols-3"><input type="search" aria-label="Tìm nội dung" placeholder={'Tìm ' + info.singular + '…'} className={field} value={query} onChange={e => { setQuery(e.target.value); setPage(1) }} /><select aria-label="Lọc hiển thị" className={field} value={status} onChange={e => { setStatus(e.target.value); setPage(1) }}><option value="ALL">Tất cả trạng thái</option><option value="ACTIVE">Đang hiển thị</option><option value="HIDDEN">Đang ẩn</option></select><select aria-label="Người phụ trách" className={field} disabled={!admin} value={teacher} onChange={e => { setTeacher(e.target.value); setLoading(true); setError(''); setItems([]); setPage(1) }}><option value="SELF">Của tôi</option>{admin && <><option value="ALL">Tất cả người phụ trách</option>{teachers.map(t => <option key={t.id} value={t.id}>{t.name || '#' + t.id}</option>)}</>}</select></div>
     {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">{error} <button type="button" onClick={reload} className="underline">Tải lại</button></p>}
     {pagination}

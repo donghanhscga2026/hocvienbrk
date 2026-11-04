@@ -3,12 +3,12 @@ import { useEffect, useId, useState, type ReactNode } from 'react'
 import { useSession } from 'next-auth/react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, BookOpen, ChevronDown, ContactRound, Globe, GraduationCap, Handshake, LayoutGrid, Link2, Menu, Network, Settings, ShieldCheck, UserRound, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, BookOpen, ChevronDown, ContactRound, Globe, GraduationCap, Handshake, LayoutGrid, Link2, Menu, Network, Settings, ShieldCheck, UserRound, Package, BriefcaseBusiness, FolderKanban, Building2, CalendarDays, type LucideIcon } from 'lucide-react'
 import { isPageManagementRoute, managementLocation, managementNavigation } from '@/lib/wi300/management-navigation'
 import type { PersonalTool } from '@/lib/wi300/personal-space'
 import { ManagementFrameContext, ManagementToolsContext } from '@/components/layout/ManagementFrameContext'
 
-const icons: Record<string, LucideIcon> = { BookOpen, ContactRound, Globe, GraduationCap, Handshake, LayoutGrid, Link2, Network, Settings, ShieldCheck, UserRound }
+const icons: Record<string, LucideIcon> = { Package, BriefcaseBusiness, FolderKanban, Building2, CalendarDays, BookOpen, ContactRound, Globe, GraduationCap, Handshake, LayoutGrid, Link2, Network, Settings, ShieldCheck, UserRound }
 
 export default function Wi300ManagementFrame({ children }: { children: ReactNode }) {
   const { data: session, status } = useSession()
@@ -39,7 +39,7 @@ export default function Wi300ManagementFrame({ children }: { children: ReactNode
     if (target.pathname === '/tools/pages' && path !== target.pathname && isPageManagementRoute(path)) return true
     return path === target.pathname && [...target.searchParams].every(([key, value]) => params.get(key) === value)
   }
-  return <ManagementFrameContext value={true}><div data-management-frame className={`min-w-0 flex-1 text-brk-on-surface ${path.startsWith("/tools/courses") ? "bg-[#F7F9F5]" : "bg-brk-background"}`}>
+  return <ManagementFrameContext value={true}><div data-management-frame className={`min-w-0 flex-1 text-brk-on-surface ${(path.startsWith("/tools/courses") || path === "/tools/products" || path === "/tools/services") ? "bg-[#F7F9F5]" : "bg-brk-background"}`}>
     <div className="mx-auto grid w-full max-w-[1600px] min-w-0 lg:grid-cols-[248px_minmax(0,1fr)]">
       <aside className="min-w-0 border-b border-brk-outline bg-white p-3 lg:border-b-0 lg:border-r lg:p-4">
         <div className="flex items-center justify-between gap-3"><Link href="/my-space" className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-brk-primary"><LayoutGrid size={18} />Không gian của tôi</Link><button type="button" aria-label="Mở hoặc đóng menu quản lý" aria-controls={menuId} aria-expanded={open} onClick={() => setOpen(value => !value)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-brk-outline px-3 text-sm lg:hidden"><Menu size={18} />Menu</button></div>

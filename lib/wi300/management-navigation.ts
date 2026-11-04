@@ -31,8 +31,9 @@ export function managementLocation(path: string, params: URLSearchParams, groups
   let back: NavigationLocation['back'] = { label: 'Về Không gian của tôi', href: root.href }
   if (path === '/my-space') {
     const tab = params.get('tab') === 'pages' ? 'business' : params.get('tab') || 'home'
-    groupId = groups.some(group => group.id === tab) ? tab : 'home'
-    title = groups.find(group => group.id === groupId)?.label || 'Không gian của tôi'
+    const ownerTab = ['products', 'services'].includes(tab) ? 'learning' : tab === 'affiliate' ? 'business' : tab
+    groupId = groups.some(group => group.id === ownerTab) ? ownerTab : 'home'
+    title = tab === 'products' ? 'Sản phẩm đã mua' : tab === 'services' ? 'Dịch vụ đã đặt' : tab === 'affiliate' ? 'Tiếp thị liên kết' : groups.find(group => group.id === groupId)?.label || 'Không gian của tôi'
     crumbs = tab === 'home' ? [{ label: root.label }] : [root, { label: title }]
     if (tab === 'home') back = null
   } else if (/^\/ho-so-hoc-tap\/\d+$/.test(path)) {
@@ -63,10 +64,10 @@ export function managementLocation(path: string, params: URLSearchParams, groups
     }
     back = path === '/tools/pages' ? null : path.startsWith('/tools/my-site/') && section !== 'manage' ? { label: 'Về website đang quản lý', href: manager.href } : { label: 'Về Page', href: pageList.href }
   } else if (path.startsWith('/tools/courses')) {
-    groupId = offeringGroup === 'COURSE' ? 'teaching' : 'business'; crumbs.push(courseList)
-    if (path === '/tools/courses') { title = courseList.label; crumbs[1] = { label: title } }
+    groupId = 'teaching'; crumbs.push({ label: 'Đào tạo & Giải pháp', href: '/my-space?tab=teaching' }, courseList)
+    if (path === '/tools/courses') { title = courseList.label; crumbs[2] = { label: title } }
     else {
-      back = { label: 'Về danh sách khóa học', href: courseList.href }
+      back = { label: 'Về danh sách ' + groupInfo[offeringGroup].singular, href: courseList.href }
       if (path === '/tools/courses/new') {
         title = (params.get('id') ? 'Chi tiết ' : 'Tạo ') + groupInfo[offeringGroup].singular
         crumbs.push({ label: title })
@@ -79,7 +80,7 @@ export function managementLocation(path: string, params: URLSearchParams, groups
       }
     }
   } else if (path.startsWith('/du-an/')) {
-    groupId = 'business'; title = params.get('project') ? 'Quản lý dự án' : path.endsWith('/noi-dung') ? 'Nội dung dự án' : 'Danh sách dự án'
+    groupId = 'profiles'; title = params.get('project') ? 'Quản lý dự án' : path.endsWith('/noi-dung') ? 'Nội dung dự án' : 'Danh sách dự án'
     crumbs.push({ label: 'Dự án', ...(params.get('project') ? { href: '/du-an/quan-ly' } : {}) })
     if (params.get('project')) { crumbs.push({ label: 'Dự án đang chỉnh sửa' }); back = { label: 'Về danh sách dự án', href: '/du-an/quan-ly' } }
     if (path.endsWith('/noi-dung') && params.get('project')) back = { label: 'Về dự án này', href: `/du-an/quan-ly?project=${encodeURIComponent(params.get('project')!)}` }
@@ -90,7 +91,9 @@ export function managementLocation(path: string, params: URLSearchParams, groups
     }
     if (path === '/tools/wi-website') { groupId = 'website-admin'; title = params.get('section') ? 'Cấu hình chung' : 'Quản trị website' }
     if (path === '/account-settings') { groupId = 'account'; title = 'Cài đặt tài khoản' }
-    if (path === '/my-requests') { groupId = 'learning'; title = 'Yêu cầu của tôi' }
+    if (path === '/my-requests') { groupId = 'account'; title = 'Yêu cầu của tôi' }
+    if (path === '/tools/products' || path === '/tools/services') groupId = 'teaching'
+    if (path === '/tools/wi-teacher-profile') groupId = 'profiles'
     const group = groups.find(item => item.id === groupId)
     if (group) back = { label: `Về ${group.label.toLowerCase()}`, href: group.href }
     if (path === '/tools/wi-website' && !params.get('section')) back = { label: 'Về Không gian của tôi', href: root.href }

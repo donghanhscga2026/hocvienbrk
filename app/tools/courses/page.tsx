@@ -9,9 +9,9 @@ import dynamic from 'next/dynamic'
 import CourseActionsMenu from '@/components/course/CourseActionsMenu'
 import CourseExportButton from '@/components/course/CourseExportButton'
 import ManagementWorkspace from '@/components/layout/ManagementWorkspace'
+import OfferingManagementTabs from '@/components/offerings/OfferingManagementTabs'
 import MainHeader from '@/components/layout/MainHeader'
 import type { ActivitySummary } from '@/components/course/CourseManagementActivity'
-import { groupInfo } from '@/lib/offerings/shared'
 
 // Nhãn dạng phí dùng chung cho danh sách và thẻ khóa học.
 const courseFeeLabels: Record<string, string> = {
@@ -31,7 +31,7 @@ export default function ToolsCoursesPage() {
             <MainHeader title="Quản lý khóa học" toolSlug="courses" />
 
             <ManagementWorkspace active="courses">
-                <nav aria-label="Nhóm quản lý" className="flex flex-wrap gap-2">{Object.entries(groupInfo).map(([key, item]) => <Link key={key} href={item.manager} aria-current={key === 'COURSE' ? 'page' : undefined} className="inline-flex min-h-12 items-center rounded-xl border border-brk-outline bg-white px-4 text-base font-semibold text-brk-primary">{item.label}</Link>)}</nav>
+                <OfferingManagementTabs active="COURSE" />
                 <div><h1 className="text-2xl font-bold text-brk-primary">Quản lý khóa học</h1><p className="mt-2 text-sm text-[#617066]">Quản lý nội dung, học viên và hoạt động của từng khóa. Chọn mẫu Sales Page trong mục Trang bán khóa học.</p></div>
 
                 <div className="mt-4 flex gap-2 rounded-2xl border border-[#E2E8DC] bg-white p-1.5 shadow-sm">

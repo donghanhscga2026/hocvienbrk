@@ -273,12 +273,12 @@ async function run() {
   }
   const navigation = load('lib/wi300/personal-space.ts', { './catalog': { searchText: value => value.toLowerCase() } })
   const projectTool = { id: -3, slug: 'wi-projects', name: 'Dự án Wi', url: '/du-an/quan-ly', roles: [], isActive: true }
-  assert.equal(navigation.spaceNavigation('STUDENT', []).some(group => group.id === 'business'), false)
+  assert.equal(navigation.spaceNavigation('STUDENT', []).some(group => group.id === 'business'), true, 'Kinh doanh includes the personal affiliate workspace')
   assert.equal(navigation.spaceNavigation('guest', [projectTool]).some(group => group.id === 'business'), false)
   for (const role of ['ADMIN', 'STUDENT']) {
     const groups = navigation.spaceNavigation(role, [projectTool])
     assert.equal(groups.flatMap(group => group.items).filter(item => item.href === '/du-an/quan-ly').length, 1)
-    assert.equal(groups.find(group => group.id === 'business').items[0].label, 'Dự án Wi')
+    assert.equal(groups.find(group => group.id === 'profiles').items[0].label, 'Dự án của tôi')
   }
   console.log('WI projects: defaults/read-only, ownership, fresh roles, strict input, safe URLs, optimistic concurrency, admin controls, origin, invalidation, form save/retry, course scope, XSS and deployment isolation passed (mock DB only).')
 }

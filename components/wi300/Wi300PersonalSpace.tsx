@@ -7,7 +7,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import Wi300CourseCover from './Wi300CourseCover'
 import { ExternalAppsCatalog } from './Wi300ExternalApps'
-import { DollarSign, Settings, Users, CreditCard, BookOpen, FileText, Gem, Map as MapIcon, Mail, Layout, Globe, Wallet, Tag, LayoutGrid, GraduationCap, UserRound, ShieldCheck, ContactRound, Link2, DatabaseBackup, LifeBuoy, Network, type LucideIcon } from 'lucide-react'
+import { DollarSign, Settings, Users, CreditCard, BookOpen, FileText, Gem, Map as MapIcon, Mail, Layout, Globe, Wallet, Tag, LayoutGrid, GraduationCap, UserRound, ShieldCheck, ContactRound, Link2, DatabaseBackup, LifeBuoy, Network, Package, BriefcaseBusiness, FolderKanban, Building2, CalendarDays, type LucideIcon } from 'lucide-react'
 import { YoutubeBrandIcon } from '@/components/icons/brands'
 import { recentActiveCourses } from '@/lib/wi300/catalog'
 import { canTeach, isContentTool, wi300ToolName, pendingCourseLabel, toolGroup, toolGroups, type PersonalTool } from '@/lib/wi300/personal-space'
@@ -29,7 +29,7 @@ const box = 'rounded-2xl border border-brk-outline bg-white p-4 sm:p-5'
 const action = 'inline-flex min-h-11 items-center justify-center rounded-xl bg-brk-primary px-4 text-sm font-semibold text-white'
 
 // Dùng lại tên icon và mã màu mà màn công cụ gốc lưu trong database.
-const toolIcons: Record<string, LucideIcon> = { Youtube: YoutubeBrandIcon, DollarSign, Settings, Users, CreditCard, BookOpen, FileText, Gem, Map: MapIcon, Mail, Layout, Globe, Wallet, Tag, LayoutGrid, GraduationCap, UserRound, ShieldCheck, ContactRound, Link2, DatabaseBackup, LifeBuoy, Network }
+const toolIcons: Record<string, LucideIcon> = { Package, BriefcaseBusiness, FolderKanban, Building2, CalendarDays, Youtube: YoutubeBrandIcon, DollarSign, Settings, Users, CreditCard, BookOpen, FileText, Gem, Map: MapIcon, Mail, Layout, Globe, Wallet, Tag, LayoutGrid, GraduationCap, UserRound, ShieldCheck, ContactRound, Link2, DatabaseBackup, LifeBuoy, Network }
 const toolColors: Record<string, string> = {
   bgRed600: 'bg-red-600', bgRed700: 'bg-red-700', bgGray500: 'bg-gray-500',
   bgEmerald500: 'bg-emerald-500', bgIndigo500: 'bg-indigo-500', bgGreen500: 'bg-green-500',
@@ -38,6 +38,7 @@ const toolColors: Record<string, string> = {
   bgRed400: 'bg-red-400', bgViolet500: 'bg-violet-500', bgAmber500: 'bg-amber-500',
 }
 const toolDefaults: Record<string, { icon: LucideIcon; color: string }> = {
+  products: { icon: Package, color: 'bg-emerald-500' }, services: { icon: BriefcaseBusiness, color: 'bg-emerald-500' }, profiles: { icon: FolderKanban, color: 'bg-indigo-500' },
   courses: { icon: BookOpen, color: 'bg-emerald-500' }, students: { icon: Users, color: 'bg-blue-500' },
   roadmap: { icon: MapIcon, color: 'bg-cyan-500' }, 'my-learning': { icon: BookOpen, color: 'bg-emerald-500' },
   crm: { icon: ContactRound, color: 'bg-teal-500' }, 'email-mkt': { icon: Mail, color: 'bg-pink-500' },
@@ -75,10 +76,12 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
   const tabs = spaceNavigation(role, tools)
   // Giữ đường dẫn Website & nội dung cũ cho bookmark đã lưu.
   const requestedTab = params.get('tab')
-  const tab = requestedTab === 'pages' ? 'business' : tabs.some(item => item.id === requestedTab) ? requestedTab! : 'home'
+  const tab = requestedTab === 'pages' ? 'business' : role !== 'guest' && ['products', 'services', 'affiliate'].includes(requestedTab || '') ? requestedTab! : tabs.some(item => item.id === requestedTab) ? requestedTab! : 'home'
+  const activeGroup = ['products', 'services'].includes(tab) ? 'learning' : tab === 'affiliate' ? 'business' : tab
+  const tabTitle = tab === 'products' ? 'Sản phẩm đã mua' : tab === 'services' ? 'Dịch vụ đã đặt' : tab === 'affiliate' ? 'Tiếp thị liên kết' : tabs.find(item => item.id === tab)?.label
   // Các bookmark cũ vẫn mở đúng tab con trong Tổng quan.
   const overview = teachingAllowed && params.get('view') === 'teaching' ? 'teaching' : 'learning'
-  const overviewTabs = [{ id: 'learning', label: 'Học tập' }, ...(teachingAllowed ? [{ id: 'teaching', label: 'Giảng dạy' }] : [])]
+  const overviewTabs = [{ id: 'learning', label: 'Khóa học của tôi' }, ...(teachingAllowed ? [{ id: 'teaching', label: 'Đào tạo & Giải pháp' }] : [])]
   const pageSize = useCoursePageSize()
   const titleRef = useRef<HTMLHeadingElement>(null)
   const [localToolsError, setToolsError] = useState(false)
@@ -138,7 +141,7 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
   const accountTools = workspaceTools('account')
   const availableGroups = toolGroups.filter(group => otherTools.some(tool => toolGroup(tool) === group.id))
 
-  const affiliateTools = [{ id: -1, slug: 'affiliate', name: 'Link giới thiệu & hoa hồng', url: '/tools/affiliate', roles: [], isActive: true }, ...workspaceTools('affiliate').filter(tool => tool.url.split(/[?#]/)[0].replace(/\/$/, '') !== '/tools/affiliate')]
+  const affiliateTools = [{ id: -1, slug: 'affiliate', name: 'Link giới thiệu & hoa hồng', url: '/tools/affiliate', roles: [], isActive: true }, ...workspaceTools('business').filter(tool => tool.url.split(/[?#]/)[0].replace(/\/$/, '') === '/tools/genealogy')]
 
   const toolGrid = (items: Tool[], grouped = false) => items.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">{items.map(tool => {
     const group = isContentTool(tool) ? { label: 'Website & nội dung' } : toolGroups.find(item => item.id === toolGroup(tool))!
@@ -168,9 +171,11 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
   }
 
   return <div className={shared ? "min-w-0" : "mx-auto w-full max-w-7xl px-3 py-5 sm:px-4 sm:py-8 lg:px-6"}><div className={shared ? "min-w-0" : "grid min-w-0 gap-5 lg:grid-cols-[290px_minmax(0,1fr)]"}>
-    {!shared && <aside className="relative z-30 min-w-0 lg:sticky lg:top-24 lg:self-start"><SpaceSidebar groups={spaceNavigation(role, permittedTools)} active={tab} route={params.toString()} onNavigate={() => titleRef.current?.scrollIntoView({ block: 'start' })} loading={toolsLoading} failed={toolsError} /></aside>}
-    <div className="relative z-0 min-w-0 space-y-5"><h1 ref={titleRef} className="scroll-mt-44 break-words text-2xl font-bold sm:text-3xl lg:scroll-mt-24">{tab === 'home' ? 'Tổng quan' : tab === 'pages' ? 'Nội dung & website' : tabs.find(item => item.id === tab)?.label}</h1>
+    {!shared && <aside className="relative z-30 min-w-0 lg:sticky lg:top-24 lg:self-start"><SpaceSidebar groups={spaceNavigation(role, permittedTools)} active={activeGroup} route={params.toString()} onNavigate={() => titleRef.current?.scrollIntoView({ block: 'start' })} loading={toolsLoading} failed={toolsError} /></aside>}
+    <div className="relative z-0 min-w-0 space-y-5"><h1 ref={titleRef} className="scroll-mt-44 break-words text-2xl font-bold sm:text-3xl lg:scroll-mt-24">{tab === 'home' ? 'Tổng quan' : tabTitle}</h1>
+      {activeGroup === 'learning' && <nav aria-label="Khóa học, sản phẩm và dịch vụ đã đăng ký" className="grid grid-cols-3 gap-1 rounded-2xl border border-brk-outline bg-white p-1.5">{[{ id: 'learning', label: 'Khóa học của tôi' }, { id: 'products', label: 'Sản phẩm đã mua' }, { id: 'services', label: 'Dịch vụ đã đặt' }].map(item => <Link key={item.id} href={'/my-space?tab=' + item.id} aria-current={tab === item.id ? 'page' : undefined} className={`flex min-h-12 items-center justify-center rounded-xl px-2 py-2 text-center text-sm font-semibold ${tab === item.id ? 'bg-brk-primary text-white' : 'text-brk-muted hover:bg-brk-background'}`}>{item.label}</Link>)}</nav>}
       {tab === 'business' && toolList(workspaceTools('business'))}
+      {tab === 'profiles' && <section className="space-y-5">{toolList(workspaceTools('profiles'))}<article id="business" className={box}><h2 className="text-xl font-bold">Hồ sơ doanh nghiệp</h2><p className="mt-3 text-sm leading-7 text-brk-muted">Hiện hồ sơ doanh nghiệp được tiếp nhận qua đăng ký hợp tác. Bạn có thể gửi thông tin doanh nghiệp và theo dõi phản hồi tại trang Đối tác. Hồ sơ này tách riêng với hồ sơ giảng viên.</p><Link href="/doi-tac" className={action + ' mt-4'}>Gửi / theo dõi hồ sơ doanh nghiệp →</Link></article></section>}
       {(tab === 'products' || tab === 'services') && <section className="space-y-4"><p className="text-base text-brk-muted">{tab === 'products' ? 'Mở ứng dụng hoặc tải tài nguyên đã mua.' : 'Xem dịch vụ, đặt lịch và yêu cầu đồng hành.'}</p>{purchasedItems.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{purchasedItems.map(course => <article key={course.id} className={box}><h2 className="text-lg font-bold">{course.name_lop}</h2><p className="mt-2 text-sm text-brk-muted">{map.get(course.id)?.status === 'ACTIVE' || map.get(course.id)?.status === 'COMPLETED' ? 'Đã kích hoạt' : map.get(course.id)?.status === 'PENDING' ? 'Chờ xử lý / thanh toán' : 'Chưa kích hoạt'}</p><Link href={offeringHref(course.productGroup, course.id_khoa)} className={action + ' mt-4'}>{tab === 'products' ? 'Mở sản phẩm' : 'Xem / đặt lịch'} →</Link></article>)}</div> : <p className={box}>Chưa có nội dung ở mục này.</p>}{tab === 'services' && <Link href="/my-requests" className="inline-flex min-h-11 items-center font-semibold text-brk-primary">Lịch hẹn & yêu cầu của tôi →</Link>}</section>}
       {tab === 'website-admin' && role === 'ADMIN' && toolList(workspaceTools('website-admin'))}
       {accountError && <p role="alert" className="rounded-xl bg-amber-50 p-4 text-amber-900">Chưa tải được dữ liệu học tập. Vui lòng thử tải lại trang.</p>}
@@ -184,7 +189,7 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
       </>}
       <div id="overview-panel" role={tab === 'home' ? 'tabpanel' : undefined} aria-labelledby={tab === 'home' ? `overview-tab-${overview}` : undefined} tabIndex={tab === 'home' ? 0 : undefined} className="min-w-0 space-y-5">
       {tab === 'home' && overview === 'teaching' && teachingAllowed && <><div className={box}><h2 className="font-bold">{teachingCourses.length} khóa giảng dạy</h2><p className="mt-2 text-sm text-brk-muted">{teachingCourses.reduce((sum, course) => sum + course._count.enrollments, 0)} lượt đăng ký học</p></div><Wi300TeachingPanel courses={teachingCourses} error={teachingError} preview /></>}
-      {tab === 'teaching' && teachingAllowed && <><Wi300TeachingPanel courses={teachingCourses} error={teachingError} /><section className="space-y-3"><h2 className="text-xl font-bold">Quản lý giảng dạy</h2><p className="text-sm text-brk-muted">Khóa học, bài học và học viên theo quyền tài khoản.</p>{toolList(workspaceTools('teaching'), true)}</section></>}
+      {tab === 'teaching' && teachingAllowed && <><section className="space-y-3"><h2 className="text-xl font-bold">Khóa học · Sản phẩm số · Dịch vụ</h2><p className="text-sm text-brk-muted">Cùng một nơi quản lý cho giảng viên và doanh nghiệp, theo quyền tài khoản được cấp.</p>{toolList(workspaceTools('teaching'), true)}</section><Wi300TeachingPanel courses={teachingCourses} error={teachingError} /></>}
       {tab === 'affiliate' && <><p className="text-sm leading-6 text-brk-muted">Quản lý link giới thiệu, hoa hồng và mạng lưới của bạn.</p>{toolsLoading && <p role="status" className="text-sm text-brk-muted">Đang tải công cụ bổ sung…</p>}{toolsError && <p role="alert" className="text-sm text-brk-muted">Chưa tải được công cụ bổ sung. Vui lòng tải lại trang.</p>}{toolGrid(affiliateTools)}</>}
       {tab === 'admin' && ['ADMIN', 'DEVELOPER'].includes(role) && <><p className="text-brk-muted">Các công cụ quản trị được cấp cho tài khoản của bạn.</p>{toolList(workspaceTools('admin'), true)}</>}
       {tab === 'home' && overview === 'learning' && <><div className="grid grid-cols-3 gap-2">{learningGroups.map(group => <div key={group.id} className={box}><p className="text-xl font-bold">{group.items.length}</p><p className="text-xs text-brk-muted">{group.title}</p></div>)}</div>{active.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{active.slice(0, 3).map(course => courseCard(course, 'active'))}</div> : <p className={box}>Bạn chưa có khóa đang học.</p>}<Link className="inline-flex min-h-11 items-center font-semibold text-brk-primary" href="/my-space?tab=learning">Xem tất cả khóa học →</Link></>}
@@ -198,7 +203,7 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
           {totalPages > 1 && <nav aria-label="Phân trang khóa học" className="flex flex-wrap items-center justify-between gap-3"><button type="button" disabled={currentPage === 1} onClick={() => setLearningPage(currentPage - 1)} className="min-h-11 rounded-xl border border-brk-outline bg-white px-4 text-sm disabled:opacity-40">← Trang trước</button><p role="status" className="text-sm text-brk-muted">Trang {currentPage}/{totalPages}</p><button type="button" disabled={currentPage === totalPages} onClick={() => setLearningPage(currentPage + 1)} className="min-h-11 rounded-xl border border-brk-outline bg-white px-4 text-sm disabled:opacity-40">Trang sau →</button></nav>}
         </section>
       </>}
-      {tab === 'learning' && <section className="space-y-3"><h2 className="text-xl font-bold">Lộ trình & công cụ học tập</h2>{toolList(workspaceTools('learning'))}</section>}
+      {tab === 'learning' && <section className="space-y-3"><h2 className="text-xl font-bold">Lộ trình & công cụ học tập</h2>{toolList(workspaceTools('learning').filter(tool => !['/my-space?tab=learning', '/my-space?tab=products', '/my-space?tab=services'].includes(tool.url)))}</section>}
       {tab === 'tools' && <><ExternalAppsCatalog /><p className="text-brk-muted">Các công cụ được chia theo mục đích sử dụng và quyền tài khoản của bạn.</p>
         {/* Chỉ hiển thị nhóm có công cụ được phép dùng, giữ nguyên phân quyền. */}
         {toolsLoading || toolsError || !otherTools.length ? toolList(otherTools) : availableGroups.map(group => {
