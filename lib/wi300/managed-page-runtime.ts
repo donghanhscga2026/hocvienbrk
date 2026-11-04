@@ -9,7 +9,7 @@ export function systemPageContent(brand: DeploymentBrand, id: string) {
   const defaults = newManagedPage(id, page.url.slice(1), page.label)
   if (id === 'about') return { ...defaults, layout: 'split' as const, title: 'Kết nối để cùng phát triển', imageUrl: brand.logoUrl,
     body: `${brand.description}\n\n${brand.name} hướng đến một hệ sinh thái dành cho cá nhân và doanh nghiệp, chia sẻ tri thức, giới thiệu sản phẩm và dịch vụ, tạo cơ hội hợp tác và cùng nâng cao năng lực trong thời đại số.\n\n300DNS là dự án của WIPA. Các dự án thuộc 300DNS được WIPA cố vấn.\n\nGiai đoạn đầu tập trung vào khóa học. Sản phẩm và dịch vụ sẽ được bổ sung khi cộng đồng sẵn sàng.` }
-  if (id === 'products' || id === 'services') return { ...defaults, title: page.label + ' trong hệ sinh thái Wi', description: `Khám phá ${page.label.toLocaleLowerCase('vi')} từ các dự án trong hệ sinh thái ${brand.name}. Xem chi tiết hoặc liên hệ đơn vị cung cấp để tìm hiểu thêm.` }
+  if (id === 'products' || id === 'services') return { ...defaults, title: id === 'products' ? 'Công cụ & tài nguyên số' : 'Đồng hành cùng chuyên gia', description: id === 'products' ? 'Khám phá App, Ebook, Template và bộ tài nguyên từ các dự án trong hệ sinh thái Wi. Chọn giải pháp phù hợp và bắt đầu áp dụng.' : 'Kết nối với chuyên gia qua coaching, tư vấn và hỗ trợ triển khai. Tìm dịch vụ phù hợp với mục tiêu của bạn.' }
   if (id === 'partners') return { ...defaults, title: 'Trở thành đối tác ' + brand.name, description: 'Chia sẻ chuyên môn với vai trò giảng viên hoặc kết nối doanh nghiệp của bạn với hệ sinh thái Wi. Bạn có thể đăng ký cả hai bằng tài khoản hiện tại.' }
   return defaults
 }

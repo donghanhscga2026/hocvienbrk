@@ -11,9 +11,12 @@ function load(file, overrides = {}) {
 async function run() {
   const shared = load('lib/offerings/shared.ts')
   const secret = 'https://files.example/private-ebook.pdf'
-  const details = shared.parseOfferingDetails({ kind: 'EBOOK', accessUrl: secret, instructions: 'PRIVATE INSTRUCTIONS', accessDays: 30 })
+  const details = shared.parseOfferingDetails({ kind: 'EBOOK', accessUrl: secret, instructions: 'PRIVATE INSTRUCTIONS', accessDays: 30, resources: [{ title: 'Private resource', kind: 'EBOOK', url: secret + '?resource=1' }] })
   assert.equal(shared.publicOfferingDetails(details).accessUrl, undefined)
   assert.equal(shared.publicOfferingDetails(details).instructions, undefined)
+  assert.equal(shared.publicOfferingDetails(details).resources, undefined)
+  assert.throws(() => shared.parseOfferingDetails({ resources: [{ title: 'Unsafe', kind: 'APP', url: 'javascript:alert(1)' }] }))
+  assert.deepEqual(shared.parseOfferingDetails({ benefits: ['One', ' '] }).benefits, ['One'])
   for (const url of ['javascript:alert(1)', '//evil.example', '/\\evil.example', 'http://example.com']) assert.throws(() => shared.parseOfferingDetails({ accessUrl: url }))
   assert.throws(() => shared.parseOfferingDetails({ accessDays: -1 }))
   assert.throws(() => shared.parseOfferingDetails({ durationMin: 0 }))
@@ -33,16 +36,19 @@ async function run() {
     systemConfig: { findUnique: async () => ({ value: details }), findMany: async () => [{ key: 'catalog:offering:5', value: details }], upsert: async () => { configWrites++ } },
     bookingSession: { findUnique: async () => ({ id: 2, expertId: bookingOwner, courseId: bookingCourse, status: 'ACTIVE' }), update: async () => {} },
     booking: { count: async () => used },
+    lesson: { findMany: async () => [{ id: 'legacy', title: 'Existing lesson', content: 'PROTECTED LEGACY CONTENT', videoUrl: '(Document)https://files.example/legacy.pdf', type: 'TEXT' }] },
   }
   const server = load('lib/offerings/server.ts', {
     'server-only': {}, '@/lib/prisma': { __esModule: true, default: db }, './shared': shared,
     '@/lib/site-profile/runtime': { getCurrentSiteProfile: async () => null, getCourseWhereForProfile: () => ({ status: true }) },
     '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => null },
     '@/lib/wi300/course-visibility': {},
+    '@/lib/wi300/public-projects': { getPublicProjects: async () => [{ slug: 'project', name: 'Public project', logo: '', courseIds: [5] }] },
   })
   const catalog = await server.getOfferingCatalog('DIGITAL')
   assert.ok(!JSON.stringify(catalog).includes(secret), 'Catalog payload never serializes download URLs')
   assert.ok(!JSON.stringify(catalog).includes('PRIVATE INSTRUCTIONS'))
+  assert.equal(catalog[0].projects[0].slug, 'project')
   await assert.rejects(() => server.saveOfferingDetails(db, 5, 'DIGITAL', { kind: 'COACHING' }, 7))
   assert.equal(configWrites, 0)
   bookingOwner = 8
@@ -75,6 +81,12 @@ async function run() {
     '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => null },
     '@/components/wi300/Wi300Header': { __esModule: true, default: () => null },
     '@/components/layout/MainHeader': { __esModule: true, default: () => null },
+    '@/components/wi300/Wi300Footer': { __esModule: true, default: () => null },
+    '@/components/home/FooterSection': { __esModule: true, default: () => null },
+    '@/components/course/CourseProjectBadges': { __esModule: true, default: () => null },
+    '@/lib/wi300/public-projects': { getPublicProjects: async () => [] },
+    './OfferingRichText': { __esModule: true, default: ({ text }) => React.createElement('p', null, text) },
+    './OfferingResources': { __esModule: true, default: ({ resources }) => React.createElement('div', null, resources.map((r, index) => React.createElement('div', { key: index }, r.title, r.url, r.body))) },
     './OfferingPurchase': { __esModule: true, default: props => React.createElement('div', { 'data-purchase': JSON.stringify(props) }) },
     './OfferingShare': { __esModule: true, default: () => null },
     '@/lib/offerings/server': { readOfferingDetails: async () => details, publicCatalogWhere: async () => ({ status: true }) },
@@ -83,15 +95,18 @@ async function run() {
   group = 'DIGITAL'; enrollment = null
   let html = renderToStaticMarkup(await Detail({ slug: 'EBOOK-5', expectedGroup: 'DIGITAL' }))
   assert.ok(!html.includes(secret) && !html.includes('PRIVATE INSTRUCTIONS'), 'Unpaid page and purchase props contain no protected data')
+  assert.ok(!html.includes('PROTECTED LEGACY CONTENT'))
   enrollment = { status: 'PENDING' }
   html = renderToStaticMarkup(await Detail({ slug: 'EBOOK-5' }))
   assert.ok(!html.includes(secret), 'A pending payment does not grant access')
   enrollment = { status: 'ACTIVE', activatedAt: new Date() }; visible = false
   html = renderToStaticMarkup(await Detail({ slug: 'EBOOK-5' }))
   assert.ok(html.includes(secret) && html.includes('PRIVATE INSTRUCTIONS'), 'Paid customer retains access when item is hidden')
+  assert.ok(html.includes('PROTECTED LEGACY CONTENT') && html.includes('https://files.example/legacy.pdf'), 'Activated workspace includes legacy content and playlist documents')
   enrollment = { status: 'ACTIVE', activatedAt: new Date('2020-01-01T00:00:00Z') }
   html = renderToStaticMarkup(await Detail({ slug: 'EBOOK-5' }))
   assert.ok(!html.includes(secret) && html.includes('hết hạn'), 'Expired access is denied on the server')
+  assert.ok(!html.includes('PROTECTED LEGACY CONTENT'))
   enrollment = null
   await assert.rejects(() => Detail({ slug: 'EBOOK-5' }), /NOT_FOUND/, 'Hidden item is unavailable to unentitled visitors')
   await assert.rejects(() => Detail({ slug: 'EBOOK-5', expectedGroup: 'SERVICE' }), /NOT_FOUND/)

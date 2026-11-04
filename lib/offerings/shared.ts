@@ -10,10 +10,10 @@ export const groupInfo = {
   DIGITAL: { label: 'Sản phẩm số', singular: 'sản phẩm số', catalog: '/san-pham', manager: '/tools/products', description: 'App, Ebook, Template và tài nguyên sử dụng ngay.' },
   SERVICE: { label: 'Dịch vụ', singular: 'dịch vụ', catalog: '/dich-vu', manager: '/tools/services', description: 'Coaching, tư vấn và đồng hành cùng chuyên gia.' },
 } as const
-export const offeringKinds = { APP: 'App', EBOOK: 'Ebook', TEMPLATE: 'Template', RESOURCE: 'Tài nguyên', COACHING: 'Coaching', CONSULTING: 'Tư vấn', OTHER: 'Khác' } as const
+export const offeringKinds = { APP: 'App', EBOOK: 'Ebook', TEMPLATE: 'Template', RESOURCE: 'Bộ tài nguyên', COACHING: 'Coaching', CONSULTING: 'Tư vấn', IMPLEMENTATION: 'Hỗ trợ triển khai', OTHER: 'Khác' } as const
 const safeUrl = z.string().trim().max(2000).refine(value => !value || (value.startsWith('/') && !value.startsWith('//') && !/[\\\s]/.test(value)) || (() => { try { return new URL(value).protocol === 'https:' } catch { return false } })(), 'Dùng đường dẫn nội bộ hoặc URL https hợp lệ.')
 export const offeringDetailsSchema = z.object({
-  kind: z.enum(['APP', 'EBOOK', 'TEMPLATE', 'RESOURCE', 'COACHING', 'CONSULTING', 'OTHER']).default('OTHER'),
+  kind: z.enum(['APP', 'EBOOK', 'TEMPLATE', 'RESOURCE', 'COACHING', 'CONSULTING', 'IMPLEMENTATION', 'OTHER']).default('OTHER'),
   accessUrl: safeUrl.default(''),
   accessDays: z.number().int().min(0).max(36500).default(0),
   instructions: z.string().trim().max(5000).default(''),
@@ -21,6 +21,14 @@ export const offeringDetailsSchema = z.object({
   durationMin: z.number().int().min(5).max(1440).default(60),
   mode: z.enum(['ONLINE', 'OFFLINE', 'HYBRID']).default('ONLINE'),
   bookingCode: z.string().trim().max(100).regex(/^[a-zA-Z0-9_-]*$/).default(''),
+  format: z.string().trim().max(160).default(''),
+  platform: z.string().trim().max(160).default(''),
+  language: z.string().trim().max(80).default(''),
+  delivery: z.enum(['ONLINE', 'DOWNLOAD', 'BOTH']).default('ONLINE'),
+  audience: z.enum(['INDIVIDUAL', 'GROUP']).default('INDIVIDUAL'),
+  benefits: z.array(z.string().trim().max(240)).max(6).default([]).transform(items => items.filter(Boolean)),
+  agenda: z.array(z.object({ title: z.string().trim().min(1).max(160), description: z.string().trim().max(2000) })).max(30).default([]),
+  resources: z.array(z.object({ title: z.string().trim().min(1).max(200), kind: z.enum(['EBOOK', 'APP', 'TEMPLATE', 'GUIDE', 'RESOURCE']), url: safeUrl.refine(value => !!value, 'Nhập đường dẫn tài nguyên.') })).max(100).default([]),
 }).strict()
 export type OfferingDetails = z.infer<typeof offeringDetailsSchema>
 export const emptyOfferingDetails: OfferingDetails = offeringDetailsSchema.parse({})
@@ -29,8 +37,16 @@ export function parseOfferingDetails(value: unknown): OfferingDetails {
 }
 // Không đưa đường dẫn tài nguyên hoặc hướng dẫn sau mua vào danh mục công khai.
 export function publicOfferingDetails(details: OfferingDetails) {
-  const { kind, accessDays, sessions, durationMin, mode } = details
-  return { kind, accessDays, sessions, durationMin, mode }
+  const { kind, accessDays, sessions, durationMin, mode, format, platform, language, delivery, audience } = details
+  return { kind, accessDays, sessions, durationMin, mode, format, platform, language, delivery, audience }
+}
+export const modeLabels = { ONLINE: 'Online', OFFLINE: 'Trực tiếp', HYBRID: 'Online & trực tiếp' }
+export const deliveryLabels = { ONLINE: 'Trực tuyến', DOWNLOAD: 'Tải về', BOTH: 'Trực tuyến / tải về' }
+export const resourceLabels = { EBOOK: 'Ebook', APP: 'Công cụ / App', TEMPLATE: 'Template', GUIDE: 'Hướng dẫn', RESOURCE: 'Tài nguyên' }
+export function offeringFacts(group: string, details: ReturnType<typeof publicOfferingDetails>) {
+  return group === 'SERVICE'
+    ? [['Hình thức', modeLabels[details.mode]], ['Đồng hành', details.audience === 'GROUP' ? 'Theo nhóm' : '1:1'], ['Thời lượng', `${details.sessions} buổi · ${details.durationMin} phút/buổi`]]
+    : [['Bao gồm', details.format || offeringKinds[details.kind]], ['Truy cập', deliveryLabels[details.delivery]], ['Thời hạn', details.accessDays ? `${details.accessDays} ngày từ khi kích hoạt` : 'Không giới hạn'], ...(details.platform ? [['Nền tảng', details.platform]] : []), ...(details.language ? [['Ngôn ngữ', details.language]] : [])]
 }
 export function offeringHref(group: unknown, slug: string) {
   return groupInfo[productGroup(group)].catalog + '/' + encodeURIComponent(slug)

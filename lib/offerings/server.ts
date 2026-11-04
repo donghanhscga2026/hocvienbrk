@@ -1,6 +1,7 @@
 import 'server-only'
 import type { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
+import { getPublicProjects } from '@/lib/wi300/public-projects'
 import { getCurrentSiteProfile, getCourseWhereForProfile } from '@/lib/site-profile/runtime'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import { wi300CoursePreferences, wi300CourseWhere } from '@/lib/wi300/course-visibility'
@@ -13,7 +14,7 @@ export async function readOfferingDetails(id: number, db: Pick<Prisma.Transactio
 }
 export async function saveOfferingDetails(db: Prisma.TransactionClient, id: number, group: string, value: unknown, teacherId: number | null) {
   const details = offeringDetailsSchema.parse(value)
-  const allowed = group === 'DIGITAL' ? ['APP', 'EBOOK', 'TEMPLATE', 'RESOURCE', 'OTHER'] : ['COACHING', 'CONSULTING', 'OTHER']
+  const allowed = group === 'DIGITAL' ? ['APP', 'EBOOK', 'TEMPLATE', 'RESOURCE', 'OTHER'] : ['COACHING', 'CONSULTING', 'IMPLEMENTATION', 'OTHER']
   if (group !== 'COURSE' && !allowed.includes(details.kind)) throw new Error('Loại nội dung không thuộc nhóm đã chọn.')
   if (group === 'SERVICE' && details.bookingCode) {
     const session = await db.bookingSession.findUnique({ where: { code: details.bookingCode } })
@@ -35,5 +36,6 @@ export async function getOfferingCatalog(group: Exclude<ProductGroup, 'COURSE'>)
   })
   const metadata = items.length ? await prisma.systemConfig.findMany({ where: { key: { in: items.map(item => offeringDetailsKey(item.id)) } } }) : []
   const byKey = new Map(metadata.map(row => [row.key, row.value]))
-  return items.map(item => ({ ...item, details: publicOfferingDetails(offeringDetailsSchema.safeParse(byKey.get(offeringDetailsKey(item.id)) || {}).data || emptyOfferingDetails) }))
+  const projects = await getPublicProjects()
+  return items.map(item => ({ ...item, projects: projects.filter(project => project.courseIds.includes(item.id)).map(({ slug, name, logo }) => ({ slug, name, logo })), details: publicOfferingDetails(offeringDetailsSchema.safeParse(byKey.get(offeringDetailsKey(item.id)) || {}).data || emptyOfferingDetails) }))
 }

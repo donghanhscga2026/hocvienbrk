@@ -5,6 +5,7 @@ import CoursePlayer from "@/components/course/CoursePlayer"
 import { requireDomainCourse } from '@/lib/website/domain-context'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import Wi300Breadcrumb from '@/components/wi300/Wi300Breadcrumb'
+import { offeringHref } from '@/lib/offerings/shared'
 
 type PlaylistItem = {
   type: 'video' | 'doc'
@@ -51,10 +52,12 @@ export default async function CourseLearnPage({
   // enrollment bên dưới không phải fetch lại cùng 1 dòng course lần nữa.
   const course = await prisma.course.findUnique({
     where: { id_khoa: id },
-    select: { id: true, type: true, id_khoa: true, name_lop: true, teacherId: true },
+    select: { id: true, type: true, id_khoa: true, name_lop: true, teacherId: true, productGroup: true },
   })
 
   if (!course) redirect(`/courses/${id}`)
+  // Sản phẩm/dịch vụ dùng trang nội dung riêng, kiểm tra quyền và hạn dùng ở server.
+  if (course.productGroup !== 'COURSE') redirect(offeringHref(course.productGroup, course.id_khoa))
 
   if (course.type === 'LIB') {
     if (!session?.user?.email) redirect(`/courses/${id}?error=lib_access_denied`)

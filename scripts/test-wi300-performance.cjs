@@ -13,7 +13,7 @@ async function run() {
   const calls = {}
   const count = (name, value) => async args => { (calls[name] ||= []).push(args); return value }
   let publishedPage = zip, brand = { name: 'WI300' }, allowed = true, projects = []
-  const course = { id: 17, id_khoa: 'ZIP', name_lop: 'Course', phi_coc: 100, teacherBankAccount: { bankName: 'TCB', accountNumber: 'test', accountHolder: 'Test' } }
+  const course = { id: 17, id_khoa: 'ZIP', name_lop: 'Course', productGroup: 'COURSE', phi_coc: 100, teacherBankAccount: { bankName: 'TCB', accountNumber: 'test', accountHolder: 'Test' } }
   const enrollment = { status: 'PENDING', userId: 31, courseId: 17 }
   const View = () => null, Landing = () => null, Notification = () => null, Header = () => null
   const children = page => React.Children.toArray(page.props.children)
@@ -21,6 +21,7 @@ async function run() {
   const reset = () => Object.keys(calls).forEach(key => delete calls[key])
   const publicationMocks = { getPublishedCoursePageBySlug: async () => { (calls.published ||= []).push({}); return publishedPage } }
   const mocks = {
+    '@/components/offerings/OfferingDetail': { __esModule: true, default: () => null },
     '@/lib/wi300/project-service': { readPublicProjects: async () => projects },
     'next/cache': { unstable_cache: fn => fn },
     react: { ...React, cache: fn => fn },

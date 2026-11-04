@@ -27,7 +27,7 @@ export default function CourseProjectBadges({ projects, showAll = false, compact
   return <div data-course-projects className={`flex min-w-0 items-start gap-2${compact ? '' : ' mb-3 border-b border-brk-outline pb-3'}`}>
     <span className="shrink-0 pt-3 text-xs text-brk-muted">Dự án</span>
     <div className="min-w-0 flex-1">
-      <ul id={listId} aria-label="Dự án liên kết với khóa học" className="flex min-w-0 flex-wrap gap-1.5">
+      <ul id={listId} aria-label="Dự án liên kết" className="flex min-w-0 flex-wrap gap-1.5">
         {shown.map(project => <li key={project.slug} className="min-w-0 max-w-full">
           {brand ? <Link href={`/du-an/${encodeURIComponent(project.slug)}`} prefetch={false} className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-xl border border-brk-primary/20 bg-brk-primary/5 px-2 py-1 text-xs font-semibold text-brk-primary transition-colors hover:bg-brk-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brk-primary">
             <ProjectLogo logo={project.logo} /><span className="min-w-0 break-words [overflow-wrap:anywhere]">{project.name}</span>
