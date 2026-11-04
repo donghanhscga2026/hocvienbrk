@@ -1864,6 +1864,7 @@ export async function updateCourseAction(courseId: number, data: {
     categoryId?: number | null,
     category?: string,
     type?: any,
+    productGroup?: string,
     status?: boolean,
     pin?: number,
     date_join?: string | null,
@@ -1934,6 +1935,7 @@ export async function updateCourseAction(courseId: number, data: {
             file_email: data.file_email ?? null,
             noidung_email: data.noidung_email ?? null,
             type: data.type,
+            productGroup: ['COURSE', 'DIGITAL', 'SERVICE'].includes(data.productGroup || '') ? data.productGroup : undefined,
             pin: data.pin,
             category: data.category ?? 'Khác',
         }
