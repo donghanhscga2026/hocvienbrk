@@ -91,6 +91,8 @@ async function run() {
   assert.equal(embeddedSource('https://files.example/movie.mp4?token=123', 'VIDEO').video, true)
   const viewerHtml = renderToStaticMarkup(React.createElement(Viewer, { url: 'https://files.example/book.pdf', title: 'PDF' }))
   assert.ok(viewerHtml.includes('<iframe') && !viewerHtml.includes('target="_blank"') && !viewerHtml.includes('allow-popups') && !viewerHtml.includes('allow-top-navigation'))
+  const youtubeHtml = renderToStaticMarkup(React.createElement(Viewer, { url: 'https://youtu.be/dQw4w9WgXcQ', title: 'YouTube', kind: 'VIDEO' }))
+  assert.ok(youtubeHtml.includes('referrerPolicy="strict-origin-when-cross-origin"') && !youtubeHtml.includes('referrerPolicy="no-referrer"'), 'YouTube embeds must send their website origin to avoid player error 153')
   const originalFetch = global.fetch, calls = []
   global.fetch = async url => { calls.push(url); return { ok: true, json: async () => ({ title: url.includes('resource%3A1') ? 'Second body' : 'First body', kind: 'EBOOK', content: 'Only selected content' }) } }
   const root = require('react-dom/client').createRoot(document.getElementById('root'))

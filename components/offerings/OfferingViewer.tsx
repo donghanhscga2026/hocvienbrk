@@ -72,7 +72,7 @@ export default function OfferingViewer({ url, title, kind }: { url: string; titl
           sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
           allow="fullscreen; encrypted-media"
           allowFullScreen
-          referrerPolicy="no-referrer"
+          referrerPolicy="strict-origin-when-cross-origin"
           className={`w-full rounded-xl border bg-stone-50 ${kind === 'VIDEO' ? 'aspect-video' : 'h-[68dvh] min-h-96'}`}
         />
       )}
