@@ -88,10 +88,14 @@ export default function OfferingLibrary({
   return (
     <section id="tai-nguyen" className="scroll-mt-28">
       <h2 className="mb-5 text-2xl font-bold text-green-950">Tài nguyên của bạn</h2>
-      <div className={compact ? 'space-y-4' : 'grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]'}>
-        <aside
-          className={`min-w-0 rounded-2xl border bg-white p-4 ${compact ? '' : 'lg:order-2 lg:sticky lg:top-28'}`}
-        >
+      <div
+        className={
+          compact
+            ? 'space-y-4'
+            : `grid items-start gap-5 lg:grid-cols-[260px_minmax(0,1fr)] ${instructions ? 'xl:grid-cols-[250px_minmax(0,1fr)_280px]' : ''}`
+        }
+      >
+        <aside className={`min-w-0 rounded-2xl border bg-white p-4 ${compact ? '' : 'lg:sticky lg:top-28'}`}>
           <label className="flex items-center gap-2 rounded-xl border px-3">
             <Search className="h-4 w-4 shrink-0 text-brk-primary" />
             <input
@@ -217,13 +221,16 @@ export default function OfferingLibrary({
               </article>
             )
           )}
-          {instructions && (
-            <section id="huong-dan" className="mt-6 scroll-mt-28 border-t pt-5">
-              <h3 className="mb-3 text-lg font-bold">Hướng dẫn sử dụng</h3>
-              <OfferingInlineContent text={instructions} />
-            </section>
-          )}
         </div>
+        {instructions && (
+          <aside
+            id="huong-dan"
+            className="min-w-0 scroll-mt-28 rounded-2xl border bg-white p-5 lg:col-span-2 xl:col-span-1 xl:sticky xl:top-28"
+          >
+            <h3 className="mb-3 text-lg font-bold">Hướng dẫn sử dụng</h3>
+            <OfferingInlineContent text={instructions} />
+          </aside>
+        )}
       </div>
     </section>
   )

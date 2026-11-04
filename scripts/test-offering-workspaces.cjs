@@ -109,10 +109,10 @@ async function run() {
   assert.equal(document.querySelectorAll('a[target="_blank"]').length, 0)
   await React.act(async () => root.unmount()); global.fetch = originalFetch; dom.window.close()
 
-  let selectedLayout = 'LIBRARY'
+  let selectedLayout = 'LIBRARY', hasApp = true, resourceRows = []
   const Workspace = load('components/offerings/OfferingWorkspace.tsx', {
     'next/link': link, '@/lib/prisma': { __esModule: true, default: { booking: { findMany: async args => { assert.equal(args.where.userId, 0); return [] } } } },
-    '@/lib/offerings/workspace': { WorkspaceError: workspace.WorkspaceError, requireOfferingWorkspace: async () => ({ course, userId: 0, details: shared.parseOfferingDetails({ workspaceLayout: selectedLayout, accessUrl: 'https://app.example' }), profile: null }), workspaceResources: async () => [], readDelivery: async () => null },
+    '@/lib/offerings/workspace': { WorkspaceError: workspace.WorkspaceError, requireOfferingWorkspace: async () => ({ course, userId: 0, details: shared.parseOfferingDetails({ workspaceLayout: selectedLayout, accessUrl: hasApp ? 'https://app.example' : '' }), profile: null }), workspaceResources: async () => resourceRows, readDelivery: async () => null },
     '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => null }, '@/lib/wi300/public-projects': { getPublicProjects: async () => [] },
     '@/lib/booking/notify': { formatVnDateTime: value => String(value) }, '@/components/layout/MainHeader': { __esModule: true, default: () => null }, '@/components/home/FooterSection': { __esModule: true, default: () => null }, '@/components/course/CourseProjectBadges': { __esModule: true, default: () => null }, '@/components/crm/CrmRequestButton': { __esModule: true, default: () => null },
     './OfferingLibrary': { __esModule: true, default: () => React.createElement('div', null, 'Library') },
@@ -121,6 +121,10 @@ async function run() {
     selectedLayout = layout
     assert.ok(renderToStaticMarkup(await Workspace({ slug: 'PRODUCT', group })).includes(expected))
   }
+  selectedLayout = 'APP'; hasApp = false; resourceRows = [{ id: 'resource:0', title: 'Gift guide', kind: 'GUIDE' }]
+  const giftHtml = renderToStaticMarkup(await Workspace({ slug: 'PRODUCT', group: 'DIGITAL' }))
+  assert.ok(giftHtml.includes('Library'), 'App bundles without a main app show their usable resources in the full workspace')
+  assert.ok(!giftHtml.includes('Ứng dụng của bạn') && !giftHtml.includes('Hướng dẫn ngay tại đây'), 'Missing app/instructions do not reserve empty panels')
   console.log('Offering workspaces: server entitlements, domain/group isolation, lazy selected resources, legacy content, disabled modules, delivery ownership/CSRF/conflicts/account zero and four real layouts passed.')
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })

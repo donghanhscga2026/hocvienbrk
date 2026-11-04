@@ -92,19 +92,16 @@ export default async function OfferingWorkspace({
     .filter((project) => project.courseIds.includes(course.id))
     .map(({ slug, name, logo }) => ({ slug, name, logo }))
   const appUrl = details.accessUrl || details.resources.find((resource) => resource.kind === 'APP')?.url
-  const visibleResources =
-    layout === 'APP'
-      ? resources.filter((resource) => resource.kind !== 'APP' && resource.id !== 'main')
-      : resources
+  const visibleResources = resources
   const showLibrary = has('resources') && (layout === 'LIBRARY' || visibleResources.length > 0)
   const showBookings = has('bookings') && group === 'SERVICE'
   const showDelivery = has('delivery') && group === 'SERVICE' && (layout === 'DELIVERY' || !!delivery)
   const navigation = [
-    ...(layout === 'APP' ? [['ung-dung', 'Ứng dụng của tôi']] : []),
+    ...(layout === 'APP' && appUrl && !showLibrary ? [['ung-dung', 'Ứng dụng của tôi']] : []),
     ...(showLibrary ? [['tai-nguyen', 'Tài nguyên']] : []),
     ...(showBookings ? [['lich-hen', 'Lịch hẹn']] : []),
     ...(showDelivery ? [['ban-giao', 'Tiến độ & Bàn giao']] : []),
-    ...(has('instructions')
+    ...(has('instructions') && details.instructions
       ? [['huong-dan', group === 'SERVICE' ? 'Chuẩn bị & Hướng dẫn' : 'Hướng dẫn']]
       : []),
     ...(has('conversation') ? [['trao-doi', 'Trao đổi & Hỗ trợ']] : []),
@@ -167,8 +164,8 @@ export default async function OfferingWorkspace({
               </a>
             ))}
           </nav>
-          {layout === 'APP' && (
-            <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
+          {layout === 'APP' && appUrl && !showLibrary && (
+            <div>
               <section id="ung-dung" className={panel + ' scroll-mt-28'}>
                 <div className="flex flex-wrap items-center justify-between gap-5">
                   <div>
@@ -197,29 +194,6 @@ export default async function OfferingWorkspace({
                   </div>
                 )}
               </section>
-              {(has('instructions') || showLibrary) && (
-                <aside className="min-w-0 space-y-5 xl:sticky xl:top-28">
-                  {has('instructions') && (
-                    <section id="huong-dan" className={panel + ' scroll-mt-28'}>
-                      <h2 className="mb-4 text-xl font-bold text-green-950">Hướng dẫn ngay tại đây</h2>
-                      <OfferingInlineContent
-                        text={
-                          details.instructions ||
-                          'Sử dụng ứng dụng bên cạnh. Gửi yêu cầu hỗ trợ nếu cần hướng dẫn thêm.'
-                        }
-                      />
-                    </section>
-                  )}
-                  {showLibrary && (
-                    <OfferingLibrary
-                      key={course.id + ':' + userId}
-                      slug={slug}
-                      resources={visibleResources}
-                      compact
-                    />
-                  )}
-                </aside>
-              )}
             </div>
           )}
           {showBookings && (
@@ -342,7 +316,7 @@ export default async function OfferingWorkspace({
               )}
             </section>
           )}
-          {showLibrary && layout !== 'APP' && (
+          {showLibrary && (
             <OfferingLibrary
               key={course.id + ':' + userId}
               slug={slug}
@@ -350,7 +324,7 @@ export default async function OfferingWorkspace({
               instructions={has('instructions') ? details.instructions : undefined}
             />
           )}
-          {has('instructions') && layout !== 'APP' && !(showLibrary && details.instructions) && (
+          {has('instructions') && details.instructions && !showLibrary && (
             <section id="huong-dan" className={panel + ' scroll-mt-28'}>
               <h2 className="mb-4 text-2xl font-bold text-green-950">
                 {group === 'SERVICE' ? 'Chuẩn bị & Hướng dẫn' : 'Hướng dẫn sử dụng'}
