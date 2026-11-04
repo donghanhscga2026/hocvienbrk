@@ -14,6 +14,7 @@ const courseSelect = {
   id: true, id_khoa: true, name_lop: true, name_khoa: true, status: true,
   mo_ta_ngan: true, link_anh_bia: true, link_zalo: true, phi_coc: true,
   createdAt: true, updatedAt: true, type: true, pin: true, category: true,
+  productGroup: true,
   teacherId: true, categoryId: true, teacherBankAccountId: true, vipExempt: true,
   feeType: true, voucherConfig: true, allowMbvDeduction: true,
   requiresReferralActivation: true, referralActivationThreshold: true,
@@ -58,7 +59,7 @@ export default async function Wi300Home({ brand, session, view = 'home', catalog
   const teachingReady = (async (): Promise<{ teachingCourses: Wi300TeachingCourse[]; teachingError: boolean }> => {
     if (view === 'space' && userId != null && Number.isInteger(userId) && canTeach(session?.user?.role)) {
       try {
-        return { teachingCourses: await prisma.course.findMany({ where: { teacherId: userId }, select: teachingSelect, orderBy: { updatedAt: 'desc' } }), teachingError: false }
+        return { teachingCourses: await prisma.course.findMany({ where: { teacherId: userId, productGroup: 'COURSE' }, select: teachingSelect, orderBy: { updatedAt: 'desc' } }), teachingError: false }
       } catch (error) {
         console.error('[WI300] Không tải được khóa giảng dạy', error)
         return { teachingCourses: [], teachingError: true }

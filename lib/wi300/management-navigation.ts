@@ -1,5 +1,6 @@
 import { spaceNavigation, type PersonalTool, type SpaceNavGroup } from './personal-space'
 import { defaultPageTitle } from './default-pages'
+import { groupInfo, productGroup } from '@/lib/offerings/shared'
 
 // Menu chỉ sắp xếp các công cụ đã được cấp quyền; API vẫn kiểm tra quyền riêng.
 export function managementNavigation(role: string, tools: PersonalTool[]): SpaceNavGroup[] {
@@ -16,7 +17,8 @@ export function isPageManagementRoute(path: string) {
 }
 export function managementLocation(path: string, params: URLSearchParams, groups: SpaceNavGroup[], viewerId?: string | number | null): NavigationLocation {
   const root = { label: 'Không gian của tôi', href: '/my-space' }
-  const courseList = { label: 'Quản lý khóa học', href: '/tools/courses' }
+  const offeringGroup = productGroup(params.get('group'))
+  const courseList = { label: 'Quản lý ' + groupInfo[offeringGroup].singular, href: groupInfo[offeringGroup].manager }
   const courseId = params.get('courseId')
   const courseReturn = courseId && /^\d+$/.test(courseId) && Number.isSafeInteger(Number(courseId)) && Number(courseId) > 0 ? `/tools/courses/new?id=${courseId}&tab=sales` : null
   const exactTool = groups.flatMap(group => group.items.map(item => ({ ...item, groupId: group.id }))).filter(item => item.href.startsWith('/')).sort((a, b) => b.href.split('?')[0].length - a.href.split('?')[0].length).find(item => {
@@ -61,12 +63,12 @@ export function managementLocation(path: string, params: URLSearchParams, groups
     }
     back = path === '/tools/pages' ? null : path.startsWith('/tools/my-site/') && section !== 'manage' ? { label: 'Về website đang quản lý', href: manager.href } : { label: 'Về Page', href: pageList.href }
   } else if (path.startsWith('/tools/courses')) {
-    groupId = 'teaching'; crumbs.push(courseList)
+    groupId = offeringGroup === 'COURSE' ? 'teaching' : 'business'; crumbs.push(courseList)
     if (path === '/tools/courses') { title = courseList.label; crumbs[1] = { label: title } }
     else {
       back = { label: 'Về danh sách khóa học', href: courseList.href }
       if (path === '/tools/courses/new') {
-        title = params.get('id') ? 'Chi tiết khóa học' : 'Tạo khóa học'
+        title = (params.get('id') ? 'Chi tiết ' : 'Tạo ') + groupInfo[offeringGroup].singular
         crumbs.push({ label: title })
       } else {
         title = path.includes('/templates/legacy') ? 'Nhập mẫu nâng cao' : path.includes('/templates') ? 'Thư viện mẫu trang bán' : path.includes('/pages/') ? 'Chỉnh sửa trang bán' : 'Cài đặt khóa học'

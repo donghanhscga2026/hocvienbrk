@@ -49,7 +49,7 @@ for (const pathname of ['/my-space', '/tools', '/tools/crm', '/tools/courses/pag
 for (const pathname of ['/', '/khoa-hoc/AI', '/courses/AI/learn', '/page/lucy', '/tools/courses/templates/preview']) assert.equal(model.isManagementRoute(pathname), false)
 const groups = model.managementNavigation('ADMIN', tools)
 assert.deepEqual(groups, load('lib/wi300/personal-space.ts').spaceNavigation('ADMIN', tools), 'Cards, header and sidebar have one model')
-assert.deepEqual(groups.map(group => group.label), ['Tổng quan', 'Học tập', 'Giảng dạy', 'Cộng tác viên', 'Quản lý & kinh doanh', 'Quản trị website', 'Công cụ & tiện ích', 'Tài khoản & tài chính', 'Quản trị hệ thống'])
+assert.deepEqual(groups.map(group => group.label), ['Tổng quan', 'Học tập', 'Giảng dạy', 'Cộng tác viên', 'Sản phẩm đã mua', 'Dịch vụ đã đặt', 'Quản lý & kinh doanh', 'Quản trị website', 'Công cụ & tiện ích', 'Tài khoản & tài chính', 'Quản trị hệ thống'])
 assert.ok(groups.find(group => group.id === 'admin').items.some(item => item.href === '/tools/reserved-ids'))
 assert.ok(groups.find(group => group.id === 'website-admin').items.some(item => item.href === '/tools/wi-appearance'))
 assert.deepEqual(groups.find(group => group.id === 'website-admin').items.map(item => item.label), ['Cấu hình chung', 'Trang', 'Bài viết', 'Thư viện media'])

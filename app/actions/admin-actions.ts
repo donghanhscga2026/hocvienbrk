@@ -20,6 +20,7 @@ import { canPinAnotherCourse, PIN_LIMIT_ERROR } from "@/lib/course/pin-limit"
 import { formatCourseSaveError } from "@/lib/course/errors"
 import { getCurrentDeploymentBrand } from "@/lib/site-profile/deployment-runtime"
 import { setWi300CourseVisibility, wi300CoursePreferences } from "@/lib/wi300/course-visibility"
+import { saveOfferingDetails } from '@/lib/offerings/server'
 
 // Helper to check admin permission
 async function checkAdmin() {
@@ -1865,6 +1866,7 @@ export async function updateCourseAction(courseId: number, data: {
     category?: string,
     type?: any,
     productGroup?: string,
+    offeringDetails?: unknown,
     status?: boolean,
     pin?: number,
     date_join?: string | null,
@@ -1958,9 +1960,10 @@ export async function updateCourseAction(courseId: number, data: {
             ? { connect: { id: bankAccountId } }
             : { disconnect: true }
 
-        const updatedCourse = await prisma.course.update({
-            where: { id: courseId },
-            data: courseData
+        const updatedCourse = await prisma.$transaction(async tx => {
+            const updated = await tx.course.update({ where: { id: courseId }, data: courseData })
+            if (data.offeringDetails !== undefined) await saveOfferingDetails(tx, courseId, updated.productGroup, data.offeringDetails, updated.teacherId)
+            return updated
         })
 
         if (wi300 && data.status !== undefined) await setWi300CourseVisibility(prisma, [courseId], data.status)
@@ -1987,6 +1990,10 @@ export async function updateCourseAction(courseId: number, data: {
 
         revalidatePath('/tools/courses')
         revalidatePath('/') // Revalidate trang chủ nếu có đổi tên/giá
+        revalidatePath('/san-pham', 'layout')
+        revalidatePath('/dich-vu', 'layout')
+        revalidatePath('/tools/products')
+        revalidatePath('/tools/services')
         revalidateTag('site-profile', { expire: 0 }) // Clear cache của site-profile (khoá học trên trang chủ)
         return { success: true, course: { ...updatedCourse, status: wi300 && data.status !== undefined ? data.status : updatedCourse.status } }
     } catch (error: any) {

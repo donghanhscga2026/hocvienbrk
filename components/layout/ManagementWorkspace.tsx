@@ -2,7 +2,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { useManagementFrame } from './ManagementFrameContext'
-import { Home, BookOpen, Users, Settings } from 'lucide-react'
+import { Home, BookOpen, Users, Settings, Package, BriefcaseBusiness } from 'lucide-react'
 
 // Sidebar độc lập chỉ render khi không có khung quản lý wi300, nên không gắn
 // link tới các route chỉ tồn tại ở wi300 (/my-space, /du-an/quan-ly) — trên
@@ -10,10 +10,12 @@ import { Home, BookOpen, Users, Settings } from 'lucide-react'
 const links = [
   { key: 'home', href: '/', label: 'Không gian của tôi', icon: Home },
   { key: 'courses', href: '/tools/courses', label: 'Quản lý khóa học', icon: BookOpen },
+  { key: 'products', href: '/tools/products', label: 'Sản phẩm số', icon: Package },
+  { key: 'services', href: '/tools/services', label: 'Dịch vụ', icon: BriefcaseBusiness },
   { key: 'crm', href: '/tools/crm', label: 'CRM', icon: Users },
   { key: 'settings', href: '/tools', label: 'Công cụ quản lý', icon: Settings },
 ]
-export default function ManagementWorkspace({ children, active, appearance = 'default' }: { children: ReactNode; active: 'courses' | 'projects'; appearance?: 'default' | 'forest' }) {
+export default function ManagementWorkspace({ children, active, appearance = 'default' }: { children: ReactNode; active: 'courses' | 'projects' | 'products' | 'services'; appearance?: 'default' | 'forest' }) {
   const shared = useManagementFrame()
   if (shared) return <div data-management-workspace className="min-w-0 space-y-5 pb-12">{children}</div>
   return <div data-management-workspace className="min-h-screen bg-[linear-gradient(120deg,var(--color-background,#FAE0C7),#f8faf7)] text-brk-on-surface">

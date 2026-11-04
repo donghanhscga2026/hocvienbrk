@@ -11,6 +11,7 @@ import { enrollInCourseAction, checkEnrollmentStatusAction, getBrkMbvBalanceActi
 import { resolveBankBin } from '@/lib/bank-bin'
 import { generateTransferContent } from '@/lib/vietqr'
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
+import { offeringHref } from '@/lib/offerings/shared'
 
 type FlowStep = 'auth' | 'voucher_confirm' | 'payment' | 'thankyou'
 
@@ -231,7 +232,7 @@ export default function RegistrationFlowModal({
           {accountAssistantEnabled ? <AccountAssistantModal
             onClose={onClose}
           /> : <div role="dialog" aria-modal="true" aria-labelledby="wi300-registration-auth" className="w-full max-w-md rounded-2xl bg-white p-6 text-brk-on-surface">
-            <div className="flex items-center justify-between gap-3"><h2 id="wi300-registration-auth" className="text-xl font-bold">Đăng nhập để tham gia khóa học</h2><button type="button" onClick={onClose} aria-label="Đóng" className="flex h-11 w-11 shrink-0 items-center justify-center"><X className="h-5 w-5" /></button></div>
+            <div className="flex items-center justify-between gap-3"><h2 id="wi300-registration-auth" className="text-xl font-bold">Đăng nhập để tiếp tục</h2><button type="button" onClick={onClose} aria-label="Đóng" className="flex h-11 w-11 shrink-0 items-center justify-center"><X className="h-5 w-5" /></button></div>
             <p className="mt-3 text-sm leading-6 text-brk-muted">Đăng nhập hoặc tạo tài khoản để tiếp tục đăng ký {course.name_lop}.</p>
             {initialContact && (initialContact.fullName || initialContact.phone || initialContact.email) && (
               <div className="mt-3 rounded-xl bg-brk-background p-3 text-sm leading-6">
@@ -630,7 +631,7 @@ export default function RegistrationFlowModal({
           }}>
             <div>
               <h3 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '22px', fontWeight: 700, color: '#F8F1E6', margin: 0 }}>
-                Kích hoạt khóa học
+                {course.productGroup === 'DIGITAL' ? 'Kích hoạt sản phẩm' : course.productGroup === 'SERVICE' ? 'Kích hoạt dịch vụ' : 'Kích hoạt khóa học'}
               </h3>
               <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', color: '#A8A39C', margin: '4px 0 0' }}>
                 {course.name_lop || course.name_khoa}
@@ -876,7 +877,7 @@ export default function RegistrationFlowModal({
             {/* Learn CTA */}
             <div style={{ display: 'flex', gap: '12px' }}>
               <a
-                href={`/courses/${course.id_khoa}/learn`}
+                href={course.productGroup && course.productGroup !== 'COURSE' ? offeringHref(course.productGroup, course.id_khoa) : `/courses/${course.id_khoa}/learn`}
                 style={{
                   flex: 1,
                   display: 'flex',
@@ -894,7 +895,7 @@ export default function RegistrationFlowModal({
                   letterSpacing: '0.02em',
                 }}
               >
-                Vào học ngay →
+                {course.productGroup === 'DIGITAL' ? 'Mở sản phẩm →' : course.productGroup === 'SERVICE' ? 'Sử dụng dịch vụ →' : 'Vào học ngay →'}
               </a>
               <button
                 onClick={onClose}

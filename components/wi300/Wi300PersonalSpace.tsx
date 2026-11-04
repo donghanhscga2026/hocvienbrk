@@ -19,6 +19,7 @@ import { useManagementFrame, useManagementTools } from '@/components/layout/Mana
 import { SpaceSidebar } from './Wi300SpaceMenu'
 import { canUseTool, safeToolUrl, spaceNavigation } from '@/lib/wi300/personal-space'
 import { canCreateProfile, isProfileTool } from '@/lib/auth/roles'
+import { offeringHref } from '@/lib/offerings/shared'
 export { canUseTool } from '@/lib/wi300/personal-space'
 
 const PaymentModal = dynamic(() => import('@/components/course/PaymentModal'), { ssr: false })
@@ -113,8 +114,10 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
   }, [role, session?.user?.id, hasSharedTools])
 
   const map = new Map(enrollments.map(row => [row.courseId, row]))
-  const learning = courses.filter(course => { const row = map.get(course.id); return row && !row.hiddenFromGifts })
-  const active = recentActiveCourses(courses, enrollments, enrollments.length)
+  const courseItems = courses.filter(course => !course.productGroup || course.productGroup === 'COURSE')
+  const learning = courseItems.filter(course => { const row = map.get(course.id); return row && !row.hiddenFromGifts })
+  const active = recentActiveCourses(courseItems, enrollments, enrollments.length)
+  const purchasedItems = courses.filter(course => course.productGroup === (tab === 'products' ? 'DIGITAL' : 'SERVICE') && map.has(course.id))
   const completed = learning.filter(course => { const row = map.get(course.id)!; return row.status === 'COMPLETED' || (row.status === 'ACTIVE' && row.totalLessons > 0 && row.completedCount >= row.totalLessons) })
   const pending = learning.filter(course => map.get(course.id)?.status === 'PENDING')
   const learningGroups = [{ id: 'active' as const, title: 'Đang học', items: active }, { id: 'completed' as const, title: 'Đã hoàn thành', items: completed }, { id: 'pending' as const, title: 'Chờ xử lý', items: pending }]
@@ -168,6 +171,7 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
     {!shared && <aside className="relative z-30 min-w-0 lg:sticky lg:top-24 lg:self-start"><SpaceSidebar groups={spaceNavigation(role, permittedTools)} active={tab} route={params.toString()} onNavigate={() => titleRef.current?.scrollIntoView({ block: 'start' })} loading={toolsLoading} failed={toolsError} /></aside>}
     <div className="relative z-0 min-w-0 space-y-5"><h1 ref={titleRef} className="scroll-mt-44 break-words text-2xl font-bold sm:text-3xl lg:scroll-mt-24">{tab === 'home' ? 'Tổng quan' : tab === 'pages' ? 'Nội dung & website' : tabs.find(item => item.id === tab)?.label}</h1>
       {tab === 'business' && toolList(workspaceTools('business'))}
+      {(tab === 'products' || tab === 'services') && <section className="space-y-4"><p className="text-base text-brk-muted">{tab === 'products' ? 'Mở ứng dụng hoặc tải tài nguyên đã mua.' : 'Xem dịch vụ, đặt lịch và yêu cầu đồng hành.'}</p>{purchasedItems.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{purchasedItems.map(course => <article key={course.id} className={box}><h2 className="text-lg font-bold">{course.name_lop}</h2><p className="mt-2 text-sm text-brk-muted">{map.get(course.id)?.status === 'ACTIVE' || map.get(course.id)?.status === 'COMPLETED' ? 'Đã kích hoạt' : map.get(course.id)?.status === 'PENDING' ? 'Chờ xử lý / thanh toán' : 'Chưa kích hoạt'}</p><Link href={offeringHref(course.productGroup, course.id_khoa)} className={action + ' mt-4'}>{tab === 'products' ? 'Mở sản phẩm' : 'Xem / đặt lịch'} →</Link></article>)}</div> : <p className={box}>Chưa có nội dung ở mục này.</p>}{tab === 'services' && <Link href="/my-requests" className="inline-flex min-h-11 items-center font-semibold text-brk-primary">Lịch hẹn & yêu cầu của tôi →</Link>}</section>}
       {tab === 'website-admin' && role === 'ADMIN' && toolList(workspaceTools('website-admin'))}
       {accountError && <p role="alert" className="rounded-xl bg-amber-50 p-4 text-amber-900">Chưa tải được dữ liệu học tập. Vui lòng thử tải lại trang.</p>}
       {tab === 'home' && <>

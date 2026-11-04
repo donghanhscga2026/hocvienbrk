@@ -92,7 +92,14 @@ export function spaceNavigation(role: string, tools: PersonalTool[]): SpaceNavGr
     ] },
     ...(canTeach(role) ? [{ id: 'teaching', label: 'Giảng dạy', href: '/my-space?tab=teaching', icon: 'GraduationCap', items: [{ label: 'Hồ sơ giảng viên', href: '/tools/wi-teacher-profile', icon: 'UserRound' }, { label: 'Thư viện mẫu trang bán', href: '/tools/courses/templates', icon: 'PanelsTopLeft' }] }] : []),
     ...(loggedIn ? [{ id: 'affiliate', label: 'Cộng tác viên', href: '/my-space?tab=affiliate', icon: 'Link2', items: [{ label: 'Link giới thiệu & hoa hồng', href: '/tools/affiliate', icon: 'Link2' }] }] : []),
-    ...(loggedIn ? [{ id: 'business', label: 'Quản lý & kinh doanh', href: '/my-space?tab=business', icon: 'Handshake', items: [] }] : []),
+    ...(loggedIn ? [
+      { id: 'products', label: 'Sản phẩm đã mua', href: '/my-space?tab=products', icon: 'Package', items: [] },
+      { id: 'services', label: 'Dịch vụ đã đặt', href: '/my-space?tab=services', icon: 'BriefcaseBusiness', items: [] },
+    ] : []),
+    ...(loggedIn ? [{ id: 'business', label: 'Quản lý & kinh doanh', href: '/my-space?tab=business', icon: 'Handshake', items: canTeach(role) ? [
+      { label: 'Sản phẩm số', href: '/tools/products', icon: 'Package' },
+      { label: 'Dịch vụ', href: '/tools/services', icon: 'BriefcaseBusiness' },
+    ] : [] }] : []),
     ...(role === 'ADMIN' ? [{ id: 'website-admin', label: 'Quản trị website', href: '/tools/wi-website', icon: 'Globe', items: [
       { label: 'Cấu hình chung', href: '/tools/wi-website?section=common', icon: 'Settings' },
       { label: 'Trang', href: '/tools/wi-appearance', icon: 'PanelsTopLeft' },

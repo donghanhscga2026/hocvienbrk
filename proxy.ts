@@ -29,7 +29,7 @@ const RESERVED_PATHS = new Set([
     'tca', 'ktc', 'khoa-hoc', 'land', 'page', 'du-an', 'ho-so-hoc-tap'
 ])
 
-const RESOURCE_PREFIXES = new Set(['khoa-hoc', 'land', 'page', 'du-an'])
+const RESOURCE_PREFIXES = new Set(['khoa-hoc', 'san-pham', 'dich-vu', 'land', 'page', 'du-an'])
 
 // Lớp bảo vệ mặc định (defense-in-depth) cho các nhóm route quản trị/nhạy cảm.
 // Đây là lớp chặn thứ 2 — mỗi route/action bên trong vẫn PHẢI tự kiểm tra quyền

@@ -43,9 +43,9 @@ export default function Wi300Header() {
   const links = (brand.appearance?.headerMenu || [
     { label: 'Trang chủ', url: '/', visible: true },
     { label: 'Khóa học', url: '/khoa-hoc', visible: true },
-    { label: 'Sản phẩm', url: '/san-pham', visible: true },
+    { label: 'Sản phẩm số', url: '/san-pham', visible: true },
     { label: 'Dịch vụ', url: '/dich-vu', visible: true },
-  ]).filter(item => item.visible).map(item => ({ href: item.url, label: item.label, icon: menuIcons[item.url.split('?')[0]] || LayoutGrid }))
+  ]).filter(item => item.visible).map(item => ({ href: item.url, label: item.url === '/san-pham' && item.label === 'Sản phẩm' ? 'Sản phẩm số' : item.label, icon: menuIcons[item.url.split('?')[0]] || LayoutGrid }))
   const accountLink = 'flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-brk-background focus-visible:outline-brk-primary'
   return <><header className={`${brand.appearance?.common.stickyHeader !== false ? "sticky top-0" : "relative"} z-50 shrink-0 border-b border-brk-outline bg-white/95 backdrop-blur-xl`}>
     <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-2 sm:px-4 lg:flex lg:justify-between lg:px-6">
@@ -57,7 +57,7 @@ export default function Wi300Header() {
       </Link>
       <nav aria-label="Điều hướng chính" className="col-span-2 row-start-2 flex w-full min-w-0 items-center gap-1 overflow-x-auto py-1 lg:w-auto lg:justify-start">
         {links.filter(item => websiteLinkVisible(item.href, brand.appearance)).map(({ href, label, icon: Icon }) => {
-          const selected = path === href || (href === '/khoa-hoc' && path.startsWith(href + '/'))
+          const selected = path === href || (['/khoa-hoc', '/san-pham', '/dich-vu'].includes(href) && path.startsWith(href + '/'))
           return <Link key={href} href={href} target={href.startsWith('https://') ? '_blank' : undefined} rel={href.startsWith('https://') ? 'noopener noreferrer' : undefined} aria-current={selected ? 'page' : undefined} className={`inline-flex min-h-11 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-xl px-2.5 text-[11px] font-semibold sm:px-2.5 sm:text-sm lg:flex-none ${selected ? 'bg-brk-background text-brk-primary' : 'text-brk-muted hover:bg-brk-background hover:text-brk-primary'}`}><Icon className="h-4 w-4" aria-hidden="true" />{label}</Link>
         })}
       </nav>

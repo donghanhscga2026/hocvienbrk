@@ -20,7 +20,9 @@ import { formatCourseSaveError } from "@/lib/course/errors"
 import { resolveImageUrl } from "@/lib/image-utils"
 import { requireDomainCourse, requireDomainEnrollment, domainContext } from '@/lib/website/domain-context'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
-import { WI300_LEARNING_PREFIX } from '@/lib/wi300/course-visibility'
+import { WI300_LEARNING_PREFIX, WI300_COURSE_PREFIX, ensureWi300CourseVisibility } from '@/lib/wi300/course-visibility'
+import { saveOfferingDetails } from '@/lib/offerings/server'
+import { parseOfferingDetails } from '@/lib/offerings/shared'
 
 /**
  * Đăng ký khóa học mới
@@ -59,6 +61,7 @@ export async function enrollInCourseAction(
                     name_lop: true,
                     noidung_email: true,
                     type: true,
+                    productGroup: true,
                     teacherId: true,
                     requiresReferralActivation: true,
                     referralActivationThreshold: true,
@@ -182,7 +185,8 @@ export async function enrollInCourseAction(
                     where: { id: existing.id },
                     data: {
                         phi_coc: effectivePhiCoc,
-                        status: isAutoActiveExisting ? 'ACTIVE' : 'PENDING'
+                        status: isAutoActiveExisting ? 'ACTIVE' : 'PENDING',
+                        ...(isAutoActiveExisting && course.productGroup && course.productGroup !== 'COURSE' ? { activatedAt: existing.activatedAt || new Date() } : {}),
                     }
                 })
                 await markBenefitUsed()
@@ -398,6 +402,7 @@ export async function enrollInCourseAction(
                     userId,
                     courseId,
                     status: isAutoActive ? "ACTIVE" : "PENDING",
+                    ...(isAutoActive && course.productGroup && course.productGroup !== 'COURSE' ? { activatedAt: new Date() } : {}),
                     studyMode,
                     phi_coc: effectivePhiCoc,
                     referrerId: enrollmentReferrerId,
@@ -974,8 +979,15 @@ export async function createCourseAction(formData: FormData) {
                 courseData.teacherBankAccountId = parseInt(teacherBankAccountIdStr)
             }
 
-        const newCourse = await prisma.course.create({
-            data: courseData as Prisma.CourseCreateInput
+        const detailsRaw = formData.get('offeringDetails')
+        const details = detailsRaw ? parseOfferingDetails(JSON.parse(String(detailsRaw))) : undefined
+        const wi300 = !!await getCurrentDeploymentBrand()
+        if (wi300) await ensureWi300CourseVisibility(prisma)
+        const newCourse = await prisma.$transaction(async tx => {
+            const created = await tx.course.create({ data: courseData as Prisma.CourseCreateInput })
+            if (details) await saveOfferingDetails(tx, created.id, created.productGroup, details, created.teacherId)
+            if (wi300) await tx.systemConfig.upsert({ where: { key: WI300_COURSE_PREFIX + created.id }, create: { key: WI300_COURSE_PREFIX + created.id, value: created.status }, update: { value: created.status } })
+            return created
         })
 
         // Tự tạo AutoVerifyConfig cho khóa học có phí (thanh toán tự động theo GV).
@@ -1037,7 +1049,7 @@ export async function createCourseAction(formData: FormData) {
         revalidatePath('/tools/courses')
 
         // ✅ Auto-create first lesson (TEXT type with course info template)
-        try {
+        if (newCourse.productGroup === 'COURSE') try {
             const defaultContent = `📌 THÔNG TIN KHAI GIẢNG & LƯU Ý
 
 🗓 Ngày khai giảng: [Điền ngày]

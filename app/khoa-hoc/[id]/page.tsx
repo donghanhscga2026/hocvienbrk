@@ -16,6 +16,7 @@ import { courseLoadingPlan } from '@/lib/course-page/loading-plan'
 import { getCoursePublicExtras } from '@/lib/course-page/public-extras'
 import { getPublicProjects } from '@/lib/wi300/public-projects'
 import CourseProjectBadges from '@/components/course/CourseProjectBadges'
+import OfferingDetail from '@/components/offerings/OfferingDetail'
 
 // Dùng chung kiểm tra phạm vi trong metadata và nội dung của cùng request.
 const getPageProfile = cache(getCurrentSiteProfile)
@@ -108,6 +109,7 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
     ])
 
     if (!course) notFound()
+    if (course.productGroup !== 'COURSE' && !publishedPage) return <OfferingDetail slug={course.id_khoa} />
     if (siteProfile && !(await canAccessPageCourse(siteProfile, course.id))) notFound()
 
     const courseId = course.id
