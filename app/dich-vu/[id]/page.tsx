@@ -1,4 +1,4 @@
-import OfferingDetail from '@/components/offerings/OfferingDetail'
+import OfferingSalesPage from '@/components/offerings/OfferingSalesPage'
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
-  return <OfferingDetail slug={(await params).id} expectedGroup="SERVICE" />
+  return <OfferingSalesPage slug={(await params).id} group="SERVICE" />
 }

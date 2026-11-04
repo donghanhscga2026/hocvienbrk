@@ -49,7 +49,7 @@ async function run() {
     './Wi300Footer': { __esModule: true, default: () => React.createElement('footer', { 'data-test-footer': true }) },
     './Wi300ManagementFrame': { __esModule: true, default: ({ children }) => children },
   }).default
-  for (const route of ['/san-pham/item', '/dich-vu/item']) {
+  for (const route of ['/san-pham/item', '/dich-vu/item', '/san-pham/item/su-dung', '/dich-vu/item/su-dung']) {
     pathname = route
     await act(async () => root.render(React.createElement(Shell, null, React.createElement('main', null, 'Detail'))))
     assert.equal(document.querySelectorAll('[data-test-header]').length, 1)

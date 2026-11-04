@@ -11,7 +11,6 @@ import FooterSection from '@/components/home/FooterSection'
 import CourseProjectBadges from '@/components/course/CourseProjectBadges'
 import { getPublicProjects } from '@/lib/wi300/public-projects'
 import { CheckCircle2, LifeBuoy, ArrowRight, Layers } from 'lucide-react'
-import OfferingResources, { type OfferingResource } from './OfferingResources'
 import OfferingRichText from './OfferingRichText'
 import MainHeader from '@/components/layout/MainHeader'
 import OfferingPurchase from './OfferingPurchase'
@@ -20,6 +19,7 @@ import { publicCatalogWhere, readOfferingDetails } from '@/lib/offerings/server'
 import {
   groupInfo,
   offeringFacts,
+  offeringWorkspaceHref,
   publicOfferingDetails,
   offeringAccess,
   offeringKinds,
@@ -97,62 +97,9 @@ export default async function OfferingDetail({
   const info = groupInfo[group]
   const active = offeringAccess(enrollment, group === 'DIGITAL' ? details.accessDays : 0)
   const previouslyActive = enrollment && ['ACTIVE', 'COMPLETED'].includes(enrollment.status)
-  const booking =
-    active && group === 'SERVICE' && details.bookingCode
-      ? await prisma.bookingSession.findFirst({
-          where: { code: details.bookingCode, courseId: course.id, status: 'ACTIVE' },
-          select: { code: true },
-        })
-      : null
   const projects = (await getPublicProjects())
     .filter((project) => project.courseIds.includes(course.id))
     .map(({ slug, name, logo }) => ({ slug, name, logo }))
-  // Chỉ đọc và truyền nội dung riêng tư xuống client sau khi xác minh quyền ở server.
-  const lessons =
-    active && group === 'DIGITAL'
-      ? await prisma.lesson.findMany({
-          where: { courseId: course.id },
-          orderBy: { order: 'asc' },
-          select: { id: true, title: true, type: true, content: true, videoUrl: true, imageUrl: true },
-        })
-      : []
-  const resources: OfferingResource[] = active ? details.resources.map((resource) => ({ ...resource })) : []
-  if (active && details.accessUrl)
-    resources.unshift({
-      title: details.kind === 'APP' ? 'Mở ứng dụng' : 'Tài nguyên sản phẩm',
-      kind: details.kind === 'APP' ? 'APP' : 'RESOURCE',
-      url: details.accessUrl,
-    })
-  for (const lesson of lessons) {
-    if (lesson.content || lesson.imageUrl)
-      resources.push({
-        title: lesson.title,
-        kind: 'GUIDE',
-        body: (
-          <>
-            {lesson.imageUrl && (
-              <img
-                src={lesson.imageUrl}
-                alt=""
-                loading="lazy"
-                className="mb-4 max-h-96 max-w-full rounded-xl object-contain"
-              />
-            )}
-            <OfferingRichText text={lesson.content} />
-          </>
-        ),
-      })
-    for (const [index, part] of (lesson.videoUrl || '').split('|').filter(Boolean).entries()) {
-      const match = part.match(/^(?:\[([^\]]+)\]|\(([^)]+)\))(.*)$/)
-      const url = (match ? match[3] : part).trim()
-      if (!/^https:\/\//i.test(url)) continue
-      resources.push({
-        title: match?.[1] || match?.[2] || `${lesson.title} · Phần ${index + 1}`,
-        kind: match?.[2] ? 'RESOURCE' : 'GUIDE',
-        url,
-      })
-    }
-  }
   const ownBrandShell = !!brand && !expectedGroup
   const button =
     'inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brk-primary px-4 text-center font-semibold text-white'
@@ -249,28 +196,9 @@ export default async function OfferingDetail({
                 </dl>
               </section>
               {active ? (
-                <div className="space-y-3">
-                  {group === 'DIGITAL' ? (
-                    <a href="#noi-dung" className={button}>
-                      Mở nội dung sản phẩm <ArrowRight className="h-4 w-4" />
-                    </a>
-                  ) : (
-                    <Link
-                      href={booking ? '/dat-lich/' + encodeURIComponent(booking.code) : '/my-requests'}
-                      className={button}
-                    >
-                      {booking ? 'Chọn lịch hẹn' : 'Gửi yêu cầu đồng hành'} <ArrowRight className="h-4 w-4" />
-                    </Link>
-                  )}
-                  {group === 'SERVICE' && (
-                    <Link
-                      href="/my-requests"
-                      className="flex min-h-11 items-center justify-center text-sm font-semibold text-brk-primary"
-                    >
-                      Xem lịch đã đặt →
-                    </Link>
-                  )}
-                </div>
+                <Link href={offeringWorkspaceHref(group, slug)} className={button}>
+                  Vào sử dụng <ArrowRight className="h-4 w-4" />
+                </Link>
               ) : previouslyActive ? (
                 <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
                   Quyền sử dụng đã hết hạn. Vui lòng gửi yêu cầu hỗ trợ để gia hạn.
@@ -331,7 +259,20 @@ export default async function OfferingDetail({
             />
           </section>
           {group === 'DIGITAL' ? (
-            <OfferingResources resources={resources} active={active} />
+            <section id="noi-dung" className="scroll-mt-36 rounded-2xl border bg-green-50 p-6">
+              <h2 className="text-2xl font-bold text-green-950">Không gian sử dụng riêng</h2>
+              <p className="my-3 text-brk-muted">
+                Tài nguyên và hướng dẫn được mở tại khu vực riêng sau khi kích hoạt sản phẩm.
+              </p>
+              {active && (
+                <Link
+                  href={offeringWorkspaceHref(group, slug)}
+                  className="inline-flex min-h-12 items-center rounded-xl bg-brk-primary px-5 font-semibold text-white"
+                >
+                  Vào sử dụng →
+                </Link>
+              )}
+            </section>
           ) : (
             <section id="noi-dung" className="scroll-mt-36 space-y-4">
               <h2 className="text-2xl font-bold text-green-950">{contentTitle}</h2>
@@ -369,7 +310,7 @@ export default async function OfferingDetail({
                     ['Đăng ký dịch vụ', 'Hoàn tất đăng ký để kích hoạt quyền đồng hành.'],
                     [
                       'Chọn lịch hẹn',
-                      booking || details.bookingCode
+                      details.bookingCode
                         ? 'Chọn khung giờ phù hợp trong lịch của chuyên gia.'
                         : 'Gửi yêu cầu đồng hành để thống nhất lịch với chuyên gia.',
                     ],
@@ -385,14 +326,6 @@ export default async function OfferingDetail({
                 </article>
               ))}
             </div>
-            {active && details.instructions && (
-              <div className="rounded-2xl border bg-green-50 p-5">
-                <h3 className="mb-3 font-bold">
-                  {group === 'DIGITAL' ? 'Hướng dẫn từ đơn vị cung cấp' : 'Chuẩn bị trước buổi hẹn'}
-                </h3>
-                <OfferingRichText text={details.instructions} />
-              </div>
-            )}
           </section>
           <section
             id="ho-tro"

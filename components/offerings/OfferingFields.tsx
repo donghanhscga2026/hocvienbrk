@@ -1,12 +1,15 @@
 'use client'
 
+import OfferingWorkspaceFields from './OfferingWorkspaceFields'
 import { offeringKinds, type OfferingDetails, type ProductGroup } from '@/lib/offerings/shared'
 
 export default function OfferingFields({
   group,
   value,
   onChange,
+  courseId,
 }: {
+  courseId?: string
   group: ProductGroup
   value: OfferingDetails
   onChange: (value: OfferingDetails) => void
@@ -21,6 +24,7 @@ export default function OfferingFields({
       : (['COACHING', 'CONSULTING', 'IMPLEMENTATION', 'OTHER'] as const)
   return (
     <section className="mt-6 space-y-4 rounded-2xl border border-brk-outline bg-brk-background p-4">
+      <OfferingWorkspaceFields group={group} value={value} onChange={onChange} courseId={courseId} />
       <h3 className="text-lg font-bold">{group === 'DIGITAL' ? 'Nội dung & quyền sử dụng' : 'Thông tin đồng hành'}</h3>
       <label className="block text-sm font-semibold">
         Loại
@@ -265,6 +269,8 @@ export default function OfferingFields({
                     ['APP', 'Công cụ / App'],
                     ['TEMPLATE', 'Template'],
                     ['GUIDE', 'Hướng dẫn'],
+                    ['PROMPT', 'Prompt'],
+                    ['VIDEO', 'Video'],
                     ['RESOURCE', 'Tài nguyên'],
                   ].map(([key, label]) => (
                     <option key={key} value={key}>
@@ -288,12 +294,32 @@ export default function OfferingFields({
                   }
                 />
               </label>
+              <label className="block text-sm">
+                Cách mở
+                <select
+                  className={field}
+                  value={resource.viewer}
+                  onChange={(e) =>
+                    update(
+                      'resources',
+                      value.resources.map((item, i) =>
+                        i === index ? { ...item, viewer: e.target.value as 'LINK' | 'PDF' } : item,
+                      ),
+                    )
+                  }
+                >
+                  <option value="LINK">Mở tại nơi lưu tài nguyên</option>
+                  <option value="PDF">Xem PDF bên trong trang (nếu nơi lưu hỗ trợ)</option>
+                </select>
+              </label>
             </div>
           ))}
           <button
             type="button"
             disabled={value.resources.length >= 100}
-            onClick={() => update('resources', [...value.resources, { title: '', kind: 'RESOURCE', url: '' }])}
+            onClick={() =>
+              update('resources', [...value.resources, { title: '', kind: 'RESOURCE', viewer: 'LINK', url: '' }])
+            }
             className="min-h-12 rounded-xl border border-brk-primary px-4 font-semibold text-brk-primary disabled:opacity-40"
           >
             + Thêm tài nguyên

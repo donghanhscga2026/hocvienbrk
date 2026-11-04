@@ -12,6 +12,11 @@ export const groupInfo = {
 } as const
 export const offeringKinds = { APP: 'App', EBOOK: 'Ebook', TEMPLATE: 'Template', RESOURCE: 'Bộ tài nguyên', COACHING: 'Coaching', CONSULTING: 'Tư vấn', IMPLEMENTATION: 'Hỗ trợ triển khai', OTHER: 'Khác' } as const
 const safeUrl = z.string().trim().max(2000).refine(value => !value || (value.startsWith('/') && !value.startsWith('//') && !/[\\\s]/.test(value)) || (() => { try { return new URL(value).protocol === 'https:' } catch { return false } })(), 'Dùng đường dẫn nội bộ hoặc URL https hợp lệ.')
+export const workspaceLayouts = { AUTO: 'Tự chọn theo loại', LIBRARY: 'Thư viện tài nguyên', APP: 'Không gian App', SESSIONS: 'Dịch vụ theo buổi', DELIVERY: 'Triển khai & Bàn giao' } as const
+export const workspaceModules = { resources: 'Tài nguyên', instructions: 'Hướng dẫn / Chuẩn bị', bookings: 'Lịch hẹn', conversation: 'Trao đổi & Hỗ trợ', delivery: 'Tiến độ & Bàn giao' } as const
+export const deliveryStateSchema = z.object({ version: z.number().int().min(0).default(0), phase: z.enum(['NEW', 'IN_PROGRESS', 'REVIEW', 'COMPLETED']).default('NEW'), note: z.string().trim().max(4000).default(''), files: z.array(z.object({ title: z.string().trim().min(1).max(200), url: safeUrl.refine(Boolean, 'Nhập liên kết bàn giao.') })).max(30).default([]) }).strict()
+export const deliveryLabels = { ONLINE: 'Trực tuyến', DOWNLOAD: 'Tải về', BOTH: 'Trực tuyến / tải về' }
+export const deliveryPhaseLabels = { NEW: 'Tiếp nhận', IN_PROGRESS: 'Đang thực hiện', REVIEW: 'Chờ khách duyệt', COMPLETED: 'Đã bàn giao' }
 export const offeringDetailsSchema = z.object({
   kind: z.enum(['APP', 'EBOOK', 'TEMPLATE', 'RESOURCE', 'COACHING', 'CONSULTING', 'IMPLEMENTATION', 'OTHER']).default('OTHER'),
   accessUrl: safeUrl.default(''),
@@ -21,6 +26,9 @@ export const offeringDetailsSchema = z.object({
   durationMin: z.number().int().min(5).max(1440).default(60),
   mode: z.enum(['ONLINE', 'OFFLINE', 'HYBRID']).default('ONLINE'),
   bookingCode: z.string().trim().max(100).regex(/^[a-zA-Z0-9_-]*$/).default(''),
+  salesLayout: z.enum(['DEFAULT', 'TEMPLATE']).default('DEFAULT'),
+  workspaceLayout: z.enum(['AUTO', 'LIBRARY', 'APP', 'SESSIONS', 'DELIVERY']).default('AUTO'),
+  modules: z.array(z.enum(['resources', 'instructions', 'bookings', 'conversation', 'delivery'])).max(5).default(['resources', 'instructions', 'bookings', 'conversation', 'delivery']).transform(items => [...new Set(items)]),
   format: z.string().trim().max(160).default(''),
   platform: z.string().trim().max(160).default(''),
   language: z.string().trim().max(80).default(''),
@@ -28,7 +36,7 @@ export const offeringDetailsSchema = z.object({
   audience: z.enum(['INDIVIDUAL', 'GROUP']).default('INDIVIDUAL'),
   benefits: z.array(z.string().trim().max(240)).max(6).default([]).transform(items => items.filter(Boolean)),
   agenda: z.array(z.object({ title: z.string().trim().min(1).max(160), description: z.string().trim().max(2000) })).max(30).default([]),
-  resources: z.array(z.object({ title: z.string().trim().min(1).max(200), kind: z.enum(['EBOOK', 'APP', 'TEMPLATE', 'GUIDE', 'RESOURCE']), url: safeUrl.refine(value => !!value, 'Nhập đường dẫn tài nguyên.') })).max(100).default([]),
+  resources: z.array(z.object({ title: z.string().trim().min(1).max(200), kind: z.enum(['EBOOK', 'APP', 'TEMPLATE', 'GUIDE', 'RESOURCE', 'PROMPT', 'VIDEO']), viewer: z.enum(['LINK', 'PDF']).default('LINK'), url: safeUrl.refine(value => !!value, 'Nhập đường dẫn tài nguyên.') })).max(100).default([]),
 }).strict()
 export type OfferingDetails = z.infer<typeof offeringDetailsSchema>
 export const emptyOfferingDetails: OfferingDetails = offeringDetailsSchema.parse({})
@@ -41,8 +49,9 @@ export function publicOfferingDetails(details: OfferingDetails) {
   return { kind, accessDays, sessions, durationMin, mode, format, platform, language, delivery, audience }
 }
 export const modeLabels = { ONLINE: 'Online', OFFLINE: 'Trực tiếp', HYBRID: 'Online & trực tiếp' }
-export const deliveryLabels = { ONLINE: 'Trực tuyến', DOWNLOAD: 'Tải về', BOTH: 'Trực tuyến / tải về' }
-export const resourceLabels = { EBOOK: 'Ebook', APP: 'Công cụ / App', TEMPLATE: 'Template', GUIDE: 'Hướng dẫn', RESOURCE: 'Tài nguyên' }
+export const resourceLabels = { EBOOK: 'Ebook', APP: 'Công cụ / App', TEMPLATE: 'Template', GUIDE: 'Hướng dẫn', RESOURCE: 'Tài nguyên', PROMPT: 'Prompt', VIDEO: 'Video' }
+export function offeringWorkspaceHref(group: unknown, slug: string) { return offeringHref(group, slug) + '/su-dung' }
+export function resolvedWorkspace(group: string, details: OfferingDetails) { return details.workspaceLayout !== 'AUTO' ? details.workspaceLayout : group === 'SERVICE' ? details.kind === 'IMPLEMENTATION' ? 'DELIVERY' : 'SESSIONS' : details.kind === 'APP' ? 'APP' : 'LIBRARY' }
 export function offeringFacts(group: string, details: ReturnType<typeof publicOfferingDetails>) {
   return group === 'SERVICE'
     ? [['Hình thức', modeLabels[details.mode]], ['Đồng hành', details.audience === 'GROUP' ? 'Theo nhóm' : '1:1'], ['Thời lượng', `${details.sessions} buổi · ${details.durationMin} phút/buổi`]]

@@ -101,8 +101,8 @@ async function run() {
   assert.ok(!html.includes(secret), 'A pending payment does not grant access')
   enrollment = { status: 'ACTIVE', activatedAt: new Date() }; visible = false
   html = renderToStaticMarkup(await Detail({ slug: 'EBOOK-5' }))
-  assert.ok(html.includes(secret) && html.includes('PRIVATE INSTRUCTIONS'), 'Paid customer retains access when item is hidden')
-  assert.ok(html.includes('PROTECTED LEGACY CONTENT') && html.includes('https://files.example/legacy.pdf'), 'Activated workspace includes legacy content and playlist documents')
+  assert.ok(!html.includes(secret) && !html.includes('PRIVATE INSTRUCTIONS') && html.includes('/san-pham/EBOOK-5/su-dung'), 'Sales page links to the private workspace without protected payloads')
+  assert.ok(!html.includes('PROTECTED LEGACY CONTENT'), 'Legacy content is not rendered on the sales page')
   enrollment = { status: 'ACTIVE', activatedAt: new Date('2020-01-01T00:00:00Z') }
   html = renderToStaticMarkup(await Detail({ slug: 'EBOOK-5' }))
   assert.ok(!html.includes(secret) && html.includes('hết hạn'), 'Expired access is denied on the server')

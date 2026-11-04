@@ -11,7 +11,7 @@ import { enrollInCourseAction, checkEnrollmentStatusAction, getBrkMbvBalanceActi
 import { resolveBankBin } from '@/lib/bank-bin'
 import { generateTransferContent } from '@/lib/vietqr'
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
-import { offeringHref } from '@/lib/offerings/shared'
+import { offeringWorkspaceHref } from '@/lib/offerings/shared'
 
 type FlowStep = 'auth' | 'voucher_confirm' | 'payment' | 'thankyou'
 
@@ -877,7 +877,7 @@ export default function RegistrationFlowModal({
             {/* Learn CTA */}
             <div style={{ display: 'flex', gap: '12px' }}>
               <a
-                href={course.productGroup && course.productGroup !== 'COURSE' ? offeringHref(course.productGroup, course.id_khoa) : `/courses/${course.id_khoa}/learn`}
+                href={course.productGroup && course.productGroup !== 'COURSE' ? offeringWorkspaceHref(course.productGroup, course.id_khoa) : `/courses/${course.id_khoa}/learn`}
                 style={{
                   flex: 1,
                   display: 'flex',

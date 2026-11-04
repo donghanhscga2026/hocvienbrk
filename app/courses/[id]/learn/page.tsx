@@ -5,7 +5,7 @@ import CoursePlayer from "@/components/course/CoursePlayer"
 import { requireDomainCourse } from '@/lib/website/domain-context'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import Wi300Breadcrumb from '@/components/wi300/Wi300Breadcrumb'
-import { offeringHref } from '@/lib/offerings/shared'
+import { offeringWorkspaceHref } from '@/lib/offerings/shared'
 
 type PlaylistItem = {
   type: 'video' | 'doc'
@@ -57,7 +57,7 @@ export default async function CourseLearnPage({
 
   if (!course) redirect(`/courses/${id}`)
   // Sản phẩm/dịch vụ dùng trang nội dung riêng, kiểm tra quyền và hạn dùng ở server.
-  if (course.productGroup !== 'COURSE') redirect(offeringHref(course.productGroup, course.id_khoa))
+  if (course.productGroup !== 'COURSE') redirect(offeringWorkspaceHref(course.productGroup, course.id_khoa))
 
   if (course.type === 'LIB') {
     if (!session?.user?.email) redirect(`/courses/${id}?error=lib_access_denied`)
