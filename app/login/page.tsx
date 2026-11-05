@@ -82,7 +82,7 @@ function LoginForm() {
             } else if (errorStr.includes("INVALID_PASSWORD")) {
                 setError("Mật khẩu không chính xác. Vui lòng thử lại.")
             } else if (errorStr.includes("NO_PASSWORD")) {
-                setError("Tài khoản này chưa thiết lập mật khẩu. Vui lòng liên hệ Admin.")
+                setError("Tài khoản này chưa thiết lập mật khẩu. Hãy đăng nhập bằng mã OTP qua mail, hoặc dùng Quên mật khẩu để tạo mật khẩu.")
             } else if (errorStr.includes("EMAIL_NOT_VERIFIED")) {
                 setError("Vui lòng xác minh email trước khi đăng nhập.")
             } else if (errorStr.includes("EMAIL_VERIFICATION_PENDING")) {
@@ -175,8 +175,9 @@ function LoginForm() {
             })
 
             if (result?.error) {
+                // Mã lỗi cụ thể từ server nằm ở result.code (CustomLoginError); dự phòng thêm result.error
+                const errStr = String(result.error || "") + " " + String((result as any).code || "")
                 // Server xác nhận tài khoản cần MFA: hiện ô nhập mã Authenticator
-                const errStr = String(result.error || "")
                 if (/MFA_REQUIRED/i.test(errStr) || /mã xác thực quản trị/i.test(errStr)) {
                     setMfaRequired(true)
                     setError(null)
@@ -184,31 +185,30 @@ function LoginForm() {
                     setIsLoading(false)
                     return
                 }
-                let errorMsg = "Thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại."
 
+                // Báo cáo lần đăng nhập thất bại (alert Telegram + log) — chỉ để ghi nhận,
+                // nội dung trả về cố ý không dùng để hiển thị.
                 try {
                     const errRes = await fetch('/api/auth/report-failed-login', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ identifier: data.identifier })
                     })
-                    // Đọc body để hoàn tất request; nội dung trả về cố ý KHÔNG dùng:
-                    // lỗi công khai phải giữ chung chung để kẻ xấu không dò được tài khoản.
                     await errRes.json()
+                } catch { /* bỏ qua: việc hiển thị lỗi không phụ thuộc vào báo cáo */ }
 
-                    errorMsg = "Không thể đăng nhập. Kiểm tra thông tin xác thực và mã Authenticator nếu tài khoản đã bật MFA."
-                } catch {
-                    // report-failed-login thất bại, dùng thông tin cơ bản
-                    const identifier = data.identifier
-                    if (/^\d{1,6}$/.test(identifier)) {
-                        errorMsg = "Mã thành viên không tồn tại hoặc mật khẩu không chính xác."
-                    } else if (identifier.includes('@')) {
-                        errorMsg = "Email không tồn tại hoặc mật khẩu không chính xác."
-                    } else {
-                        errorMsg = "Số điện thoại không tồn tại hoặc mật khẩu không chính xác."
-                    }
+                // Hiển thị đúng nguyên nhân server đã xác nhận. Chỉ trường hợp MFA ở trên
+                // mới nhắc tới mã Authenticator; các lỗi còn lại ghi rõ để tránh hiểu lầm.
+                let errorMsg = "Không thể đăng nhập. Vui lòng kiểm tra lại thông tin đã nhập."
+                if (/RATE_LIMITED/i.test(errStr)) {
+                    errorMsg = "Bạn thử sai quá nhiều lần. Vui lòng thử lại sau ít phút."
+                } else if (/INVALID_PASSWORD/i.test(errStr)) {
+                    errorMsg = "Mật khẩu không đúng. Vui lòng kiểm tra lại, hoặc đăng nhập bằng mã OTP qua mail / Quên mật khẩu."
+                } else if (/NO_PASSWORD/i.test(errStr)) {
+                    errorMsg = "Tài khoản chưa thiết lập mật khẩu. Hãy đăng nhập bằng mã OTP qua mail, hoặc dùng Quên mật khẩu để tạo mật khẩu."
+                } else if (/INVALID_OTP/i.test(errStr)) {
+                    errorMsg = "Mã OTP không đúng hoặc đã hết hạn. Vui lòng kiểm tra lại hoặc gửi mã mới."
                 }
-
 
                 setError(errorMsg)
                 setIsLoading(false)
