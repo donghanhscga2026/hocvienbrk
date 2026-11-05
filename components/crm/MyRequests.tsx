@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { ArrowUpRight, CheckCircle2, ChevronDown, Clock3, MessageCircle, Plus, RefreshCw, Send, X } from 'lucide-react'
 import { REQUEST_TOPICS, type RequestTopic } from '@/lib/crm/request-workflow'
 import { REQUEST_CATEGORIES, REQUEST_STATUSES, formatCrmDate } from '@/lib/crm/shared'
 
-type Row = { topic: RequestTopic; thread: { action: string; content: string; changedAt: string }[]; id: string; content: string; publicReply: string; category: keyof typeof REQUEST_CATEGORIES; status: keyof typeof REQUEST_STATUSES; version: number; createdAt: string; updatedAt: string; lessonId: string | null; course: { name_lop: string; id_khoa: string } | null }
+type Row = { topic: RequestTopic; thread: { action: string; content: string; changedAt: string }[]; id: string; content: string; publicReply: string; category: keyof typeof REQUEST_CATEGORIES; status: keyof typeof REQUEST_STATUSES; version: number; createdAt: string; updatedAt: string; lessonId: string | null; course: { name_lop: string; id_khoa: string; productGroup?: string } | null }
 const button = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brk-primary disabled:cursor-not-allowed disabled:opacity-50'
 const primary = button + ' bg-brk-primary text-white hover:brightness-95'
 const secondary = button + ' border border-brk-outline bg-white text-brk-on-surface hover:bg-brk-background'
@@ -82,6 +83,7 @@ export default function MyRequests() {
             <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${statusStyles[row.status]}`}><StatusIcon className="h-3.5 w-3.5" aria-hidden="true" />{REQUEST_STATUSES[row.status]}</span>
           </div>
           <p className="line-clamp-3 whitespace-pre-wrap break-words text-sm leading-6 text-brk-muted">{row.content}</p>
+          {row.course?.productGroup === 'SERVICE' && <Link className={secondary} href={'/my-requests/' + row.id + '/bao-gia'}>Báo giá dịch vụ & thanh toán →</Link>}
           {replyContent ? <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-3 sm:p-4"><p className="flex flex-wrap items-center justify-between gap-2 text-xs"><span className="font-semibold text-emerald-800">Phản hồi gần nhất</span><span className="text-brk-muted">{formatCrmDate(lastReply?.changedAt || row.updatedAt)}</span></p><p className="mt-2 line-clamp-3 whitespace-pre-wrap break-words text-sm leading-6">{replyContent}</p></div> : <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm leading-6 text-brk-muted">Người phụ trách chưa phản hồi. Bạn sẽ nhận được thông báo khi có câu trả lời.</p>}
           <details className="group rounded-xl border border-brk-outline">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-sm font-semibold text-brk-muted [&::-webkit-details-marker]:hidden">Xem nội dung & trao đổi<ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" /></summary>

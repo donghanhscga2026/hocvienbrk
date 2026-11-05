@@ -20,7 +20,7 @@
  */
 
 import prisma from "@/lib/prisma"
-import { CommissionStatus, ConversionStatus, CommissionKind } from "@prisma/client"
+import { CommissionStatus, ConversionStatus, CommissionKind, type Prisma } from "@prisma/client"
 import { ensureWalletAndUpdate, createTransactionLog } from "./wallet-service"
 import { resolveRefToUserId } from "./resolve-ref-helper"
 
@@ -147,15 +147,15 @@ export async function resolveAffiliateIdFromCookie(): Promise<{ affiliateId: num
  * - Khóa học (COURSE): có enrollment ACTIVE.
  * - Sản phẩm/dịch vụ: có Order PAID chứa sản phẩm đó.
  */
-export async function hasPurchasedProduct(userId: number, productType: string, productId: number): Promise<boolean> {
+export async function hasPurchasedProduct(userId: number, productType: string, productId: number, db: Prisma.TransactionClient = prisma): Promise<boolean> {
   if (productType === 'COURSE') {
-    const e = await prisma.enrollment.findFirst({
+    const e = await db.enrollment.findFirst({
       where: { userId, courseId: productId, status: 'ACTIVE' },
       select: { id: true }
     })
     return !!e
   }
-  const o = await prisma.orderItem.findFirst({
+  const o = await db.orderItem.findFirst({
     where: {
       productType: productType as any,
       productId,
@@ -170,9 +170,9 @@ export async function hasPurchasedProduct(userId: number, productType: string, p
  * Kiểm tra một user có phải giảng viên của khóa học không.
  * (Quyết định 2026-10-20: giảng viên không nhận hoa hồng cho chính khóa của mình.)
  */
-export async function isTeacherOfCourse(userId: number, productType: string, productId: number): Promise<boolean> {
+export async function isTeacherOfCourse(userId: number, productType: string, productId: number, db: Prisma.TransactionClient = prisma): Promise<boolean> {
   if (productType !== 'COURSE') return false
-  const course = await prisma.course.findUnique({
+  const course = await db.course.findUnique({
     where: { id: productId },
     select: { teacherId: true }
   })
@@ -192,9 +192,9 @@ interface CommissionLine {
 /**
  * Engine duy nhất tính hoa hồng cho một Order đã PAID.
  */
-export async function processOrderCommission(orderId: number): Promise<UnifiedCommissionResult> {
+export async function processOrderCommission(orderId: number, db: Prisma.TransactionClient = prisma): Promise<UnifiedCommissionResult> {
   try {
-    const order = await prisma.order.findUnique({
+    const order = await db.order.findUnique({
       where: { id: orderId },
       include: {
         buyer: { select: { id: true, referrerId: true } },
@@ -213,22 +213,22 @@ export async function processOrderCommission(orderId: number): Promise<UnifiedCo
     }
 
     // Idempotency lớp 2: đã có conversion cho order này chưa?
-    const existingConversion = await prisma.affiliateConversion.findFirst({
+    const existingConversion = await db.affiliateConversion.findFirst({
       where: { orderRecordId: orderId }
     })
     if (existingConversion) {
-      await prisma.order.update({ where: { id: orderId }, data: { commissionProcessed: true } })
+      await db.order.update({ where: { id: orderId }, data: { commissionProcessed: true } })
       return { success: true, message: 'Already processed', orderId }
     }
 
     // Cấu hình hệ thống
-    const sysCfg = await prisma.systemAffiliateConfig.findUnique({ where: { id: 1 } })
+    const sysCfg = await db.systemAffiliateConfig.findUnique({ where: { id: 1 } })
     const gratitudeRate = sysCfg?.gratitudeRate ?? 2
     const pendingDays = sysCfg?.pendingDays ?? 30
     const taxRate = sysCfg?.taxRate ?? 0
 
     // Campaign mặc định (cần cho bản ghi conversion)
-    const campaign = await prisma.affiliateCampaign.findFirst({
+    const campaign = await db.affiliateCampaign.findFirst({
       where: { slug: 'default', isActive: true }
     })
     if (!campaign) {
@@ -244,7 +244,7 @@ export async function processOrderCommission(orderId: number): Promise<UnifiedCo
     // ── 1. HOA HỒNG TRỰC TIẾP ──────────────────────────────────
     if (order.affiliateId && order.affiliateId !== 0) {
       for (const item of order.items) {
-        const config = await prisma.productAffiliateConfig.findUnique({
+        const config = await db.productAffiliateConfig.findUnique({
           where: { productType_productId: { productType: item.productType, productId: item.productId } }
         })
         if (!config || !config.isActive) {
@@ -253,14 +253,14 @@ export async function processOrderCommission(orderId: number): Promise<UnifiedCo
         }
 
         // LOẠI TRỪ (2026-10-20): CTV là giảng viên của chính khóa này → không nhận hoa hồng trực tiếp
-        if (await isTeacherOfCourse(order.affiliateId, item.productType, item.productId)) {
+        if (await isTeacherOfCourse(order.affiliateId, item.productType, item.productId, db)) {
           console.log(`[AffiliateV2] Skip direct: affiliate ${order.affiliateId} is teacher of course ${item.productId}`)
           continue
         }
 
         let rate = config.directRate
         // Quy tắc giảm 50%: CTV chưa từng mua sản phẩm này
-        const purchased = await hasPurchasedProduct(order.affiliateId, item.productType, item.productId)
+        const purchased = await hasPurchasedProduct(order.affiliateId, item.productType, item.productId, db)
         if (!purchased) {
           rate = rate * 0.5
         }
@@ -287,11 +287,13 @@ export async function processOrderCommission(orderId: number): Promise<UnifiedCo
     // ── 2. HOA HỒNG GIÁN TIẾP (tri ân) ──────────────────────────
     // Luôn trả cho người đầu tiên đưa khách vào hệ thống, bất kể đơn mua qua link ai.
     // LOẠI TRỪ (2026-10-20): không tính tri ân trên các khóa mà chính người được tri ân là giảng viên.
-    const referrerId = order.buyer?.referrerId
+    // Custom service orders retain the relationship captured with the original request.
+    const quoteSource = await db.systemConfig.findUnique({ where: { key: 'catalog:quote-order:' + orderId } })
+    const referrerId = quoteSource ? (quoteSource.value as { gratitudeId?: number | null }).gratitudeId : order.buyer?.referrerId
     if (referrerId && referrerId !== 0) {
       let gratitudeBase = 0 // GIÁ NIÊM YẾT của các item đủ điều kiện
       for (const item of order.items) {
-        if (await isTeacherOfCourse(referrerId, item.productType, item.productId)) {
+        if (await isTeacherOfCourse(referrerId, item.productType, item.productId, db)) {
           console.log(`[AffiliateV2] Skip gratitude base: referrer ${referrerId} is teacher of course ${item.productId}`)
           continue
         }
@@ -319,17 +321,17 @@ export async function processOrderCommission(orderId: number): Promise<UnifiedCo
     }
 
     if (lines.length === 0) {
-      await prisma.order.update({ where: { id: orderId }, data: { commissionProcessed: true } })
+      await db.order.update({ where: { id: orderId }, data: { commissionProcessed: true } })
       return { success: true, message: 'No commission lines', orderId }
     }
 
     // Link cho bản ghi conversion: ưu tiên link của CTV trực tiếp, fallback link của người tri ân
     const primaryAffiliateId = order.affiliateId || referrerId!
-    let link = await prisma.affiliateLink.findFirst({
+    let link = await db.affiliateLink.findFirst({
       where: { userId: primaryAffiliateId, campaignId: campaign.id }
     })
     if (!link) {
-      link = await prisma.affiliateLink.create({
+      link = await db.affiliateLink.create({
         data: {
           userId: primaryAffiliateId,
           campaignId: campaign.id,
@@ -340,7 +342,7 @@ export async function processOrderCommission(orderId: number): Promise<UnifiedCo
       })
     }
 
-    const conversion = await prisma.affiliateConversion.create({
+    const conversion = await db.affiliateConversion.create({
       data: {
         linkId: link.id,
         campaignId: campaign.id,
@@ -356,7 +358,7 @@ export async function processOrderCommission(orderId: number): Promise<UnifiedCo
 
     const results: UnifiedCommissionResult['commissions'] = []
     for (const line of lines) {
-      await prisma.affiliateCommission.create({
+      await db.affiliateCommission.create({
         data: {
           conversionId: conversion.id,
           affiliateId: line.affiliateId,
@@ -372,11 +374,11 @@ export async function processOrderCommission(orderId: number): Promise<UnifiedCo
         }
       })
 
-      const walletBefore = await prisma.affiliateWallet.findUnique({
+      const walletBefore = await db.affiliateWallet.findUnique({
         where: { userId: line.affiliateId },
         select: { pendingBalance: true }
       })
-      const updated = await ensureWalletAndUpdate(line.affiliateId, { pendingBalance: line.netAmount })
+      const updated = await ensureWalletAndUpdate(line.affiliateId, { pendingBalance: line.netAmount }, db)
       await createTransactionLog({
         userId: line.affiliateId,
         amount: line.netAmount,
@@ -386,7 +388,7 @@ export async function processOrderCommission(orderId: number): Promise<UnifiedCo
           : `Hoa hồng tri ân đơn #${orderId}`,
         balanceBefore: walletBefore?.pendingBalance ?? 0,
         balanceAfter: updated.pendingBalance
-      })
+      }, db)
 
       results.push({
         kind: line.kind,
@@ -397,7 +399,7 @@ export async function processOrderCommission(orderId: number): Promise<UnifiedCo
       })
     }
 
-    await prisma.order.update({ where: { id: orderId }, data: { commissionProcessed: true } })
+    await db.order.update({ where: { id: orderId }, data: { commissionProcessed: true } })
 
     console.log(`[AffiliateV2] Order #${orderId}: created ${results.length} commission lines`)
     return { success: true, orderId, conversionId: conversion.id, commissions: results }

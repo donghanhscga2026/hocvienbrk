@@ -79,7 +79,7 @@ function CreateCourseContent() {
     const [productGroup, setProductGroup] = useState<ProductGroup>(normalizeProductGroup(searchParams.get('group')))
     const activeTab = (productGroup === 'COURSE' ? ['info', 'lessons', 'members', 'stats', 'feed', 'activity', 'sales'] : ['info', 'sales', 'resources', 'pricing', 'settings', 'members', 'feed', ...(productGroup === 'SERVICE' ? ['operations'] : [])]).includes(requestedTab) ? requestedTab : 'info'
     const offeringForm = ['info', 'sales', 'resources', 'pricing', 'settings'].includes(activeTab)
-    const showInfoGroup = (key: 'basic' | 'description' | 'payment' | 'voucher' | 'email') => productGroup === 'COURSE' ? !isEditMode || infoGroup === key : key === 'payment' && productGroup === 'SERVICE' && isQuoteService(offeringDetails) ? false : ({ basic: 'info', description: 'sales', payment: 'pricing', voucher: 'settings', email: 'settings' }[key] === activeTab)
+    const showInfoGroup = (key: 'basic' | 'description' | 'payment' | 'voucher' | 'email') => productGroup === 'COURSE' ? !isEditMode || infoGroup === key : ({ basic: 'info', description: 'sales', payment: 'pricing', voucher: 'settings', email: 'settings' }[key] === activeTab)
     const [offeringDetails, setOfferingDetails] = useState<OfferingDetails>({ ...emptyOfferingDetails, ...(searchParams.get('group') === 'SERVICE' && !courseId ? { service: serviceSchema.parse({ saleMode: 'QUOTE', model: 'PROJECT' }) } : {}), ...(searchParams.get('kind') === 'COMBO' && searchParams.get('group') === 'DIGITAL' ? { kind: 'COMBO' as const } : {}) })
     useEffect(() => {
         if ((!dirty && !operationsDirty) || productGroup === 'COURSE') return
@@ -728,7 +728,7 @@ function CreateCourseContent() {
                 {/* SECTION 3: HỌC PHÍ & THANH TOÁN */}
                 <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-brk-outline">
                     <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
-                        <DollarSign className="w-5 h-5 text-yellow-500" /> {productGroup === 'COURSE' ? 'Học phí & Thanh toán' : 'Giá & Thanh toán'}
+                        <DollarSign className="w-5 h-5 text-yellow-500" /> {productGroup === 'COURSE' ? 'Học phí & Thanh toán' : productGroup === 'SERVICE' && isQuoteService(offeringDetails) ? 'Tài khoản nhận tiền báo giá' : 'Giá & Thanh toán'}
                     </h2>
                     
                     {teacherBankAccounts.length > 0 && (
@@ -757,6 +757,8 @@ function CreateCourseContent() {
                             Vui lòng cấu hình tài khoản ngân hàng cho giáo viên này tại mục quản lý User hoặc Bank Accounts trước.
                         </div>
                     )}
+                    {productGroup === 'SERVICE' && isQuoteService(offeringDetails) && <p className="rounded-xl bg-green-50 p-4 text-sm">Chọn tài khoản ngân hàng nhận tiền. Giá và các đợt thanh toán được nhập riêng khi lập báo giá từ yêu cầu CRM, không nhập giá cố định ở đây.</p>}
+                    <div hidden={productGroup === 'SERVICE' && isQuoteService(offeringDetails)}>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <label className="text-sm font-semibold text-gray-600 ml-1">{productGroup === 'COURSE' ? 'Học phí' : 'Giá bán'} (VND)</label>
@@ -818,6 +820,7 @@ function CreateCourseContent() {
                             className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
                             placeholder="Nội dung..." 
                         />
+                    </div>
                     </div>
                 </div>
                 

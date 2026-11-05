@@ -37,6 +37,7 @@ export function domainRoute(path: string, modules: DomainModules): 'page' | 'acc
   if(path==='/api/account-support') return 'system'
   if(path==='/api/csp-report') return 'system' // Trình duyệt gửi báo cáo vi phạm CSP; không chứa dữ liệu người dùng.
   if(path==='/support' || path==='/my-requests' || path==='/api/my-requests') return modules.crm ? 'system' : 'deny'
+  if(/^\/(?:api\/service-quotes\/[a-f0-9-]{36}|tools\/service-quotes\/[a-f0-9-]{36}|my-requests\/[a-f0-9-]{36}\/bao-gia)$/.test(path)) return modules.crm && modules.courses ? 'system' : 'deny'
   if(path==='/api/upload/url') return 'system' // Ảnh đại diện của tài khoản đã đăng nhập.
   if(path==='/cong-cu') return 'page'
   if(/^\/ung-dung\/[a-z]+$/.test(path)) return 'page'

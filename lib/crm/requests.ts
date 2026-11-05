@@ -27,7 +27,7 @@ export async function readRequests(db: PrismaClient, actor: CrmActor, page: numb
   if (contactId != null && !await db.crmContact.findFirst({ where: { id: contactId, ...contactScope(actor) }, select: { id: true } })) throw new CrmError('Không có quyền xem hồ sơ.', 404)
   const where = { AND: [scope, ...(topic ? [topicScope(topic)] : [])], ...(ownerId !== undefined ? { ownerId } : {}), ...(requestId ? { id: requestId } : {}), ...(status ? { status } : {}), ...(contactId == null ? {} : { contactId }) }
   const [requests, total] = await Promise.all([
-    db.crmRequest.findMany({ where, include: { course: { select: { name_lop: true, id_khoa: true } }, formSubmission: {select:{id:true,formVersion:true,identityStatus:true}} }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20, skip: (page - 1) * 20 }),
+    db.crmRequest.findMany({ where, include: { course: { select: { name_lop: true, id_khoa: true, productGroup: true } }, formSubmission: {select:{id:true,formVersion:true,identityStatus:true}} }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20, skip: (page - 1) * 20 }),
     db.crmRequest.count({ where }),
   ])
   const contacts = await db.crmContact.findMany({ where: { AND: [contactScope(actor)], id: { in: requests.map(r => r.contactId).filter((id): id is number => id != null) } }, select: { id: true } })
@@ -102,7 +102,7 @@ export async function requestSource(db: PrismaClient, actor: CrmActor, id: strin
   const submission=await db.crmFormSubmission.findFirst({where:{requestId:row.id,...(actor.role==='ADMIN'?{}:{ownerId:actor.id})},select:{definitionSnapshot:true,answers:true,formVersion:true,identityStatus:true,createdAt:true}})
   return { lesson, comment, submission }
 }
-export async function createRequest(db: PrismaClient, raw: unknown, userId: number | null, address: string, generalContext?: { ownerId: number; source: string }, wi300 = false) {
+export async function createRequest(db: PrismaClient, raw: unknown, userId: number | null, address: string, generalContext?: { ownerId: number; source: string }, wi300 = false, quoteRef?: { affiliateId: number | null; refCode: string | null; disabled?: boolean }) {
   const input = requestInput.parse(raw)
   if (userId == null) throw new CrmError('Vui lòng đăng nhập hoặc đăng ký trước khi gửi yêu cầu.', 401)
   if (input.website) return { received: true }
@@ -135,7 +135,12 @@ export async function createRequest(db: PrismaClient, raw: unknown, userId: numb
     const ownerId = course?.teacherId != null && course.teacher && canUseCrm(course.teacher.role) ? course.teacherId : generalOwner && generalContext ? generalContext.ownerId : null
     // An explicit registered student's request may create their private teacher profile.
     const contact = user && enrollment && ownerId != null ? await tx.crmContact.upsert({ where: { ownerId_studentUserId: { ownerId, studentUserId: user.id } }, update: {}, create: { name: fields.name, ownerId, studentUserId: user.id, studentProfile: true, source: 'Học viên khóa học', createdBy: -1 } }) : null
-    await tx.crmRequest.create({ data: { key, ipHash, contactId: contact?.id, ownerId, courseId: course?.id, userId: user?.id, lessonId: input.lessonId, commentId: input.commentId, category: input.category, content: input.content, name: fields.name, email: fields.email, phone: fields.phone, source: input.feedback ? FEEDBACK_SOURCE : input.commentId ? 'Bình luận bài học' : input.lessonId ? 'Bài học' : course ? 'Trang khóa học' : generalContext?.source || 'Yêu cầu thành viên' } })
+    const created = await tx.crmRequest.create({ data: { key, ipHash, contactId: contact?.id, ownerId, courseId: course?.id, userId: user?.id, lessonId: input.lessonId, commentId: input.commentId, category: input.category, content: input.content, name: fields.name, email: fields.email, phone: fields.phone, source: input.feedback ? FEEDBACK_SOURCE : input.commentId ? 'Bình luận bài học' : input.lessonId ? 'Bài học' : course ? 'Trang khóa học' : generalContext?.source || 'Yêu cầu thành viên' } })
+    if (quoteRef) {
+      const buyer = await tx.user.findUnique({ where: { id: userId! }, select: { referrerId: true } })
+      const affiliateId = quoteRef.affiliateId !== userId ? quoteRef.affiliateId : null
+      await tx.systemConfig.create({ data: { key: 'catalog:quote-ref:' + created.id, value: { affiliateId: quoteRef.disabled ? null : affiliateId, refCode: quoteRef.disabled ? null : quoteRef.refCode, gratitudeId: quoteRef.disabled ? null : buyer?.referrerId ?? null } } })
+    }
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 15000 })
   return { received: true }
 }

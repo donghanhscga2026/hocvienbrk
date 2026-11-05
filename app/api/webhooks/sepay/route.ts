@@ -179,6 +179,15 @@ export async function POST(req: NextRequest) {
 
         const teacherId = bankAccount.userId;
 
+        // Quote references do not use the course COC/HV format. Match them first,
+        // after webhook authentication and the existing cross-channel dedup claim.
+        if (/SQ[A-F0-9]{20}/i.test(String(content))) {
+            const { matchQuoteTransfer } = await import('@/lib/offerings/quotes');
+            const result = await matchQuoteTransfer(prisma, { content: String(content), amount: Number(transferAmount), receipt: 'BANK:' + fingerprint, bankAccountId: bankAccount.id });
+            await prisma.processedTransaction.update({ where: { id: txRecord.id }, data: { status: 'PROCESSED', reason: result?.commissionPending ? 'Thanh toán đã xác nhận; cần thử lại tính hoa hồng trong báo giá.' : null } });
+            return NextResponse.json({ success: true, matched: 1 });
+        }
+
         // 2. Trích xuất thông tin từ nội dung chuyển khoản
         const parsed = extractInfoFromDescription(String(content));
         if (!parsed.userId && !parsed.phone) {

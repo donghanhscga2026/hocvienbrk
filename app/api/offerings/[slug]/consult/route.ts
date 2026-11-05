@@ -8,6 +8,7 @@ import { requireDomainCourse, requireDomainModule } from '@/lib/website/domain-c
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import { publicCatalogWhere, readOfferingDetails } from '@/lib/offerings/server'
 import { isQuoteService } from '@/lib/offerings/service'
+import { resolveAffiliateIdFromCookie } from '@/lib/affiliate/unified-commission'
 
 export async function POST(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   try {
@@ -23,7 +24,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       .strict()
       .parse(raw)
     const slug = (await params).slug
-    await requireDomainModule('crm')
+    const domain = await requireDomainModule('crm')
     await requireDomainCourse(slug)
     const course = await prisma.course.findFirst({
       where: { AND: [await publicCatalogWhere(), { id_khoa: slug, productGroup: 'SERVICE' }] },
@@ -68,6 +69,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       request.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim() || 'unknown',
       undefined,
       !!(await getCurrentDeploymentBrand()),
+      domain && !domain.affiliate ? { affiliateId: null, refCode: null, disabled: true } : await resolveAffiliateIdFromCookie(),
     )
     return crmResponse(result, 201)
   } catch (error) {
