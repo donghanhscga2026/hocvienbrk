@@ -45,6 +45,22 @@ async function run(){
   assert.equal(value.service.scope,'KEEP');assert.equal(value.service.turnaround,'14 days');assert(document.querySelector('[aria-label="Chu kỳ cung cấp"]'));assert(!document.querySelector('[aria-label="Thời gian thực hiện"]'))
   await React.act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Áp dụng bố cục gợi ý').click());assert(!value.modules.includes('bookings'));assert(value.modules.includes('delivery'))
   const Viewer=load('components/offerings/OfferingViewer.tsx').default;const html=require('react-dom/server').renderToStaticMarkup(React.createElement(Viewer,{url:'https://app.example',title:'App'}));assert(!html.includes('Nếu nội dung trống'))
+  const Fields=load('components/offerings/OfferingFields.tsx',{'next/link':{__esModule:true,default:({children,...props})=>React.createElement('a',props,children)}}).default
+  let admin=false
+  function renderFields(){root.render(React.createElement(Fields,{group:'SERVICE',section:'resources',value,canManageDomains:admin,onChange:next=>{value=next;renderFields()}}))}
+  await React.act(async()=>renderFields())
+  const optional=[...document.querySelectorAll('details')].find(item=>item.querySelector('summary')?.textContent==='+ Thêm tài liệu hoặc công cụ')
+  assert(optional&&!optional.open,'Empty service resources are optional and collapsed')
+  assert.equal(document.querySelector('[aria-label="Tìm trong thư viện quản trị"]'),null,'No empty library grid')
+  await React.act(async()=>{optional.open=true;[...optional.querySelectorAll('button')].find(b=>b.textContent.trim()==='+ Công cụ / App').click()})
+  assert.equal(value.resources.length,1)
+  assert.equal(document.querySelector('a[href="/tools/settings/app-frame-domains"]'),null,'Teacher cannot see admin shortcut')
+  await React.act(async()=>{const input=document.querySelector('[aria-label="Tên tài nguyên đang sửa"]');Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,'Shared service App');input.dispatchEvent(new window.Event('input',{bubbles:true}))})
+  await React.act(async()=>{optional.open=false;optional.open=true})
+  assert.equal(document.querySelector('[aria-label="Tên tài nguyên đang sửa"]').value,'Shared service App','Collapse preserves unsaved resource draft')
+  admin=true;await React.act(async()=>renderFields());assert(document.querySelector('a[href="/tools/settings/app-frame-domains"]'))
+  await React.act(async()=>{const select=document.querySelector('[aria-label="Loại tài nguyên đang sửa"]');select.value='EBOOK';select.dispatchEvent(new window.Event('change',{bubbles:true}))})
+  assert.equal(document.querySelector('a[href="/tools/settings/app-frame-domains"]'),null,'Admin shortcut only appears for selected App')
  }finally{await React.act(async()=>root.unmount());dom.window.close()}
  console.log('Service models: dynamic form retention, non-session facts/layout, public/private fields, intake requirements/CSRF/ownership/version/account-zero, scoped templates and removed static viewer notice passed.')
 }

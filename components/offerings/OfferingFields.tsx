@@ -15,6 +15,7 @@ export default function OfferingFields({
   section = 'all',
   existing,
   onEditExisting,
+  canManageDomains = false,
 }: {
   group: ProductGroup
   value: OfferingDetails
@@ -24,6 +25,7 @@ export default function OfferingFields({
   section?: OfferingAdminSection
   existing?: ExistingOfferingContent[]
   onEditExisting?: (item: ExistingOfferingContent) => void
+  canManageDomains?: boolean
 }) {
   if (group === 'COURSE') return null
   const update = <K extends keyof OfferingDetails>(key: K, next: OfferingDetails[K]) =>
@@ -220,15 +222,40 @@ export default function OfferingFields({
             />
           </label>
           <p className="text-sm leading-7 text-brk-muted">
-            Bộ quà tặng nhiều loại: để trống nguồn chung và nhập link riêng từng món bên dưới. Chỉ nhập hướng dẫn áp dụng cho cả bộ ở đây. Nội dung chỉ hiện khi khách đã kích hoạt.
+            {group === 'SERVICE'
+              ? 'Chỉ nhập hướng dẫn dùng chung cho mọi khách đã kích hoạt. Hồ sơ và kết quả riêng từng khách đặt trong Vận hành → chọn khách → Đầu vào / Bàn giao.'
+              : 'Bộ quà tặng nhiều loại: để trống nguồn chung và nhập link riêng từng món bên dưới. Chỉ nhập hướng dẫn áp dụng cho cả bộ ở đây. Nội dung chỉ hiện khi khách đã kích hoạt.'}
           </p>
         </div>
-        <OfferingResourceEditor
-          resources={value.resources}
-          onChange={(resources) => update('resources', resources)}
-          existing={existing}
-          onEditExisting={onEditExisting}
-        />
+        {group === 'SERVICE' ? (
+          <details className="rounded-2xl border bg-white p-5">
+            <summary className="min-h-12 cursor-pointer text-lg font-bold text-green-950">
+              {value.resources.length || existing?.length
+                ? `Tài liệu & công cụ đi kèm (${value.resources.length + (existing?.length || 0)})`
+                : '+ Thêm tài liệu hoặc công cụ'}
+            </summary>
+            <p className="mb-4 text-sm leading-7 text-brk-muted">
+              Không bắt buộc. Tài liệu ở đây dùng chung cho mọi khách đã kích hoạt dịch vụ. Hồ sơ và kết quả
+              riêng của khách được quản lý tại Vận hành.
+            </p>
+            <OfferingResourceEditor
+              resources={value.resources}
+              onChange={(resources) => update('resources', resources)}
+              existing={existing}
+              onEditExisting={onEditExisting}
+              serviceMode
+              canManageDomains={canManageDomains}
+            />
+          </details>
+        ) : (
+          <OfferingResourceEditor
+            resources={value.resources}
+            onChange={(resources) => update('resources', resources)}
+            existing={existing}
+            onEditExisting={onEditExisting}
+            canManageDomains={canManageDomains}
+          />
+        )}
       </section>
       <section
         hidden={!show('pricing')}
