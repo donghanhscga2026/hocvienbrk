@@ -129,6 +129,14 @@ export async function confirmQuotePayment(db: PrismaClient, input: { requestId: 
     const quote = await readQuote(tx, input.requestId)
     const part = quote?.installments[input.index]
     if (!quote || quote.status !== 'ACCEPTED' || !part?.orderId || !quote.bank) throw new CrmError('Không có đợt thanh toán phù hợp.', 404)
+    const current = await tx.enrollment.findUnique({ where: { userId_courseId: { userId: quote.buyerId, courseId: quote.courseId } } })
+    if (current) {
+      await lock(tx, 'enrollment-order:' + current.id)
+      const fresh = await tx.enrollment.findUnique({ where: { id: current.id } })
+      if (!fresh || ['CANCELLED', 'REJECTED'].includes(fresh.status)) throw new CrmError('Dịch vụ đã hủy hoặc bị từ chối. Không thể xác nhận thanh toán.', 409)
+    }
+    const order = await tx.order.findUnique({ where: { id: part.orderId }, select: { status: true } })
+    if (!order || !['PENDING', 'PAID'].includes(order.status)) throw new CrmError('Đơn thanh toán đã hủy hoặc hoàn tiền.', 409)
     if (input.bankAccountId != null && input.bankAccountId !== quote.bank.id) throw new CrmError('Tài khoản nhận tiền không khớp báo giá.')
     if (input.amount != null && (!Number.isSafeInteger(input.amount) || input.amount < part.amount)) throw new CrmError('Số tiền chưa đủ cho đợt thanh toán.')
     if (part.paidAt) return part.orderId
@@ -152,6 +160,28 @@ export async function confirmQuotePayment(db: PrismaClient, input: { requestId: 
   }, { timeout: 20000 })
   const commission = await settleQuoteCommission(db, orderId)
   return { updated: true, commissionPending: !commission.success }
+}
+
+// Chạy trong cùng giao dịch hủy đăng ký; cả đợt chưa trả cũng được đóng.
+export async function cancelQuotesForEnrollment(tx: Tx, enrollment: { id: number; userId: number; courseId: number }) {
+  const rows = await tx.systemConfig.findMany({ where: {
+    key: { startsWith: 'catalog:service-quote:' },
+    AND: [{ value: { path: ['buyerId'], equals: enrollment.userId } }, { value: { path: ['courseId'], equals: enrollment.courseId } }],
+  }, select: { key: true } })
+  for (const row of rows.sort((a, b) => a.key.localeCompare(b.key))) {
+    await lock(tx, row.key)
+    const quote = await readQuote(tx, row.key.slice('catalog:service-quote:'.length))
+    if (!quote || quote.status === 'CANCELLED') continue
+    for (const part of quote.installments) {
+      if (!part.orderId) continue
+      const result = await (await import('@/lib/affiliate/unified-commission')).reverseOrderCommission(part.orderId, 'Hủy dịch vụ #' + enrollment.id, tx)
+      if (!result.success) throw new Error(result.error || 'Không thu hồi được hoa hồng.')
+      await tx.order.update({ where: { id: part.orderId }, data: { status: 'CANCELLED' } })
+    }
+    quote.status = 'CANCELLED'
+    const saved = await writeQuote(tx, quote)
+    await notify(tx, saved, saved.buyerId, 'cancelled', 'Dịch vụ và các đợt thanh toán đã được hủy')
+  }
 }
 export async function matchQuoteTransfer(db: PrismaClient, input: { content: string; amount: number; receipt: string; bankAccountId: number }) {
   const code = input.content.toUpperCase().match(/SQ[A-F0-9]{20}/)?.[0]

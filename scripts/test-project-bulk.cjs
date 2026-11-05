@@ -5,7 +5,7 @@ class CrmError extends Error { constructor(message, status = 400) { super(messag
 function load(file, mocks = {}) {
   if (!fs.existsSync(path.join(repo, file)) && file.endsWith('.ts')) file += 'x'
   const mod = { exports: {} }, code = ts.transpileModule(fs.readFileSync(path.join(repo, file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name === '@/lib/crm/service' || name === './service' ? { CrmError } : name.startsWith('@/') || name.startsWith('./') ? load(name.startsWith('@/') ? name.slice(2) + '.ts' : path.posix.join(path.posix.dirname(file), name + '.ts'), mocks) : require(name), mod, mod.exports)
+  new Function('require', 'module', 'exports', code)(name => name in mocks ? mocks[name] : name === '@/lib/crm/service' || (name === './service' && file.startsWith('lib/crm/')) ? { CrmError } : name.startsWith('@/') || name.startsWith('./') ? load(name.startsWith('@/') ? name.slice(2) + '.ts' : path.posix.join(path.posix.dirname(file), name + '.ts'), mocks) : require(name), mod, mod.exports)
   return mod.exports
 }
 async function run() {
@@ -78,7 +78,7 @@ async function run() {
     assert.ok(document.body.textContent.includes('Thay đổi chủ dự án'))
     assert.ok(document.body.textContent.includes('Lĩnh vực'))
     snapshot('projects-overview')
-    await click('Xem tất cả 6 khóa học →')
+    await click('Xem tất cả 6 mục →')
     assert.ok(document.body.textContent.includes('Khóa học kiểm thử 6'))
     const checkbox = document.querySelector('input[name="featured"]')
     await React.act(async () => checkbox.click())

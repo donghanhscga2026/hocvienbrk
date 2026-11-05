@@ -111,6 +111,7 @@ jobs:
           node scripts/test-offering-commercial-links.cjs
           node scripts/test-service-quotes.cjs
           node scripts/test-service-quote-commissions.cjs
+          node scripts/test-offering-payment-integrity.cjs
           node scripts/test-wi300-home-ecosystem.cjs
           node scripts/test-wi300-public-streaming.cjs
           node scripts/test-wi300-appearance.cjs

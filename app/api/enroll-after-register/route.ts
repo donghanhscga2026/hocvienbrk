@@ -212,11 +212,9 @@ export async function POST(request: NextRequest) {
       try {
         const {
           createOrderForEnrollment,
-          processOrderCommission,
-          resolveAffiliateIdFromCookie
+          processOrderCommission
         } = await import("@/lib/affiliate/unified-commission")
-        const { affiliateId, refCode } = await resolveAffiliateIdFromCookie()
-        const orderRes: any = await createOrderForEnrollment(newEnrollment.id, { affiliateId, refCode })
+        const orderRes: any = await createOrderForEnrollment(newEnrollment.id)
         if (orderRes.success && orderRes.orderId) {
           await processOrderCommission(orderRes.orderId)
         }

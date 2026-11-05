@@ -25,6 +25,7 @@ function load(file) {
     if (name === '@/lib/prisma') return { __esModule: true, default: db }
     if (name === '@/lib/course-page/permissions') return { coursePageActionAccess: async () => denied, courseEditorActor: async () => ({ id: 0, role: 'ADMIN' }), assertCourseEditor: async () => {} }
     if (name === '@/lib/api-auth') return { requireAdminAction: async () => denied }
+    if (name === '@/lib/offerings/server') return { readOfferingDetails: async () => ({}), offeringDetailsKey: id => 'catalog:offering:' + id }
     if (name === 'next/cache') return { revalidatePath() {} }
     if (!name.startsWith('@/') && !name.startsWith('.')) return require(name)
     const base = name.startsWith('@/') ? name.slice(2) : path.posix.join(path.posix.dirname(file), name)

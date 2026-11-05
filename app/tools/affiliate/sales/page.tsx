@@ -23,9 +23,14 @@ export default async function AffiliateSalesPage({
 
   const params = await searchParams
   const filterAffiliateId = params.affiliateId ? Number(params.affiliateId) : null
-  const filterProductType = params.productType || ''
+  const filterProductType = ['COURSE', 'PRODUCT', 'SERVICE'].includes(params.productType || '') ? params.productType! : ''
   const filterFrom = params.from || ''
   const filterTo = params.to || ''
+  // Các sản phẩm số/dịch vụ vẫn dùng namespace COURSE trong engine hoa hồng.
+  const catalog = await prisma.course.findMany({ select: { id: true, productGroup: true } })
+  const catalogTypes = new Map(catalog.map(item => [item.id, item.productGroup === 'DIGITAL' ? 'PRODUCT' : item.productGroup]))
+  const itemType = (item: { productType: string; productId: number }) => item.productType === 'COURSE' ? catalogTypes.get(item.productId) || 'COURSE' : item.productType
+  const typeLabels: Record<string, string> = { COURSE: 'Khóa học', PRODUCT: 'Sản phẩm số', SERVICE: 'Dịch vụ' }
 
   const where: any = { status: 'PAID' }
   if (!isAdmin) {
@@ -34,7 +39,11 @@ export default async function AffiliateSalesPage({
     where.affiliateId = filterAffiliateId
   }
   if (filterProductType) {
-    where.items = { some: { productType: filterProductType as any } }
+    const ids = catalog.filter(item => catalogTypes.get(item.id) === filterProductType).map(item => item.id)
+    where.items = { some: { OR: [
+      { productType: 'COURSE', productId: { in: ids } },
+      ...(filterProductType !== 'COURSE' ? [{ productType: filterProductType }] : []),
+    ] } }
   }
   if (filterFrom || filterTo) {
     where.paidAt = {}
@@ -103,7 +112,7 @@ export default async function AffiliateSalesPage({
   for (const o of orders) {
     for (const it of o.items) {
       const key = `${it.productType}#${it.productId}`
-      const cur = byProduct.get(key) || { name: it.productName, type: it.productType, gmv: 0, qty: 0 }
+      const cur = byProduct.get(key) || { name: it.productName, type: itemType(it), gmv: 0, qty: 0 }
       cur.gmv += it.unitPrice * it.quantity
       cur.qty += it.quantity
       byProduct.set(key, cur)
@@ -145,7 +154,7 @@ export default async function AffiliateSalesPage({
               className="px-3 py-2 text-sm border border-gray-200 rounded-xl">
               <option value="">Tất cả loại</option>
               <option value="COURSE">Khóa học</option>
-              <option value="PRODUCT">Sản phẩm</option>
+              <option value="PRODUCT">Sản phẩm số</option>
               <option value="SERVICE">Dịch vụ</option>
             </select>
             <input type="date" name="from" defaultValue={filterFrom}
@@ -227,7 +236,7 @@ export default async function AffiliateSalesPage({
                 {productRows.map((r, i) => (
                   <tr key={i} className="hover:bg-gray-50/50">
                     <td className="px-3 py-2 font-medium text-gray-800">{r.name}</td>
-                    <td className="px-3 py-2 text-gray-500">{r.type}</td>
+                    <td className="px-3 py-2 text-gray-500">{typeLabels[r.type] || r.type}</td>
                     <td className="px-3 py-2 text-right font-bold">{fmt(r.gmv)}</td>
                     <td className="px-3 py-2 text-right">{r.qty}</td>
                   </tr>

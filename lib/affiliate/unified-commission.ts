@@ -54,10 +54,12 @@ export interface UnifiedCommissionResult {
  */
 export async function createOrderForEnrollment(
   enrollmentId: number,
-  opts?: { affiliateId?: number | null; refCode?: string | null }
-) {
+  db?: Prisma.TransactionClient
+): Promise<{ success: boolean; orderId?: number; error?: string; message?: string }> {
+  if (!db) return prisma.$transaction(tx => createOrderForEnrollment(enrollmentId, tx), { timeout: 20000 })
+  await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'enrollment-order:' + enrollmentId}))`
   // Idempotency: đã có Order cho enrollment này chưa?
-  const existing = await prisma.orderItem.findFirst({
+  const existing = await db.orderItem.findFirst({
     where: { enrollmentId },
     select: { orderId: true }
   })
@@ -65,23 +67,25 @@ export async function createOrderForEnrollment(
     return { success: true, orderId: existing.orderId, message: 'Order already exists' }
   }
 
-  const enrollment = await prisma.enrollment.findUnique({
+  const enrollment = await db.enrollment.findUnique({
     where: { id: enrollmentId },
     include: { course: { select: { id: true, phi_coc: true, name_lop: true, name_khoa: true } } }
   })
   if (!enrollment) {
     return { success: false, error: 'Enrollment not found' }
   }
+  if (!['ACTIVE', 'COMPLETED'].includes(enrollment.status)) {
+    return { success: false, error: 'Đăng ký chưa có quyền sử dụng hợp lệ.' }
+  }
 
   const listedPrice = enrollment.course.phi_coc || 0
   const productName = enrollment.course.name_khoa || enrollment.course.name_lop || `Khóa học #${enrollment.course.id}`
 
-  // Snapshot CTV trực tiếp: ưu tiên giá trị truyền vào (cookie lúc mua);
-  // fallback: conversion PURCHASE đã track lúc đăng ký (link.userId).
-  let affiliateId = opts?.affiliateId ?? null
-  let refCode = opts?.refCode ?? null
-  if (!affiliateId) {
-    const conv = await prisma.affiliateConversion.findFirst({
+  // Chỉ dùng thông tin đã lưu lúc khách mua, không đọc phiên người duyệt.
+  let affiliateId = enrollment.referrerId
+  let refCode: string | null = null
+  {
+    const conv = await db.affiliateConversion.findFirst({
       where: { enrollmentId },
       orderBy: { createdAt: 'desc' },
       include: { link: { select: { userId: true, code: true } } }
@@ -92,7 +96,8 @@ export async function createOrderForEnrollment(
     }
   }
 
-  const order = await prisma.order.create({
+  if (affiliateId === enrollment.userId) affiliateId = null
+  const order = await db.order.create({
     data: {
       buyerId: enrollment.userId,
       affiliateId,
@@ -140,6 +145,14 @@ export async function resolveAffiliateIdFromCookie(): Promise<{ affiliateId: num
   } catch {
     return { affiliateId: null, refCode: null }
   }
+}
+
+// Dùng cho cả thanh toán ngân hàng và phần còn phải trả bằng 0 sau ví/quà tặng.
+export async function settleEnrollmentOrder(enrollmentId: number) {
+  const order = await createOrderForEnrollment(enrollmentId)
+  if (!order.success || !order.orderId) throw new Error(order.error || 'Không ghi nhận được đơn hàng.')
+  const commission = await processOrderCommission(order.orderId)
+  return { orderId: order.orderId, commissionPending: !commission.success || commission.message === 'No campaign' }
 }
 
 /**
@@ -192,8 +205,14 @@ interface CommissionLine {
 /**
  * Engine duy nhất tính hoa hồng cho một Order đã PAID.
  */
-export async function processOrderCommission(orderId: number, db: Prisma.TransactionClient = prisma): Promise<UnifiedCommissionResult> {
+export async function processOrderCommission(orderId: number, db?: Prisma.TransactionClient): Promise<UnifiedCommissionResult> {
   try {
+    if (!db) return await prisma.$transaction(async tx => {
+      const result = await processOrderCommission(orderId, tx)
+      if (!result.success) throw new Error(result.error || 'Không xử lý được hoa hồng.')
+      return result
+    }, { timeout: 20000 })
+    await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'order-commission:' + orderId}))`
     const order = await db.order.findUnique({
       where: { id: orderId },
       include: {
@@ -205,11 +224,11 @@ export async function processOrderCommission(orderId: number, db: Prisma.Transac
     if (!order) {
       return { success: false, error: 'Order not found' }
     }
-    if (order.commissionProcessed) {
-      return { success: true, message: 'Already processed', orderId }
-    }
     if (order.status !== 'PAID') {
       return { success: false, error: `Order status is ${order.status}, expected PAID` }
+    }
+    if (order.commissionProcessed) {
+      return { success: true, message: 'Already processed', orderId }
     }
 
     // Idempotency lớp 2: đã có conversion cho order này chưa?
@@ -414,9 +433,15 @@ export async function processOrderCommission(orderId: number, db: Prisma.Transac
  * - Commission PENDING → CANCELLED, trừ pendingBalance.
  * - Commission AVAILABLE/WITHDRAWN → CANCELLED, trừ balance + log ADJUSTMENT.
  */
-export async function reverseOrderCommission(orderId: number, reason: string) {
+export async function reverseOrderCommission(orderId: number, reason: string, db?: Prisma.TransactionClient): Promise<{ success: boolean; reversed?: number; error?: string }> {
   try {
-    const commissions = await prisma.affiliateCommission.findMany({
+    if (!db) return await prisma.$transaction(async tx => {
+      const result = await reverseOrderCommission(orderId, reason, tx)
+      if (!result.success) throw new Error(result.error)
+      return result
+    }, { timeout: 20000 })
+    await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'order-commission:' + orderId}))`
+    const commissions = await db.affiliateCommission.findMany({
       where: {
         conversion: { orderRecordId: orderId },
         status: { in: [CommissionStatus.PENDING, CommissionStatus.AVAILABLE, CommissionStatus.WITHDRAWN] }
@@ -425,14 +450,15 @@ export async function reverseOrderCommission(orderId: number, reason: string) {
 
     let reversed = 0
     for (const c of commissions) {
-      await prisma.$transaction(async (tx) => {
+      const tx = db
+      {
         await tx.affiliateCommission.update({
           where: { id: c.id },
           data: { status: CommissionStatus.CANCELLED }
         })
 
         const wallet = await tx.affiliateWallet.findUnique({ where: { userId: c.affiliateId } })
-        if (!wallet) return
+        if (!wallet) throw new Error('Không tìm thấy ví để thu hồi hoa hồng.')
 
         if (c.status === CommissionStatus.PENDING) {
           const dec = Math.min(c.netAmount, wallet.pendingBalance)
@@ -469,7 +495,7 @@ export async function reverseOrderCommission(orderId: number, reason: string) {
             }
           })
         }
-      })
+      }
       reversed++
     }
 
@@ -484,15 +510,18 @@ export async function reverseOrderCommission(orderId: number, reason: string) {
 /**
  * Thu hồi hoa hồng theo enrollment (dùng khi admin hủy đăng ký khóa học).
  */
-export async function reverseCommissionForEnrollment(enrollmentId: number, reason: string) {
-  const items = await prisma.orderItem.findMany({
+export async function reverseCommissionForEnrollment(enrollmentId: number, reason: string, db?: Prisma.TransactionClient): Promise<{ success: boolean; reversed: number }> {
+  if (!db) return prisma.$transaction(tx => reverseCommissionForEnrollment(enrollmentId, reason, tx), { timeout: 20000 })
+  const items = await db.orderItem.findMany({
     where: { enrollmentId },
     select: { orderId: true },
     distinct: ['orderId']
   })
   let total = 0
   for (const item of items) {
-    const r = await reverseOrderCommission(item.orderId, reason)
+    const r = await reverseOrderCommission(item.orderId, reason, db)
+    if (!r.success) throw new Error(r.error || 'Không thu hồi được hoa hồng.')
+    await db.order.update({ where: { id: item.orderId }, data: { status: 'CANCELLED' } })
     if (r.success) total += r.reversed || 0
   }
   return { success: true, reversed: total }

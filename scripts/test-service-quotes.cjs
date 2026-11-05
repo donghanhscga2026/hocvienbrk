@@ -17,6 +17,7 @@ async function run() {
     $executeRaw: async () => {},
     crmRequest: { findFirst: async ({ where }) => where.id === id && (where.userId == null || where.userId === row.userId) && (where.ownerId == null || where.ownerId === row.ownerId) ? copy(row) : null },
     systemConfig: {
+      findMany: async ({ where }) => [...configs].filter(([key, value]) => key.startsWith(where.key.startsWith) && where.AND.every(condition => Object.entries(condition.value).length && value[condition.value.path[0]] === condition.value.equals)).map(([key]) => ({ key })),
       findUnique: async ({ where }) => configs.has(where.key) ? { key: where.key, value: copy(configs.get(where.key)) } : null,
       upsert: async ({ where, create, update }) => configs.set(where.key, copy(configs.has(where.key) ? update.value : create.value)),
       create: async ({ data }) => { if (configs.has(data.key)) throw Error('Unique conflict'); configs.set(data.key, copy(data.value)) },
@@ -24,9 +25,9 @@ async function run() {
     user: { findUnique: async () => ({ referrerId: 99 }) },
     appNotification: { upsert: async ({ create }) => notifications.push(copy(create)) },
     productAffiliateConfig: { upsert: async () => ({}) },
-    order: { create: async ({ data }) => { if (failOrder) throw Error('ORDER_FAILED'); const order = { id: nextId++, ...copy(data) }; orders.set(order.id, order); return copy(order) }, update: async ({ where, data }) => { const value = { ...orders.get(where.id), ...data }; orders.set(where.id, value); return copy(value) } },
+    order: { findUnique: async ({ where }) => copy(orders.get(where.id)), create: async ({ data }) => { if (failOrder) throw Error('ORDER_FAILED'); const order = { id: nextId++, ...copy(data) }; orders.set(order.id, order); return copy(order) }, update: async ({ where, data }) => { const value = { ...orders.get(where.id), ...data }; orders.set(where.id, value); return copy(value) } },
     orderItem: { updateMany: async ({ where, data }) => { Object.assign(orders.get(where.orderId).items.create, data) } },
-    enrollment: { upsert: async ({ where, create }) => { if (failGrant) throw Error('GRANT_FAILED'); const key = JSON.stringify(where); if (!enrollments.has(key)) enrollments.set(key, { id: 50, ...copy(create) }); return copy(enrollments.get(key)) }, update: async () => {} },
+    enrollment: { findUnique: async ({ where }) => copy(where.id != null ? [...enrollments.values()].find(row => row.id === where.id) : enrollments.get(JSON.stringify(where))) || null, upsert: async ({ where, create }) => { if (failGrant) throw Error('GRANT_FAILED'); const key = JSON.stringify(where); if (!enrollments.has(key)) enrollments.set(key, { id: 50, ...copy(create) }); return copy(enrollments.get(key)) }, update: async () => {} },
   }
   let queue = Promise.resolve()
   db.$transaction = callback => {
@@ -35,7 +36,7 @@ async function run() {
   }
   const quotes = load('lib/offerings/quotes.ts', {
     'server-only': {}, '@/lib/crm/service': { CrmError }, '@/lib/crm/requests': { requestScope: actor => actor.role === 'ADMIN' ? {} : { ownerId: actor.id } },
-    '@/lib/affiliate/unified-commission': { processOrderCommission: async id => { if (!commissions.includes(id)) commissions.push(id); return { success: true } } },
+    '@/lib/affiliate/unified-commission': { processOrderCommission: async id => { if (!commissions.includes(id)) commissions.push(id); return { success: true } }, reverseOrderCommission: async () => ({ success: true }) },
   })
   assert.throws(() => shared.quoteDraftSchema.parse({ ...draft, total: 1 }))
   assert.throws(() => shared.quoteDraftSchema.parse({ ...draft, installments: [{ label: 'Bad', amount: 1234 }] }))
@@ -70,11 +71,28 @@ async function run() {
   failGrant = true; await assert.rejects(() => quotes.matchQuoteTransfer(db, transfer(0)), /GRANT_FAILED/); assert.equal(orders.get(1).status, 'PENDING'); assert(!(await quotes.readQuote(db, id)).installments[0].paidAt); failGrant = false
   await Promise.all([quotes.matchQuoteTransfer(db, transfer(0)), quotes.matchQuoteTransfer(db, transfer(0))])
   assert.equal(enrollments.size, 1); assert.equal(commissions.length, 1); assert.equal(orders.get(1).status, 'PAID'); assert.equal(orders.get(2).status, 'PENDING')
+  const entitlement = [...enrollments.values()][0]
+  entitlement.status = 'CANCELLED'
+  await assert.rejects(() => quotes.matchQuoteTransfer(db, transfer(1)), /đã hủy/)
+  await assert.rejects(() => quotes.matchQuoteTransfer(db, transfer(0)), /đã hủy/)
+  assert.equal([...enrollments.values()][0].status, 'CANCELLED'); assert.equal(orders.get(2).status, 'PENDING'); assert.equal(commissions.length, 1)
+  ;[...enrollments.values()][0].status = 'ACTIVE'
+  const beforeCancel = copy({ configs, orders, enrollments, notifications })
+  await db.$transaction(tx => quotes.cancelQuotesForEnrollment(tx, { id: 50, userId: 0, courseId: 9 }))
+  assert.equal((await quotes.readQuote(db, id)).status, 'CANCELLED')
+  assert.equal(orders.get(2).status, 'CANCELLED', 'Unpaid future installments are cancelled too')
+  await assert.rejects(() => quotes.matchQuoteTransfer(db, transfer(1)), /phù hợp/)
+  ;({ configs, orders, enrollments, notifications } = beforeCancel)
   await assert.rejects(() => quotes.matchQuoteTransfer(db, { ...transfer(1), receipt: 'bank-0' }), /đã dùng/)
   await quotes.confirmQuotePayment(db, { requestId: id, index: 1, actor, receipt: 'manual-bank-1' })
   assert.equal(commissions.length, 2); assert.equal(enrollments.size, 1); assert((await quotes.readQuote(db, id)).installments.every(part => part.paidAt))
   await quotes.confirmQuotePayment(db, { requestId: id, index: 1, actor, receipt: 'retry-commission' }); assert.equal(commissions.length, 2)
   assert.equal(notifications.filter(item => item.title.startsWith('Đã xác nhận')).length, 2)
+  await db.$transaction(tx => quotes.cancelQuotesForEnrollment(tx, { id: 50, userId: 0, courseId: 9 }))
+  assert.equal((await quotes.readQuote(db, id)).status, 'CANCELLED')
+  assert([...orders.values()].every(order => order.status === 'CANCELLED'))
+  assert((await quotes.readQuote(db, id)).installments.every(part => part.paidAt), 'Cancellation retains the receipt history')
+  await assert.rejects(() => quotes.matchQuoteTransfer(db, transfer(1)), /phù hợp/)
   const domain = load('lib/website/domain-shared.ts')
   for (const path of ['/api/service-quotes/' + id, '/tools/service-quotes/' + id, '/my-requests/' + id + '/bao-gia']) {
     assert.equal(domain.domainRoute(path, { courses: true, crm: true, affiliate: true }), 'system')

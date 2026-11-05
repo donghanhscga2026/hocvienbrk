@@ -52,7 +52,7 @@ export async function enrollInCourseAction(
         // [OPTIMIZE] 4 truy vấn độc lập (chỉ cần userId/courseId đã biết trước) —
         // chạy song song thay vì tuần tự để giảm độ trễ trên đường dẫn mua/đăng ký
         // khóa học, hành động được gọi nhiều nhất của toàn hệ thống.
-        const [course, user, brkWallet, existing] = await Promise.all([
+        const [course, user, existing] = await Promise.all([
             prisma.course.findUnique({
                 where: { id: courseId },
                 select: {
@@ -78,14 +78,23 @@ export async function enrollInCourseAction(
                 where: { id: userId },
                 select: { id: true, name: true, phone: true, email: true, referrerId: true }
             }),
-            // Lấy wallet + enrollment TRƯỚC khi trừ ví (dùng cho chống trừ kép)
-            prisma.brkWallet.findUnique({ where: { userId } }),
+            // Kiểm tra quyền trước khi bắt đầu thanh toán.
             prisma.enrollment.findUnique({
                 where: { userId_courseId: { userId, courseId } }
             })
         ])
 
         if (!course) throw new Error("Khóa học không tồn tại.")
+        if (existing && ['CANCELLED', 'REJECTED'].includes(existing.status)) throw new Error('Đăng ký đã hủy hoặc bị từ chối. Vui lòng liên hệ người phụ trách trước khi thanh toán lại.')
+        const recordAutoPaidOrder = async (enrollmentId: number) => {
+            if (course.type === 'SYS' || course.type === 'LIB') return
+            return (await import('@/lib/affiliate/unified-commission')).settleEnrollmentOrder(enrollmentId)
+        }
+        // Đăng ký đã mở quyền không được trừ ví hoặc dùng lại quà tặng khi bấm lại.
+        if (existing && ['ACTIVE', 'COMPLETED'].includes(existing.status)) {
+            const enrollment = await prisma.enrollment.findUnique({ where: { id: existing.id }, include: { payment: true } })
+            return { success: true, status: existing.status, enrollment }
+        }
         if (course.productGroup === 'SERVICE') {
             const details = await (await import('@/lib/offerings/server')).readOfferingDetails(courseId)
             if ((await import('@/lib/offerings/service')).isQuoteService(details)) throw new Error('Dịch vụ báo giá riêng. Vui lòng gửi yêu cầu tư vấn trước, chưa đăng ký thanh toán.')
@@ -110,41 +119,12 @@ export async function enrollInCourseAction(
             effectivePhiCoc = 0
             isLibAllowed = true
         } else if (course.allowMbvDeduction && course.voucherConfig === 'WALLET' && (useVoucher || useVndWallet)) {
-            // Tính tổng đã trừ ví MBV / VNĐ từ trước cho khóa này (có thể đã trừ nhiều lần / từng phần)
-            const [mbvTxAgg, cashTxAgg] = brkWallet?.id
-                ? await Promise.all([
-                    prisma.brkTransaction.aggregate({ where: { walletId: brkWallet.id, refId: `course_${courseId}` }, _sum: { amount: true } }),
-                    prisma.brkTransaction.aggregate({ where: { walletId: brkWallet.id, refId: `course_cash_${courseId}` }, _sum: { amount: true } })
-                ])
-                : [null, null]
-
-            const alreadyDeductedMbv = Math.floor(Math.abs(Number(mbvTxAgg?._sum.amount) || 0))
-            const alreadyDeductedCash = Math.floor(Math.abs(Number(cashTxAgg?._sum.amount) || 0))
-            effectivePhiCoc = Math.max(0, course.phi_coc - alreadyDeductedMbv - alreadyDeductedCash)
-
-            // 1. Trừ tiếp MBV nếu user chọn dùng ví và vẫn còn thiếu học phí (chống trừ kép: chỉ trừ đúng phần còn thiếu)
-            if (useVoucher && voucherAmountToUse > 0 && effectivePhiCoc > 0) {
-                const mbvBalance = Number(brkWallet?.mbvBalance || 0)
-                const actualDeduct = Math.floor(Math.min(mbvBalance, voucherAmountToUse, effectivePhiCoc))
-                if (actualDeduct > 0) {
-                    voucherDeducted = actualDeduct
-                    effectivePhiCoc = Math.max(0, effectivePhiCoc - voucherDeducted)
-                    voucherApplied = true
-                    const { debitMbvWallet } = await import('@/lib/brk/wallet-service')
-                    await debitMbvWallet(userId, voucherDeducted, `Thanh toán khóa học ${course.id_khoa}`, `course_${courseId}`, userId)
-                }
-            }
-
-            // 2. Trừ tiếp ví VNĐ nếu user chọn và vẫn còn thiếu học phí
-            if (useVndWallet && effectivePhiCoc > 0) {
-                const vndBalance = Number(brkWallet?.balance || 0)
-                cashDeducted = Math.floor(Math.min(vndBalance, effectivePhiCoc))
-                if (cashDeducted > 0) {
-                    effectivePhiCoc = Math.max(0, effectivePhiCoc - cashDeducted)
-                    const { debitBrkCashBalance } = await import('@/lib/brk/wallet-service')
-                    await debitBrkCashBalance(userId, cashDeducted, `Thanh toán khóa học ${course.id_khoa} (ví VNĐ)`, `course_cash_${courseId}`, userId)
-                }
-            }
+            if (useVoucherBenefit) throw new Error('Không thể dùng đồng thời quà tặng và ví MBV/VNĐ. Vui lòng chỉ chọn một.')
+            const paid = await (await import('@/lib/offerings/wallet-checkout')).debitCheckoutWallets(userId, courseId, { useVoucher, voucherAmount: voucherAmountToUse, useCash: useVndWallet })
+            effectivePhiCoc = paid.remaining
+            voucherDeducted = paid.voucherDeducted
+            cashDeducted = paid.cashDeducted
+            voucherApplied = voucherDeducted > 0
         }
 
         // 3. Áp quyền lợi voucher (quà tặng khóa học) — LOẠI TRỪ với ví MBV/VNĐ
@@ -180,25 +160,32 @@ export async function enrollInCourseAction(
             if (existing.status === 'PENDING') {
                 const isAutoActiveExisting = effectivePhiCoc === 0
 
-                // Xoá bản ghi payment cũ
-                await prisma.payment.deleteMany({
-                    where: { enrollmentId: existing.id }
-                })
-                
                 // Cập nhật số tiền cọc (phi_coc) mới và tự động ACTIVE nếu số tiền sau giảm = 0đ
-                const updatedEnrollment = await prisma.enrollment.update({
-                    where: { id: existing.id },
-                    data: {
-                        phi_coc: effectivePhiCoc,
-                        status: isAutoActiveExisting ? 'ACTIVE' : 'PENDING',
-                        ...(isAutoActiveExisting && course.productGroup && course.productGroup !== 'COURSE' ? { activatedAt: existing.activatedAt || new Date() } : {}),
+                const updatedEnrollment = await prisma.$transaction(async tx => {
+                    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'enrollment-order:' + existing.id}))`
+                    const fresh = await tx.enrollment.findUnique({ where: { id: existing.id } })
+                    if (fresh?.status !== 'PENDING') throw new Error('Đăng ký vừa thay đổi. Vui lòng tải lại.')
+                    await tx.payment.deleteMany({ where: { enrollmentId: existing.id } })
+                    const updated = await tx.enrollment.update({
+                        where: { id: existing.id },
+                        data: {
+                            phi_coc: effectivePhiCoc,
+                            status: isAutoActiveExisting ? 'ACTIVE' : 'PENDING',
+                            ...(isAutoActiveExisting && course.productGroup && course.productGroup !== 'COURSE' ? { activatedAt: existing.activatedAt || new Date() } : {}),
+                        }
+                    })
+                    if (isAutoActiveExisting && course.type !== 'SYS' && course.type !== 'LIB') {
+                        const order = await (await import('@/lib/affiliate/unified-commission')).createOrderForEnrollment(existing.id, tx)
+                        if (!order.success) throw new Error(order.error)
                     }
-                })
+                    return updated
+                }, { timeout: 20000 })
                 await markBenefitUsed()
 
                 if (course.productGroup === 'DIGITAL') await (await import('@/lib/offerings/combo')).syncComboPurchase(updatedEnrollment.id)
 
                 if (isAutoActiveExisting) {
+                    const settlement = await recordAutoPaidOrder(updatedEnrollment.id)
                     const { sendTelegram, sendActivationEmail } = await import("@/lib/notifications")
                     const msgAdmin = `🎁 <b>KÍCH HOẠT VÍ MBV 100%</b>\n\n` +
                         `👤 Thành viên: <b>${user?.name}</b> (#${user?.id})\n` +
@@ -218,7 +205,7 @@ export async function enrollInCourseAction(
                     } catch (e) {
                         console.error('[Enroll] grantVoucherBenefits error:', e)
                     }
-                    return { success: true, status: 'ACTIVE', enrollment: updatedEnrollment }
+                    return { success: true, status: 'ACTIVE', enrollment: updatedEnrollment, ...settlement }
                 }
 
                 // Sinh bản ghi payment mới với QR mới theo cấu hình giáo viên hiện tại
@@ -404,17 +391,24 @@ export async function enrollInCourseAction(
 
         let newEnrollment: Enrollment | null = null
         try {
-            newEnrollment = await prisma.enrollment.create({
-                data: {
-                    userId,
-                    courseId,
-                    status: isAutoActive ? "ACTIVE" : "PENDING",
-                    ...(isAutoActive && course.productGroup && course.productGroup !== 'COURSE' ? { activatedAt: new Date() } : {}),
-                    studyMode,
-                    phi_coc: effectivePhiCoc,
-                    referrerId: enrollmentReferrerId,
+            newEnrollment = await prisma.$transaction(async tx => {
+                const created = await tx.enrollment.create({
+                    data: {
+                        userId,
+                        courseId,
+                        status: isAutoActive ? "ACTIVE" : "PENDING",
+                        ...(isAutoActive && course.productGroup && course.productGroup !== 'COURSE' ? { activatedAt: new Date() } : {}),
+                        studyMode,
+                        phi_coc: effectivePhiCoc,
+                        referrerId: enrollmentReferrerId,
+                    }
+                })
+                if (isAutoActive && course.type !== 'SYS' && course.type !== 'LIB') {
+                    const order = await (await import('@/lib/affiliate/unified-commission')).createOrderForEnrollment(created.id, tx)
+                    if (!order.success) throw new Error(order.error)
                 }
-            })
+                return created
+            }, { timeout: 20000 })
         } catch (createErr: any) {
             if (createErr?.code === 'P2002') {
                 const existingRace = await prisma.enrollment.findUnique({
@@ -486,6 +480,7 @@ export async function enrollInCourseAction(
         const { sendTelegram, sendActivationEmail } = await import("@/lib/notifications")
 
         if (isAutoActive) {
+            await recordAutoPaidOrder(newEnrollment.id)
             // Gửi thông báo kích hoạt MIỄN PHÍ
             const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'
             const refLink = enrollmentRawRefCode ? `\n🔗 Link ref: ${appUrl}/khoa-hoc/${course.id_khoa}?ref=${enrollmentRawRefCode}` : ''
