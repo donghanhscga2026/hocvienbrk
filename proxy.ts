@@ -181,7 +181,9 @@ export default async function proxy(request: NextRequest, event: NextFetchEvent)
         if(platformSlugCandidate(path) && shouldBlockUnknownSlug(path, await publishedCustomPageSlugs())) return new NextResponse('Not found',{status:404,headers:{'Cache-Control':'no-store','Content-Type':'text/plain; charset=utf-8'}})
         if(path.startsWith('/api/') && !ADMIN_ONLY_PREFIXES.some(p=>path.startsWith(p))) return NextResponse.next()
         if(needsAuthLayer(path)) return (proxyHandler as unknown as NextMiddleware)(request,event)
-        return handlePlatformRequest(request, null)
+        const response = handlePlatformRequest(request, null)
+        if(process.env.SITE_VARIANT?.trim().toLowerCase()==='wi300') return (await import('@/lib/wi300/app-frame-response')).appFrameResponse(response,path)
+        return response
     }
     if(path.startsWith('/.well-known/giautoandien-domain/')) return NextResponse.next()
     const domainStarted=performance.now()

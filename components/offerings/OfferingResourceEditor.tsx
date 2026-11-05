@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import Link from 'next/link'
 import { resourceLabels, type OfferingDetails } from '@/lib/offerings/shared'
 import OfferingViewer from './OfferingViewer'
 import OfferingInlineContent from './OfferingInlineContent'
@@ -83,6 +84,7 @@ export default function OfferingResourceEditor({
           <p className="mt-2 text-sm text-brk-muted">
             Chọn một món để sửa. Xem thử dùng dữ liệu đang nhập; bấm Lưu thay đổi để áp dụng cho khách.
           </p>
+          <Link href="/tools/settings/app-frame-domains" target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-brk-primary">Quản lý tên miền App được phép nhúng (admin) →</Link>
         </div>
         <button
           type="button"
