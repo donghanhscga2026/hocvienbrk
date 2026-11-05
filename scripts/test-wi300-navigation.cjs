@@ -68,7 +68,8 @@ async function run() {
   const navLinks = [...document.querySelectorAll('header nav a')].map(a => a.getAttribute('href'))
   assert.deepEqual(navLinks, ['/', '/khoa-hoc', '/san-pham', '/dich-vu'])
   assert.ok(navLinks.every(href => !href.includes('#')))
-  assert.equal(document.querySelector('header a[href="/my-space"]').textContent, 'Không gian của tôi')
+  assert.equal(document.querySelector('header a[href="/my-space"]').textContent, 'Của tôi')
+  assert.equal(document.querySelector('header a[href="/my-space"]').getAttribute('aria-label'), 'Không gian của tôi', 'Short visible label retains the accessible full name')
   assert.equal(document.querySelector('header details'), null)
   assert.equal(document.querySelector('header button[aria-label="Chia sẻ link affiliate"]'), null)
   user = { id: '42', name: 'Lucy', role: 'STUDENT' }
