@@ -176,6 +176,10 @@ jobs:
       - name: Install dependencies
         if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
       - name: Validate Prisma schema
         run: npx prisma validate
 
