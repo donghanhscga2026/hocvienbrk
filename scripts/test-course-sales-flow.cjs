@@ -71,7 +71,7 @@ async function input(node, value) { await React.act(async () => { const proto = 
 async function render(key, props = {}) { await React.act(async () => root.render(React.createElement(load('components/course/CourseSalesPagePanel.tsx').default, { key, slug: 'AI', courseName: 'Course AI', courseId: 1, canEdit: true, ...props }))) }
 async function run() {
   try {
-    await render('new')
+    await render('new', { publicHref: '/san-pham/AI' })
     assert.match(current(), /Chọn giao diện/)
     await click('3Kiểm tra & xuất bản'); assert.match(current(), /Chọn giao diện/); assert.equal(publishes, 0)
     await React.act(async () => document.querySelector('input[value="code"]').click())
@@ -87,6 +87,7 @@ async function run() {
     allowConfirm = true; failPublish = true; await click('Xuất bản trang'); assert.match(document.body.textContent, /Publish failed/); assert.equal(stored.status, 'draft')
     failPublish = false; await click('Xuất bản trang'); assert.equal(publishes, 1)
     assert.equal([...document.querySelectorAll('a')].filter(node => visible(node) && node.textContent.includes('Xem trang công khai')).length, 1)
+    assert.equal([...document.querySelectorAll('a')].find(node => visible(node) && node.textContent.includes('Xem trang công khai')).getAttribute('href'), '/san-pham/AI', 'Admin public link uses the product route')
 
     stored = makePage(); await render('preset')
     assert.match(current(), /Chỉnh sửa trang/, 'Existing pages resume at step two')

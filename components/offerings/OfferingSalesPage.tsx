@@ -1,17 +1,20 @@
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import prisma from '@/lib/prisma'
 import { requireDomainCourse } from '@/lib/website/domain-context'
 import { getPublishedCoursePageBySlug } from '@/app/actions/course-page-actions'
 import { readOfferingDetails, publicCatalogWhere } from '@/lib/offerings/server'
 import type { ProductGroup } from '@/lib/offerings/shared'
 import OfferingDetail from './OfferingDetail'
+import CourseSalesPage from '@/components/course-page/CourseSalesPage'
 
 export default async function OfferingSalesPage({
   slug,
   group,
+  searchParams,
 }: {
   slug: string
   group: Exclude<ProductGroup, 'COURSE'>
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
 }) {
   await requireDomainCourse(slug)
   const course = await prisma.course.findUnique({ where: { id_khoa: slug }, select: { id: true, productGroup: true } })
@@ -25,6 +28,6 @@ export default async function OfferingSalesPage({
     })) &&
     (await getPublishedCoursePageBySlug(slug))
   )
-    redirect('/khoa-hoc/' + encodeURIComponent(slug))
+    return <CourseSalesPage params={Promise.resolve({ id: slug })} searchParams={searchParams} expectedGroup={group} />
   return <OfferingDetail slug={slug} expectedGroup={group} />
 }

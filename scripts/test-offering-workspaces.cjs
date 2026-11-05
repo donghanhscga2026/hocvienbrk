@@ -44,6 +44,7 @@ async function run() {
   assert.equal(shared.resolvedWorkspace('SERVICE', shared.parseOfferingDetails({ kind: 'IMPLEMENTATION' })), 'DELIVERY')
   assert.equal(shared.resolvedWorkspace('DIGITAL', shared.parseOfferingDetails({ kind: 'APP' })), 'APP')
   let published = false, publicItem = true
+  const TemplateSales = () => null
   const SalesPage = load('components/offerings/OfferingSalesPage.tsx', {
     'next/navigation': { notFound: () => { throw Error('NOT_FOUND') }, redirect: href => { throw Error('REDIRECT:' + href) } },
     '@/lib/prisma': { __esModule: true, default: { course: { findUnique: async () => course, findFirst: async () => publicItem ? { id: 7 } : null } } },
@@ -51,10 +52,13 @@ async function run() {
     '@/app/actions/course-page-actions': { getPublishedCoursePageBySlug: async () => published ? { status: 'published' } : null },
     '@/lib/offerings/server': { readOfferingDetails: async () => ({ salesLayout: 'TEMPLATE' }), publicCatalogWhere: async () => ({ status: true }) },
     './OfferingDetail': { __esModule: true, default: () => null },
+    '@/components/course-page/CourseSalesPage': { __esModule: true, default: TemplateSales },
   }).default
   await SalesPage({ slug: 'PRODUCT', group: 'DIGITAL' })
   published = true
-  await assert.rejects(() => SalesPage({ slug: 'PRODUCT', group: 'DIGITAL' }), /REDIRECT:\/khoa-hoc\/PRODUCT/)
+  const templatePage = await SalesPage({ slug: 'PRODUCT', group: 'DIGITAL' })
+  assert.equal(templatePage.type, TemplateSales, 'Render published templates at the product URL instead of redirecting to courses')
+  assert.equal(templatePage.props.expectedGroup, 'DIGITAL')
   publicItem = false
   await SalesPage({ slug: 'PRODUCT', group: 'DIGITAL' })
   await assert.rejects(() => SalesPage({ slug: 'PRODUCT', group: 'SERVICE' }), /NOT_FOUND/)

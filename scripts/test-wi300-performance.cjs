@@ -21,6 +21,7 @@ async function run() {
   const reset = () => Object.keys(calls).forEach(key => delete calls[key])
   const publicationMocks = { getPublishedCoursePageBySlug: async () => { (calls.published ||= []).push({}); return publishedPage } }
   const mocks = {
+    '@/lib/offerings/server': { readOfferingDetails: async () => ({ salesLayout: 'TEMPLATE' }) },
     '@/components/offerings/OfferingDetail': { __esModule: true, default: () => null },
     '@/lib/wi300/project-service': { readPublicProjects: async () => projects },
     'next/cache': { unstable_cache: fn => fn },

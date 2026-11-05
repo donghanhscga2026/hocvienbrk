@@ -103,6 +103,7 @@ jobs:
           node scripts/test-offerings.cjs
           node scripts/test-offerings-ui.cjs
           node scripts/test-offering-workspaces.cjs
+          node scripts/test-offering-sales-routes.cjs
           node scripts/test-offering-combos.cjs
           node scripts/test-offering-admin.cjs
           node scripts/test-app-frame-domains.cjs
