@@ -43,26 +43,31 @@ export async function generateMetadata(): Promise<Metadata> {
   if (config.homepage.type === 'landing') {
     const landing = await getHomepageLanding(config.homepage.landingId, config.homepage.landingSlug)
     if (landing) {
+      const landingImage = landing.heroImage || profile.metaImage || '/og-image.png'
       return {
         title: landing.title,
         description: landing.subtitle || landing.description || profile.metaDescription || undefined,
+        alternates: { canonical: '/' },
         openGraph: {
           title: landing.title,
           description: landing.subtitle || landing.description || profile.metaDescription || undefined,
-          images: landing.heroImage ? [landing.heroImage] : undefined,
+          url: '/',
+          images: [landingImage],
         },
+        twitter: { card: 'summary_large_image', title: landing.title, description: landing.subtitle || landing.description || profile.metaDescription || undefined, images: [landingImage] },
       }
     }
   }
 
   const title = profile.metaTitle || profile.title || 'MFC - Dòng chảy Phước Báu'
   const description = profile.metaDescription || profile.subtitle || undefined
-  const image = profile.metaImage || profile.heroImage || undefined
+  const image = profile.metaImage || profile.heroImage || '/og-image.png'
   return {
     title,
     description,
-    openGraph: { title, description, images: image ? [image] : undefined },
-    twitter: { card: 'summary_large_image', title, description, images: image ? [image] : undefined },
+    alternates: { canonical: '/' },
+    openGraph: { title, description, url: '/', images: [image] },
+    twitter: { card: 'summary_large_image', title, description, images: [image] },
   }
 }
 

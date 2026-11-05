@@ -68,8 +68,26 @@ const PLATFORM_ROUTE_SEGMENTS = new Set([
     'gioi-thieu', 'hanh-trinh', 'ho-so-hoc-tap', 'huy-hieu', 'i18n',
     'ket-noi-tai-khoan', 'kham-pha', 'khoa-hoc', 'land', 'lich-su-kien',
     'login', 'my-requests', 'my-space', 'page', 'register', 'san-pham',
-    'site-domain', 'support', 'tools', 'vinh-danh', 'vinh-danh-hoc-tap'
+    'site-domain', 'support', 'tools', 'tra-cuu-hen', 'vinh-danh', 'vinh-danh-hoc-tap'
 ])
+
+// [SEO/AEO] Đường một đoạn có dấu chấm là tên file: chỉ một số ít file được
+// hệ thống phục vụ thật (robots/sitemap do app/robots.ts + app/sitemap.ts
+// sinh, manifest do app/manifest.ts, sw.js ở public/). Mọi tên file khác
+// (llms.txt, *.xml, *.html...) trước đây rơi vào trang [slug], bị vỏ trang
+// phát trực tiếp biến thành soft-404 HTTP 200 — cùng cơ chế với slug lạ ở
+// trên nên cũng phải chốt 404 tại proxy. Slug trang tự tạo không chứa dấu
+// chấm (ràng buộc của managedPageSchema) nên không sợ chặn nhầm trang thật.
+const SERVED_FILE_PATHS = new Set(['/robots.txt', '/sitemap.xml', '/manifest.webmanifest', '/sw.js'])
+
+/** Tên file một đoạn không được phục vụ; trả null nếu không thuộc nhóm này. */
+export function unknownFilePath(pathname: string): string | null {
+    const parts = pathname.split('/').filter(Boolean)
+    if (parts.length !== 1) return null
+    const single = parts[0]
+    if (!single.includes('.') || SERVED_FILE_PATHS.has(pathname)) return null
+    return single
+}
 
 /** Đường một đoạn sẽ rơi vào trang [slug]; trả null nếu không thuộc nhóm này. */
 export function platformSlugCandidate(pathname: string): string | null {
@@ -178,6 +196,12 @@ export default async function proxy(request: NextRequest, event: NextFetchEvent)
     if(isBlockedProbePath(path)) return new NextResponse('Not found',{status:404,headers:{'Cache-Control':'no-store','Content-Type':'text/plain; charset=utf-8'}})
     if(isPlatformHost(hostname)) {
         if(path.startsWith('/site-domain/')) return new NextResponse('Not found',{status:404})
+        if(unknownFilePath(path)) return new NextResponse('Not found',{status:404,headers:{'Cache-Control':'no-store','Content-Type':'text/plain; charset=utf-8'}})
+        // Không có thương hiệu triển khai thì trang [slug] không thể phục vụ
+        // bất kỳ slug nào (hàm read() của trang luôn trả null khi thiếu
+        // brand) — chốt 404 tại proxy cho mọi đường ứng viên, thay vì để
+        // trang phát soft-404 qua vỏ streaming như nhánh có brand đã xử lý.
+        if(platformSlugCandidate(path) && !getDeploymentBrand()) return new NextResponse('Not found',{status:404,headers:{'Cache-Control':'no-store','Content-Type':'text/plain; charset=utf-8'}})
         if(platformSlugCandidate(path) && shouldBlockUnknownSlug(path, await publishedCustomPageSlugs())) return new NextResponse('Not found',{status:404,headers:{'Cache-Control':'no-store','Content-Type':'text/plain; charset=utf-8'}})
         if(path.startsWith('/api/') && !ADMIN_ONLY_PREFIXES.some(p=>path.startsWith(p))) return NextResponse.next()
         if(needsAuthLayer(path)) return (proxyHandler as unknown as NextMiddleware)(request,event)

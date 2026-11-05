@@ -6,7 +6,7 @@ import WiProjectDirectory from '@/components/wi300/WiProjectDirectory'
 
 export async function generateMetadata() {
   const brand = await getPresentationBrand('projects')
-  return brand ? pageMetadata(brand, 'projects') : { title: 'Các dự án Wi' }
+  return brand ? pageMetadata(brand, 'projects') : { title: 'Các dự án Wi', alternates: { canonical: '/du-an' } }
 }
 export default async function Page() {
   if (await getPagePresentation('projects') === 'classic') {

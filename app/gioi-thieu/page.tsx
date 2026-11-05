@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getPagePresentation, getPresentationBrand } from '@/lib/site-profile/presentation'
 
-export async function generateMetadata() { const brand = await getPresentationBrand('about'); return brand ? systemPageMetadata(brand, 'about') : { title: 'Giới thiệu' } }
+export async function generateMetadata() { const brand = await getPresentationBrand('about'); return brand ? systemPageMetadata(brand, 'about') : { title: 'Giới thiệu', alternates: { canonical: '/gioi-thieu' } } }
 export default async function Page() {
   if (await getPagePresentation('about') === 'classic') {
     const { default: ClassicAboutPage } = await import('@/components/classic/ClassicAbout')
