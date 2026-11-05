@@ -50,6 +50,9 @@ async function run() {
   const combo = load('lib/offerings/combo.ts', { 'server-only': {}, '@/lib/prisma': { __esModule: true, default: db } })
   assert.throws(() => shared.parseOfferingDetails({ bundleItems: [{ courseId: 20 }, { courseId: 20 }] }))
   await combo.validateCombo(db, 10, 'DIGITAL', bundle, 7)
+  setConfig(40, { kind: 'OTHER', service: { saleMode: 'QUOTE', model: 'PROJECT' } })
+  await assert.rejects(() => combo.validateCombo(db, 10, 'DIGITAL', bundle, 7), /báo giá/)
+  setConfig(40, { kind: 'COACHING', sessions: 2 })
   for (const value of [
     { ...bundle, bundleItems: [{ courseId: 20, gift: false }] },
     { ...bundle, bundleItems: [{ courseId: 20, gift: false }, { courseId: 50, gift: false }] },

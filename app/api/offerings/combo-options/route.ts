@@ -31,11 +31,10 @@ export async function GET(request: Request) {
     const byKey = new Map(metadata.map((row) => [row.key, row.value]))
     return NextResponse.json(
       {
-        items: items.filter(
-          (item) =>
-            offeringDetailsSchema.safeParse(byKey.get(`catalog:offering:${item.id}`) || {}).data?.kind !==
-            'COMBO',
-        ),
+        items: items.filter(item => {
+          const details = offeringDetailsSchema.safeParse(byKey.get(`catalog:offering:${item.id}`) || {}).data
+          return details?.kind !== 'COMBO' && !(item.productGroup === 'SERVICE' && details?.service?.saleMode === 'QUOTE')
+        }),
       },
       { headers: { 'Cache-Control': 'private, no-store' } },
     )

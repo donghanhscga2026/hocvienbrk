@@ -16,6 +16,7 @@ import CourseRosterWorkspace from '@/components/course/CourseRosterWorkspace'
 import CourseActivityFeedTab from '@/components/course/CourseActivityFeedTab'
 import OfferingFields from '@/components/offerings/OfferingFields'
 import OfferingServiceOperations from '@/components/offerings/OfferingServiceOperations'
+import { serviceSchema, isQuoteService } from '@/lib/offerings/service'
 import OfferingCustomers from '@/components/offerings/OfferingCustomers'
 import { emptyOfferingDetails, offeringDetailsSchema, groupInfo, offeringHref, offeringWorkspaceHref, productGroup as normalizeProductGroup, type OfferingDetails, type ProductGroup } from '@/lib/offerings/shared'
 
@@ -78,8 +79,8 @@ function CreateCourseContent() {
     const [productGroup, setProductGroup] = useState<ProductGroup>(normalizeProductGroup(searchParams.get('group')))
     const activeTab = (productGroup === 'COURSE' ? ['info', 'lessons', 'members', 'stats', 'feed', 'activity', 'sales'] : ['info', 'sales', 'resources', 'pricing', 'settings', 'members', 'feed', ...(productGroup === 'SERVICE' ? ['operations'] : [])]).includes(requestedTab) ? requestedTab : 'info'
     const offeringForm = ['info', 'sales', 'resources', 'pricing', 'settings'].includes(activeTab)
-    const showInfoGroup = (key: 'basic' | 'description' | 'payment' | 'voucher' | 'email') => productGroup === 'COURSE' ? !isEditMode || infoGroup === key : ({ basic: 'info', description: 'sales', payment: 'pricing', voucher: 'settings', email: 'settings' }[key] === activeTab)
-    const [offeringDetails, setOfferingDetails] = useState<OfferingDetails>({ ...emptyOfferingDetails, ...(searchParams.get('kind') === 'COMBO' && searchParams.get('group') === 'DIGITAL' ? { kind: 'COMBO' as const } : {}) })
+    const showInfoGroup = (key: 'basic' | 'description' | 'payment' | 'voucher' | 'email') => productGroup === 'COURSE' ? !isEditMode || infoGroup === key : key === 'payment' && productGroup === 'SERVICE' && isQuoteService(offeringDetails) ? false : ({ basic: 'info', description: 'sales', payment: 'pricing', voucher: 'settings', email: 'settings' }[key] === activeTab)
+    const [offeringDetails, setOfferingDetails] = useState<OfferingDetails>({ ...emptyOfferingDetails, ...(searchParams.get('group') === 'SERVICE' && !courseId ? { service: serviceSchema.parse({ saleMode: 'QUOTE', model: 'PROJECT' }) } : {}), ...(searchParams.get('kind') === 'COMBO' && searchParams.get('group') === 'DIGITAL' ? { kind: 'COMBO' as const } : {}) })
     useEffect(() => {
         if ((!dirty && !operationsDirty) || productGroup === 'COURSE') return
         const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
@@ -426,7 +427,8 @@ function CreateCourseContent() {
                 {isEditMode && activeTab === 'activity' && <CourseManagementActivity courseId={Number(courseId)} onOpenStudent={id => { setInitialStudentId(id); selectTab('members') }} />}
                 {isEditMode && visitedRoster && <div hidden={activeTab !== 'members' && activeTab !== 'stats'}>{productGroup === 'COURSE' ? <CourseRosterWorkspace key={courseId} courseId={Number(courseId)} courseName={nameLop} tab={activeTab === 'stats' ? 'stats' : 'members'} initialStudentId={initialStudentId} onActivity={() => selectTab('activity')} /> : <OfferingCustomers key={courseId} slug={idKhoa} legacyPanel={<CourseRosterWorkspace courseId={Number(courseId)} courseName={nameLop} tab="members" />} />}</div>}
                 {isEditMode && activeTab === 'feed' && <div className="rounded-2xl border bg-white"><CourseActivityFeedTab courseId={Number(courseId)} showAllActivity /></div>}
-                {isEditMode && visitedSales && idKhoa && (productGroup === 'COURSE' || offeringDetails.salesLayout === 'TEMPLATE') && <div hidden={activeTab !== 'sales'}><CourseSalesPagePanel slug={idKhoa} courseName={nameLop} courseId={courseId ? Number(courseId) : undefined} canEdit={isAdmin || isTeacher} /></div>}
+                {isEditMode && productGroup !== 'COURSE' && <div hidden={activeTab !== 'info'}><WiCourseProjects key={courseId} courseId={courseId!} subjectLabel={group.singular} /></div>}
+                {isEditMode && visitedSales && idKhoa && <div hidden={activeTab !== 'sales'}><CourseSalesPagePanel onPublished={() => { if(productGroup !== 'COURSE') setOfferingDetails(current => ({...current,salesLayout:'TEMPLATE'})) }} slug={idKhoa} courseName={nameLop} courseId={courseId ? Number(courseId) : undefined} canEdit={isAdmin || isTeacher} /></div>}
                 {productGroup !== 'COURSE' && message && <p role={message.type === 'error' ? 'alert' : 'status'} className={`rounded-xl border p-4 ${message.type === 'error' ? 'bg-red-50 text-red-900' : 'bg-green-50 text-green-950'}`}>{message.text}</p>}
                 {isEditMode && productGroup === 'SERVICE' && visitedOperations && <div hidden={activeTab !== 'operations'}><OfferingServiceOperations slug={idKhoa} courseId={Number(courseId)} onDirtyChange={setOperationsDirty} preferBookings={['COACHING', 'CONSULTING'].includes(offeringDetails.kind) || offeringDetails.workspaceLayout === 'SESSIONS'} /></div>}
                 <div hidden={productGroup === 'COURSE' ? isEditMode && activeTab !== 'info' : !offeringForm} className={isEditMode && productGroup === 'COURSE' ? "grid grid-cols-1 items-start gap-4 xl:grid-cols-[160px_minmax(0,1fr)_260px]" : "space-y-5"}>
@@ -517,7 +519,7 @@ function CreateCourseContent() {
                                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nhóm sản phẩm</label>
                                 <select
                                     value={productGroup}
-                                    onChange={(e) => { setProductGroup(normalizeProductGroup(e.target.value)); setOfferingDetails(value => ({ ...value, kind: 'OTHER' })) }}
+                                    onChange={(e) => { const next = normalizeProductGroup(e.target.value); setProductGroup(next); setOfferingDetails(value => ({ ...value, kind: 'OTHER', ...(next === 'SERVICE' && !value.service && !isEditMode ? { service: serviceSchema.parse({ saleMode: 'QUOTE', model: 'PROJECT' }) } : {}) })) }}
                                     className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
                                 >
                                     <option value="COURSE">Khóa học</option>

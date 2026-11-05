@@ -8,6 +8,7 @@ export const serviceModels = {
 } as const
 export const serviceSchema = z
   .object({
+    saleMode: z.enum(['QUOTE', 'PACKAGE']).default('PACKAGE'),
     category: z.string().trim().max(120).default(''),
     model: z.enum(['SESSIONS', 'PROJECT', 'QUANTITY', 'RECURRING', 'HYBRID']),
     blocks: z
@@ -63,6 +64,7 @@ export const serviceSchema = z
     'Chọn ít nhất một phần cho gói kết hợp.',
   )
 export type ServiceConfig = z.infer<typeof serviceSchema>
+export function isQuoteService(details: { service?: ServiceConfig }) { return details.service?.saleMode === 'QUOTE' }
 export function effectiveService(details: { kind: string; service?: ServiceConfig }): ServiceConfig {
   return (
     details.service ||
@@ -70,6 +72,7 @@ export function effectiveService(details: { kind: string; service?: ServiceConfi
   )
 }
 export function serviceHasSessions(details: { kind: string; service?: ServiceConfig }) {
+  if (isQuoteService(details)) return false
   const config = effectiveService(details)
   return (
     config.model === 'SESSIONS' ||
@@ -78,6 +81,7 @@ export function serviceHasSessions(details: { kind: string; service?: ServiceCon
   )
 }
 export function serviceFacts(config: ServiceConfig) {
+  if (config.saleMode === 'QUOTE') return [['Đăng ký', 'Trao đổi theo nhu cầu'], ...(config.category ? [['Loại dịch vụ',config.category]] : []), ['Giá','Liên hệ báo giá']]
   const has = (model: keyof typeof serviceModels) =>
     config.model === model || (config.model === 'HYBRID' && config.blocks.includes(model as 'PROJECT'))
   return [

@@ -86,6 +86,10 @@ export async function enrollInCourseAction(
         ])
 
         if (!course) throw new Error("Khóa học không tồn tại.")
+        if (course.productGroup === 'SERVICE') {
+            const details = await (await import('@/lib/offerings/server')).readOfferingDetails(courseId)
+            if ((await import('@/lib/offerings/service')).isQuoteService(details)) throw new Error('Dịch vụ báo giá riêng. Vui lòng gửi yêu cầu tư vấn trước, chưa đăng ký thanh toán.')
+        }
         if (existing && course.productGroup === 'DIGITAL') await (await import('@/lib/offerings/combo')).syncComboPurchase(existing.id)
 
         // Xử lý riêng cho loại khóa học LIB

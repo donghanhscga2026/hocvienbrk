@@ -17,6 +17,8 @@ import { getCoursePublicExtras } from '@/lib/course-page/public-extras'
 import { getPublicProjects } from '@/lib/wi300/public-projects'
 import CourseProjectBadges from '@/components/course/CourseProjectBadges'
 import OfferingDetail from '@/components/offerings/OfferingDetail'
+import { readOfferingDetails } from '@/lib/offerings/server'
+import { publicOfferingDetails } from '@/lib/offerings/shared'
 
 // Dùng chung kiểm tra phạm vi trong metadata và nội dung của cùng request.
 const getPageProfile = cache(getCurrentSiteProfile)
@@ -109,11 +111,12 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
     ])
 
     if (!course) notFound()
-    if (course.productGroup !== 'COURSE' && !publishedPage) return <OfferingDetail slug={course.id_khoa} />
+    const offeringDetails = course.productGroup !== 'COURSE' ? await readOfferingDetails(course.id) : null
+    if (offeringDetails && (!publishedPage || offeringDetails.salesLayout !== 'TEMPLATE')) return <OfferingDetail slug={course.id_khoa} />
     if (siteProfile && !(await canAccessPageCourse(siteProfile, course.id))) notFound()
 
     const courseId = course.id
-    const userId = session?.user?.id ? parseInt(session.user.id) : null
+    const userId = session?.user?.id != null ? parseInt(session.user.id) : null
     const requestedLesson = requestSearch?.notificationLesson
     const loadPlan = courseLoadingPlan(publishedPage, !!deploymentBrand, requestedLesson)
 
@@ -128,10 +131,10 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
         coursePage,
         projectBadges
     ] = await Promise.all([
-        userId
+        userId != null
             ? prisma.user.findUnique({ where: { id: userId }, select: { phone: true } })
             : Promise.resolve(null),
-        userId
+        userId != null
             ? prisma.enrollment.findFirst({ where: { userId, courseId } })
             : Promise.resolve(null),
         getCoursePublicExtras(courseId, loadPlan.lessons, loadPlan.statistics, loadPlan.testimonials),
@@ -174,7 +177,7 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
                     wi300Breadcrumb={breadcrumb}
                     projectLabels={customWi300Page ? undefined : projectLabels}
                     coursePage={effectiveCoursePage as any}
-                    course={course}
+                    course={offeringDetails ? {...course, offeringDetails:publicOfferingDetails(offeringDetails)} : course}
                     enrollment={enrollment}
                     userPhone={userPhone}
                     userId={userId}

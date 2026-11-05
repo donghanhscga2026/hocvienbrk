@@ -51,8 +51,206 @@ export default function OfferingServiceFields({
       setBusy(false)
     }
   }
+  const questionsEditor = (
+    <details className="space-y-3 border-t pt-4">
+      <summary className="min-h-12 cursor-pointer text-lg font-bold">
+        Câu hỏi khách cần trả lời · Không bắt buộc ({config.questions.length})
+      </summary>
+      <p className="text-sm text-brk-muted">
+        {config.saleMode === 'QUOTE'
+          ? 'Câu trả lời được gửi cùng yêu cầu tư vấn vào CRM để người phụ trách trao đổi và báo giá.'
+          : 'Câu trả lời được lưu riêng theo khách trong Vận hành.'}{' '}
+        Tài liệu dùng link HTTPS có cấp quyền phù hợp, chưa tải tệp trực tiếp lên đây.
+      </p>
+      {config.questions.map((q, index) => (
+        <fieldset key={q.id} className="space-y-3 rounded-xl border p-4">
+          <legend> Câu hỏi {index + 1}</legend>
+          <label className="block">
+            Câu hỏi
+            <input
+              aria-label={`Câu hỏi ${index + 1}`}
+              maxLength={200}
+              value={q.label}
+              onChange={(event) =>
+                update({
+                  questions: config.questions.map((item) =>
+                    item.id === q.id ? { ...item, label: event.target.value } : item,
+                  ),
+                })
+              }
+              className={field}
+            />
+          </label>
+          <label className="block">
+            Loại trả lời
+            <select
+              value={q.type}
+              onChange={(event) =>
+                update({
+                  questions: config.questions.map((item) =>
+                    item.id === q.id ? { ...item, type: event.target.value as typeof q.type } : item,
+                  ),
+                })
+              }
+              className={field}
+            >
+              <option value="TEXT">Văn bản</option>
+              <option value="SELECT">Lựa chọn</option>
+              <option value="LINK">Liên kết tài liệu</option>
+            </select>
+          </label>
+          {q.type === 'SELECT' && (
+            <label className="block">
+              Các lựa chọn, mỗi dòng một mục
+              <textarea
+                value={q.options.join('\n')}
+                onChange={(event) =>
+                  update({
+                    questions: config.questions.map((item) =>
+                      item.id === q.id
+                        ? { ...item, options: event.target.value.split('\n').slice(0, 20) }
+                        : item,
+                    ),
+                  })
+                }
+                className={field + ' py-3'}
+              />
+            </label>
+          )}
+          <label className="flex min-h-11 items-center gap-2">
+            <input
+              type="checkbox"
+              checked={q.required}
+              onChange={(event) =>
+                update({
+                  questions: config.questions.map((item) =>
+                    item.id === q.id ? { ...item, required: event.target.checked } : item,
+                  ),
+                })
+              }
+            />
+            Bắt buộc
+          </label>
+          <button
+            type="button"
+            className={button}
+            onClick={() => update({ questions: config.questions.filter((item) => item.id !== q.id) })}
+          >
+            Xóa câu hỏi
+          </button>
+        </fieldset>
+      ))}
+      <button
+        type="button"
+        className={button}
+        disabled={config.questions.length >= 20}
+        onClick={() =>
+          update({
+            questions: [
+              ...config.questions,
+              {
+                id: crypto.randomUUID(),
+                label: 'Nhu cầu cần hỗ trợ',
+                type: 'TEXT',
+                required: false,
+                options: [],
+              },
+            ],
+          })
+        }
+      >
+        + Thêm câu hỏi
+      </button>
+    </details>
+  )
+  const modePicker = (
+    <fieldset className="grid gap-3 sm:grid-cols-2">
+      <legend className="mb-3 font-bold">Bạn cung cấp dịch vụ theo cách nào?</legend>
+      {(
+        [
+          ['QUOTE', 'Theo nhu cầu · Báo giá riêng', 'Tư vấn từng khách rồi thống nhất công việc và chi phí.'],
+          ['PACKAGE', 'Gói dịch vụ có sẵn', 'Có phạm vi và giá xác định trước.'],
+        ] as const
+      ).map(([mode, label, help]) => (
+        <label
+          key={mode}
+          className={
+            'flex cursor-pointer items-start gap-3 rounded-xl border p-4 ' +
+            (config.saleMode === mode ? 'border-green-600 bg-green-50' : 'bg-white')
+          }
+        >
+          <input
+            type="radio"
+            name="service-sale-mode"
+            value={mode}
+            checked={config.saleMode === mode}
+            onChange={() => update({ saleMode: mode })}
+          />
+          <span>
+            <strong className="block">{label}</strong>
+            <span className="mt-2 block text-sm text-brk-muted">{help}</span>
+          </span>
+        </label>
+      ))}
+    </fieldset>
+  )
+  if (config.saleMode === 'QUOTE')
+    return (
+      <section className="space-y-5">
+        {modePicker}
+        <h3 className="text-xl font-bold">Dịch vụ theo nhu cầu</h3>
+        <p className="rounded-xl bg-green-50 p-4">
+          Giá hiển thị: <strong>Liên hệ báo giá</strong>. Khách gửi nhu cầu trước; chưa cần mua hoặc kích
+          hoạt. Phạm vi, chi phí và điều khoản sẽ thống nhất riêng sau tư vấn.
+        </p>
+        <label className="block font-semibold">
+          Loại dịch vụ
+          <input
+            aria-label="Ngành dịch vụ"
+            value={config.category}
+            maxLength={120}
+            placeholder="Thiết kế website, Kế toán, Marketing…"
+            onChange={(event) => update({ category: event.target.value })}
+            className={field}
+          />
+        </label>
+        <p className="text-sm text-brk-muted">
+          Tên dịch vụ đặt tại Thông tin; mô tả và ảnh tại Trang giới thiệu. Không cần nhập số buổi, thời hạn
+          hay điều khoản lúc này.
+        </p>
+        <h4 className="font-bold">Bạn muốn hỏi khách điều gì?</h4>
+        <div className="space-y-2">
+          {[
+            ['purpose', 'Bạn cần dịch vụ để làm gì?'],
+            ['features', 'Những yêu cầu hoặc chức năng bạn mong muốn?'],
+            ['budget', 'Ngân sách dự kiến (không bắt buộc)'],
+          ].map(([id, label]) => (
+            <label key={id} className="flex min-h-12 items-center gap-3 rounded-xl border p-3">
+              <input
+                type="checkbox"
+                checked={config.questions.some((q) => q.id === id)}
+                onChange={(event) =>
+                  update({
+                    questions: event.target.checked
+                      ? [...config.questions, { id, label, type: 'TEXT', required: false, options: [] }]
+                      : config.questions.filter((q) => q.id !== id),
+                  })
+                }
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+        {questionsEditor}
+        <p className="text-sm text-brk-muted">
+          Yêu cầu gửi vào CRM của người phụ trách dịch vụ. Khách đăng nhập để gửi và theo dõi; không cần đăng
+          ký mua.
+        </p>
+      </section>
+    )
   return (
     <section className="space-y-5">
+      {modePicker}
       <h3 className="text-xl font-bold text-green-950">Phạm vi & cách cung cấp dịch vụ</h3>
       <div className="space-y-3 rounded-xl bg-green-50 p-4">
         <h4 className="font-bold">Chưa biết bắt đầu từ đâu?</h4>
@@ -361,114 +559,7 @@ export default function OfferingServiceFields({
           + Thêm thông tin
         </button>
       </details>
-      <details className="space-y-3 border-t pt-4">
-        <summary className="min-h-12 cursor-pointer text-lg font-bold">
-          Câu hỏi khách cần trả lời · Không bắt buộc ({config.questions.length})
-        </summary>
-        <p className="text-sm text-brk-muted">
-          Câu trả lời được lưu riêng theo khách trong Vận hành. Tài liệu dùng link HTTPS có cấp quyền phù hợp,
-          chưa tải tệp trực tiếp lên đây.
-        </p>
-        {config.questions.map((q, index) => (
-          <fieldset key={q.id} className="space-y-3 rounded-xl border p-4">
-            <legend> Câu hỏi {index + 1}</legend>
-            <label className="block">
-              Câu hỏi
-              <input
-                aria-label={`Câu hỏi ${index + 1}`}
-                maxLength={200}
-                value={q.label}
-                onChange={(event) =>
-                  update({
-                    questions: config.questions.map((item) =>
-                      item.id === q.id ? { ...item, label: event.target.value } : item,
-                    ),
-                  })
-                }
-                className={field}
-              />
-            </label>
-            <label className="block">
-              Loại trả lời
-              <select
-                value={q.type}
-                onChange={(event) =>
-                  update({
-                    questions: config.questions.map((item) =>
-                      item.id === q.id ? { ...item, type: event.target.value as typeof q.type } : item,
-                    ),
-                  })
-                }
-                className={field}
-              >
-                <option value="TEXT">Văn bản</option>
-                <option value="SELECT">Lựa chọn</option>
-                <option value="LINK">Liên kết tài liệu</option>
-              </select>
-            </label>
-            {q.type === 'SELECT' && (
-              <label className="block">
-                Các lựa chọn, mỗi dòng một mục
-                <textarea
-                  value={q.options.join('\n')}
-                  onChange={(event) =>
-                    update({
-                      questions: config.questions.map((item) =>
-                        item.id === q.id
-                          ? { ...item, options: event.target.value.split('\n').slice(0, 20) }
-                          : item,
-                      ),
-                    })
-                  }
-                  className={field + ' py-3'}
-                />
-              </label>
-            )}
-            <label className="flex min-h-11 items-center gap-2">
-              <input
-                type="checkbox"
-                checked={q.required}
-                onChange={(event) =>
-                  update({
-                    questions: config.questions.map((item) =>
-                      item.id === q.id ? { ...item, required: event.target.checked } : item,
-                    ),
-                  })
-                }
-              />
-              Bắt buộc
-            </label>
-            <button
-              type="button"
-              className={button}
-              onClick={() => update({ questions: config.questions.filter((item) => item.id !== q.id) })}
-            >
-              Xóa câu hỏi
-            </button>
-          </fieldset>
-        ))}
-        <button
-          type="button"
-          className={button}
-          disabled={config.questions.length >= 20}
-          onClick={() =>
-            update({
-              questions: [
-                ...config.questions,
-                {
-                  id: crypto.randomUUID(),
-                  label: 'Nhu cầu cần hỗ trợ',
-                  type: 'TEXT',
-                  required: false,
-                  options: [],
-                },
-              ],
-            })
-          }
-        >
-          + Thêm câu hỏi
-        </button>
-      </details>
+      {questionsEditor}
       <details className="space-y-4 rounded-xl border p-4">
         <summary className="min-h-11 cursor-pointer font-semibold">
           Tùy chỉnh thêm · Bố cục & mẫu dùng lại

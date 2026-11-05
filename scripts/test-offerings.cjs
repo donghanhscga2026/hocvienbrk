@@ -3,6 +3,7 @@ const fs = require('node:fs'), path = require('node:path'), assert = require('no
 const React = require('react'), { renderToStaticMarkup } = require('react-dom/server')
 const root = path.resolve(__dirname, '..')
 function load(file, overrides = {}) {
+  overrides = { './OfferingConsultation': { __esModule:true,default:()=>null }, '@/lib/offerings/service':require('./helpers/load-ts.cjs')('lib/offerings/service.ts'), ...overrides }
   const mod = { exports: {} }
   const code = ts.transpileModule(fs.readFileSync(path.join(root, file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
   new Function('require', 'module', 'exports', code)(name => name in overrides ? overrides[name] : name === './service' ? require('./helpers/load-ts.cjs')('lib/offerings/service.ts') : require(name), mod, mod.exports)

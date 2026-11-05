@@ -66,6 +66,7 @@ export default function SectionRenderer({
   onAction,
   projectLabels,
 }: SectionRendererProps) {
+  const quoteOffering = course?.productGroup === 'SERVICE' && course.offeringDetails?.service?.saleMode === 'QUOTE'
   const visibleSections = React.useMemo(() => {
     return [...sections]
       .filter((sec) => {
@@ -87,6 +88,17 @@ export default function SectionRenderer({
       {projectLabels && !projectHero && <aside aria-label="Thông tin dự án của khóa học" className="bg-white text-slate-900"><div className="mx-auto max-w-7xl px-4 py-2 sm:px-6">{projectLabels}</div></aside>}
       {visibleSections.map((section) => {
         const type = (section as any).sectionType || (section as any).type
+        if (type === 'pricing' && course?.productGroup && course.productGroup !== 'COURSE' && !['zip-source-v1', 'imported-v1'].includes(section.variant || '')) {
+          return (
+            <section key={section.id} id={section.anchorId || section.sectionKey} className="mx-auto max-w-5xl space-y-4 p-6">
+              <h2 className="text-2xl font-bold">{quoteOffering ? 'Tư vấn & báo giá' : 'Giá sản phẩm / dịch vụ'}</h2>
+              <p className="text-3xl font-bold">{quoteOffering ? 'Liên hệ báo giá' : course.phi_coc > 0 ? course.phi_coc.toLocaleString('vi-VN') + 'đ' : 'Miễn phí'}</p>
+              <button type="button" onClick={() => onAction?.('open_registration')} className="min-h-12 rounded-xl bg-emerald-700 px-5 font-semibold text-white">
+                {quoteOffering ? 'Gửi yêu cầu tư vấn' : isEnrolled ? 'Mở nội dung' : 'Đăng ký'}
+              </button>
+            </section>
+          )
+        }
         if (section.variant?.startsWith('wi300-gift')) return <GiftTemplateSection key={section.id || section.sectionKey} section={section} onAction={onAction} testimonials={testimonials} isEnrolled={isEnrolled} projectLabels={section === projectHero ? projectLabels : undefined} />
         if (section.variant === 'zip-source-v1') {
           return (

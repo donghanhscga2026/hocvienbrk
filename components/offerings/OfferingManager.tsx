@@ -82,6 +82,7 @@ export default function OfferingManager({ group }: { group: Exclude<ProductGroup
   const total = Math.max(1, Math.ceil(filtered.length / 10))
   const current = Math.min(page, total)
   type Summary = {
+    saleMode?: 'QUOTE' | 'PACKAGE'
     id: number
     kind: keyof typeof offeringKinds
     pending: number
@@ -359,7 +360,7 @@ export default function OfferingManager({ group }: { group: Exclude<ProductGroup
                     {item.id_khoa} · {item.teacher?.name || 'Chưa phân công'}
                   </p>
                   <p className="mt-2 text-base font-semibold">
-                    {item.phi_coc > 0 ? item.phi_coc.toLocaleString('vi-VN') + 'đ' : 'Miễn phí'}
+                    {group === 'SERVICE' && !rowSummary(item.id) ? 'Đang tải giá…' : group === 'SERVICE' && rowSummary(item.id)?.saleMode === 'QUOTE' ? 'Liên hệ báo giá' : item.phi_coc > 0 ? item.phi_coc.toLocaleString('vi-VN') + 'đ' : 'Miễn phí'}
                   </p>
                   <p className="mt-1 text-sm text-brk-muted">
                     {rowSummary(item.id)?.total ?? item._count?.enrollments ?? 0} đăng ký ·{' '}

@@ -71,8 +71,9 @@ export async function GET(request: Request) {
         if (!course.link_anh_bia) warnings.push('Chưa có ảnh bìa')
         if (!course.mo_ta_ngan && !course.mo_ta_dai && !details.agenda.length)
           warnings.push('Chưa có nội dung giới thiệu')
-        if (course.feeType !== 'MIEN_PHI' && course.phi_coc <= 0) warnings.push('Chưa có giá bán')
-        if (course.phi_coc > 0 && !course.teacherBankAccountId) warnings.push('Chưa có tài khoản nhận tiền')
+        const quote = course.productGroup === 'SERVICE' && details.service?.saleMode === 'QUOTE'
+        if (!quote && course.feeType !== 'MIEN_PHI' && course.phi_coc <= 0) warnings.push('Chưa có giá bán')
+        if (!quote && course.phi_coc > 0 && !course.teacherBankAccountId) warnings.push('Chưa có tài khoản nhận tiền')
         if (
           course.productGroup === 'DIGITAL' &&
           !details.accessUrl &&
@@ -86,6 +87,7 @@ export async function GET(request: Request) {
         return {
           id: course.id,
           kind: details.kind,
+          saleMode: quote ? 'QUOTE' : 'PACKAGE',
           pending: count('PENDING'),
           active: Math.max(0, count('ACTIVE') - expired),
           expired,

@@ -14,6 +14,10 @@ export async function readOfferingDetails(id: number, db: Pick<Prisma.Transactio
 }
 export async function saveOfferingDetails(db: Prisma.TransactionClient, id: number, group: string, value: unknown, teacherId: number | null) {
   const details = offeringDetailsSchema.parse(value)
+  if(group==='SERVICE' && details.service?.saleMode==='QUOTE') {
+    const references=await db.systemConfig.findMany({where:{key:{startsWith:'catalog:offering:'}}})
+    if(references.some(row=>{const value=offeringDetailsSchema.safeParse(row.value).data;return value?.kind==='COMBO'&&value.bundleItems.some(item=>item.courseId===id)}))throw new Error('Dịch vụ đang nằm trong combo. Gỡ khỏi combo trước khi chuyển sang báo giá riêng.')
+  }
   const allowed = group === 'DIGITAL' ? ['COMBO', 'APP', 'EBOOK', 'TEMPLATE', 'RESOURCE', 'OTHER'] : ['COACHING', 'CONSULTING', 'IMPLEMENTATION', 'OTHER']
   if (group !== 'COURSE' && !allowed.includes(details.kind)) throw new Error('Loại nội dung không thuộc nhóm đã chọn.')
   if (details.kind === 'COMBO') await (await import('./combo')).validateCombo(db, id, group, details, teacherId)

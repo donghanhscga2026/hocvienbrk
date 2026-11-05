@@ -11,7 +11,7 @@ import CourseTemplateWorkspace from './CourseTemplateWorkspace'
 import TemplatePreviewFrame from './TemplatePreviewFrame'
 
 type SavedPage = NonNullable<Awaited<ReturnType<typeof getCoursePage>>>
-type Props = { slug: string; courseName: string; courseId?: number; canEdit: boolean; compact?: boolean; onOpen?: () => void; active?: boolean }
+type Props = { slug: string; courseName: string; courseId?: number; canEdit: boolean; compact?: boolean; onOpen?: () => void; active?: boolean; onPublished?:()=>void }
 type Step = 1 | 2 | 3
 type Pane = 'overview' | 'content' | 'design' | 'settings' | 'code'
 const steps = ['Chọn giao diện', 'Chỉnh sửa trang', 'Kiểm tra & xuất bản'] as const
@@ -19,7 +19,7 @@ const button = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-x
 const primary = button + ' !bg-brk-primary !text-white'
 const card = 'rounded-2xl border border-brk-outline bg-white p-4 sm:p-6'
 
-export default function CourseSalesPagePanel({ slug, courseName, courseId, canEdit, compact = false, onOpen, active = true }: Props) {
+export default function CourseSalesPagePanel({ slug, courseName, courseId, canEdit, compact = false, onOpen, active = true, onPublished }: Props) {
   const [loadAttempt, setLoadAttempt] = useState(0)
   const [page, setPage] = useState<SavedPage | null>(null), [ready, setReady] = useState(false)
   const [busy, setBusy] = useState(false), [editorBusy, setEditorBusy] = useState(false), [codeBusy, setCodeBusy] = useState(false)
@@ -145,6 +145,7 @@ export default function CourseSalesPagePanel({ slug, courseName, courseId, canEd
       const result = await publishCoursePage(page.id)
       if (!result.success) throw new Error(result.error)
       setPage({ ...page, status: 'published', useTemplate: true })
+      onPublished?.()
       setNotice('Đã xuất bản trang thành công. Bạn có thể mở trang công khai để xem.')
     } catch (error) { setError(error instanceof Error ? error.message : 'Không xuất bản được trang. Bản nháp vẫn được giữ.') }
     finally { setBusy(false) }

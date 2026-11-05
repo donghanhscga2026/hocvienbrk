@@ -59,7 +59,7 @@ export async function validateCombo(
     throw new Error('Không thể đưa combo vào chính nó.')
   const courses = await db.course.findMany({
     where: { id: { in: details.bundleItems.map((item) => item.courseId) } },
-    select: { id: true, teacherId: true, type: true },
+    select: { id: true, teacherId: true, type: true, productGroup: true },
   })
   if (
     teacherId == null ||
@@ -67,8 +67,12 @@ export async function validateCombo(
     courses.some((item) => item.teacherId !== teacherId || item.type === 'SYS')
   )
     throw new Error('Chọn các món thuộc cùng người phụ trách; khóa hệ thống không được đưa vào combo.')
-  for (const item of courses)
-    if ((await config(db, item.id)).kind === 'COMBO') throw new Error('Chưa hỗ trợ combo lồng trong combo.')
+  for (const item of courses) {
+    const details = await config(db, item.id)
+    if (details.kind === 'COMBO') throw new Error('Chưa hỗ trợ combo lồng trong combo.')
+    if (item.productGroup === 'SERVICE' && details.service?.saleMode === 'QUOTE')
+      throw new Error('Dịch vụ báo giá riêng không thể bán sẵn trong combo.')
+  }
 }
 
 /** Read-only metadata: never include private resource URLs or instructions. */

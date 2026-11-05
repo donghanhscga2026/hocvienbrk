@@ -17,7 +17,7 @@ async function run() {
     'next/link': link,
     'next/navigation': { useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }), useSearchParams: () => new URLSearchParams('id=42&group=DIGITAL') },
     '@/components/layout/MainHeader': stub, '@/components/layout/ManagementWorkspace': { __esModule: true, default: ({ children }) => children },
-    '@/components/wi300/WiCourseProjects': stub, '@/components/course/CourseManagementActivity': stub, '@/components/course/CourseSalesPagePanel': stub, '@/components/course/CourseRosterWorkspace': stub, '@/components/course/CourseActivityFeedTab': stub,
+    '@/components/wi300/WiCourseProjects': { __esModule: true, default: ({ courseId }) => React.createElement('div', { 'data-project-picker': courseId }) }, '@/components/course/CourseManagementActivity': stub, '@/components/course/CourseSalesPagePanel': { __esModule: true, default: ({ onPublished }) => React.createElement('button', { type: 'button', onClick: onPublished }, 'Publish fixture') }, '@/components/course/CourseRosterWorkspace': stub, '@/components/course/CourseActivityFeedTab': stub,
     '@/components/admin/courses/ImportLessonsModal': { ImportLessonsModal: () => null },
     '@/components/admin/courses/LessonEditModal': { LessonEditModal: ({ lesson }) => React.createElement('div', { 'data-edit-existing': lesson.id }, lesson.title) },
     '@/components/admin/courses/AddLessonModal': { AddLessonModal: () => null }, '@/components/admin/courses/LessonAnnouncementModal': { LessonAnnouncementModal: () => null },
@@ -34,6 +34,7 @@ async function run() {
     await React.act(async () => root.render(React.createElement(Page)))
     assert.ok(button('Trang giới thiệu') && button('Nội dung sử dụng') && button('Giá & Quyền lợi'))
     assert.equal(document.querySelectorAll('nav[aria-label="Nhóm thông tin khóa học"]').length, 0, 'Offerings do not show the nested course settings menu')
+    assert(visible(document.querySelector('[data-project-picker="42"]')), 'Saved digital products can link projects in Info')
     await click('Nội dung sử dụng')
     await input(document.querySelector('[aria-label="Hướng dẫn riêng tài nguyên"]'), 'Private guide for App One')
     await input(document.querySelector('[aria-label="Nguồn hướng dẫn riêng tài nguyên"]'), 'https://files.example/guide.pdf')
@@ -54,6 +55,8 @@ async function run() {
     await click('Trang giới thiệu')
     assert.equal(document.querySelector('[data-info-group="description"]').hidden, false)
     assert.equal(document.querySelector('[data-info-group="payment"]').hidden, true)
+    assert(button('Publish fixture'), 'Default-layout products can access the sales template panel')
+    await click('Publish fixture')
     await click('Giá & Quyền lợi')
     await input(document.querySelector('[data-help-id="input-course-fee"]'), '250000')
     await click('Nội dung sử dụng')
@@ -61,6 +64,7 @@ async function run() {
     await React.act(async () => document.querySelector('#course-settings-form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true })))
     assert.ok(document.querySelector('[role="alert"]').textContent.includes('Save failed fixture'))
     assert.equal(saved.data.phi_coc, 250000)
+    assert.equal(saved.data.offeringDetails.salesLayout, 'TEMPLATE', 'A later general save preserves the newly published template selection')
     assert.equal(saved.data.offeringDetails.resources[0].instructions, 'Private guide for App One')
     assert.equal(saved.data.offeringDetails.resources[0].openMode, 'NEW_TAB')
     assert.equal(saved.data.offeringDetails.resources[0].guides.length, 2)

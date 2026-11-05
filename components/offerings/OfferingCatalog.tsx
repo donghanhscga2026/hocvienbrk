@@ -15,6 +15,7 @@ import { searchText } from '@/lib/wi300/catalog'
 import type { getOfferingCatalog } from '@/lib/offerings/server'
 import CourseProjectBadges from '@/components/course/CourseProjectBadges'
 import OfferingShare from './OfferingShare'
+import { isQuoteService } from '@/lib/offerings/service'
 
 export default function OfferingCatalog({
   group,
@@ -56,7 +57,11 @@ export default function OfferingCatalog({
         (filters.kind === 'ALL' || item.details.kind === filters.kind) &&
         (filters.project === 'ALL' || item.projects.some((value) => value.slug === filters.project)) &&
         (filters.category === 'ALL' || (item.courseCategory?.name || item.category) === filters.category) &&
-        (filters.price === 'ALL' || (filters.price === 'FREE' ? item.phi_coc === 0 : item.phi_coc > 0)) &&
+        (filters.price === 'ALL' ||
+          (filters.price === 'QUOTE'
+            ? group === 'SERVICE' && isQuoteService(item.details)
+            : !(group === 'SERVICE' && isQuoteService(item.details)) &&
+              (filters.price === 'FREE' ? item.phi_coc === 0 : item.phi_coc > 0))) &&
         (filters.mode === 'ALL' || item.details.mode === filters.mode) &&
         searchText(
           [
@@ -135,7 +140,9 @@ export default function OfferingCatalog({
             value={filters.query}
             onChange={(e) => update('query', e.target.value)}
             placeholder={
-              group === 'DIGITAL' ? 'Bạn đang tìm công cụ hay tài nguyên nào?' : 'Bạn cần chuyên gia hỗ trợ điều gì?'
+              group === 'DIGITAL'
+                ? 'Bạn đang tìm công cụ hay tài nguyên nào?'
+                : 'Bạn cần chuyên gia hỗ trợ điều gì?'
             }
             className="min-h-14 w-full min-w-0 bg-transparent text-base outline-none"
           />
@@ -180,32 +187,34 @@ export default function OfferingCatalog({
               </option>
             ))}
           </select>
-          {group === 'DIGITAL' ? (
+          <>
             <select
               aria-label="Lọc giá"
               value={filters.price}
               onChange={(e) => update('price', e.target.value)}
               className={selectClass}
             >
-              <option value="ALL">Miễn phí & trả phí</option>
+              <option value="ALL">Tất cả mức giá</option>
               <option value="FREE">Miễn phí</option>
+              {group === 'SERVICE' && <option value="QUOTE">Liên hệ báo giá</option>}
               <option value="PAID">Trả phí</option>
             </select>
-          ) : (
-            <select
-              aria-label="Lọc hình thức"
-              value={filters.mode}
-              onChange={(e) => update('mode', e.target.value)}
-              className={selectClass}
-            >
-              <option value="ALL">Tất cả hình thức</option>
-              {Object.entries(modeLabels).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          )}
+            {group === 'SERVICE' && (
+              <select
+                aria-label="Lọc hình thức"
+                value={filters.mode}
+                onChange={(e) => update('mode', e.target.value)}
+                className={selectClass}
+              >
+                <option value="ALL">Tất cả hình thức</option>
+                {Object.entries(modeLabels).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </>
           <select
             aria-label="Sắp xếp"
             value={filters.sort}
@@ -229,7 +238,12 @@ export default function OfferingCatalog({
             >
               <Link href={offeringHref(group, item.id_khoa)} aria-label={item.name_lop}>
                 {item.link_anh_bia ? (
-                  <img src={item.link_anh_bia} alt="" loading="lazy" className="aspect-video w-full object-cover" />
+                  <img
+                    src={item.link_anh_bia}
+                    alt=""
+                    loading="lazy"
+                    className="aspect-video w-full object-cover"
+                  />
                 ) : (
                   <div className="flex aspect-video items-center justify-center bg-green-50">
                     <Icon className="h-16 w-16 text-brk-primary" />
@@ -268,7 +282,11 @@ export default function OfferingCatalog({
                   </p>
                 )}
                 <strong className="mt-auto pt-1 text-2xl text-red-700">
-                  {item.phi_coc > 0 ? item.phi_coc.toLocaleString('vi-VN') + 'đ' : 'Miễn phí'}
+                  {group === 'SERVICE' && isQuoteService(item.details)
+                    ? 'Liên hệ báo giá'
+                    : item.phi_coc > 0
+                      ? item.phi_coc.toLocaleString('vi-VN') + 'đ'
+                      : 'Miễn phí'}
                 </strong>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                   <Link

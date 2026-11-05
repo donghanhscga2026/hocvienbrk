@@ -32,7 +32,7 @@ export async function PUT(request: Request) {
   try {
     const id = await actor(), raw = await crmBody(request, 64000)
     const result = new URL(request.url).searchParams.has('course') ? await saveCourseProjects(prisma, id, courseId(request), raw) : await saveOffering(prisma, id, raw)
-    revalidatePath('/du-an', 'layout'); revalidatePath('/san-pham'); revalidatePath('/'); revalidatePath('/kham-pha')
+    revalidatePath('/du-an', 'layout'); revalidatePath('/san-pham', 'layout'); revalidatePath('/dich-vu', 'layout'); revalidatePath('/'); revalidatePath('/kham-pha')
     return crmResponse(result)
   } catch (error) { return failure(error) }
 }

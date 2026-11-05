@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { serviceSchema, serviceFacts, serviceHasSessions, effectiveService } from './service'
+import { serviceSchema, serviceFacts, serviceHasSessions, effectiveService, isQuoteService } from './service'
 
 export const productGroups = ['COURSE', 'DIGITAL', 'SERVICE'] as const
 export type ProductGroup = typeof productGroups[number]
@@ -49,7 +49,7 @@ export function parseOfferingDetails(value: unknown): OfferingDetails {
 // Không đưa đường dẫn tài nguyên hoặc hướng dẫn sau mua vào danh mục công khai.
 export function publicOfferingDetails(details: OfferingDetails) {
   const { kind, accessDays, sessions, durationMin, mode, format, platform, language, delivery, audience } = details
-  const service = details.service ? { ...details.service, fields: details.service.fields.filter(field => field.public), questions: [], inputs: '', startCondition: '' } : undefined
+  const service = details.service ? { ...details.service, fields: details.service.fields.filter(field => field.public), questions: isQuoteService(details) ? details.service.questions : [], inputs: '', startCondition: '' } : undefined
   return { kind, accessDays, sessions, durationMin, mode, format, platform, language, delivery, audience, service }
 }
 export const modeLabels = { ONLINE: 'Online', OFFLINE: 'Trực tiếp', HYBRID: 'Online & trực tiếp' }

@@ -19,6 +19,8 @@ import OfferingRichText from './OfferingRichText'
 import MainHeader from '@/components/layout/MainHeader'
 import OfferingPurchase from './OfferingPurchase'
 import OfferingShare from './OfferingShare'
+import OfferingConsultation from './OfferingConsultation'
+import { isQuoteService } from '@/lib/offerings/service'
 import { publicCatalogWhere, readOfferingDetails } from '@/lib/offerings/server'
 import {
   groupInfo,
@@ -116,6 +118,7 @@ export default async function OfferingDetail({
   )
     notFound()
   const group = productGroup(course.productGroup)
+  const quote = group === 'SERVICE' && isQuoteService(details)
   const info = groupInfo[group]
   const active = offeringAccess(enrollment, group === 'DIGITAL' ? details.accessDays : 0)
   const previouslyActive = enrollment && ['ACTIVE', 'COMPLETED'].includes(enrollment.status)
@@ -195,7 +198,7 @@ export default async function OfferingDetail({
                   </p>
                 ) : (
                   <p className="text-3xl font-bold text-red-700">
-                    {course.phi_coc > 0 ? course.phi_coc.toLocaleString('vi-VN') + 'đ' : 'Miễn phí'}
+                    {quote ? 'Liên hệ báo giá' : course.phi_coc > 0 ? course.phi_coc.toLocaleString('vi-VN') + 'đ' : 'Miễn phí'}
                   </p>
                 )}
               </div>
@@ -218,7 +221,7 @@ export default async function OfferingDetail({
                   ))}
                 </dl>
               </section>
-              {active ? (
+              {quote ? <OfferingConsultation slug={slug} questions={details.service!.questions} signedIn={userId!=null} /> : active ? (
                 <Link href={offeringWorkspaceHref(group, slug)} className={button}>
                   Mở nội dung <ArrowRight className="h-4 w-4" />
                 </Link>
