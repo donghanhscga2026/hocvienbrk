@@ -26,7 +26,7 @@ export default function CourseStudentTable({ courseId, courseName, members, labe
     fetch(`/api/courses/management-activity?ids=${courseId}`, { signal: controller.signal }).then(async response => { const data = await response.json(); if (!response.ok) throw new Error(); const count = data.summary?.find((row: { courseId: number }) => row.courseId === courseId)?.requests; if (typeof count !== 'number') throw new Error(); setRequests(count); setRequestError(false) }).catch(() => { if (!controller.signal.aborted) setRequestError(true) })
     return () => controller.abort()
   }, [courseId, canManage])
-  useEffect(() => { if (window.matchMedia('(max-width: 1023px)').matches) setView('cards') }, [])
+  useEffect(() => { if (window.matchMedia?.('(max-width: 1023px)')?.matches) setView('cards') }, [])
   const filtered = members.filter(member => normalized(`${member.user.name || ''} ${member.user.email || ''} ${localPhone(member.user.phone) || ''} ${member.user.phone || ''} ${member.user.id}`).includes(normalized(search.trim())) && (team === 'all' || String(member.team) === team) && (status === 'all' || status === 'pending' && !active(member) || status === 'submitted' && submitted(member) > 0 || status === 'missing' && active(member) && submitted(member) === 0))
   const selectedMembers = members.filter(member => selected.has(member.user.id))
   const allSelected = filtered.length > 0 && filtered.every(member => selected.has(member.user.id))

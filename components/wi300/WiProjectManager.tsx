@@ -20,7 +20,7 @@ export default function WiProjectManager({ courses, initial, initialSlug }: { co
   const [bulkAction, setBulkAction] = useState<BulkAction>('publish')
   const [bulkNeedsReload, setBulkNeedsReload] = useState(false)
   const [view, setView] = useState<'list' | 'cards'>('list')
-  useEffect(() => { if (window.matchMedia('(max-width: 639px)').matches) setView('cards') }, [])
+  useEffect(() => { if (window.matchMedia?.('(max-width: 639px)')?.matches) setView('cards') }, [])
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
   const [page, setPage] = useState(1)
