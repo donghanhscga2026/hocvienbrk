@@ -4,7 +4,7 @@ const isDev = process.env.NODE_ENV !== "production";
 const isVercelPreview = process.env.VERCEL_ENV === "preview";
 // Chỉ cho hai app đã được duyệt nhúng trong project WI300.
 const wi300AppFrames = process.env.SITE_VARIANT?.trim().toLowerCase() === "wi300"
-  ? " https://cleanimage.vercel.app https://digital-biz-scan.lovable.app" : "";
+  ? " https://cleanimage.vercel.app https://cleanimage.witech.io.vn https://digital-biz-scan.lovable.app" : "";
 
 const nextConfig: NextConfig = {
   // Tăng tốc phản hồi HTTP
