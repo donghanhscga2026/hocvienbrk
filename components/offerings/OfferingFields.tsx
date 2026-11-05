@@ -194,7 +194,7 @@ export default function OfferingFields({
         )}
         <div className="space-y-4 rounded-2xl border bg-white p-5">
           <h3 className="text-lg font-bold">
-            {group === 'DIGITAL' ? 'Nguồn chính & Hướng dẫn chung' : 'Hướng dẫn chuẩn bị chung'}
+            {group === 'DIGITAL' ? 'Nguồn & hướng dẫn chung (không bắt buộc)' : 'Hướng dẫn chuẩn bị chung'}
           </h3>
           {group === 'DIGITAL' && (
             <label className="block font-semibold">
@@ -219,7 +219,7 @@ export default function OfferingFields({
             />
           </label>
           <p className="text-sm leading-7 text-brk-muted">
-            Chỉ hiện khi khách đã kích hoạt. Hướng dẫn của từng món được nhập riêng trong thư viện bên dưới.
+            Bộ quà tặng nhiều loại: để trống nguồn chung và nhập link riêng từng món bên dưới. Chỉ nhập hướng dẫn áp dụng cho cả bộ ở đây. Nội dung chỉ hiện khi khách đã kích hoạt.
           </p>
         </div>
         <OfferingResourceEditor

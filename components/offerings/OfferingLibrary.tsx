@@ -1,12 +1,13 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Search, Loader2, FileText, PlayCircle } from 'lucide-react'
+import { Search, Loader2, FileText, PlayCircle, AppWindow } from 'lucide-react'
 import { resourceLabels } from '@/lib/offerings/shared'
 import type { ResourceSummary, WorkspaceResource } from '@/lib/offerings/workspace'
 import OfferingRichText from './OfferingRichText'
 import OfferingViewer from './OfferingViewer'
 import OfferingInlineContent from './OfferingInlineContent'
+import OfferingResourceContent from './OfferingResourceContent'
 
 export default function OfferingLibrary({
   slug,
@@ -135,7 +136,9 @@ export default function OfferingLibrary({
                 }}
                 className={`flex min-h-14 w-full items-start gap-3 rounded-xl p-3 text-left text-sm ${currentId === item.id ? 'bg-green-50 font-semibold text-green-950' : 'hover:bg-stone-50'}`}
               >
-                {item.kind === 'VIDEO' ? (
+                {item.kind === 'APP' ? (
+                  <AppWindow className="h-5 w-5 shrink-0 text-brk-primary" />
+                ) : item.kind === 'VIDEO' ? (
                   <PlayCircle className="h-5 w-5 shrink-0 text-brk-primary" />
                 ) : (
                   <FileText className="h-5 w-5 shrink-0 text-brk-primary" />
@@ -178,15 +181,19 @@ export default function OfferingLibrary({
                     <p className="mt-2 text-sm text-brk-muted">{resourceLabels[loaded.data.kind]}</p>
                   </div>
                 </div>
-                {(openedLink || loaded.data.url || loaded.data.links?.[0]) && (
-                  <OfferingViewer
-                    key={
-                      currentId + ':' + (openedLink?.url || loaded.data.url || loaded.data.links?.[0]?.url)
-                    }
-                    url={openedLink?.url || loaded.data.url || loaded.data.links![0].url}
-                    title={openedLink?.title || loaded.data.title}
-                    kind={loaded.data.kind}
-                  />
+                {loaded.data.url && !openedLink ? (
+                  <OfferingResourceContent key={currentId} resource={loaded.data} />
+                ) : (
+                  (openedLink || loaded.data.links?.[0]) && (
+                    <OfferingViewer
+                      key={
+                        currentId + ':' + (openedLink?.url || loaded.data.url || loaded.data.links?.[0]?.url)
+                      }
+                      url={openedLink?.url || loaded.data.url || loaded.data.links![0].url}
+                      title={openedLink?.title || loaded.data.title}
+                      kind={loaded.data.kind}
+                    />
+                  )
                 )}
                 {loaded.data.imageUrl && (
                   <img
@@ -200,7 +207,6 @@ export default function OfferingLibrary({
                   text={loaded.data.content}
                   onOpenLink={(url, title) => setOpenedLink({ url, title })}
                 />
-                {(loaded.data.instructions || loaded.data.guideUrl) && <section className="mt-5 space-y-4 border-t pt-5"><h4 className="text-lg font-bold">Hướng dẫn cho {loaded.data.title}</h4><OfferingInlineContent text={loaded.data.instructions} />{loaded.data.guideUrl && <OfferingViewer key={loaded.data.guideUrl} url={loaded.data.guideUrl} title={'Hướng dẫn: ' + loaded.data.title} />}</section>}
                 {loaded.data.links?.length ? (
                   <ul className="mt-4 space-y-3">
                     {loaded.data.links.map((link, index) => (
@@ -211,7 +217,7 @@ export default function OfferingLibrary({
                           className="flex min-h-12 items-center justify-between gap-3 rounded-xl border p-3 font-semibold text-brk-primary"
                         >
                           <span>{link.title}</span>
-                          <span className="text-sm">Xem tại đây</span>
+                          <span className="text-sm">Mở nội dung</span>
                         </button>
                       </li>
                     ))}

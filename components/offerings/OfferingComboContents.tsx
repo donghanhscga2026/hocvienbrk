@@ -66,7 +66,7 @@ export default async function OfferingComboContents({
                   ? 'Vào học'
                   : item.productGroup === 'SERVICE'
                     ? 'Vào dịch vụ / Đặt lịch'
-                    : 'Vào sử dụng'}{' '}
+                    : 'Mở nội dung'}{' '}
                 →
               </Link>
             ) : (

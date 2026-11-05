@@ -74,6 +74,10 @@ export type WorkspaceResource = {
   imageUrl?: string | null
   instructions?: string
   guideUrl?: string
+  description?: string
+  iconUrl?: string
+  openMode?: 'EMBED' | 'NEW_TAB'
+  guides?: import('./shared').OfferingDetails['resources'][number]['guides']
   links?: { title: string; url: string }[]
 }
 export async function readWorkspaceResource(slug: string, id: string): Promise<WorkspaceResource> {
@@ -85,8 +89,8 @@ export async function readWorkspaceResource(slug: string, id: string): Promise<W
     const resource = details.resources[Number(id.slice(9))]
     if (resource) {
       if (details.modules.includes('instructions')) return resource
-      const { instructions: _instructions, guideUrl: _guideUrl, ...content } = resource
-      void _instructions; void _guideUrl
+      const { instructions: _instructions, guideUrl: _guideUrl, guides: _guides, ...content } = resource
+      void _instructions; void _guideUrl; void _guides
       return content
     }
   }

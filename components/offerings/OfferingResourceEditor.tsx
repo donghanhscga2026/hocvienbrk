@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { resourceLabels, type OfferingDetails } from '@/lib/offerings/shared'
 import OfferingViewer from './OfferingViewer'
 import OfferingInlineContent from './OfferingInlineContent'
+import OfferingResourceContent from './OfferingResourceContent'
 
 export type ExistingOfferingContent = {
   id: string
@@ -62,7 +63,14 @@ export default function OfferingResourceEditor({
     const next = resources.length
     onChange([
       ...resources,
-      { title: '', kind, url: '', viewer: kind === 'EBOOK' ? 'PDF' : 'LINK', instructions: '', guideUrl: '' },
+      {
+        title: '',
+        kind,
+        url: '',
+        viewer: kind === 'EBOOK' ? 'PDF' : 'LINK',
+        instructions: '',
+        guideUrl: '',
+      },
     ])
     setQuery('')
     setSelected(`resource:${next}`)
@@ -86,7 +94,7 @@ export default function OfferingResourceEditor({
         </button>
       </div>
       <div className="flex flex-wrap gap-2">
-        {(['EBOOK', 'VIDEO', 'APP', 'GUIDE', 'TEMPLATE', 'PROMPT'] as const).map((kind) => (
+        {(['EBOOK', 'VIDEO', 'APP', 'TEMPLATE', 'PROMPT'] as const).map((kind) => (
           <button
             type="button"
             key={kind}
@@ -173,6 +181,53 @@ export default function OfferingResourceEditor({
                   className={field}
                 />
               </label>
+              {resource.kind === 'APP' && (
+                <div className="space-y-4 rounded-xl bg-green-50 p-4">
+                  <h4 className="font-bold">Thẻ ứng dụng</h4>
+                  <label className="block font-semibold">
+                    Logo / ảnh đại diện
+                    <input
+                      aria-label="Logo ứng dụng"
+                      value={resource.iconUrl || ''}
+                      maxLength={2000}
+                      onChange={(event) => update({ iconUrl: event.target.value })}
+                      placeholder="https://… hoặc đường dẫn nội bộ"
+                      className={field}
+                    />
+                  </label>
+                  <label className="block font-semibold">
+                    Mô tả ngắn
+                    <textarea
+                      aria-label="Mô tả ứng dụng"
+                      value={resource.description || ''}
+                      maxLength={1000}
+                      rows={3}
+                      onChange={(event) => update({ description: event.target.value })}
+                      className={field + ' py-3'}
+                    />
+                  </label>
+                  <label className="block font-semibold">
+                    Cách mở ứng dụng
+                    <select
+                      aria-label="Cách mở ứng dụng"
+                      value={resource.openMode || 'EMBED'}
+                      onChange={(event) =>
+                        update({
+                          openMode: event.target.value as Resource['openMode'],
+                        })
+                      }
+                      className={field}
+                    >
+                      <option value="EMBED">Dùng ngay trong trang</option>
+                      <option value="NEW_TAB">Mở ở tab mới</option>
+                    </select>
+                  </label>
+                  <p className="text-sm text-brk-muted">
+                    Nếu App không cho phép nhúng hoặc khung xem bị lỗi, chọn Mở ở tab mới. Khách sẽ thấy thẻ
+                    App và nút Mở ứng dụng.
+                  </p>
+                </div>
+              )}
               <p className="text-sm leading-6 text-brk-muted">
                 Dùng nguồn cho phép xem nhúng. Link này chỉ được gửi đến khách có quyền sử dụng; việc xem thử
                 không tự chuyển nguồn sang kho riêng tư.
@@ -190,28 +245,181 @@ export default function OfferingResourceEditor({
               </label>
               <div className="space-y-4 border-t pt-4">
                 <h4 className="font-bold">Hướng dẫn đi kèm riêng món này</h4>
-                <label className="block text-sm font-semibold">
-                  Nội dung hướng dẫn
-                  <textarea
-                    aria-label="Hướng dẫn riêng tài nguyên"
-                    rows={6}
-                    maxLength={5000}
-                    value={resource.instructions || ''}
-                    onChange={(event) => update({ instructions: event.target.value })}
-                    className={field + ' py-3'}
-                  />
-                </label>
-                <label className="block text-sm font-semibold">
-                  Video / tài liệu hướng dẫn
-                  <input
-                    aria-label="Nguồn hướng dẫn riêng tài nguyên"
-                    maxLength={2000}
-                    value={resource.guideUrl || ''}
-                    onChange={(event) => update({ guideUrl: event.target.value })}
-                    placeholder="Để trống nếu chỉ dùng hướng dẫn bằng chữ"
-                    className={field}
-                  />
-                </label>
+                <p className="text-sm text-brk-muted">
+                  Văn bản, video, Docs và PDF đều nằm trong tài nguyên này, không tạo mục riêng ở thư viện.
+                </p>
+                {(resource.guides || []).map((guide, guideIndex) => (
+                  <fieldset key={guideIndex} className="space-y-3 rounded-xl border p-4">
+                    <legend className="px-2 font-semibold">Hướng dẫn {guideIndex + 1}</legend>
+                    <label className="block">
+                      Tên hướng dẫn
+                      <input
+                        aria-label={`Tên hướng dẫn ${guideIndex + 1}`}
+                        value={guide.title}
+                        maxLength={200}
+                        onChange={(event) =>
+                          update({
+                            guides: resource.guides!.map((item, i) =>
+                              i === guideIndex ? { ...item, title: event.target.value } : item,
+                            ),
+                          })
+                        }
+                        className={field}
+                      />
+                    </label>
+                    <label className="block">
+                      Loại hướng dẫn
+                      <select
+                        aria-label={`Loại hướng dẫn ${guideIndex + 1}`}
+                        value={guide.kind}
+                        onChange={(event) =>
+                          update({
+                            guides: resource.guides!.map((item, i) =>
+                              i === guideIndex
+                                ? {
+                                    ...item,
+                                    kind: event.target.value as typeof guide.kind,
+                                  }
+                                : item,
+                            ),
+                          })
+                        }
+                        className={field}
+                      >
+                        {Object.entries({
+                          TEXT: 'Văn bản nhập trực tiếp',
+                          VIDEO: 'Video',
+                          DOCS: 'Google Docs / tài liệu',
+                          PDF: 'PDF',
+                        }).map(([key, label]) => (
+                          <option key={key} value={key}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {guide.kind === 'TEXT' ? (
+                      <label className="block">
+                        Nội dung
+                        <textarea
+                          aria-label={`Nội dung hướng dẫn ${guideIndex + 1}`}
+                          rows={5}
+                          maxLength={5000}
+                          value={guide.content}
+                          onChange={(event) =>
+                            update({
+                              guides: resource.guides!.map((item, i) =>
+                                i === guideIndex ? { ...item, content: event.target.value } : item,
+                              ),
+                            })
+                          }
+                          className={field + ' py-3'}
+                        />
+                      </label>
+                    ) : (
+                      <label className="block">
+                        Liên kết hướng dẫn
+                        <input
+                          aria-label={`Liên kết hướng dẫn ${guideIndex + 1}`}
+                          maxLength={2000}
+                          value={guide.url}
+                          onChange={(event) =>
+                            update({
+                              guides: resource.guides!.map((item, i) =>
+                                i === guideIndex ? { ...item, url: event.target.value } : item,
+                              ),
+                            })
+                          }
+                          className={field}
+                        />
+                      </label>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={guideIndex === 0}
+                        className="min-h-11 rounded-xl border px-3 disabled:opacity-40"
+                        onClick={() => {
+                          const next = [...resource.guides!]
+                          ;[next[guideIndex - 1], next[guideIndex]] = [next[guideIndex], next[guideIndex - 1]]
+                          update({ guides: next })
+                        }}
+                      >
+                        Đưa hướng dẫn lên
+                      </button>
+                      <button
+                        type="button"
+                        disabled={guideIndex === resource.guides!.length - 1}
+                        className="min-h-11 rounded-xl border px-3 disabled:opacity-40"
+                        onClick={() => {
+                          const next = [...resource.guides!]
+                          ;[next[guideIndex + 1], next[guideIndex]] = [next[guideIndex], next[guideIndex + 1]]
+                          update({ guides: next })
+                        }}
+                      >
+                        Đưa hướng dẫn xuống
+                      </button>
+                      <button
+                        type="button"
+                        className="min-h-11 rounded-xl border px-3 text-red-700"
+                        onClick={() =>
+                          update({
+                            guides: resource.guides!.filter((_, i) => i !== guideIndex),
+                          })
+                        }
+                      >
+                        Xóa hướng dẫn
+                      </button>
+                    </div>
+                  </fieldset>
+                ))}
+                <button
+                  type="button"
+                  disabled={(resource.guides?.length || 0) >= 30}
+                  onClick={() =>
+                    update({
+                      guides: [
+                        ...(resource.guides || []),
+                        {
+                          title: 'Hướng dẫn mới',
+                          kind: 'TEXT',
+                          content: '',
+                          url: '',
+                        },
+                      ],
+                    })
+                  }
+                  className="min-h-12 rounded-xl border px-4 font-semibold text-brk-primary disabled:opacity-40"
+                >
+                  + Thêm nội dung hướng dẫn
+                </button>
+                <details open={!!(resource.instructions || resource.guideUrl)} className="space-y-4">
+                  <summary className="min-h-11 cursor-pointer font-semibold">
+                    Hướng dẫn đã nhập / ghi chú bổ sung
+                  </summary>
+                  <label className="block text-sm font-semibold">
+                    Nội dung hướng dẫn
+                    <textarea
+                      aria-label="Hướng dẫn riêng tài nguyên"
+                      rows={6}
+                      maxLength={5000}
+                      value={resource.instructions || ''}
+                      onChange={(event) => update({ instructions: event.target.value })}
+                      className={field + ' py-3'}
+                    />
+                  </label>
+                  <label className="block text-sm font-semibold">
+                    Video / tài liệu hướng dẫn
+                    <input
+                      aria-label="Nguồn hướng dẫn riêng tài nguyên"
+                      maxLength={2000}
+                      value={resource.guideUrl || ''}
+                      onChange={(event) => update({ guideUrl: event.target.value })}
+                      placeholder="Để trống nếu chỉ dùng hướng dẫn bằng chữ"
+                      className={field}
+                    />
+                  </label>
+                </details>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -275,7 +483,9 @@ export default function OfferingResourceEditor({
           <aside className="min-w-0 space-y-4 rounded-2xl border bg-white p-4 lg:col-span-2 2xl:col-span-1">
             <h4 className="text-lg font-bold">Xem thử trong web</h4>
             {current && <p className="font-semibold">{current.title}</p>}
-            {source ? (
+            {resource ? (
+              <OfferingResourceContent resource={resource} />
+            ) : source ? (
               <OfferingViewer
                 key={source}
                 url={source}
@@ -286,12 +496,9 @@ export default function OfferingResourceEditor({
               <p className="rounded-xl bg-stone-50 p-4 text-sm">Chưa có nguồn để xem thử.</p>
             )}
             {lesson?.imageUrl && <img src={lesson.imageUrl} alt="" className="max-w-full rounded-xl" />}
-            <OfferingInlineContent text={resource?.instructions || lesson?.content} />
-            {resource?.guideUrl && (
-              <OfferingViewer key={resource.guideUrl} url={resource.guideUrl} title="Hướng dẫn đi kèm" />
-            )}
+            {!resource && <OfferingInlineContent text={lesson?.content} />}
             <p className="text-sm text-brk-muted">
-              Nếu nguồn từ chối hiển thị, hãy cập nhật nguồn cho phép nhúng. Nội dung vẫn ở trong trang.
+              Xem thử dùng cấu hình đang nhập. Với App không cho nhúng, chọn Mở ở tab mới.
             </p>
           </aside>
         )}

@@ -28,6 +28,11 @@ async function run() {
   await assert.rejects(() => workspace.requireOfferingWorkspace('PRODUCT'), error => error.status === 404)
   inScope = true
   assert.equal((await workspace.readWorkspaceResource('PRODUCT', 'resource:0')).url, 'https://private.example/book.pdf')
+  details.resources[0].guides = [{ title: 'Private steps', kind: 'TEXT', content: 'SECRET STEPS', url: '' }]
+  assert.equal((await workspace.readWorkspaceResource('PRODUCT', 'resource:0')).guides[0].content, 'SECRET STEPS')
+  const originalModules = details.modules; details.modules = ['resources']
+  assert.equal((await workspace.readWorkspaceResource('PRODUCT', 'resource:0')).guides, undefined, 'Disabled instructions module strips nested guides as well as legacy fields')
+  details.modules = originalModules
   const summary = await workspace.workspaceResources(7, details)
   assert.ok(!JSON.stringify(summary).includes('private.example') && !JSON.stringify(summary).includes('PROTECTED BODY'))
   const legacy = await workspace.readWorkspaceResource('PRODUCT', 'lesson:own-lesson')
@@ -113,6 +118,15 @@ async function run() {
   await React.act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === 'Read guide').click())
   assert.equal(document.querySelector('iframe').src, 'https://files.example/guide.pdf')
   assert.equal(document.querySelectorAll('a[target="_blank"]').length, 0)
+  const Content = load('components/offerings/OfferingResourceContent.tsx').default
+  const mixed = { title: 'CleanImage', kind: 'APP', url: 'https://app.example/tool', openMode: 'NEW_TAB', guides: [{ title: 'Steps', kind: 'TEXT', content: 'Private text' }, { title: 'Docs', kind: 'DOCS', url: 'https://docs.google.com/document/d/abc/edit' }, { title: 'Video', kind: 'VIDEO', url: 'https://youtu.be/dQw4w9WgXcQ' }, { title: 'PDF', kind: 'PDF', url: 'https://files.example/guide.pdf' }] }
+  await React.act(async () => root.render(React.createElement(Content, { resource: mixed })))
+  assert.equal(document.querySelectorAll('iframe').length, 0, 'Closed guide sections do not load third-party frames')
+  assert.equal(document.querySelector('a[target="_blank"]').rel, 'noopener noreferrer')
+  const docsSection = [...document.querySelectorAll('details')][1]
+  await React.act(async () => { docsSection.open = true; docsSection.dispatchEvent(new window.Event('toggle')) })
+  assert.equal(document.querySelector('iframe').src, 'https://docs.google.com/document/d/abc/preview')
+  assert.equal(document.querySelectorAll('details').length, 4, 'Mixed guides remain inside one App')
   await React.act(async () => root.unmount()); global.fetch = originalFetch; dom.window.close()
 
   let selectedLayout = 'LIBRARY', hasApp = true, resourceRows = []

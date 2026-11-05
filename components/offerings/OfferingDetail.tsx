@@ -220,7 +220,7 @@ export default async function OfferingDetail({
               </section>
               {active ? (
                 <Link href={offeringWorkspaceHref(group, slug)} className={button}>
-                  Vào sử dụng <ArrowRight className="h-4 w-4" />
+                  Mở nội dung <ArrowRight className="h-4 w-4" />
                 </Link>
               ) : previouslyActive ? (
                 <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
@@ -327,7 +327,7 @@ export default async function OfferingDetail({
                   href={offeringWorkspaceHref(group, slug)}
                   className="inline-flex min-h-12 items-center rounded-xl bg-brk-primary px-5 font-semibold text-white"
                 >
-                  Vào sử dụng →
+                  Mở nội dung →
                 </Link>
               )}
             </section>

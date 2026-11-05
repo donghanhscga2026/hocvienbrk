@@ -37,7 +37,7 @@ export const offeringDetailsSchema = z.object({
   audience: z.enum(['INDIVIDUAL', 'GROUP']).default('INDIVIDUAL'),
   benefits: z.array(z.string().trim().max(240)).max(6).default([]).transform(items => items.filter(Boolean)),
   agenda: z.array(z.object({ title: z.string().trim().min(1).max(160), description: z.string().trim().max(2000) })).max(30).default([]),
-  resources: z.array(z.object({ title: z.string().trim().min(1).max(200), kind: z.enum(['EBOOK', 'APP', 'TEMPLATE', 'GUIDE', 'RESOURCE', 'PROMPT', 'VIDEO']), viewer: z.enum(['LINK', 'PDF']).default('LINK'), url: safeUrl.refine(value => !!value, 'Nhập đường dẫn tài nguyên.'), instructions: z.string().trim().max(5000).default(''), guideUrl: safeUrl.default('') })).max(100).default([]),
+  resources: z.array(z.object({ title: z.string().trim().min(1).max(200), kind: z.enum(['EBOOK', 'APP', 'TEMPLATE', 'GUIDE', 'RESOURCE', 'PROMPT', 'VIDEO']), viewer: z.enum(['LINK', 'PDF']).default('LINK'), url: safeUrl.refine(value => !!value, 'Nhập đường dẫn tài nguyên.'), instructions: z.string().trim().max(5000).default(''), guideUrl: safeUrl.default(''), description: z.string().trim().max(1000).optional(), iconUrl: safeUrl.optional(), openMode: z.enum(['EMBED', 'NEW_TAB']).optional(), guides: z.array(z.object({ title: z.string().trim().min(1).max(200), kind: z.enum(['TEXT', 'VIDEO', 'DOCS', 'PDF']), content: z.string().trim().max(5000).default(''), url: safeUrl.default('') }).refine(item => item.kind === 'TEXT' ? !!item.content : !!item.url, 'Nhập nội dung hoặc liên kết hướng dẫn.')).max(30).optional() })).max(100).default([]),
 }).strict()
 export type OfferingDetails = z.infer<typeof offeringDetailsSchema>
 export const emptyOfferingDetails: OfferingDetails = offeringDetailsSchema.parse({})

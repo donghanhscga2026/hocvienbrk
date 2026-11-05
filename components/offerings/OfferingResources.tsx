@@ -63,7 +63,7 @@ export default function OfferingResources({
                   {resource.url && (
                     <details className="w-full">
                       <summary className="min-h-11 cursor-pointer py-3 font-semibold text-brk-primary">
-                        Xem tại đây
+                        Mở nội dung
                       </summary>
                       <OfferingViewer url={resource.url} title={resource.title} kind={resource.kind} />
                     </details>
