@@ -159,7 +159,7 @@ export default function VoucherReportsPage() {
           ))}
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-x-auto">
           {loading ? (
             <div className="p-12 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-brk-accent" /></div>
           ) : !data ? (

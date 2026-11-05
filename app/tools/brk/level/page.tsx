@@ -386,25 +386,25 @@ export default function BrkLevelPage() {
                     <div className="pt-3 border-t border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-4">
                       {/* Points MBP */}
                       <div className="space-y-0.5">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Điểm</span>
+                        <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Điểm</span>
                         <div className="text-slate-700 font-extrabold text-sm flex items-baseline space-x-0.5">
                           <span>{item.points.toFixed(0)}</span>
-                          <span className="text-[10px] text-slate-400 font-normal">MBP</span>
+                          <span className="text-[11px] text-slate-400 font-normal">MBP</span>
                         </div>
                       </div>
 
                       {/* Group members count */}
                       <div className="space-y-0.5">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Thành viên nhóm</span>
+                        <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Thành viên nhóm</span>
                         <div className="text-slate-700 font-extrabold text-sm flex items-baseline space-x-0.5">
                           <span>{item.teamCount}</span>
-                          <span className="text-[10px] text-slate-400 font-normal">thành viên</span>
+                          <span className="text-[11px] text-slate-400 font-normal">thành viên</span>
                         </div>
                       </div>
 
                       {/* Income MBDT (cỡ chữ to hơn, không đơn vị) */}
                       <div className="space-y-0.5">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">{walletText('Thu nhập (MBDT)', wi300)}</span>
+                        <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">{walletText('Thu nhập (MBDT)', wi300)}</span>
                         <div className="text-emerald-700 font-extrabold text-base leading-none">
                           {formatMBDT(item.incomeMBDT)}
                         </div>
@@ -412,7 +412,7 @@ export default function BrkLevelPage() {
 
                       {/* Offset CASH (cỡ chữ nhỏ hơn, có đơn vị VNĐ) */}
                       <div className="space-y-0.5">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Đối ứng</span>
+                        <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Đối ứng</span>
                         <div className="text-slate-600 font-bold text-xs">
                           {formatCASH(item.offsetCASH)}
                         </div>
@@ -452,7 +452,7 @@ export default function BrkLevelPage() {
                       <div className="flex items-center space-x-2">
                         <span className={`font-bold ${isCurrent ? 'text-amber-700' : 'text-slate-700'}`}>Cấp {cfg.level}</span>
                         {isCurrent && (
-                          <span className="text-[10px] text-amber-700 bg-amber-100/70 border border-amber-200/50 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider scale-95">Hiện tại</span>
+                          <span className="text-[11px] text-amber-700 bg-amber-100/70 border border-amber-200/50 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider scale-95">Hiện tại</span>
                         )}
                       </div>
                     </td>

@@ -151,7 +151,7 @@ export default async function AffiliateSettlementPage({
               <div className="text-sm font-semibold text-gray-800 mb-2">
                 {cs.courseName} <span className="text-gray-400 font-normal">— tổng {fmt(cs.totalAmount)}</span>
               </div>
-              <table className="w-full text-xs">
+              <div className="overflow-x-auto"><table className="w-full text-xs">
                 <thead>
                   <tr className="text-gray-400">
                     <th className="py-1 text-left font-medium">Người giới thiệu</th>
@@ -179,13 +179,13 @@ export default async function AffiliateSettlementPage({
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             </div>
           ))}
 
           <details className="px-4 py-3 print:hidden">
             <summary className="text-xs font-semibold text-gray-500 cursor-pointer">Chi tiết từng dòng hoa hồng (để đối chiếu)</summary>
-            <table className="w-full text-xs mt-2">
+            <div className="overflow-x-auto"><table className="w-full text-xs mt-2">
               <thead>
                 <tr className="text-gray-400 border-b border-gray-100">
                   <th className="py-1 text-left font-medium">Đơn</th>
@@ -218,7 +218,7 @@ export default async function AffiliateSettlementPage({
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </details>
         </div>
       ))}

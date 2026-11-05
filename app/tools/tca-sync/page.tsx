@@ -71,7 +71,7 @@ function TestPanel() {
     <div className="space-y-4">
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
         <h3 className="font-bold text-yellow-800 mb-2">Dữ liệu Test (Staging)</h3>
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <div className="text-2xl font-bold text-green-600">{testData?.users || 0}</div>
             <div className="text-sm text-gray-500">UserTest</div>
@@ -354,7 +354,7 @@ export default function TCASyncAdminPage() {
             <div className="p-4 border-b">
               <h2 className="text-xl font-bold text-gray-900">Lịch sử Sync</h2>
             </div>
-            <div className="p-4 max-h-96 overflow-y-auto">
+            <div className="p-4 max-h-96 overflow-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>
