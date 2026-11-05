@@ -71,6 +71,7 @@ function CoursesTab() {
 
     const [search, setSearch] = useState('')
     const [filterStatus, setFilterStatus] = useState('ALL')
+    const [filterGroup, setFilterGroup] = useState('ALL')
     const [filterCategory, setFilterCategory] = useState('ALL')
     const [filterProject, setFilterProject] = useState('ALL')
     const [projects, setProjects] = useState<{ slug: string; name: string; courseIds: number[] }[]>([])
@@ -194,6 +195,7 @@ function CoursesTab() {
                     || (course.teacher?.name || '').toLowerCase().includes(q)
                 if (!match) return false
             }
+            if (filterGroup !== 'ALL' && (course.productGroup || 'COURSE') !== filterGroup) return false
             if (filterStatus === 'ACTIVE' && !course.status) return false
             if (filterStatus === 'HIDDEN' && course.status) return false
             const catName = course.courseCategory?.name || course.category || 'Khác'
@@ -201,7 +203,7 @@ function CoursesTab() {
             if (filterProject !== 'ALL' && !projects.find(project => project.slug === filterProject)?.courseIds.includes(course.id)) return false
             return true
         })
-    }, [courses, search, filterStatus, filterCategory, filterProject, projects])
+    }, [courses, search, filterStatus, filterGroup, filterCategory, filterProject, projects])
 
     const totalPages = Math.max(1, Math.ceil(filteredCourses.length / 10))
     const currentPage = Math.min(page, totalPages)
@@ -333,7 +335,7 @@ function CoursesTab() {
                 <label className="space-y-1 text-xs text-gray-600">Giảng viên<select aria-label="Lọc giảng viên" disabled={!isAdmin} value={isAdmin ? filterTeacher : 'SELF'} onChange={event => setFilterTeacher(event.target.value)} className="block min-h-11 w-full rounded-xl border border-brk-outline bg-white px-3 text-sm disabled:bg-gray-50"><option value="SELF">Khóa học của tôi</option>{isAdmin && <option value="ALL">Tất cả</option>}{isAdmin && teacherOptions.filter(teacher => teacher.id !== currentUserId).map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}</select></label>
                 <label className="space-y-1 text-xs text-gray-600">Danh mục<select aria-label="Lọc danh mục" value={filterCategory} onChange={event => setFilterCategory(event.target.value)} className="block min-h-11 w-full rounded-xl border border-brk-outline bg-white px-3 text-sm"><option value="ALL">Tất cả</option>{categories.map(category => <option key={category} value={category}>{category}</option>)}</select></label>
                 <label className="space-y-1 text-xs text-gray-600">Dự án<select aria-label="Lọc theo dự án" value={filterProject} onChange={event => setFilterProject(event.target.value)} className="block min-h-11 w-full rounded-xl border border-brk-outline bg-white px-3 text-sm"><option value="ALL">Tất cả</option>{projects.map(project => <option key={project.slug} value={project.slug}>{project.name}</option>)}</select></label>
-                <label className="space-y-1 text-xs text-gray-600">Hiển thị<select aria-label="Lọc hiển thị" value={filterStatus} onChange={event => setFilterStatus(event.target.value)} className="block min-h-11 w-full rounded-xl border border-brk-outline bg-white px-3 text-sm"><option value="ALL">Tất cả</option><option value="ACTIVE">Đang hiển thị</option><option value="HIDDEN">Đang ẩn</option></select></label>
+                <label className="space-y-1 text-xs text-gray-600">Hiển thị<select aria-label="Lọc hiển thị" value={filterStatus} onChange={event => setFilterStatus(event.target.value)} className="block min-h-11 w-full rounded-xl border border-brk-outline bg-white px-3 text-sm"><option value="ALL">Tất cả</option><option value="ACTIVE">Đang hiển thị</option><option value="HIDDEN">Đang ẩn</option></select></label><label className="space-y-1 text-xs text-gray-600">Nhóm sản phẩm<select aria-label="Lọc theo nhóm sản phẩm" value={filterGroup} onChange={event => setFilterGroup(event.target.value)} className="block min-h-11 w-full rounded-xl border border-brk-outline bg-white px-3 text-sm"><option value="ALL">Tất cả</option><option value="COURSE">Khóa học</option><option value="DIGITAL">Sản phẩm số</option><option value="SERVICE">Dịch vụ</option></select></label>
             </div>
             {(search || filterStatus !== 'ALL' || filterCategory !== 'ALL' || filterProject !== 'ALL' || (isAdmin && filterTeacher !== 'SELF')) && <button type="button" onClick={() => { setSearch(''); setFilterStatus('ALL'); setFilterCategory('ALL'); setFilterProject('ALL'); if (isAdmin) setFilterTeacher('SELF') }} className="min-h-10 text-sm text-brk-primary">Xóa bộ lọc</button>}
 
@@ -394,7 +396,7 @@ function CoursesTab() {
                             const names = projects.filter(project => project.courseIds.includes(course.id)).map(project => project.name)
                             return <article key={course.id} className={`gap-3 p-4 [&>*]:min-w-0 [&>*]:[overflow-wrap:anywhere] ${display === 'list' ? 'grid grid-cols-[minmax(0,1fr)] rounded-2xl border border-brk-outline bg-white @[64rem]:grid-cols-[24px_minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_76px_56px_minmax(0,1.4fr)_112px] @[64rem]:items-center @[64rem]:rounded-none @[64rem]:border-x-0 @[64rem]:border-t-0 @[64rem]:last:border-b-0' : 'grid grid-cols-[minmax(0,1fr)] rounded-2xl border border-brk-outline bg-white'} ${selectedIds.has(course.id) ? 'bg-brk-background ring-2 ring-inset ring-brk-primary' : ''}`}>
                                 <input type="checkbox" aria-label={`Chọn ${course.name_lop}`} checked={selectedIds.has(course.id)} onChange={() => toggleSelect(course.id)} className="h-4 w-4 accent-green-700" />
-                                <div className="flex min-w-0 items-center gap-3">{course.link_anh_bia ? <img src={course.link_anh_bia} alt="" loading="lazy" decoding="async" width={80} height={64} className="h-16 w-20 shrink-0 rounded-lg object-cover" /> : <div className="flex h-16 w-20 shrink-0 items-center justify-center rounded-lg bg-brk-background text-brk-primary"><BookOpen size={24} /></div>}<div className="min-w-0 flex-1 [overflow-wrap:anywhere]"><Link href={`/tools/courses/new?id=${course.id}`} className="break-words text-sm font-bold text-brk-primary">{course.name_lop}</Link><p className="mt-1 whitespace-normal [overflow-wrap:anywhere] text-xs text-gray-500">{course.id_khoa}</p><p className="mt-1 text-xs text-gray-500">{course.teacher?.name || course.teacher?.email || 'Chưa phân công'} · {course._count?.lessons || 0} bài</p></div></div>
+                                <div className="flex min-w-0 items-center gap-3">{course.link_anh_bia ? <img src={course.link_anh_bia} alt="" loading="lazy" decoding="async" width={80} height={64} className="h-16 w-20 shrink-0 rounded-lg object-cover" /> : <div className="flex h-16 w-20 shrink-0 items-center justify-center rounded-lg bg-brk-background text-brk-primary"><BookOpen size={24} /></div>}<div className="min-w-0 flex-1 [overflow-wrap:anywhere]"><Link href={`/tools/courses/new?id=${course.id}`} className="break-words text-sm font-bold text-brk-primary">{course.name_lop}</Link><p className="mt-1 whitespace-normal [overflow-wrap:anywhere] text-xs text-gray-500">{course.id_khoa}</p><span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${course.productGroup === 'DIGITAL' ? 'bg-purple-100 text-purple-700' : course.productGroup === 'SERVICE' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>{course.productGroup === 'DIGITAL' ? 'Sản phẩm số' : course.productGroup === 'SERVICE' ? 'Dịch vụ' : 'Khóa học'}</span><p className="mt-1 text-xs text-gray-500">{course.teacher?.name || course.teacher?.email || 'Chưa phân công'} · {course._count?.lessons || 0} bài</p></div></div>
                                 <div className="min-w-0"><p className="text-xs text-gray-500">{display === 'cards' ? 'Học phí · ' : ''}{feeLabel}</p><p className="mt-1 break-words text-sm font-semibold text-brk-primary">{feeText}</p></div>
                                 <p className="break-words text-xs font-medium text-brk-primary"><span className={display === 'list' ? 'text-gray-500 @[64rem]:hidden' : 'text-gray-500'}>Danh mục: </span>{course.courseCategory?.name || course.category || 'Khác'}</p>
                                 <p className="break-words text-xs text-gray-600"><span className={display === 'list' ? 'text-gray-500 @[64rem]:hidden' : 'text-gray-500'}>Dự án: </span>{names.join(', ') || 'Chưa liên kết'}</p>

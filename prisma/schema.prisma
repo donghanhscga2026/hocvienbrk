@@ -396,6 +396,7 @@ model Course {
   createdAt                   DateTime                @default(now())
   updatedAt                   DateTime                @updatedAt
   type                        CourseType              @default(NORMAL)
+  productGroup                ProductGroup            @default(COURSE)
   pin                         Int                     @default(0)
   category                    String                  @default("Khác")
   teacherId                   Int?
@@ -2517,6 +2518,12 @@ enum CourseType {
   CHALLENGE
   LIB
   SYS
+}
+
+enum ProductGroup {
+  COURSE
+  DIGITAL
+  SERVICE
 }
 
 enum FeeType {

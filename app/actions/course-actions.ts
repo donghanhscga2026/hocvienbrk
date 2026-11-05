@@ -940,6 +940,7 @@ export async function createCourseAction(formData: FormData) {
             category: categoryName,
             categoryId,
             type: (formData.get('type') as string) || 'NORMAL',
+            productGroup: ['DIGITAL', 'SERVICE'].includes(formData.get('productGroup') as string) ? (formData.get('productGroup') as string) : 'COURSE',
             status: formData.get('status') === 'true',
             pin,
             date_join: formData.get('date_join') as string || null,

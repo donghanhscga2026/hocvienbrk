@@ -67,6 +67,7 @@ function CreateCourseContent() {
     const [nameKhoa, setNameKhoa] = useState('')
     const [categoryId, setCategoryId] = useState<number | null>(null)
     const [type, setType] = useState('NORMAL')
+    const [productGroup, setProductGroup] = useState('COURSE')
     const [status, setStatus] = useState(true)
     const [pin, setPin] = useState(0)
     const [dateJoin, setDateJoin] = useState('')
@@ -208,6 +209,7 @@ function CreateCourseContent() {
                          setNameKhoa(courseRes.name_khoa || '')
                           setCategoryId(courseRes.categoryId || null)
                           setType(courseRes.type || 'NORMAL')
+                          setProductGroup(courseRes.productGroup || 'COURSE')
                         setStatus(courseRes.status ?? true)
                         setPin(courseRes.pin || 0)
                         setDateJoin(isValidDateFormat(courseRes.date_join || '') ? courseRes.date_join : '')
@@ -280,6 +282,7 @@ function CreateCourseContent() {
                 name_khoa: nameKhoa || null,
                 categoryId,
                 type,
+                productGroup,
                 status,
                 pin,
                 date_join: dateJoin || null,
@@ -321,6 +324,7 @@ function CreateCourseContent() {
             if (nameKhoa) formData.append('name_khoa', nameKhoa)
             if (categoryId) formData.append('categoryId', categoryId.toString())
             formData.append('type', type)
+            formData.append('productGroup', productGroup)
             formData.append('status', status.toString())
             formData.append('pin', pin.toString())
             if (dateJoin) formData.append('date_join', dateJoin)
@@ -470,6 +474,19 @@ function CreateCourseContent() {
                                         <Mail className="w-3 h-3" /> Quản lý Whitelist Email
                                     </Link>
                                 )}
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nhóm sản phẩm</label>
+                                <select
+                                    value={productGroup}
+                                    onChange={(e) => setProductGroup(e.target.value)}
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
+                                >
+                                    <option value="COURSE">Khóa học</option>
+                                    <option value="DIGITAL">Sản phẩm số (App / Ebook / Công cụ)</option>
+                                    <option value="SERVICE">Dịch vụ (Coaching / Tư vấn)</option>
+                                </select>
+                                <p className="text-[11px] text-gray-400 ml-1">Khóa học hiện ở trang Khóa học; Sản phẩm số hiện ở trang Sản phẩm; Dịch vụ hiện ở trang Dịch vụ.</p>
                             </div>
                             <div hidden={isEditMode} className="space-y-1.5">
                                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Trạng thái</label>

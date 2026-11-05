@@ -81,7 +81,10 @@ export default async function Wi300Home({ brand, session, view = 'home', catalog
       preferences = coursePreferences
       const enrolledCourseIds = enrolledRows.map(row => row.courseId)
       // Catalog hiding is independent of existing learning/enrollment access.
-      courses = await getCatalog(wi300CourseWhere(getCourseWhereForProfile(profile || { userId: 0 }), preferences, view !== 'space', enrolledCourseIds))
+      const catalogWhere = wi300CourseWhere(getCourseWhereForProfile(profile || { userId: 0 }), preferences, view !== 'space', enrolledCourseIds)
+      // Trang Khóa học (/khoa-hoc, view catalog) chỉ hiện nhóm COURSE — Sản phẩm số và Dịch vụ
+      // hiện ở trang riêng của chúng; các view khác (trang chủ, không gian học viên) giữ nguyên.
+      courses = await getCatalog(view === 'catalog' ? { ...catalogWhere, productGroup: 'COURSE' } : catalogWhere)
       courses = courses.map(course => ({ ...course, status: preferences.get(course.id) ?? false }))
     }
   } catch (error) {
