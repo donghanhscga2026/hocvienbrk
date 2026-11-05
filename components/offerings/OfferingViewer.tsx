@@ -76,9 +76,6 @@ export default function OfferingViewer({ url, title, kind }: { url: string; titl
           className={`w-full rounded-xl border bg-stone-50 ${kind === 'VIDEO' ? 'aspect-video' : 'h-[68dvh] min-h-96'}`}
         />
       )}
-      <p className="text-sm leading-6 text-brk-muted">
-        Xem và thao tác ngay tại đây. Nếu nội dung trống hoặc nguồn từ chối hiển thị, hãy gửi yêu cầu hỗ trợ.
-      </p>
     </div>
   )
 }

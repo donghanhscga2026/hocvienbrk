@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { serviceSchema, serviceFacts, serviceHasSessions, effectiveService } from './service'
 
 export const productGroups = ['COURSE', 'DIGITAL', 'SERVICE'] as const
 export type ProductGroup = typeof productGroups[number]
@@ -18,6 +19,7 @@ export const deliveryStateSchema = z.object({ version: z.number().int().min(0).d
 export const deliveryLabels = { ONLINE: 'Trực tuyến', DOWNLOAD: 'Tải về', BOTH: 'Trực tuyến / tải về' }
 export const deliveryPhaseLabels = { NEW: 'Tiếp nhận', IN_PROGRESS: 'Đang thực hiện', REVIEW: 'Chờ khách duyệt', COMPLETED: 'Đã bàn giao' }
 export const offeringDetailsSchema = z.object({
+  service: serviceSchema.optional(),
   kind: z.enum(['COMBO', 'APP', 'EBOOK', 'TEMPLATE', 'RESOURCE', 'COACHING', 'CONSULTING', 'IMPLEMENTATION', 'OTHER']).default('OTHER'),
   bundleItems: z.array(z.object({ courseId: z.number().int().positive(), gift: z.boolean().default(false) })).max(50).default([]).refine(items => new Set(items.map(item => item.courseId)).size === items.length, 'Mỗi món chỉ được chọn một lần.'),
   accessUrl: safeUrl.default(''),
@@ -47,16 +49,17 @@ export function parseOfferingDetails(value: unknown): OfferingDetails {
 // Không đưa đường dẫn tài nguyên hoặc hướng dẫn sau mua vào danh mục công khai.
 export function publicOfferingDetails(details: OfferingDetails) {
   const { kind, accessDays, sessions, durationMin, mode, format, platform, language, delivery, audience } = details
-  return { kind, accessDays, sessions, durationMin, mode, format, platform, language, delivery, audience }
+  const service = details.service ? { ...details.service, fields: details.service.fields.filter(field => field.public), questions: [], inputs: '', startCondition: '' } : undefined
+  return { kind, accessDays, sessions, durationMin, mode, format, platform, language, delivery, audience, service }
 }
 export const modeLabels = { ONLINE: 'Online', OFFLINE: 'Trực tiếp', HYBRID: 'Online & trực tiếp' }
 export const resourceLabels = { EBOOK: 'Ebook', APP: 'Công cụ / App', TEMPLATE: 'Template', GUIDE: 'Hướng dẫn', RESOURCE: 'Tài nguyên', PROMPT: 'Prompt', VIDEO: 'Video' }
 export function offeringWorkspaceHref(group: unknown, slug: string) { return offeringHref(group, slug) + '/su-dung' }
-export function resolvedWorkspace(group: string, details: OfferingDetails) { return details.workspaceLayout !== 'AUTO' ? details.workspaceLayout : group === 'SERVICE' ? details.kind === 'IMPLEMENTATION' ? 'DELIVERY' : 'SESSIONS' : details.kind === 'APP' ? 'APP' : 'LIBRARY' }
+export function resolvedWorkspace(group: string, details: OfferingDetails) { return details.workspaceLayout !== 'AUTO' ? details.workspaceLayout : group === 'SERVICE' ? effectiveService(details).model === 'SESSIONS' ? 'SESSIONS' : 'DELIVERY' : details.kind === 'APP' ? 'APP' : 'LIBRARY' }
 export function offeringFacts(group: string, details: ReturnType<typeof publicOfferingDetails>) {
   if (details.kind === 'COMBO') return [['Bao gồm', details.format || 'Các món trong gói'], ['Thời hạn', 'Theo từng món'], ['Kích hoạt', 'Sau khi combo được kích hoạt']]
   return group === 'SERVICE'
-    ? [['Hình thức', modeLabels[details.mode]], ['Đồng hành', details.audience === 'GROUP' ? 'Theo nhóm' : '1:1'], ['Thời lượng', `${details.sessions} buổi · ${details.durationMin} phút/buổi`]]
+    ? [...(details.service ? serviceFacts(details.service) : []), ...(serviceHasSessions(details) ? [['Hình thức', modeLabels[details.mode]], ['Đồng hành', details.audience === 'GROUP' ? 'Theo nhóm' : '1:1'], ['Thời lượng', `${details.sessions} buổi · ${details.durationMin} phút/buổi`]] : [])]
     : [['Bao gồm', details.format || offeringKinds[details.kind]], ['Truy cập', deliveryLabels[details.delivery]], ['Thời hạn', details.accessDays ? `${details.accessDays} ngày từ khi kích hoạt` : 'Không giới hạn'], ...(details.platform ? [['Nền tảng', details.platform]] : []), ...(details.language ? [['Ngôn ngữ', details.language]] : [])]
 }
 export function offeringHref(group: unknown, slug: string) {

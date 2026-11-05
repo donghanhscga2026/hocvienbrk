@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma'
 import { courseEditorActor } from '@/lib/course-page/permissions'
 import { emptyOfferingDetails, offeringDetailsSchema } from '@/lib/offerings/shared'
 import { CrmError } from '@/lib/crm/service'
+import { serviceHasSessions } from '@/lib/offerings/service'
 const responseHeaders = { 'Cache-Control': 'private, no-store' }
 export async function GET(request: Request) {
   try {
@@ -80,7 +81,7 @@ export async function GET(request: Request) {
           !(details.kind === 'COMBO' && details.bundleItems.length >= 2)
         )
           warnings.push('Chưa có nội dung sử dụng')
-        if (course.productGroup === 'SERVICE' && details.modules.includes('bookings') && !details.bookingCode)
+        if (course.productGroup === 'SERVICE' && serviceHasSessions(details) && details.modules.includes('bookings') && !details.bookingCode)
           warnings.push('Chưa gắn lịch hẹn')
         return {
           id: course.id,

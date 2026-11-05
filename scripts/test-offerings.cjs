@@ -5,7 +5,7 @@ const root = path.resolve(__dirname, '..')
 function load(file, overrides = {}) {
   const mod = { exports: {} }
   const code = ts.transpileModule(fs.readFileSync(path.join(root, file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
-  new Function('require', 'module', 'exports', code)(name => name in overrides ? overrides[name] : require(name), mod, mod.exports)
+  new Function('require', 'module', 'exports', code)(name => name in overrides ? overrides[name] : name === './service' ? require('./helpers/load-ts.cjs')('lib/offerings/service.ts') : require(name), mod, mod.exports)
   return mod.exports
 }
 async function run() {

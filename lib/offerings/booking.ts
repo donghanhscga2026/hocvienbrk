@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { readOfferingDetails } from './server'
+import { serviceHasSessions } from './service'
 
 /** Gọi trong transaction có khóa đặt lịch để hai yêu cầu không vượt số buổi. */
 export async function assertServiceBooking(db: Prisma.TransactionClient, session: { courseId: number | null; code: string }, userId?: number | null) {
@@ -9,6 +10,7 @@ export async function assertServiceBooking(db: Prisma.TransactionClient, session
   const details = await readOfferingDetails(session.courseId, db)
   // Phiên lịch cũ giữ nguyên cách hoạt động tới khi được gắn rõ trong dịch vụ.
   if (!details.bookingCode) return
+  if (details.service && (!serviceHasSessions(details) || !details.modules.includes('bookings'))) throw new Error('Dịch vụ không mở quyền đặt lịch. Vui lòng liên hệ người phụ trách.')
   if (details.bookingCode !== session.code) throw new Error('Phiên hẹn này không còn được sử dụng cho dịch vụ. Vui lòng mở lại trang dịch vụ.')
   if (userId == null) throw new Error('Vui lòng đăng nhập bằng tài khoản đã mua dịch vụ để đặt lịch.')
   const enrollment = await db.enrollment.findUnique({ where: { userId_courseId: { userId, courseId: session.courseId } }, select: { status: true } })

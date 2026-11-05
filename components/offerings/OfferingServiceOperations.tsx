@@ -1,4 +1,5 @@
 'use client'
+import OfferingServiceIntake from './OfferingServiceIntake'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import OfferingDeliveryEditor from './OfferingDeliveryEditor'
@@ -203,6 +204,7 @@ export default function OfferingServiceOperations({
                 ))}
               </nav>
               <div hidden={tab !== 'delivery'}>
+                <OfferingServiceIntake key={'intake:'+selected} slug={slug} userId={selected} />
                 <OfferingDeliveryEditor
                   key={selected}
                   slug={slug}

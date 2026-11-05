@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { comboItems } from '@/lib/offerings/combo'
 import { groupInfo, offeringWorkspaceHref, type OfferingDetails } from '@/lib/offerings/shared'
 import { getCurrentSiteProfile, getCourseWhereForProfile } from '@/lib/site-profile/runtime'
+import { serviceModels } from '@/lib/offerings/service'
 
 export default async function OfferingComboContents({
   details,
@@ -46,7 +47,7 @@ export default async function OfferingComboContents({
             </div>
             <p className="text-sm text-brk-muted">
               {item.productGroup === 'SERVICE'
-                ? `${item.sessions} buổi · ${item.durationMin} phút/buổi`
+                ? item.service ? serviceModels[item.service.model] : `${item.sessions} buổi · ${item.durationMin} phút/buổi`
                 : item.productGroup === 'DIGITAL'
                   ? item.accessDays
                     ? `${item.accessDays} ngày từ khi kích hoạt`

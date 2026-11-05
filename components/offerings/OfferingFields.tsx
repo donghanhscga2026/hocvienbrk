@@ -1,6 +1,7 @@
 'use client'
 import OfferingWorkspaceFields from './OfferingWorkspaceFields'
 import OfferingComboFields from './OfferingComboFields'
+import OfferingServiceFields from './OfferingServiceFields'
 import OfferingResourceEditor, { type ExistingOfferingContent } from './OfferingResourceEditor'
 import { offeringKinds, type OfferingDetails, type ProductGroup } from '@/lib/offerings/shared'
 
@@ -69,7 +70,7 @@ export default function OfferingFields({
         <p className="text-sm leading-7 text-brk-muted">
           {group === 'DIGITAL'
             ? 'Bộ tài nguyên chứa nhiều video, PDF và App trong cùng một bộ. Combo ghép các khóa học, sản phẩm hoặc dịch vụ đã tạo riêng.'
-            : 'Coaching / Tư vấn phù hợp dịch vụ theo buổi. Hỗ trợ triển khai phù hợp công việc có tiến độ và bàn giao.'}
+            : 'Đây là nhóm phân loại. Chọn ngành và cách cung cấp chi tiết tại Giá & Quyền lợi; mỗi ngành có thể làm theo buổi, dự án, số lượng hoặc định kỳ.'}
         </p>
       </section>
       <section
@@ -209,7 +210,7 @@ export default function OfferingFields({
             </label>
           )}
           <label className="block font-semibold">
-            {group === 'DIGITAL' ? 'Hướng dẫn sau mua' : 'Chuẩn bị trước buổi hẹn'}
+            {group === 'DIGITAL' ? 'Hướng dẫn sau mua' : 'Hướng dẫn chuẩn bị / tiếp nhận dịch vụ'}
             <textarea
               maxLength={5000}
               rows={5}
@@ -234,7 +235,7 @@ export default function OfferingFields({
         data-offering-section="pricing"
         className="space-y-4 rounded-2xl border bg-white p-5"
       >
-        <h3 className="text-xl font-bold text-green-950">Quyền lợi sử dụng</h3>
+        {group === 'DIGITAL' && <h3 className="text-xl font-bold text-green-950">Quyền lợi sử dụng</h3>}
         {group === 'DIGITAL' ? (
           <>
             <label className="block font-semibold">
@@ -268,7 +269,7 @@ export default function OfferingFields({
             </label>
           </>
         ) : (
-          <>
+          <OfferingServiceFields value={value} onChange={onChange}>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="font-semibold">
                 Số buổi
@@ -333,7 +334,7 @@ export default function OfferingFields({
               Để trống nếu tiếp nhận qua Yêu cầu của tôi. Chỉ gắn lịch đang hoạt động của người phụ trách dịch
               vụ.
             </p>
-          </>
+          </OfferingServiceFields>
         )}
       </section>
     </div>

@@ -102,6 +102,7 @@ export async function comboItems(
                 accessDays: d.accessDays,
                 sessions: d.sessions,
                 durationMin: d.durationMin,
+                service: d.service ? (await import('./shared')).publicOfferingDetails(d).service : undefined,
               }
             })(),
           ]

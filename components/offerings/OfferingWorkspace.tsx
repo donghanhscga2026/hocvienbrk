@@ -28,6 +28,8 @@ import CrmRequestButton from '@/components/crm/CrmRequestButton'
 import OfferingLibrary from './OfferingLibrary'
 import OfferingViewer from './OfferingViewer'
 import OfferingInlineContent from './OfferingInlineContent'
+import OfferingServiceIntake from './OfferingServiceIntake'
+import { effectiveService, serviceHasSessions, serviceFacts } from '@/lib/offerings/service'
 
 const panel = 'rounded-2xl border border-brk-outline bg-white p-5 sm:p-6'
 const action =
@@ -95,7 +97,7 @@ export default async function OfferingWorkspace({
   const appUrl = details.accessUrl || details.resources.find((resource) => resource.kind === 'APP')?.url
   const visibleResources = resources
   const showLibrary = has('resources') && (details.kind !== 'COMBO' && layout === 'LIBRARY' || visibleResources.length > 0)
-  const showBookings = has('bookings') && group === 'SERVICE'
+  const showBookings = has('bookings') && group === 'SERVICE' && (!details.service || serviceHasSessions(details))
   const showDelivery = has('delivery') && group === 'SERVICE' && (layout === 'DELIVERY' || !!delivery)
   const navigation = [
     ...(details.kind === 'COMBO' ? [['combo', 'Các món trong combo']] : []),
@@ -199,6 +201,8 @@ export default async function OfferingWorkspace({
             </div>
           )}
           {ComboContents && <ComboContents details={details} active />}
+          {group === 'SERVICE' && details.service && <section className={panel + ' space-y-4'}><h2 className="text-2xl font-bold">Phạm vi dịch vụ của bạn</h2><dl className="grid gap-3 sm:grid-cols-2">{serviceFacts(effectiveService(details)).map(([label,text],index)=><div key={index}><dt className="text-sm text-brk-muted">{label}</dt><dd className="whitespace-pre-wrap">{text}</dd></div>)}</dl>{details.service.inputs && <p className="whitespace-pre-wrap">Khách cần cung cấp: {details.service.inputs}</p>}{details.service.startCondition && <p className="whitespace-pre-wrap">Điều kiện bắt đầu: {details.service.startCondition}</p>}</section>}
+          {group === 'SERVICE' && !!details.service?.questions.length && <OfferingServiceIntake slug={slug} />}
           {showBookings && (
             <section id="lich-hen" className="scroll-mt-28 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
