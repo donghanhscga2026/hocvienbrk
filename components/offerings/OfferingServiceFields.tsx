@@ -54,6 +54,57 @@ export default function OfferingServiceFields({
   return (
     <section className="space-y-5">
       <h3 className="text-xl font-bold text-green-950">Phạm vi & cách cung cấp dịch vụ</h3>
+      <div className="space-y-3 rounded-xl bg-green-50 p-4">
+        <h4 className="font-bold">Chưa biết bắt đầu từ đâu?</h4>
+        <p className="text-sm leading-6">
+          Với dịch vụ làm website, chọn mẫu dưới đây rồi sửa nội dung theo gói của bạn. Mọi con số trong mẫu
+          đều là minh họa, cần kiểm tra trước khi công khai.
+        </p>
+        <button
+          type="button"
+          className={button}
+          onClick={() => {
+            if (
+              window.confirm(
+                'Điền mẫu minh họa sẽ thay phạm vi, thời gian, số vòng sửa và bảo hành đang nhập. Giữ nguyên thông tin riêng và câu hỏi. Tiếp tục?',
+              )
+            ) {
+              onChange({
+                ...value,
+                service: {
+                  ...config,
+                  model: 'PROJECT',
+                  category: 'Thiết kế website',
+                  scope: 'Thiết kế giao diện, xây dựng website và cài đặt các chức năng đã thống nhất.',
+                  deliverables: '01 website hoàn chỉnh và tài khoản quản trị.',
+                  inputs: 'Logo, nội dung giới thiệu, hình ảnh và thông tin liên hệ.',
+                  startCondition: 'Sau khi nhận đủ nội dung và xác nhận thanh toán theo thỏa thuận.',
+                  turnaround: '14 ngày làm việc từ khi nhận đủ thông tin.',
+                  revisions: 2,
+                  warranty: '30 ngày sau bàn giao.',
+                  extraSessions: false,
+                },
+                workspaceLayout: 'DELIVERY',
+                modules: [
+                  ...new Set<OfferingDetails['modules'][number]>([
+                    ...value.modules.filter((module) => module !== 'bookings'),
+                    'delivery',
+                    'conversation',
+                  ]),
+                ],
+              })
+              setNotice('Đã điền mẫu minh họa. Kiểm tra, sửa thông tin và bấm Lưu thay đổi của dịch vụ.')
+            }
+          }}
+        >
+          Điền mẫu thiết kế website
+        </button>
+      </div>
+      {notice && (
+        <p role="status" className="text-green-800">
+          {notice}
+        </p>
+      )}
       <label className="block font-semibold">
         Ngành / loại dịch vụ
         <input
@@ -239,8 +290,10 @@ export default function OfferingServiceFields({
         </label>
       )}
       <div hidden={!has('SESSIONS') && !config.extraSessions}>{children}</div>
-      <section className="space-y-3 border-t pt-4">
-        <h4 className="text-lg font-bold">Thông tin riêng</h4>
+      <details className="space-y-3 border-t pt-4">
+        <summary className="min-h-12 cursor-pointer text-lg font-bold">
+          Thông tin bổ sung · Không bắt buộc ({config.fields.length})
+        </summary>
         {config.fields.map((item, index) => (
           <div key={index} className="grid gap-3 rounded-xl border p-3 sm:grid-cols-2">
             <label>
@@ -307,9 +360,11 @@ export default function OfferingServiceFields({
         >
           + Thêm thông tin
         </button>
-      </section>
-      <section className="space-y-3 border-t pt-4">
-        <h4 className="text-lg font-bold">Tiếp nhận khách · Sau kích hoạt</h4>
+      </details>
+      <details className="space-y-3 border-t pt-4">
+        <summary className="min-h-12 cursor-pointer text-lg font-bold">
+          Câu hỏi khách cần trả lời · Không bắt buộc ({config.questions.length})
+        </summary>
         <p className="text-sm text-brk-muted">
           Câu trả lời được lưu riêng theo khách trong Vận hành. Tài liệu dùng link HTTPS có cấp quyền phù hợp,
           chưa tải tệp trực tiếp lên đây.
@@ -413,7 +468,7 @@ export default function OfferingServiceFields({
         >
           + Thêm câu hỏi
         </button>
-      </section>
+      </details>
       <details className="space-y-4 rounded-xl border p-4">
         <summary className="min-h-11 cursor-pointer font-semibold">
           Tùy chỉnh thêm · Bố cục & mẫu dùng lại

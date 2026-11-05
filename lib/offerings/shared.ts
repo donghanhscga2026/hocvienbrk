@@ -59,7 +59,7 @@ export function resolvedWorkspace(group: string, details: OfferingDetails) { ret
 export function offeringFacts(group: string, details: ReturnType<typeof publicOfferingDetails>) {
   if (details.kind === 'COMBO') return [['Bao gồm', details.format || 'Các món trong gói'], ['Thời hạn', 'Theo từng món'], ['Kích hoạt', 'Sau khi combo được kích hoạt']]
   return group === 'SERVICE'
-    ? [...(details.service ? serviceFacts(details.service) : []), ...(serviceHasSessions(details) ? [['Hình thức', modeLabels[details.mode]], ['Đồng hành', details.audience === 'GROUP' ? 'Theo nhóm' : '1:1'], ['Thời lượng', `${details.sessions} buổi · ${details.durationMin} phút/buổi`]] : [])]
+    ? [...(details.service ? serviceFacts(details.service) : []), ...(serviceHasSessions(details) ? details.service && details.service.model !== 'SESSIONS' ? [['Buổi tư vấn / hướng dẫn đi kèm', `${details.sessions} buổi · ${details.durationMin} phút/buổi`]] : [['Hình thức', modeLabels[details.mode]], ['Đồng hành', details.audience === 'GROUP' ? 'Theo nhóm' : '1:1'], ['Thời lượng', `${details.sessions} buổi · ${details.durationMin} phút/buổi`]] : [])]
     : [['Bao gồm', details.format || offeringKinds[details.kind]], ['Truy cập', deliveryLabels[details.delivery]], ['Thời hạn', details.accessDays ? `${details.accessDays} ngày từ khi kích hoạt` : 'Không giới hạn'], ...(details.platform ? [['Nền tảng', details.platform]] : []), ...(details.language ? [['Ngôn ngữ', details.language]] : [])]
 }
 export function offeringHref(group: unknown, slug: string) {

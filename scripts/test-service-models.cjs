@@ -40,7 +40,12 @@ async function run(){
  let value=shared.parseOfferingDetails({kind:'CONSULTING',service:{model:'PROJECT',scope:'KEEP',turnaround:'14 days',questions:[]}})
  function render(){root.render(React.createElement(Component,{value,onChange:next=>{value=next;render()}},React.createElement('input',{'data-session-field':true})))}
  try{
+  window.confirm=()=>true
   await React.act(async()=>render());assert(document.querySelector('[data-session-field]').closest('[hidden]'))
+  await React.act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Điền mẫu thiết kế website').click())
+  assert.equal(value.service.model,'PROJECT');assert.equal(value.service.revisions,2);assert.equal(value.service.extraSessions,false);assert(!value.modules.includes('bookings'))
+  assert(!JSON.stringify(shared.offeringFacts('SERVICE',shared.publicOfferingDetails(value))).includes('1:1'))
+  value={...value,service:{...value.service,scope:'KEEP',turnaround:'14 days'}};await React.act(async()=>render())
   await React.act(async()=>{const select=document.querySelector('[aria-label="Cách cung cấp dịch vụ"]');select.value='RECURRING';select.dispatchEvent(new window.Event('change',{bubbles:true}))})
   assert.equal(value.service.scope,'KEEP');assert.equal(value.service.turnaround,'14 days');assert(document.querySelector('[aria-label="Chu kỳ cung cấp"]'));assert(!document.querySelector('[aria-label="Thời gian thực hiện"]'))
   await React.act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Áp dụng bố cục gợi ý').click());assert(!value.modules.includes('bookings'));assert(value.modules.includes('delivery'))

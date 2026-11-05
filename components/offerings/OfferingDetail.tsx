@@ -201,13 +201,13 @@ export default async function OfferingDetail({
               </div>
               <section>
                 <h3 className="mb-3 text-lg font-bold text-green-950">
-                  {group === 'DIGITAL' ? 'Thông tin sử dụng' : 'Thông tin đồng hành'}
+                  {group === 'DIGITAL' ? 'Thông tin sử dụng' : 'Phạm vi dịch vụ'}
                 </h3>
                 <dl className="divide-y divide-stone-100 text-sm">
                   {[
                     ...offeringFacts(group, publicOfferingDetails(details)),
                     ...(course.teacher?.name
-                      ? [[group === 'DIGITAL' ? 'Cung cấp bởi' : 'Chuyên gia', course.teacher.name]]
+                      ? [['Cung cấp bởi', course.teacher.name]]
                       : []),
                   ].map(([label, value]) => (
                     <div key={label} className="grid grid-cols-[20px_100px_minmax(0,1fr)] gap-2 py-3">
