@@ -78,7 +78,7 @@ async function run() {
     '@/lib/offerings/server': { getOfferingCatalog: async () => [] },
     '@/components/offerings/OfferingCatalog': { __esModule: true, default: () => null },
   }).default
-  const html = require('react-dom/server').renderToStaticMarkup(await publicCatalog({ kind: 'SERVICE' }))
+  const html = await require('./helpers/render-async.cjs')(await publicCatalog({ kind: 'SERVICE' }))
   assert.ok(html.includes('Website service')); assert.ok(!html.includes('Private draft'))
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://wi300.vn/du-an/noi-dung' })
   global.window = dom.window; global.document = dom.window.document; global.FormData = dom.window.FormData; global.IS_REACT_ACT_ENVIRONMENT = true

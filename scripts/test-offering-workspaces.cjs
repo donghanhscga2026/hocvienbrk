@@ -50,7 +50,7 @@ async function run() {
     '@/lib/prisma': { __esModule: true, default: { course: { findUnique: async () => course, findFirst: async () => publicItem ? { id: 7 } : null } } },
     '@/lib/website/domain-context': { requireDomainCourse: async () => {} },
     '@/app/actions/course-page-actions': { getPublishedCoursePageBySlug: async () => published ? { status: 'published' } : null },
-    '@/lib/offerings/server': { readOfferingDetails: async () => ({ salesLayout: 'TEMPLATE' }), publicCatalogWhere: async () => ({ status: true }) },
+    '@/lib/offerings/server': { getOfferingSalesCourse: async () => course, readOfferingDetails: async () => ({ salesLayout: 'TEMPLATE' }), publicCatalogWhere: async () => ({ status: true }) },
     './OfferingDetail': { __esModule: true, default: () => null },
     '@/components/course-page/CourseSalesPage': { __esModule: true, default: TemplateSales },
   }).default

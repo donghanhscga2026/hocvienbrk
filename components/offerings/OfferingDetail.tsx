@@ -21,7 +21,7 @@ import OfferingPurchase from './OfferingPurchase'
 import OfferingShare from './OfferingShare'
 import OfferingConsultation from './OfferingConsultation'
 import { isQuoteService } from '@/lib/offerings/service'
-import { publicCatalogWhere, readOfferingDetails } from '@/lib/offerings/server'
+import { publicCatalogWhere, readOfferingDetails, getOfferingSalesCourse } from '@/lib/offerings/server'
 import {
   groupInfo,
   offeringFacts,
@@ -45,35 +45,7 @@ export default async function OfferingDetail({
 }) {
   await requireDomainCourse(slug)
   const [course, session, profile, brand] = await Promise.all([
-    prisma.course.findUnique({
-      where: { id_khoa: slug },
-      select: {
-        id: true,
-        id_khoa: true,
-        name_lop: true,
-        productGroup: true,
-        phi_coc: true,
-        mo_ta_ngan: true,
-        mo_ta_dai: true,
-        link_anh_bia: true,
-        type: true,
-        feeType: true,
-        voucherConfig: true,
-        allowMbvDeduction: true,
-        requiresReferralActivation: true,
-        referralActivationThreshold: true,
-        teacher: { select: { name: true } },
-        teacherBankAccount: {
-          select: {
-            id: true,
-            accountHolder: true,
-            accountNumber: true,
-            bankName: true,
-            qrCodeUrl: true,
-          },
-        },
-      },
-    }),
+    getOfferingSalesCourse(slug),
     getSession(),
     getCurrentSiteProfile(),
     getCurrentDeploymentBrand(),

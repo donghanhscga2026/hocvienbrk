@@ -1,4 +1,5 @@
 import 'server-only'
+import { cache } from 'react'
 
 import { headers } from 'next/headers'
 import { unstable_cache } from 'next/cache'
@@ -88,7 +89,7 @@ export async function getSiteProfileForHostname(hostname: string) {
   return profile ? {...profile,siteConfig:domain.profile.siteConfig}:null
 }
 
-export async function getCurrentSiteProfile() {
+export const getCurrentSiteProfile = cache(async () => {
   const requestHeaders = await headers()
   const hostname = normalizeSiteHostname(
     requestHeaders.get('host'),
@@ -107,7 +108,7 @@ export async function getCurrentSiteProfile() {
   }
 
   return getDefaultRuntimeProfileCached()
-}
+})
 
 export async function canProfileAccessCourse(profile: RuntimeSiteProfile, courseId: number) {
   const base = getCourseWhereForProfile(profile)

@@ -3,6 +3,32 @@ const React = require('react')
 const { JSDOM } = require('jsdom')
 const load = require('./helpers/load-ts.cjs')
 async function run() {
+  let request = 0, courseReads = 0, detailReads = 0, scopeReads = 0
+  const db = {
+    course: { findUnique: async () => { courseReads++; return { id: 1, name_lop: 'Request ' + request } } },
+    systemConfig: { findUnique: async () => { detailReads++; return { value: { kind: 'APP' } } } },
+  }
+  const catalogData = load('lib/offerings/server.ts', {
+    'server-only': {},
+    react: { ...React, cache: fn => { let epoch = -1, values; return (...args) => { if (epoch !== request) { epoch = request; values = new Map() } const key = JSON.stringify(args); if (!values.has(key)) values.set(key, fn(...args)); return values.get(key) } } },
+    '@/lib/prisma': { __esModule: true, default: db },
+    '@/lib/wi300/public-projects': { getPublicProjects: async () => [] },
+    '@/lib/site-profile/runtime': { getCurrentSiteProfile: async () => { scopeReads++; return null }, getCourseWhereForProfile: () => ({ status: true }) },
+    '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => null },
+    '@/lib/wi300/course-visibility': {},
+  })
+  const firstCourse = await Promise.all(Array.from({ length: 3 }, () => catalogData.getOfferingSalesCourse('APP')))
+  assert.equal(courseReads, 1, 'Metadata, layout selection and detail reuse one course query per request')
+  assert.equal(firstCourse[0], firstCourse[2])
+  await Promise.all([catalogData.readOfferingDetails(1), catalogData.readOfferingDetails(1)])
+  assert.equal(detailReads, 1)
+  await Promise.all([catalogData.publicCatalogWhere(), catalogData.publicCatalogWhere()])
+  assert.equal(scopeReads, 1)
+  request++
+  assert.equal((await catalogData.getOfferingSalesCourse('APP')).name_lop, 'Request 1', 'A new request reads fresh data')
+  assert.equal(courseReads, 2)
+  await catalogData.readOfferingDetails(1, db); await catalogData.readOfferingDetails(1, db)
+  assert.equal(detailReads, 3, 'Explicit database and transaction reads remain fresh during edits')
   let showList = true, projectCalls = 0, catalogCalls = 0, releaseProjects
   const projectWait = new Promise(resolve => { releaseProjects = resolve })
   const CatalogPage = load('components/wi300/WiOfferingCatalog.tsx', {
@@ -15,7 +41,7 @@ async function run() {
     '@/lib/wi300/managed-page-runtime': { systemPageHidden: () => false, systemPageContent: () => ({ showList }) },
     './WiContentPage': { __esModule: true, default: () => null },
   }).default
-  const pendingCatalog = CatalogPage({ kind: 'PRODUCT' })
+  const pendingCatalog = require('./helpers/render-async.cjs')(await CatalogPage({ kind: 'PRODUCT' }))
   await new Promise(resolve => setImmediate(resolve))
   assert.equal(projectCalls, 1)
   assert.equal(catalogCalls, 1, 'Catalog starts before project data resolves; independent reads run in parallel')

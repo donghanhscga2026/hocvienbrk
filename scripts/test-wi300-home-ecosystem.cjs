@@ -234,7 +234,7 @@ async function run() {
   await assert.rejects(() => Catalog({ kind: 'PRODUCT' }), /404/)
   brand = { name: 'WI300' }
   for (const kind of ['PRODUCT', 'SERVICE']) {
-    dom = new JSDOM(renderToStaticMarkup(await Catalog({ kind }))); doc = dom.window.document
+    dom = new JSDOM(await require('./helpers/render-async.cjs')(await Catalog({ kind }))); doc = dom.window.document
     assert.equal(doc.querySelectorAll('article').length, 1)
     assert.match(doc.querySelector('article').textContent, kind === 'PRODUCT' ? /Sản phẩm thật/ : /Dịch vụ thật/)
     assert.doesNotMatch(doc.body.textContent, /Nội dung riêng/)
