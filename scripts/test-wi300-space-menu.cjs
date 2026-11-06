@@ -62,7 +62,7 @@ async function run() {
   try {
     await act(async () => render())
     assert.equal(requests, 0, 'Không gọi API trước khi mở menu')
-    await act(async () => enter(document.querySelector('a[aria-label="Không gian của tôi"]')))
+    await act(async () => enter(document.querySelector('a[aria-label="Góc của tôi"]')))
     assert.ok(panel(), 'Rê chuột mở menu mà không chuyển trang')
     assert.equal(panel().querySelectorAll('[data-space-mega-menu] section').length, 4, 'Desktop shows the four approved workspaces together')
     assert.deepEqual([...panel().querySelectorAll('[data-space-mega-menu] section')][1].querySelectorAll('a')[1].getAttribute('href'), '/tools/courses')
@@ -80,7 +80,7 @@ async function run() {
     await act(async () => click(panel().querySelector('a[href="/my-space?tab=services"]')))
     assert.equal(panel(), null)
     hover = false
-    await act(async () => enter(document.querySelector('a[aria-label="Không gian của tôi"]')))
+    await act(async () => enter(document.querySelector('a[aria-label="Góc của tôi"]')))
     assert.equal(panel(), null, 'Cảm ứng không giả lập hover')
     await act(async () => click(findButton('Mở lối tắt Không gian của tôi')))
     assert.ok(panel())
