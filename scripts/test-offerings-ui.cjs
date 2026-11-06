@@ -13,7 +13,10 @@ async function run() {
   const { createRoot } = require('react-dom/client'), { act } = React
   const root = createRoot(document.getElementById('root'))
   const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
+  let indexedItems = 0
+  const { searchText } = load('lib/wi300/catalog.ts')
   const Catalog = load('components/offerings/OfferingCatalog.tsx', {
+    '@/lib/wi300/catalog': { searchText: value => { if (value.includes('Expert')) indexedItems++; return searchText(value) } },
     'next/link': link, 'next-auth/react': { useSession: () => ({ data: { user: { id: '0' } } }) },
     '@/components/course/CourseProjectBadges': { __esModule: true, default: ({ projects }) => React.createElement('div', null, projects.map(p => p.name).join(', ')) },
     './OfferingShare': { __esModule: true, default: ({ userId }) => React.createElement('button', { 'data-share-user': userId }, 'Chia sẻ') },
@@ -24,9 +27,11 @@ async function run() {
   assert.equal(document.querySelectorAll('[data-share-user="0"]').length, 9)
   const change = async (label, value) => act(async () => { const el = document.querySelector(`[aria-label="${label}"]`); el.value = value; el.dispatchEvent(new window.Event('change', { bubbles: true })) })
   await change('Chọn trang dưới', '2'); assert.equal(document.querySelectorAll('article').length, 3)
+  assert.equal(indexedItems, items.length, 'Pagination reuses the search index instead of normalizing every item again')
   await change('Lọc dự án', 'b'); assert.equal(document.querySelectorAll('article').length, 6)
   assert.equal(document.querySelector('[aria-label="Chọn trang trên"]').value, '1')
   await change('Sắp xếp', 'PRICE_DESC'); assert.ok(document.querySelector('article h2').textContent.includes('11'))
+  assert.equal(indexedItems, items.length, 'Filtering and sorting reuse the search index')
   await change('Lọc giá', 'FREE'); assert.equal(document.querySelectorAll('article').length, 0)
   await act(async () => [...document.querySelectorAll('button')].find(b => b.textContent === 'Xóa bộ lọc').click())
   assert.equal(document.querySelectorAll('article').length, 9)

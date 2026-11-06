@@ -29,5 +29,5 @@ export default async function OfferingSalesPage({
     (await getPublishedCoursePageBySlug(slug))
   )
     return <CourseSalesPage params={Promise.resolve({ id: slug })} searchParams={searchParams} expectedGroup={group} />
-  return <OfferingDetail slug={slug} expectedGroup={group} />
+  return <OfferingDetail slug={slug} expectedGroup={group} initialDetails={details} />
 }

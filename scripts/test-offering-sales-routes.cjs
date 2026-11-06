@@ -41,6 +41,10 @@ async function run() {
   await assert.rejects(() => core(props), /NOT_FOUND/); assert.equal(extras, before, 'Scope denial occurs before reading public extras')
   allowed = true; await assert.rejects(() => core({ ...props, expectedGroup: 'SERVICE' }), /NOT_FOUND/)
   layout = 'DEFAULT'; assert.equal((await core({ ...props, expectedGroup: 'DIGITAL' })).type, Detail, 'Default product layout remains available')
+  const sales = load('components/offerings/OfferingSalesPage.tsx', mocks).default
+  const defaultSales = await sales({ slug: 'GIFTS', group: 'DIGITAL' })
+  assert.equal(defaultSales.type, Detail)
+  assert.equal(defaultSales.props.initialDetails.salesLayout, 'DEFAULT', 'Sales route passes already loaded details to its server child')
   const Breadcrumb = load('components/wi300/Wi300Breadcrumb.tsx', { 'next/link': { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) } }).default
   for (const [group, href, label] of [['DIGITAL', '/san-pham', 'Sản phẩm số'], ['SERVICE', '/dich-vu', 'Dịch vụ'], ['COURSE', '/khoa-hoc', 'Khóa học']]) {
     const html = require('react-dom/server').renderToStaticMarkup(React.createElement(Breadcrumb, { title: 'Item', group }))

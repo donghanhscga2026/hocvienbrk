@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { Package, BriefcaseBusiness, Search, ArrowRight, Check, UserRound } from 'lucide-react'
@@ -45,15 +45,20 @@ export default function OfferingCatalog({
     group === 'DIGITAL'
       ? (['COMBO', 'APP', 'EBOOK', 'TEMPLATE', 'RESOURCE', 'OTHER'] as const)
       : (['COACHING', 'CONSULTING', 'IMPLEMENTATION', 'OTHER'] as const)
-  const projects = Array.from(
+  const projects = useMemo(() => Array.from(
     new Map(items.flatMap((item) => item.projects.map((value) => [value.slug, value] as const))).values(),
-  )
-  const categories = Array.from(
+  ), [items])
+  const categories = useMemo(() => Array.from(
     new Set(items.map((item) => item.courseCategory?.name || item.category).filter(Boolean)),
-  )
-  const filtered = items
+  ), [items])
+  const indexed = useMemo(() => items.map(item => ({ item, text: searchText([
+    item.name_lop, item.mo_ta_ngan, item.teacher?.name,
+    item.courseCategory?.name || item.category, ...item.projects.map(value => value.name),
+  ].join(' ')) })), [items])
+  const query = searchText(filters.query)
+  const filtered = useMemo(() => indexed
     .filter(
-      (item) =>
+      ({ item, text }) =>
         (filters.kind === 'ALL' || item.details.kind === filters.kind) &&
         (filters.project === 'ALL' || item.projects.some((value) => value.slug === filters.project)) &&
         (filters.category === 'ALL' || (item.courseCategory?.name || item.category) === filters.category) &&
@@ -63,16 +68,9 @@ export default function OfferingCatalog({
             : !(group === 'SERVICE' && isQuoteService(item.details)) &&
               (filters.price === 'FREE' ? item.phi_coc === 0 : item.phi_coc > 0))) &&
         (filters.mode === 'ALL' || item.details.mode === filters.mode) &&
-        searchText(
-          [
-            item.name_lop,
-            item.mo_ta_ngan,
-            item.teacher?.name,
-            item.courseCategory?.name || item.category,
-            ...item.projects.map((value) => value.name),
-          ].join(' '),
-        ).includes(searchText(filters.query)),
+        text.includes(query),
     )
+    .map(({ item }) => item)
     .sort((a, b) =>
       filters.sort === 'PRICE_ASC'
         ? a.phi_coc - b.phi_coc
@@ -81,7 +79,7 @@ export default function OfferingCatalog({
           : filters.sort === 'NAME'
             ? a.name_lop.localeCompare(b.name_lop, 'vi')
             : 0,
-    )
+    ), [indexed, filters, group, query])
   const pages = Math.max(1, Math.ceil(filtered.length / 9)),
     current = Math.min(page, pages)
   const selectClass = 'min-h-12 min-w-0 rounded-xl border border-brk-outline bg-white px-3 text-sm'

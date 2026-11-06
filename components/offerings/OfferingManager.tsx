@@ -41,7 +41,7 @@ export default function OfferingManager({ group }: { group: Exclude<ProductGroup
   const [page, setPage] = useState(1)
   useEffect(() => {
     let current = true
-    getAdminCoursesAction({ teacherId: teacher === 'SELF' || teacher === 'ALL' ? teacher : Number(teacher) })
+    getAdminCoursesAction({ teacherId: teacher === 'SELF' || teacher === 'ALL' ? teacher : Number(teacher), productGroup: group })
       .then((result) => {
         if (!current) return
         if (!result.success) throw new Error('Không tải được danh sách. Vui lòng thử lại hoặc đăng nhập lại.')

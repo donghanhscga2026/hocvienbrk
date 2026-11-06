@@ -53,7 +53,8 @@ async function run() {
   }
   let brand = {}, role = 'ADMIN', session = { user: { id: '0', role: 'ADMIN' } }
   db.user = { findUnique: async () => ({ role }) }
-  db.course.findMany = async () => [{ id: 1, status: true }, { id: 2, status: false }, { id: 4, status: true }]
+  let managementWhere
+  db.course.findMany = async ({ where }) => { managementWhere = where; return [{ id: 1, status: true }, { id: 2, status: false }, { id: 4, status: true }] }
   const admin = actions('app/actions/admin-actions.ts', ['getAdminCoursesAction', 'bulkToggleCourseStatusAction', 'bulkUpdateCoursesOptionsAction'], {
     auth: async () => session, prisma: db, Role: { ADMIN: 'ADMIN', TEACHER: 'TEACHER', INSTRUCTOR: 'INSTRUCTOR' },
     getCurrentDeploymentBrand: async () => brand, setWi300CourseVisibility: visibility.setWi300CourseVisibility, wi300CoursePreferences: visibility.wi300CoursePreferences,
@@ -67,6 +68,14 @@ async function run() {
   assert.equal(management.courses[0].status, false); assert.equal(management.courses[1].status, true)
   assert.equal(management.visibilityScope, 'wi300')
   assert.equal(management.courses[2].status, false, 'Management shows unconfigured new courses as hidden on WI300')
+  for (const productGroup of ['DIGITAL', 'SERVICE']) {
+    await admin.getAdminCoursesAction({ teacherId: 'ALL', productGroup })
+    assert.deepEqual(managementWhere, { productGroup }, 'Filter group at the database instead of transferring unrelated courses')
+    role = 'TEACHER'
+    await admin.getAdminCoursesAction({ teacherId: 999, productGroup })
+    assert.deepEqual(managementWhere, { teacherId: 0, productGroup }, 'Group filtering cannot expand teacher ownership')
+    role = 'ADMIN'
+  }
   brand = null; await admin.bulkToggleCourseStatusAction([1], true)
   assert.equal(sharedWrites, 1, 'Original website retains its existing status action')
   management = await admin.getAdminCoursesAction({ teacherId: 'ALL' })

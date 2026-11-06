@@ -3,6 +3,27 @@ const React = require('react')
 const { JSDOM } = require('jsdom')
 const load = require('./helpers/load-ts.cjs')
 async function run() {
+  let showList = true, projectCalls = 0, catalogCalls = 0, releaseProjects
+  const projectWait = new Promise(resolve => { releaseProjects = resolve })
+  const CatalogPage = load('components/wi300/WiOfferingCatalog.tsx', {
+    'next/link': { __esModule: true, default: () => null },
+    'next/navigation': { notFound: () => { throw Error('404') } },
+    '@/lib/wi300/public-projects': { getPublicProjects: () => { projectCalls++; return projectWait } },
+    '@/lib/offerings/server': { getOfferingCatalog: async () => { catalogCalls++; return [] } },
+    '@/components/offerings/OfferingCatalog': { __esModule: true, default: () => null },
+    '@/lib/site-profile/presentation': { getPresentationBrand: async () => ({ name: 'Wi300' }) },
+    '@/lib/wi300/managed-page-runtime': { systemPageHidden: () => false, systemPageContent: () => ({ showList }) },
+    './WiContentPage': { __esModule: true, default: () => null },
+  }).default
+  const pendingCatalog = CatalogPage({ kind: 'PRODUCT' })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(projectCalls, 1)
+  assert.equal(catalogCalls, 1, 'Catalog starts before project data resolves; independent reads run in parallel')
+  releaseProjects([])
+  await pendingCatalog
+  showList = false
+  await CatalogPage({ kind: 'SERVICE' })
+  assert.equal(projectCalls, 1); assert.equal(catalogCalls, 1, 'Hidden catalog performs no project or product reads')
   const { courseLoadingPlan } = load('lib/course-page/loading-plan.ts')
   const zip = { useTemplate: true, theme: { importedLayout: true }, sections: [{ enabled: true, variant: 'zip-source-v1' }] }
   assert.deepEqual(courseLoadingPlan(zip, true), { lessons: false, statistics: false, testimonials: false })

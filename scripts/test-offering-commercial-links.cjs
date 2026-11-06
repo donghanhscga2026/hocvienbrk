@@ -88,6 +88,8 @@ async function run() {
 
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://test.invalid' })
   global.window = dom.window; global.document = dom.window.document; global.IS_REACT_ACT_ENVIRONMENT = true
+  window.HTMLDialogElement.prototype.showModal = function () { this.open = true }
+  window.HTMLDialogElement.prototype.close = function () { this.open = false }
   Object.defineProperty(global, 'navigator', { configurable: true, value: dom.window.navigator })
   const root = require('react-dom/client').createRoot(document.getElementById('root'))
   try {
@@ -105,15 +107,29 @@ async function run() {
     global.fetch = async (url, init) => { payloads.push(JSON.parse(init.body)); return { ok: !fail, json: async () => fail ? { error: 'Retry me' } : { success: true } } }
     await React.act(async () => root.render(React.createElement(Form, { slug: 'WEB', signedIn: true, questions: [] })))
     await React.act(async () => document.querySelector('button').click())
+    assert.equal(document.querySelector('dialog').open, true)
+    assert.equal(document.body.style.overflow, 'hidden', 'Opening the modal prevents background scrolling')
     await React.act(async () => {
       const node = document.querySelector('textarea')
       Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set.call(node, 'Need a website')
       node.dispatchEvent(new window.Event('input', { bubbles: true }))
       document.querySelector('input[type="checkbox"]').click()
     })
+    await React.act(async () => document.querySelector('[aria-label="Đóng form tư vấn"]').click())
+    assert.equal(document.querySelector('dialog').open, false)
+    assert.equal(document.body.style.overflow, '', 'Closing restores background scrolling')
+    await React.act(async () => document.querySelector('[aria-haspopup="dialog"]').click())
+    assert.equal(document.querySelector('textarea').value, 'Need a website', 'Closing and reopening preserves the draft')
+    assert.equal(document.querySelector('input[type="checkbox"]').checked, true)
     async function send() { await React.act(async () => document.querySelector('form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }))) }
     await send(); assert(document.body.textContent.includes('Retry me')); assert.equal(document.querySelector('textarea').value, 'Need a website')
     fail = false; await send(); assert.equal(payloads[0].key, payloads[1].key); assert.equal(payloads[1].content, 'Need a website'); assert(document.querySelector('a[href="/my-requests"]'))
+    await React.act(async () => document.querySelector('dialog').dispatchEvent(new window.Event('cancel')))
+    assert.equal(document.querySelector('dialog').open, false, 'Escape closes the dialog')
+    assert.equal(document.body.style.overflow, '')
+    await React.act(async () => root.render(React.createElement(Form, { key: 'guest', slug: 'WEB', signedIn: false, questions: [] })))
+    await React.act(async () => document.querySelector('[aria-haspopup="dialog"]').click())
+    assert(document.querySelector('dialog a[href^="/login?callbackUrl="]'), 'Guests see the login route inside the popup')
   } finally { await React.act(async () => root.unmount()); dom.window.close() }
   console.log('Offering commercial links: quote privacy/validation/CRM, scoped publication, project routes/prices, mode retention and consultation retry passed (isolated fixtures).')
 }

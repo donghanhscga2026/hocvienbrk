@@ -31,14 +31,17 @@ import {
   offeringKinds,
   productGroup,
   type ProductGroup,
+  type OfferingDetails,
 } from '@/lib/offerings/shared'
 
 export default async function OfferingDetail({
   slug,
   expectedGroup,
+  initialDetails,
 }: {
   slug: string
   expectedGroup?: Exclude<ProductGroup, 'COURSE'>
+  initialDetails?: OfferingDetails
 }) {
   await requireDomainCourse(slug)
   const [course, session, profile, brand] = await Promise.all([
@@ -93,7 +96,7 @@ export default async function OfferingDetail({
           select: { phone: true },
         })
       : null,
-    readOfferingDetails(course.id),
+    initialDetails ?? readOfferingDetails(course.id),
   ])
   if (profile) {
     if (enrollment) {

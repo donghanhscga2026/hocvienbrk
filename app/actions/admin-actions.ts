@@ -1381,7 +1381,7 @@ export async function changeUserIdAction(_prevState: UserIdChangeState, formData
  *   phạm vi xem — 'SELF' (mặc định, kể cả ADMIN), 'ALL' (ADMIN xem hết), hoặc id
  *   một GV cụ thể (chỉ ADMIN mới đổi được, TEACHER luôn bị ép về chính mình).
  */
-export async function getAdminCoursesAction(options?: { teacherId?: number | 'ALL' | 'SELF' }) {
+export async function getAdminCoursesAction(options?: { teacherId?: number | 'ALL' | 'SELF'; productGroup?: 'COURSE' | 'DIGITAL' | 'SERVICE' }) {
     try {
         const session = await auth(); if (session?.user?.id == null) return { success: false, error: "Unauthorized" }
         const userId = Number(session.user.id)
@@ -1400,6 +1400,7 @@ export async function getAdminCoursesAction(options?: { teacherId?: number | 'AL
             where = { teacherId: isAdmin ? options.teacherId : userId }
         }
 
+        if (options?.productGroup && ['COURSE', 'DIGITAL', 'SERVICE'].includes(options.productGroup)) where.productGroup = options.productGroup
         const courses = await prisma.course.findMany({ where, include: { _count: { select: { lessons: true, enrollments: { where: { status: 'ACTIVE' } } } }, teacher: true, courseCategory: true }, orderBy: { id: 'desc' } })
         const wi300 = !!await getCurrentDeploymentBrand()
         const preferences = wi300 ? await wi300CoursePreferences(prisma) : new Map<number, boolean>()

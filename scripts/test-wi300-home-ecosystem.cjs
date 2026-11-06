@@ -223,7 +223,7 @@ async function run() {
     '@/components/offerings/OfferingCatalog': { __esModule: true, default: () => null },
     'next/link': link, 'next/navigation': { notFound: () => { throw Error('404') } },
     '@/lib/prisma': { __esModule: true, default: {} },
-    '@/lib/wi300/project-service': { readProjects: async () => source },
+    '@/lib/wi300/public-projects': { getPublicProjects: async () => source.filter(project => project.published) },
     '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => brand },
     '@/lib/site-profile/presentation': { getPresentationBrand: async () => brand },
     // Nhóm mục hàng của giảng viên trên trang Sản phẩm/Dịch vụ (Cách 3 — GĐ1) cần thêm 2 module

@@ -1,8 +1,7 @@
 import Link from 'next/link'
 import { BriefcaseBusiness, Package } from 'lucide-react'
 import { notFound } from 'next/navigation'
-import prisma from '@/lib/prisma'
-import { readProjects } from '@/lib/wi300/project-service'
+import { getPublicProjects } from '@/lib/wi300/public-projects'
 import { getOfferingCatalog } from '@/lib/offerings/server'
 import OfferingCatalog from '@/components/offerings/OfferingCatalog'
 import { getPresentationBrand } from '@/lib/site-profile/presentation'
@@ -22,18 +21,16 @@ export default async function WiOfferingCatalog({ kind }: { kind: 'PRODUCT' | 'S
   const page = systemPageContent(brand, pageId)
   const title = product ? 'Sản phẩm số' : 'Dịch vụ'
   const Icon = product ? Package : BriefcaseBusiness
-  const projects = (await readProjects(prisma)).filter(project => project.published)
+  const group = product ? 'DIGITAL' : 'SERVICE'
+  const [projects, catalog] = page.showList ? await Promise.all([
+    getPublicProjects(),
+    getOfferingCatalog(group).then(items => ({ items, error: false })).catch(() => ({ items: [], error: true })),
+  ]) : [[], { items: [], error: false }]
   const offerings = projects.flatMap(project => project.offerings
     .filter(item => item.kind === kind)
     .map((item, index) => ({ project, item, index })))
-  const group = product ? 'DIGITAL' : 'SERVICE'
-  let groupCourses: Awaited<ReturnType<typeof getOfferingCatalog>> = []
-  let catalogError = false
-  try {
-    groupCourses = await getOfferingCatalog(group)
-  } catch {
-    catalogError = true
-  }
+  const groupCourses = catalog.items
+  const catalogError = catalog.error
   return <div className="bg-stone-50"><main className="mx-auto w-full max-w-7xl px-4 py-7 text-brk-on-surface sm:px-6 lg:py-9">
     <nav aria-label="Đường dẫn trang" className="mb-8 flex gap-2 text-sm text-brk-muted"><Link href="/" className="text-brk-primary">Trang chủ</Link><span aria-hidden>/</span><span aria-current="page">{title}</span></nav>
     <div className="mb-6 rounded-3xl border border-green-100 bg-gradient-to-br from-green-50 via-white to-amber-50 p-6 sm:p-8">

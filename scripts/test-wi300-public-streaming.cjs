@@ -93,12 +93,12 @@ async function run() {
     for (const child of React.Children.toArray(element.props.children)) { const result = find(child, type); if (result) return result }
     return null
   }
-  for (pathname of ['/', '/khoa-hoc']) {
+  for (pathname of ['/', '/khoa-hoc', '/san-pham', '/dich-vu']) {
     const tree = await Layout({ children: 'public-content' })
     assert.equal(sessionCalls, 0, 'Public shell never starts the server session lookup')
     assert.equal(find(tree, Providers).props.session, undefined, 'SessionProvider will fetch account UI after hydration')
   }
-  for (pathname of ['/my-space', '/tools/crm', '/khoa-hoc/PRIVATE', '']) {
+  for (pathname of ['/my-space', '/tools/crm', '/khoa-hoc/PRIVATE', '/san-pham/PRIVATE/su-dung', '/dich-vu/PRIVATE/su-dung', '']) {
     const previous = sessionCalls
     const tree = await Layout({ children: 'private-content' })
     assert.equal(sessionCalls, previous + 1)

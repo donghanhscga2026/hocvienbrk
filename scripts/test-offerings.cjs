@@ -73,6 +73,7 @@ async function run() {
   await booking.assertServiceBooking(db, { courseId: null, code: 'PUBLIC' }, null)
 
   const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
+  let detailReads = 0
   const Detail = load('components/offerings/OfferingDetail.tsx', {
     'next/link': link, 'next/navigation': { notFound: () => { throw new Error('NOT_FOUND') } },
     '@/lib/prisma': { __esModule: true, default: db },
@@ -90,7 +91,7 @@ async function run() {
     './OfferingResources': { __esModule: true, default: ({ resources }) => React.createElement('div', null, resources.map((r, index) => React.createElement('div', { key: index }, r.title, r.url, r.body))) },
     './OfferingPurchase': { __esModule: true, default: props => React.createElement('div', { 'data-purchase': JSON.stringify(props) }) },
     './OfferingShare': { __esModule: true, default: () => null },
-    '@/lib/offerings/server': { readOfferingDetails: async () => details, publicCatalogWhere: async () => ({ status: true }) },
+    '@/lib/offerings/server': { readOfferingDetails: async () => { detailReads++; return details }, publicCatalogWhere: async () => ({ status: true }) },
     '@/lib/offerings/shared': shared,
   }).default
   group = 'DIGITAL'; enrollment = null
@@ -98,6 +99,10 @@ async function run() {
   assert.ok(!html.includes(secret) && !html.includes('PRIVATE INSTRUCTIONS'), 'Unpaid page and purchase props contain no protected data')
   assert.ok(!html.includes('PROTECTED LEGACY CONTENT'))
   assert.ok(html.includes('Private resource'), 'Unpaid visitors can read resource titles without receiving the URLs or paid body')
+  assert.equal(detailReads, 1)
+  const reused = renderToStaticMarkup(await Detail({ slug: 'EBOOK-5', expectedGroup: 'DIGITAL', initialDetails: details }))
+  assert.equal(detailReads, 1, 'Already loaded details are reused without a second database query')
+  assert.equal(reused, html, 'Reuse preserves the same public output and protected-content boundaries')
   enrollment = { status: 'PENDING' }
   html = renderToStaticMarkup(await Detail({ slug: 'EBOOK-5' }))
   assert.ok(!html.includes(secret), 'A pending payment does not grant access')
