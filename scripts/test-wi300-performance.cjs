@@ -3,6 +3,27 @@ const React = require('react')
 const { JSDOM } = require('jsdom')
 const load = require('./helpers/load-ts.cjs')
 async function run() {
+  let showList = true, projectCalls = 0, catalogCalls = 0, releaseProjects
+  const projectWait = new Promise(resolve => { releaseProjects = resolve })
+  const CatalogPage = load('components/wi300/WiOfferingCatalog.tsx', {
+    'next/link': { __esModule: true, default: () => null },
+    'next/navigation': { notFound: () => { throw Error('404') } },
+    '@/lib/wi300/public-projects': { getPublicProjects: () => { projectCalls++; return projectWait } },
+    '@/lib/offerings/server': { getOfferingCatalog: async () => { catalogCalls++; return [] } },
+    '@/components/offerings/OfferingCatalog': { __esModule: true, default: () => null },
+    '@/lib/site-profile/presentation': { getPresentationBrand: async () => ({ name: 'Wi300' }) },
+    '@/lib/wi300/managed-page-runtime': { systemPageHidden: () => false, systemPageContent: () => ({ showList }) },
+    './WiContentPage': { __esModule: true, default: () => null },
+  }).default
+  const pendingCatalog = CatalogPage({ kind: 'PRODUCT' })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(projectCalls, 1)
+  assert.equal(catalogCalls, 1, 'Catalog starts before project data resolves; independent reads run in parallel')
+  releaseProjects([])
+  await pendingCatalog
+  showList = false
+  await CatalogPage({ kind: 'SERVICE' })
+  assert.equal(projectCalls, 1); assert.equal(catalogCalls, 1, 'Hidden catalog performs no project or product reads')
   const { courseLoadingPlan } = load('lib/course-page/loading-plan.ts')
   const zip = { useTemplate: true, theme: { importedLayout: true }, sections: [{ enabled: true, variant: 'zip-source-v1' }] }
   assert.deepEqual(courseLoadingPlan(zip, true), { lessons: false, statistics: false, testimonials: false })
@@ -13,7 +34,7 @@ async function run() {
   const calls = {}
   const count = (name, value) => async args => { (calls[name] ||= []).push(args); return value }
   let publishedPage = zip, brand = { name: 'WI300' }, allowed = true, projects = []
-  const course = { id: 17, id_khoa: 'ZIP', name_lop: 'Course', phi_coc: 100, teacherBankAccount: { bankName: 'TCB', accountNumber: 'test', accountHolder: 'Test' } }
+  const course = { id: 17, id_khoa: 'ZIP', name_lop: 'Course', productGroup: 'COURSE', phi_coc: 100, teacherBankAccount: { bankName: 'TCB', accountNumber: 'test', accountHolder: 'Test' } }
   const enrollment = { status: 'PENDING', userId: 31, courseId: 17 }
   const View = () => null, Landing = () => null, Notification = () => null, Header = () => null
   const children = page => React.Children.toArray(page.props.children)
@@ -21,6 +42,8 @@ async function run() {
   const reset = () => Object.keys(calls).forEach(key => delete calls[key])
   const publicationMocks = { getPublishedCoursePageBySlug: async () => { (calls.published ||= []).push({}); return publishedPage } }
   const mocks = {
+    '@/lib/offerings/server': { readOfferingDetails: async () => ({ salesLayout: 'TEMPLATE' }) },
+    '@/components/offerings/OfferingDetail': { __esModule: true, default: () => null },
     '@/lib/wi300/project-service': { readPublicProjects: async () => projects },
     'next/cache': { unstable_cache: fn => fn },
     react: { ...React, cache: fn => fn },

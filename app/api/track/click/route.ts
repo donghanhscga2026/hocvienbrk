@@ -10,7 +10,7 @@ async function resolveRefToUserId(ref: string): Promise<number | null> {
   if (customRef) return customRef.userId
 
   // 2. Parse as number (direct user ID)
-  const numericId = parseInt(ref, 10)
+  const numericId = /^\d+$/.test(ref) ? Number(ref) : NaN
   if (!isNaN(numericId) && numericId > 0) {
     const user = await prisma.user.findUnique({ where: { id: numericId } })
     if (user) return numericId

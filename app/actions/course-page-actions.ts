@@ -6,6 +6,7 @@ import { CourseStatus, CourseSection, SectionVisibility } from '@/lib/course-pag
 import { courseEditorActor, assertCourseEditor, coursePageActionAccess } from '@/lib/course-page/permissions'
 import { requireAdminAction } from '@/lib/api-auth'
 import { createCoursePageFromTemplate, CourseTemplateKey } from '@/lib/course-page/templates'
+import { readOfferingDetails, offeringDetailsKey } from '@/lib/offerings/server'
 
 export async function getCoursePages() {
   try {
@@ -349,11 +350,19 @@ export async function publishCoursePage(coursePageId: string) {
     const snapshot = await buildCoursePageSnapshot(coursePageId, 'published')
     if (!snapshot) return { success: false, error: 'Không tìm thấy trang khóa học' }
     const version = await createCoursePageVersion(coursePageId, snapshot)
-    const page = await prisma.coursePage.update({
-      where: { id: coursePageId },
-      data: { status: 'published', publishedAt: new Date(), useTemplate: true },
+    const page = await prisma.$transaction(async tx => {
+      const saved = await tx.coursePage.update({ where: { id: coursePageId }, data: { status: 'published', publishedAt: new Date(), useTemplate: true } })
+      const course = await tx.course.findUnique({ where: { id_khoa: saved.slug }, select: { id:true,productGroup:true } })
+      if(course && course.productGroup !== 'COURSE') {
+        const key=offeringDetailsKey(course.id),details=await readOfferingDetails(course.id,tx)
+        const value={...details,salesLayout:'TEMPLATE'}
+        await tx.systemConfig.upsert({where:{key},create:{key,value},update:{value}})
+      }
+      return saved
     })
     revalidatePath(`/khoa-hoc/${page.slug}`)
+    revalidatePath(`/san-pham/${page.slug}`)
+    revalidatePath(`/dich-vu/${page.slug}`)
     return { success: true, versionNumber: version.versionNumber }
   } catch (error: any) {
     console.error('[CoursePage] Publish error:', error)

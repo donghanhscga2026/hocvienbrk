@@ -28,7 +28,7 @@ async function requestProjects(url: string, init: RequestInit = {}) {
   }
 }
 
-export default function WiCourseProjects({ courseId, compact = false }: { courseId: string; compact?: boolean }) {
+export default function WiCourseProjects({ courseId, compact = false, subjectLabel = 'khóa học' }: { courseId: string; compact?: boolean; subjectLabel?: string }) {
   const [projects, setProjects] = useState<Option[] | null>(null)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -86,7 +86,7 @@ export default function WiCourseProjects({ courseId, compact = false }: { course
       {projects && <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-600">Đã chọn: {selectedCount}</span>}
     </div>
     {!editing && <div className="flex flex-wrap gap-2">{projects?.filter(project => project.selected).map(project => <span key={project.slug} className="rounded-lg bg-brk-background px-3 py-2 text-sm text-brk-primary">{project.name}</span>)}{!selectedCount && <p className="text-sm text-gray-500">Chưa liên kết dự án.</p>}</div>}
-    {editing && <p className="text-sm text-gray-600">Chọn dự án để liên kết khóa học này.</p>}
+    {editing && <p className="text-sm text-gray-600">Chọn dự án để liên kết {subjectLabel} này. Bấm Lưu liên kết để áp dụng.</p>}
     {projects && editing && <ProjectMultiSelect options={projects} disabled={busy || needsReload} onChange={(slug, checked) => setProjects(current => current?.map(item => item.slug === slug ? { ...item, selected: checked } : item) || null)} />}
     {error && <p role="alert" className="text-sm text-red-700">{error}{needsReload && ' Vui lòng tải lại trước khi sửa tiếp.'}</p>}
     {message && <p role="status" className="text-sm text-green-700">{message}</p>}

@@ -26,7 +26,7 @@ const footerSchema = z.object({ logoUrl: url, description, note: description, co
 export const defaultHeaderMenu = [
   { label: 'Trang chủ', url: '/', visible: true },
   { label: 'Khóa học', url: '/khoa-hoc', visible: true },
-  { label: 'Sản phẩm', url: '/san-pham', visible: true },
+  { label: 'Sản phẩm số', url: '/san-pham', visible: true },
   { label: 'Dịch vụ', url: '/dich-vu', visible: true },
 ]
 const headerMenuSchema = z.array(z.object({ label: text, url: url.refine(Boolean, 'Nhập đường dẫn menu.'), visible: z.boolean() }).strict()).max(12).refine(items => new Set(items.map(item => item.url)).size === items.length, 'Đường dẫn menu trùng nhau.')

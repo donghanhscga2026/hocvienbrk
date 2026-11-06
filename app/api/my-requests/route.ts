@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const where = { userId: actor.id, ...(query.request ? { id: query.request } : {}) }
     // Chỉ trả lời công khai; không gửi resolution/history/email/phone của CRM.
     const [requests, total] = await prisma.$transaction([
-      prisma.crmRequest.findMany({ where, select: { id: true, source: true, history: true, content: true, publicReply: true, category: true, status: true, version: true, createdAt: true, updatedAt: true, lessonId: true, course: { select: { name_lop: true, id_khoa: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20, skip: (query.page - 1) * 20 }),
+      prisma.crmRequest.findMany({ where, select: { id: true, source: true, history: true, content: true, publicReply: true, category: true, status: true, version: true, createdAt: true, updatedAt: true, lessonId: true, course: { select: { name_lop: true, id_khoa: true, productGroup: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20, skip: (query.page - 1) * 20 }),
       prisma.crmRequest.count({ where }),
     ])
     return crmResponse({ requests: requests.map(({ history, ...row }) => ({ ...row, topic: requestTopic(row), thread: publicRequestThread(history) })), total })

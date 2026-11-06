@@ -12,7 +12,7 @@ export interface WalletUpdateParams {
 /**
  * Service quản lý ví Affiliate tập trung
  */
-export async function ensureWalletAndUpdate(userId: number, updates: WalletUpdateParams) {
+export async function ensureWalletAndUpdate(userId: number, updates: WalletUpdateParams, db: Prisma.TransactionClient = prisma) {
     const updateData: Prisma.AffiliateWalletUpdateInput = {}
     const createData: Prisma.AffiliateWalletCreateInput = { 
         user: { connect: { id: userId } },
@@ -34,7 +34,7 @@ export async function ensureWalletAndUpdate(userId: number, updates: WalletUpdat
         createData.points = updates.points
     }
 
-    return await prisma.affiliateWallet.upsert({
+    return await db.affiliateWallet.upsert({
         where: { userId },
         create: createData,
         update: updateData
@@ -51,8 +51,8 @@ export async function createTransactionLog(params: {
     description: string
     balanceBefore: number
     balanceAfter: number
-}) {
-    const wallet = await prisma.affiliateWallet.findUnique({
+}, db: Prisma.TransactionClient = prisma) {
+    const wallet = await db.affiliateWallet.findUnique({
         where: { userId: params.userId },
         select: { id: true }
     })
@@ -62,7 +62,7 @@ export async function createTransactionLog(params: {
         return null
     }
 
-    return await prisma.affiliateTransaction.create({
+    return await db.affiliateTransaction.create({
         data: {
             walletId: wallet.id,
             amount: params.amount,

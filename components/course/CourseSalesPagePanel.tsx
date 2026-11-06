@@ -11,7 +11,7 @@ import CourseTemplateWorkspace from './CourseTemplateWorkspace'
 import TemplatePreviewFrame from './TemplatePreviewFrame'
 
 type SavedPage = NonNullable<Awaited<ReturnType<typeof getCoursePage>>>
-type Props = { slug: string; courseName: string; courseId?: number; canEdit: boolean; compact?: boolean; onOpen?: () => void; active?: boolean }
+type Props = { slug: string; courseName: string; courseId?: number; canEdit: boolean; compact?: boolean; onOpen?: () => void; active?: boolean; onPublished?:()=>void; publicHref?: string }
 type Step = 1 | 2 | 3
 type Pane = 'overview' | 'content' | 'design' | 'settings' | 'code'
 const steps = ['Chọn giao diện', 'Chỉnh sửa trang', 'Kiểm tra & xuất bản'] as const
@@ -19,7 +19,7 @@ const button = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-x
 const primary = button + ' !bg-brk-primary !text-white'
 const card = 'rounded-2xl border border-brk-outline bg-white p-4 sm:p-6'
 
-export default function CourseSalesPagePanel({ slug, courseName, courseId, canEdit, compact = false, onOpen, active = true }: Props) {
+export default function CourseSalesPagePanel({ slug, courseName, courseId, canEdit, compact = false, onOpen, active = true, onPublished, publicHref }: Props) {
   const [loadAttempt, setLoadAttempt] = useState(0)
   const [page, setPage] = useState<SavedPage | null>(null), [ready, setReady] = useState(false)
   const [busy, setBusy] = useState(false), [editorBusy, setEditorBusy] = useState(false), [codeBusy, setCodeBusy] = useState(false)
@@ -145,6 +145,7 @@ export default function CourseSalesPagePanel({ slug, courseName, courseId, canEd
       const result = await publishCoursePage(page.id)
       if (!result.success) throw new Error(result.error)
       setPage({ ...page, status: 'published', useTemplate: true })
+      onPublished?.()
       setNotice('Đã xuất bản trang thành công. Bạn có thể mở trang công khai để xem.')
     } catch (error) { setError(error instanceof Error ? error.message : 'Không xuất bản được trang. Bản nháp vẫn được giữ.') }
     finally { setBusy(false) }
@@ -220,7 +221,7 @@ export default function CourseSalesPagePanel({ slug, courseName, courseId, canEd
       <div className="flex flex-wrap items-center gap-3">{step !== 1 ? <button type="button" disabled={locked} onClick={() => void goStep(step === 3 ? 2 : 1)} className={button}><ArrowLeft size={16} />{step === 3 ? 'Quay lại chỉnh sửa' : 'Quay lại'}</button> : page && <button type="button" disabled={locked} onClick={() => void goStep(2)} className={button}>Giữ giao diện hiện tại</button>}<span role="status" className="text-xs text-brk-muted">{locked ? 'Đang xử lý…' : dirty ? 'Có thay đổi chưa lưu' : 'Bước ' + step + ' / 3'}</span></div>
       <div className="flex flex-wrap gap-2">{step === 2 && <><button type="button" disabled={locked || !dirty} onClick={() => void saveCurrent()} className={button}>Lưu nháp</button><button type="button" disabled={locked} onClick={() => void goStep(3)} className={primary}>{dirty ? 'Lưu & tiếp tục kiểm tra' : 'Tiếp tục kiểm tra'}<ArrowRight size={16} /></button></>}{step === 1 && <button type="button" disabled={locked} onClick={() => void startEditing()} className={primary}>{source === 'preset' ? 'Chọn mẫu & tiếp tục' : 'Tiếp tục dán code'}<ArrowRight size={16} /></button>}{step === 3 && <button type="button" disabled={locked || dirty || !page} onClick={() => void publish()} className={primary}>Xuất bản trang</button>}</div>
     </footer>}
-    {ready && page?.status === 'published' && page.useTemplate && <Link href={'/khoa-hoc/' + encodeURIComponent(slug)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm text-brk-primary">Xem trang công khai ↗</Link>}
+    {ready && page?.status === 'published' && page.useTemplate && <Link href={publicHref || '/khoa-hoc/' + encodeURIComponent(slug)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm text-brk-primary">Xem trang công khai ↗</Link>}
     <dialog ref={dialog} aria-label="Xem trước mẫu có sẵn" onCancel={() => setPresetPreview(false)} className="m-auto max-h-[95dvh] w-[calc(100%_-_1rem)] max-w-6xl overflow-y-auto rounded-2xl bg-white p-4 backdrop:bg-black/50">{presetPreview && <><div className="mb-4 flex items-center justify-between gap-3"><h3 className="font-bold">Xem trước mẫu</h3><button type="button" onClick={() => setPresetPreview(false)} className={button}>Đóng</button></div><TemplatePreviewFrame src={'/tools/courses/templates/preview?system=' + encodeURIComponent(preset)} /></>}</dialog>
   </section>
 }

@@ -46,7 +46,7 @@ async function run() {
     assert.equal(document.querySelector('[aria-expanded]').getAttribute('aria-expanded'), 'false')
     assert.deepEqual(selectedIds(), [1, 99], 'Preserve inaccessible existing course links')
     await React.act(async () => document.querySelector('[aria-expanded]').click())
-    await input(document.querySelector('[aria-label="Tìm khóa để liên kết"]'), 'COURSE_20')
+    await input(document.querySelector('[aria-label="Tìm nội dung để liên kết"]'), 'COURSE_20')
     await React.act(async () => document.querySelector('[aria-label="Liên kết Khóa 20"]').click())
     assert.deepEqual(selectedIds(), [1, 99, 20])
     await React.act(async () => document.querySelector('label input').click())

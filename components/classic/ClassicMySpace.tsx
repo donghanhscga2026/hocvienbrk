@@ -7,6 +7,7 @@ import { getCoursesForProfile } from '@/app/actions/site-profile-actions'
 import { getCurrentSiteProfile } from '@/lib/site-profile/runtime'
 import { canTeach, spaceNavigation, type PersonalTool } from '@/lib/wi300/personal-space'
 import { FALLBACK_PROFILE } from '@/lib/db-fallback'
+import PurchasedOfferings from '@/components/offerings/PurchasedOfferings'
 
 /**
  * Bản classic (giautoandien) của trang cá nhân /my-space.
@@ -50,7 +51,7 @@ export default async function ClassicMySpace({ session, tab, status }: { session
 
   const courses = await getCoursesForProfile(safeProfile)
   const courseById = new Map((Array.isArray(courses) ? courses : []).map((course: any) => [course.id, course]))
-  const myEnrollments = (enrollments as any[]).filter(e => courseById.has(e.courseId))
+  const myEnrollments = (enrollments as any[]).filter(e => courseById.has(e.courseId) && (!courseById.get(e.courseId).productGroup || courseById.get(e.courseId).productGroup === 'COURSE'))
   const active = myEnrollments.filter(e => e.status === 'ACTIVE')
   const completed = myEnrollments.filter(e => e.status === 'COMPLETED')
   const pending = myEnrollments.filter(e => e.status !== 'ACTIVE' && e.status !== 'COMPLETED')
@@ -143,7 +144,8 @@ export default async function ClassicMySpace({ session, tab, status }: { session
             </section>
           )}
 
-          {activeTab !== 'home' && activeTab !== 'learning' && activeTab !== 'teaching' && activeGroup && (
+          {(activeTab === 'products' || activeTab === 'services') && <PurchasedOfferings userId={userId} group={activeTab === 'products' ? 'DIGITAL' : 'SERVICE'} />}
+          {activeTab !== 'home' && activeTab !== 'learning' && activeTab !== 'teaching' && activeTab !== 'products' && activeTab !== 'services' && activeGroup && (
             <section>
               {activeTab === 'affiliate' && <p className="mb-5 max-w-3xl leading-7 text-brk-muted">Chương trình cộng tác viên: chia sẻ link giới thiệu và theo dõi hoa hồng của bạn.</p>}
               {itemCards(activeGroup)}

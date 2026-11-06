@@ -162,7 +162,7 @@ export default async function RootLayout({
     // The proxy overwrites this header. Only public entry pages defer account UI;
     // protected/personal pages retain the existing server-provided session.
     const path = (await headers()).get('x-wi300-pathname')
-    const session = path === '/' || path === '/khoa-hoc' ? undefined : await getSession()
+    const session = path === '/' || path === '/khoa-hoc' || path === '/san-pham' || path === '/dich-vu' ? undefined : await getSession()
     const theme = websiteTheme(brand.palette.primary, brand.palette.background, brand.palette)
     // Bảng màu riêng lấy từ server, không dùng lựa chọn theme đã lưu của web cũ.
     return <html lang="vi" data-website-theme="light" data-site-variant="wi300" style={{ ...theme.style, ...appearanceStyle(brand.appearance || defaultAppearance) }}><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website accountAssistant={false} assistantToast={false} attentionHighlight={{ config: DEFAULT_ATTENTION_CONFIG, items: [] }}><Wi300BrandProvider brand={brand}><PwaInstallProvider><Wi300Shell>{children}</Wi300Shell></PwaInstallProvider></Wi300BrandProvider></Providers></body></html>

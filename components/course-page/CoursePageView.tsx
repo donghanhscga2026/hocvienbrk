@@ -11,6 +11,9 @@ import { CoursePage } from '@/lib/course-page/types'
 import { checkEnrollmentStatusAction } from '@/app/actions/course-actions'
 import { useDomainBrand } from '@/components/website/DomainShell'
 import { mapFormDataToContact } from '@/lib/course-page/import-review'
+import OfferingConsultation from '@/components/offerings/OfferingConsultation'
+import { isQuoteService } from '@/lib/offerings/service'
+import { offeringWorkspaceHref } from '@/lib/offerings/shared'
 
 // Nội dung trang vẫn SSR; chỉ các cửa sổ tương tác được tải theo nhu cầu.
 const modalLoading = () => <div role="status" className="fixed bottom-4 left-1/2 z-[250] -translate-x-1/2 rounded-xl bg-white px-5 py-3 text-sm shadow-lg">Đang mở…</div>
@@ -60,6 +63,8 @@ export default function CoursePageView({
 
   const effectiveEnrollment = localEnrollment || enrollment
   const isEnrolled = effectiveEnrollment?.status === 'ACTIVE'
+  const isOffering = course.productGroup && course.productGroup !== 'COURSE'
+  const quoteOffering = course.productGroup === 'SERVICE' && isQuoteService(course.offeringDetails || {})
 
   // ── Scroll progress ───────────────────────────────────────────────────────
   const [scrollProgress, setScrollProgress] = React.useState(0)
@@ -95,8 +100,9 @@ export default function CoursePageView({
   // ── Action handler (called by sections) ──────────────────────────────────
   const handleAction = (actionType: string, target?: string, extra?: Record<string, string>) => {
     if (actionType === 'open_registration') {
+      if (quoteOffering) { document.getElementById('offering-sale-details')?.scrollIntoView({behavior:'smooth'}); return }
       if (isEnrolled) {
-        router.push(`/courses/${course.id_khoa}/learn`)
+        router.push(isOffering ? offeringWorkspaceHref(course.productGroup,course.id_khoa) : `/courses/${course.id_khoa}/learn`)
         return
       }
       // Dữ liệu khách đã điền trên form của trang nhập: giữ để điền sẵn, không lưu DB.
@@ -182,15 +188,16 @@ export default function CoursePageView({
           onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-hover)')}
           onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent)')}
         >
-          {isEnrolled ? 'Vào học ngay' : coursePage.navigation.ctaText}
+          {quoteOffering ? 'Gửi yêu cầu tư vấn' : isEnrolled ? isOffering ? 'Mở nội dung' : 'Vào học ngay' : coursePage.navigation.ctaText}
         </button>
         <div className="flex items-center justify-end gap-1"><NotificationBell /><CrmRequestButton courseId={course.id} courseTitle={course.name_lop} signedIn={!!session?.user} compact /></div>
         </div>
       </nav>}
       {wi300Breadcrumb}
+      {isOffering && <div className={importedLayout || wi300Breadcrumb ? '' : 'pt-[calc(80px_+_env(safe-area-inset-top))]'}><section id="offering-sale-details" className="mx-auto max-w-7xl scroll-mt-24 space-y-3 rounded-xl border bg-white p-5 text-slate-900"><h2 className="text-xl font-bold">{course.name_lop}</h2><p className="text-2xl font-bold">{quoteOffering?'Liên hệ báo giá':course.phi_coc>0?course.phi_coc.toLocaleString('vi-VN')+'đ':'Miễn phí'}</p>{quoteOffering?<OfferingConsultation slug={course.id_khoa} questions={course.offeringDetails?.service?.questions||[]} signedIn={userId!=null}/>:<button type="button" onClick={()=>handleAction('open_registration')} className="min-h-12 rounded-xl bg-emerald-700 px-5 font-semibold text-white">{isEnrolled?'Mở nội dung':course.productGroup==='SERVICE'?'Đăng ký dịch vụ':'Mua / nhận sản phẩm'}</button>}</section></div>}
 
       {/* Page sections */}
-      <div className={importedLayout || wi300Breadcrumb ? '' : 'pt-[calc(80px_+_env(safe-area-inset-top))]'}>
+      <div className={isOffering || importedLayout || wi300Breadcrumb ? '' : 'pt-[calc(80px_+_env(safe-area-inset-top))]'}>
         <SectionRenderer
           projectLabels={projectLabels}
           sections={coursePage.sections}
@@ -229,7 +236,7 @@ export default function CoursePageView({
       )}
 
       {/* ── Registration Flow Modal ──────────────────────────────────────── */}
-      {showRegistration && (
+      {showRegistration && !quoteOffering && (
         <RegistrationFlowModal
           course={course}
           session={session}

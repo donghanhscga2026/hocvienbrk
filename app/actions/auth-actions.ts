@@ -91,11 +91,7 @@ export async function registerUser(prevState: any, formData: FormData) {
                 const affData = JSON.parse(decodeURIComponent(affRefCookie.value));
                 if (affData.r) {
                     rawRefCode = affData.r;
-                    refId = parseInt(affData.r);
-                    if (isNaN(refId) || refId <= 0) {
-                        const resolved = await resolveRefToUserId(affData.r);
-                        refId = resolved;
-                    }
+                    refId = await resolveRefToUserId(String(affData.r));
                 }
             } catch (e) {
                 console.error("[Affiliate] Lỗi parse cookie aff_ref:", e);
@@ -104,8 +100,7 @@ export async function registerUser(prevState: any, formData: FormData) {
         
         // Fallback: Nếu không có cookie hợp lệ, lấy từ form ẩn
         if (!refId || isNaN(refId)) {
-            const parsedRef = parseInt(referrerId || "0");
-            refId = isNaN(parsedRef) ? 0 : parsedRef;
+            refId = referrerId ? await resolveRefToUserId(referrerId) : 0;
         }
 
         if(websiteDomain && !websiteDomain.affiliate) { refId=0;rawRefCode='' }

@@ -4,6 +4,7 @@ import { toTitleCase } from '@/lib/utils/text-format';
 import { requireCourseAccessApi } from '@/lib/course/permissions';
 import { resolveCourseCategoryName } from '@/lib/course/category';
 import { resolveImageUrl } from '@/lib/image-utils';
+import { readOfferingDetails } from '@/lib/offerings/server';
 
 // ✅ GET - TEACHER chỉ thấy course có teacherId = userId
 export async function GET(
@@ -36,7 +37,7 @@ export async function GET(
     const { denied } = await requireCourseAccessApi(course.teacherId);
     if (denied) return denied;
 
-    return NextResponse.json(course);
+    return NextResponse.json({ ...course, offeringDetails: await readOfferingDetails(course.id) });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

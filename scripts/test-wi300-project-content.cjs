@@ -73,11 +73,10 @@ async function run() {
     '@/lib/prisma': { __esModule: true, default: {} },
     '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => ({ name: 'Wi300' }) },
     '@/lib/site-profile/presentation': { getPresentationBrand: async () => ({ name: 'Wi300' }) },
-    '@/lib/wi300/project-service': { readProjects: async () => [{ ...grow, published: true, offerings: [offering] }, { ...grow, slug: 'wi-hidden', published: false, offerings: [{ ...offering, name: 'Private draft' }] }] },
-    // Nhóm mục hàng của giảng viên trên trang Sản phẩm/Dịch vụ (Cách 3 — GĐ1) cần thêm 2 module
-    // phía máy chủ; trong môi trường kiểm tra chúng được giả lập để danh sách nhóm rỗng.
-    '@/lib/site-profile/runtime': { getCurrentSiteProfile: async () => null, getCourseWhereForProfile: () => ({}) },
-    '@/lib/wi300/course-visibility': { wi300CoursePreferences: async () => new Map(), wi300CourseWhere: () => ({}) },
+    '@/lib/wi300/public-projects': { getPublicProjects: async () => [{ ...grow, published: true, offerings: [offering] }] },
+    // This suite isolates project offerings; the separate offering catalog has its own regression suites.
+    '@/lib/offerings/server': { getOfferingCatalog: async () => [] },
+    '@/components/offerings/OfferingCatalog': { __esModule: true, default: () => null },
   }).default
   const html = require('react-dom/server').renderToStaticMarkup(await publicCatalog({ kind: 'SERVICE' }))
   assert.ok(html.includes('Website service')); assert.ok(!html.includes('Private draft'))

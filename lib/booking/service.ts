@@ -8,6 +8,7 @@
  * (đúng khuôn CRM intake đang chạy production).
  */
 import prisma from '@/lib/prisma'
+import { assertServiceBooking } from '@/lib/offerings/booking'
 import {
   addDaysVN,
   generateDaySlots,
@@ -253,6 +254,9 @@ export async function confirmBooking(input: ConfirmInput) {
     }
     const session = await tx.bookingSession.findUnique({ where: { id: booking.sessionId } })
     if (!session) throw new BookingError('Phiên hẹn không còn tồn tại.', 404)
+    try { await assertServiceBooking(tx, session, input.userId) } catch (error) {
+      throw new BookingError(error instanceof Error ? error.message : 'Không thể đặt lịch dịch vụ.', 403)
+    }
 
     const fields = parseFormSchema(session.formSchema)
     const errors = validateFormAnswers(fields, input.answers || {})

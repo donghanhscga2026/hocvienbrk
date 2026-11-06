@@ -262,22 +262,19 @@ export async function rejectPaymentAction(enrollmentId: number, reason: string) 
 
     if (isAdmin) {
       // ADMIN: xóa luôn Payment + LessonProgress + Enrollment
-      await prisma.$transaction([
-        prisma.payment.deleteMany({ where: { enrollmentId } }),
-        prisma.lessonProgress.deleteMany({ where: { enrollmentId } }),
-        prisma.enrollment.delete({ where: { id: enrollmentId } })
-      ])
+      await prisma.$transaction(async tx => {
+        await tx.payment.deleteMany({ where: { enrollmentId } })
+        await tx.lessonProgress.deleteMany({ where: { enrollmentId } })
+        await tx.enrollment.delete({ where: { id: enrollmentId } })
+        if (enrollment.course.productGroup === 'DIGITAL') await (await import('@/lib/offerings/combo')).syncComboInTransaction(tx, enrollmentId)
+      }, { timeout: 20000 })
     } else {
       // TEACHER: chỉ đổi Enrollment -> REJECTED + xóa Payment
-      await prisma.$transaction([
-        prisma.enrollment.update({
-          where: { id: enrollmentId },
-          data: { status: 'REJECTED' }
-        }),
-        prisma.payment.delete({
-          where: { enrollmentId }
-        })
-      ])
+      await prisma.$transaction(async tx => {
+        await tx.enrollment.update({ where: { id: enrollmentId }, data: { status: 'REJECTED' } })
+        await tx.payment.delete({ where: { enrollmentId } })
+        if (enrollment.course.productGroup === 'DIGITAL') await (await import('@/lib/offerings/combo')).syncComboInTransaction(tx, enrollmentId)
+      }, { timeout: 20000 })
     }
 
     revalidatePath('/')
@@ -480,11 +477,16 @@ export async function revertToPendingAction(enrollmentIds: number[]) {
     for (const enrollmentId of enrollmentIds) {
       const enrollment = await prisma.enrollment.findUnique({
         where: { id: enrollmentId },
-        include: { course: { select: { name_lop: true, type: true, id_khoa: true } } }
+        include: { course: { select: { name_lop: true, type: true, id_khoa: true, productGroup: true } } }
       })
       if (!enrollment) continue
 
       // Guard: Nếu khóa SYS, kiểm tra BRK đã active chưa
+      const settled = await prisma.orderItem.findFirst({ where: { enrollmentId, order: { status: { in: ['PAID', 'CANCELLED', 'REFUNDED'] } } }, select: { id: true } })
+      if (settled || ['CANCELLED', 'REJECTED'].includes(enrollment.status)) {
+        errors.push({ enrollmentId, reason: 'Đăng ký đã có đơn thanh toán hoặc đã hủy. Không chuyển về chờ; hãy xử lý hủy đơn riêng.' })
+        continue
+      }
       if (enrollment.course.type === 'SYS') {
         const brkTree = await prisma.systemTree.findFirst({
           where: { courseId: enrollment.courseId }
@@ -514,17 +516,14 @@ export async function revertToPendingAction(enrollmentIds: number[]) {
       }
 
       // Giữ nguyên updatedAt cũ (Prisma @updatedAt sẽ ghi đè bằng now nếu không truyền)
-      await prisma.$transaction([
-        prisma.enrollment.update({
-          where: { id: enrollmentId },
-          data: { status: 'PENDING', updatedAt: enrollment.updatedAt }
-        }),
-        prisma.payment.updateMany({
-          where: { enrollmentId, status: 'VERIFIED' },
-          data: { status: 'PENDING', verifiedAt: null, verifyMethod: null }
-        })
-      ])
-
+      await prisma.$transaction(async tx => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'enrollment-order:' + enrollmentId}))`
+        const paidOrder = await tx.orderItem.findFirst({ where: { enrollmentId, order: { status: { in: ['PAID', 'CANCELLED', 'REFUNDED'] } } }, select: { id: true } })
+        if (paidOrder) throw new Error('Đơn vừa được thanh toán. Tải lại trước khi đổi trạng thái.')
+        await tx.enrollment.update({ where: { id: enrollmentId }, data: { status: 'PENDING', updatedAt: enrollment.updatedAt } })
+        await tx.payment.updateMany({ where: { enrollmentId, status: 'VERIFIED' }, data: { status: 'PENDING', verifiedAt: null, verifyMethod: null } })
+        if (enrollment.course.productGroup === 'DIGITAL') await (await import('@/lib/offerings/combo')).syncComboInTransaction(tx, enrollmentId)
+      }, { timeout: 20000 })
       count++
     }
 
@@ -682,21 +681,18 @@ export async function cancelEnrollmentAction(enrollmentIds: number[]) {
     for (const enrollmentId of enrollmentIds) {
       const enrollment = await prisma.enrollment.findUnique({
         where: { id: enrollmentId },
-        include: { course: { select: { name_lop: true } } }
+        include: { course: { select: { name_lop: true, productGroup: true } } }
       })
       if (!enrollment) continue
 
-      await prisma.$transaction([
-        prisma.enrollment.update({
-          where: { id: enrollmentId },
-          data: { status: 'CANCELLED' }
-        }),
-        prisma.payment.updateMany({
-          where: { enrollmentId },
-          data: { status: 'CANCELLED' }
-        })
-      ])
-
+      await prisma.$transaction(async tx => {
+        if (enrollment.course.productGroup === 'SERVICE') await (await import('@/lib/offerings/quotes')).cancelQuotesForEnrollment(tx, enrollment)
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'enrollment-order:' + enrollmentId}))`
+        await tx.enrollment.update({ where: { id: enrollmentId }, data: { status: 'CANCELLED' } })
+        await tx.payment.updateMany({ where: { enrollmentId }, data: { status: 'CANCELLED' } })
+        await (await import('@/lib/affiliate/unified-commission')).reverseCommissionForEnrollment(enrollmentId, `Admin hủy đăng ký #${enrollmentId}`, tx)
+        if (enrollment.course.productGroup === 'DIGITAL') await (await import('@/lib/offerings/combo')).syncComboInTransaction(tx, enrollmentId)
+      }, { timeout: 20000 })
       const { logActivity } = await import('@/lib/activity-logger')
       await logActivity({
         userId: enrollment.userId,
@@ -704,14 +700,6 @@ export async function cancelEnrollmentAction(enrollmentIds: number[]) {
         detail: `Admin hủy đăng ký: ${enrollment.course.name_lop}`,
         metadata: { enrollmentId, adminId: parseInt(session.user.id) }
       })
-
-      // Affiliate v2: thu hồi hoa hồng của đơn hàng liên quan (nếu đã từng tính)
-      try {
-        const { reverseCommissionForEnrollment } = await import('@/lib/affiliate/unified-commission')
-        await reverseCommissionForEnrollment(enrollmentId, `Admin hủy đăng ký #${enrollmentId}`)
-      } catch (revErr) {
-        console.error('[CancelEnrollment] Reverse commission error:', revErr)
-      }
 
       count++
     }

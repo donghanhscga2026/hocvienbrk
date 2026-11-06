@@ -4,6 +4,7 @@ import { buildTxFingerprint, TX_FINAL_STATES } from '@/lib/payment-dedup';
 import prisma from '@/lib/prisma';
 import { isTestAccount } from '@/lib/test-account';
 import { processEnrollmentActivation } from '@/lib/enrollment-activation';
+import { readPurchase } from '@/lib/offerings/purchase-snapshot';
 
 function extractInfoFromDescription(description: string) {
     let phone = null;
@@ -24,7 +25,7 @@ function extractInfoFromDescription(description: string) {
     }
 
     let courseCode = null;
-    const courseCodeMatch = description.match(/COC[\s\._]*(\w+)/i);
+    const courseCodeMatch = description.match(/COC[\s\._]*([A-Z0-9_-]+)/i);
     if (courseCodeMatch) {
         courseCode = courseCodeMatch[1].toUpperCase();
     } else {
@@ -179,9 +180,18 @@ export async function POST(req: NextRequest) {
 
         const teacherId = bankAccount.userId;
 
+        // Quote references do not use the course COC/HV format. Match them first,
+        // after webhook authentication and the existing cross-channel dedup claim.
+        if (/SQ[A-F0-9]{20}/i.test(String(content))) {
+            const { matchQuoteTransfer } = await import('@/lib/offerings/quotes');
+            const result = await matchQuoteTransfer(prisma, { content: String(content), amount: Number(transferAmount), receipt: 'BANK:' + fingerprint, bankAccountId: bankAccount.id });
+            await prisma.processedTransaction.update({ where: { id: txRecord.id }, data: { status: 'PROCESSED', reason: result?.commissionPending ? 'Thanh toán đã xác nhận; cần thử lại tính hoa hồng trong báo giá.' : null } });
+            return NextResponse.json({ success: true, matched: 1 });
+        }
+
         // 2. Trích xuất thông tin từ nội dung chuyển khoản
         const parsed = extractInfoFromDescription(String(content));
-        if (!parsed.userId && !parsed.phone) {
+        if (parsed.userId == null && !parsed.phone) {
             const reason = `Không trích xuất được số điện thoại hoặc mã HV từ nội dung: ${content}`;
             console.log(`❌ [SEPAY] ${reason}`);
             await markUnmatched(reason);
@@ -200,6 +210,7 @@ export async function POST(req: NextRequest) {
                         id_khoa: true,
                         phi_coc: true,
                         name_lop: true,
+                        teacherBankAccountId: true,
                         autoVerifyConfig: { select: { alternativeCodes: true } }
                     }
                 },
@@ -215,6 +226,7 @@ export async function POST(req: NextRequest) {
         }
 
         let matched = 0;
+        const candidates: typeof pendingEnrollments = [];
 
         // 4. Tìm kiếm Enrollment phù hợp và kích hoạt
         for (const enrollment of pendingEnrollments) {
@@ -222,11 +234,11 @@ export async function POST(req: NextRequest) {
 
             const userPhone = enrollment.user.phone?.replace(/\D/g, '') || '';
             const emailPhone = parsed.phone || '';
-            const userIdMatch = parsed.userId && parsed.userId === enrollment.userId;
+            const userIdMatch = parsed.userId != null && parsed.userId === enrollment.userId;
             const phoneMatch = userPhone && emailPhone && userPhone.includes(emailPhone);
             const normalizeCode = (s: string) => s.replace(/[^A-Z0-9]/gi, '').toUpperCase();
 
-            let courseCodeMatch = parsed.courseCode && normalizeCode(enrollment.course.id_khoa).includes(normalizeCode(parsed.courseCode));
+            let courseCodeMatch = parsed.courseCode && normalizeCode(enrollment.course.id_khoa) === normalizeCode(parsed.courseCode);
 
             if (!courseCodeMatch && parsed.courseCode) {
                 const altCodes: string[] = enrollment.course.autoVerifyConfig?.alternativeCodes
@@ -237,9 +249,19 @@ export async function POST(req: NextRequest) {
                 }
             }
 
-            const amountMatch = transferAmount >= (enrollment.phi_coc || enrollment.course.phi_coc || 0);
+            const amountMatch = Number(transferAmount) >= (enrollment.phi_coc ?? enrollment.course.phi_coc ?? 0);
+            const snapshot = await readPurchase(prisma, enrollment.id);
+            const bankMatch = (snapshot ? snapshot.bank?.id : enrollment.course.teacherBankAccountId) === bankAccount.id
+                && (!snapshot || snapshot.bank?.accountNumber === String(accountNumber));
 
-            if (!((parsed.userId ? userIdMatch : phoneMatch) && courseCodeMatch && amountMatch)) continue;
+            if (!((parsed.userId != null ? userIdMatch : phoneMatch) && courseCodeMatch && amountMatch && bankMatch)) continue;
+            candidates.push(enrollment);
+        }
+        if (candidates.length > 1) {
+            await markUnmatched('Nhiều đăng ký khớp cùng giao dịch. Cần đối soát thủ công.');
+            return NextResponse.json({ success: true, matched: 0 }, { status: 200 });
+        }
+        for (const enrollment of candidates) {
 
             // Tiến hành kích hoạt
             console.log(`✅ [SEPAY] Khớp giao dịch! Tiến hành duyệt cho HV ${enrollment.userId}, khóa ${enrollment.course.id_khoa}`);

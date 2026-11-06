@@ -66,6 +66,10 @@ export async function processEnrollmentActivation(options: ActivationOptions): P
     return { success: false, error: 'Enrollment already active' }
   }
 
+  if (['CANCELLED', 'REJECTED'].includes(enrollment.status)) {
+    return { success: false, error: 'Đăng ký đã hủy hoặc bị từ chối. Không thể kích hoạt bằng giao dịch thanh toán.' }
+  }
+
   // Mốc kích hoạt bất biến, dùng chung cho BRK, Payment và Enrollment.
   const finalActivatedAt = customActivatedAt || enrollment.activatedAt || new Date()
 
@@ -129,20 +133,19 @@ export async function processEnrollmentActivation(options: ActivationOptions): P
     })
   }
 
-  const [payment, updatedEnrollment] = await prisma.$transaction([
-    prisma.payment.upsert({
-      where: { enrollmentId },
-      create: { enrollmentId, ...paymentData },
-      update: paymentData
-    }),
-    prisma.enrollment.update({
-      where: { id: enrollmentId },
-      data: {
-        status: 'ACTIVE',
-        activatedAt: finalActivatedAt
-      }
-    })
-  ])
+  const combo = enrollment.course.productGroup === 'DIGITAL' && (await (await import('@/lib/offerings/server')).readOfferingDetails(enrollment.courseId)).kind === 'COMBO'
+  const [payment, updatedEnrollment, activationOrder] = await prisma.$transaction(async tx => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'enrollment-order:' + enrollmentId}))`
+    const current = await tx.enrollment.findUnique({ where: { id: enrollmentId } })
+    if (!current || ['CANCELLED', 'REJECTED'].includes(current.status)) throw new Error('Đăng ký đã hủy hoặc bị từ chối.')
+    const payment = await tx.payment.upsert({ where: { enrollmentId }, create: { enrollmentId, ...paymentData }, update: paymentData })
+    const updatedEnrollment = await tx.enrollment.update({ where: { id: enrollmentId }, data: { status: 'ACTIVE', activatedAt: finalActivatedAt } })
+    if (combo) await (await import('@/lib/offerings/combo')).syncComboInTransaction(tx, enrollmentId)
+    const order = enrollment.course.type !== 'SYS'
+      ? await (await import('@/lib/affiliate/unified-commission')).createOrderForEnrollment(enrollmentId, tx) : null
+    if (order && !order.success) throw new Error(order.error || 'Không ghi nhận được đơn hàng.')
+    return [payment, updatedEnrollment, order] as const
+  }, { timeout: 20000 })
 
   // ════════════════════════════════════════════════════════════
   // STEP 3: YTB sync (teacher 327)
@@ -164,14 +167,9 @@ export async function processEnrollmentActivation(options: ActivationOptions): P
   let commissionResult: any = null
   if (enrollment.course.type !== 'SYS') {
     try {
-      const {
-        createOrderForEnrollment,
-        processOrderCommission,
-        resolveAffiliateIdFromCookie
-      } = await import('@/lib/affiliate/unified-commission')
-      const { affiliateId, refCode } = await resolveAffiliateIdFromCookie()
-      const orderRes: any = await createOrderForEnrollment(enrollmentId, { affiliateId, refCode })
-      if (orderRes.success && orderRes.orderId) {
+      const { processOrderCommission } = await import('@/lib/affiliate/unified-commission')
+      const orderRes = activationOrder
+      if (orderRes?.success && orderRes.orderId) {
         commissionResult = await processOrderCommission(orderRes.orderId)
       } else {
         commissionResult = orderRes

@@ -68,7 +68,8 @@ async function run() {
   const navLinks = [...document.querySelectorAll('header nav a')].map(a => a.getAttribute('href'))
   assert.deepEqual(navLinks, ['/', '/khoa-hoc', '/san-pham', '/dich-vu'])
   assert.ok(navLinks.every(href => !href.includes('#')))
-  assert.equal(document.querySelector('header a[href="/my-space"]').textContent, 'Không gian của tôi')
+  assert.equal(document.querySelector('header a[href="/my-space"]').textContent, 'Góc của tôi')
+  assert.equal(document.querySelector('header a[href="/my-space"]').getAttribute('aria-label'), 'Góc của tôi', 'Visible and accessible labels match')
   assert.equal(document.querySelector('header details'), null)
   assert.equal(document.querySelector('header button[aria-label="Chia sẻ link affiliate"]'), null)
   user = { id: '42', name: 'Lucy', role: 'STUDENT' }
@@ -174,7 +175,7 @@ async function run() {
   global.fetch = async () => ({ ok: true, json: async () => ({ tools: [] }) })
   try {
     await act(async () => root.render(React.createElement(SpaceModule.default, { courses: courses.map(c => ({ ...c, name_lop: `Khóa ${c.id}` })), enrollments: rows, userId: 1, userPhone: null, accountError: false })))
-    assert.match(document.querySelector('h1').textContent, /Học tập/)
+    assert.match(document.querySelector('h1').textContent, /Đã đăng ký & Đã mua/)
     assert.equal(document.querySelectorAll('article').length, 4)
     assert.deepEqual([...document.querySelectorAll('[aria-label="Trạng thái học tập"] [role="tab"]')].map(h => h.textContent), ['Đang học (4)', 'Đã hoàn thành (2)', 'Chờ xử lý (1)'])
     await act(async () => document.getElementById('learning-tab-completed').click())
@@ -182,7 +183,7 @@ async function run() {
     await act(async () => document.getElementById('learning-tab-pending').click())
     assert.equal(document.querySelectorAll('article').length, 1)
     assert.equal(document.querySelector('a[href="/my-space?tab=pages"]'), null)
-    assert.equal(document.querySelector('a[href="/my-space?tab=affiliate"]').textContent, 'Cộng tác viên')
+    assert.equal(document.querySelector('a[href="/my-space?tab=business"]').textContent, 'Kinh doanh')
   } finally { global.fetch = savedFetch }
   pathname = '/tools/posts'
   await act(async () => renderShell())

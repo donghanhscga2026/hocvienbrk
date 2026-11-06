@@ -11,6 +11,7 @@ export default function SettingsPage() {
 
       <div className="p-4 max-w-lg mx-auto">
         <div className="space-y-4 mt-4">
+          <Link href="/tools/settings/app-frame-domains" className="block rounded-2xl border border-gray-100 bg-white p-6 hover:border-green-300 hover:shadow-md"><h2 className="text-lg font-bold text-gray-900">Tên miền App được phép nhúng</h2><p className="mt-2 text-sm text-gray-500">Admin Wi300 quản lý tên miền preview App, không cần deploy lại</p></Link>
           <Link
             href="/tools/settings/theme"
             className="block bg-white rounded-2xl border border-gray-100 p-6 hover:border-amber-300 hover:shadow-md transition-all"

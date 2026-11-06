@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 2. Thử parse as number (direct user ID)
-    const numericId = parseInt(refKey, 10)
+    const numericId = /^\d+$/.test(refKey) ? Number(refKey) : NaN
     if (!isNaN(numericId) && numericId > 0) {
       const userById = await prisma.user.findUnique({
         where: { id: numericId },

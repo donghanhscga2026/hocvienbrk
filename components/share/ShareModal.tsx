@@ -4,6 +4,7 @@ import React, { useState, useEffect, useSyncExternalStore } from 'react'
 import { X, Link2, MessageCircle, Send, Check } from 'lucide-react'
 import { FacebookBrandIcon as Facebook } from '@/components/icons/brands'
 import { useDomainBrand } from '@/components/website/DomainShell'
+import { groupInfo, offeringHref, productGroup } from '@/lib/offerings/shared'
 
 const subscribeMounted = () => () => {}
 const clientMounted = () => true
@@ -15,6 +16,7 @@ interface ShareModalProps {
   course: {
     id_khoa: string
     name_lop: string
+    productGroup?: string
   }
   affiliateCode: string | null
   profileSlug?: string | null
@@ -54,8 +56,8 @@ export default function ShareModal({ isOpen, onClose, course, affiliateCode, pro
     const shareUrl = (() => {
         if (shareType === 'course' && course?.id_khoa) {
             return affiliateCode
-                ? `${baseUrl}/khoa-hoc/${encodeURIComponent(course.id_khoa)}?ref=${encodeURIComponent(affiliateCode)}`
-                : `${baseUrl}/khoa-hoc/${encodeURIComponent(course.id_khoa)}`
+                ? `${baseUrl}${offeringHref(course.productGroup, course.id_khoa)}?ref=${encodeURIComponent(affiliateCode)}`
+                : `${baseUrl}${offeringHref(course.productGroup, course.id_khoa)}`
         }
         if (profileSlug) {
             return affiliateCode
@@ -69,7 +71,7 @@ export default function ShareModal({ isOpen, onClose, course, affiliateCode, pro
 
   // Title tùy theo shareType
   const shareTitle = shareType === 'course'
-    ? `Khóa học: ${course.name_lop} - ${siteName}`
+    ? `${groupInfo[productGroup(course.productGroup)].label}: ${course.name_lop} - ${siteName}`
     : `Trang chủ - ${siteName}`
 
   const encodedUrl = encodeURIComponent(shareUrl)

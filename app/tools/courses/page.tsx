@@ -9,6 +9,7 @@ import dynamic from 'next/dynamic'
 import CourseActionsMenu from '@/components/course/CourseActionsMenu'
 import CourseExportButton from '@/components/course/CourseExportButton'
 import ManagementWorkspace from '@/components/layout/ManagementWorkspace'
+import OfferingManagementTabs from '@/components/offerings/OfferingManagementTabs'
 import MainHeader from '@/components/layout/MainHeader'
 import type { ActivitySummary } from '@/components/course/CourseManagementActivity'
 
@@ -30,6 +31,7 @@ export default function ToolsCoursesPage() {
             <MainHeader title="Quản lý khóa học" toolSlug="courses" />
 
             <ManagementWorkspace active="courses">
+                <OfferingManagementTabs active="COURSE" />
                 <div><h1 className="text-2xl font-bold text-brk-primary">Quản lý khóa học</h1><p className="mt-2 text-sm text-[#617066]">Quản lý nội dung, học viên và hoạt động của từng khóa. Chọn mẫu Sales Page trong mục Trang bán khóa học.</p></div>
 
                 <div className="mt-4 flex gap-2 rounded-2xl border border-[#E2E8DC] bg-white p-1.5 shadow-sm">
@@ -71,7 +73,6 @@ function CoursesTab() {
 
     const [search, setSearch] = useState('')
     const [filterStatus, setFilterStatus] = useState('ALL')
-    const [filterGroup, setFilterGroup] = useState('ALL')
     const [filterCategory, setFilterCategory] = useState('ALL')
     const [filterProject, setFilterProject] = useState('ALL')
     const [projects, setProjects] = useState<{ slug: string; name: string; courseIds: number[] }[]>([])
@@ -114,7 +115,7 @@ function CoursesTab() {
             // Chỉ phản hồi của lựa chọn mới nhất được cập nhật danh sách.
             if (requestId !== courseRequest.current) return
             if (!res.success) throw new Error('Không tải được khóa học. Vui lòng thử lại hoặc đăng nhập lại.')
-            setCourses(res.courses || [])
+            setCourses((res.courses || []).filter((course: any) => !course.productGroup || course.productGroup === 'COURSE'))
             setIsAdmin(res.isAdmin || false)
             setVisibilityScope(res.visibilityScope || "shared")
             setCurrentUserId(res.userId ?? null)
@@ -195,7 +196,6 @@ function CoursesTab() {
                     || (course.teacher?.name || '').toLowerCase().includes(q)
                 if (!match) return false
             }
-            if (filterGroup !== 'ALL' && (course.productGroup || 'COURSE') !== filterGroup) return false
             if (filterStatus === 'ACTIVE' && !course.status) return false
             if (filterStatus === 'HIDDEN' && course.status) return false
             const catName = course.courseCategory?.name || course.category || 'Khác'
@@ -203,7 +203,7 @@ function CoursesTab() {
             if (filterProject !== 'ALL' && !projects.find(project => project.slug === filterProject)?.courseIds.includes(course.id)) return false
             return true
         })
-    }, [courses, search, filterStatus, filterGroup, filterCategory, filterProject, projects])
+    }, [courses, search, filterStatus, filterCategory, filterProject, projects])
 
     const totalPages = Math.max(1, Math.ceil(filteredCourses.length / 10))
     const currentPage = Math.min(page, totalPages)
@@ -335,7 +335,7 @@ function CoursesTab() {
                 <label className="space-y-1 text-xs text-gray-600">Giảng viên<select aria-label="Lọc giảng viên" disabled={!isAdmin} value={isAdmin ? filterTeacher : 'SELF'} onChange={event => setFilterTeacher(event.target.value)} className="block min-h-11 w-full rounded-xl border border-brk-outline bg-white px-3 text-sm disabled:bg-gray-50"><option value="SELF">Khóa học của tôi</option>{isAdmin && <option value="ALL">Tất cả</option>}{isAdmin && teacherOptions.filter(teacher => teacher.id !== currentUserId).map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}</select></label>
                 <label className="space-y-1 text-xs text-gray-600">Danh mục<select aria-label="Lọc danh mục" value={filterCategory} onChange={event => setFilterCategory(event.target.value)} className="block min-h-11 w-full rounded-xl border border-brk-outline bg-white px-3 text-sm"><option value="ALL">Tất cả</option>{categories.map(category => <option key={category} value={category}>{category}</option>)}</select></label>
                 <label className="space-y-1 text-xs text-gray-600">Dự án<select aria-label="Lọc theo dự án" value={filterProject} onChange={event => setFilterProject(event.target.value)} className="block min-h-11 w-full rounded-xl border border-brk-outline bg-white px-3 text-sm"><option value="ALL">Tất cả</option>{projects.map(project => <option key={project.slug} value={project.slug}>{project.name}</option>)}</select></label>
-                <label className="space-y-1 text-xs text-gray-600">Hiển thị<select aria-label="Lọc hiển thị" value={filterStatus} onChange={event => setFilterStatus(event.target.value)} className="block min-h-11 w-full rounded-xl border border-brk-outline bg-white px-3 text-sm"><option value="ALL">Tất cả</option><option value="ACTIVE">Đang hiển thị</option><option value="HIDDEN">Đang ẩn</option></select></label><label className="space-y-1 text-xs text-gray-600">Nhóm sản phẩm<select aria-label="Lọc theo nhóm sản phẩm" value={filterGroup} onChange={event => setFilterGroup(event.target.value)} className="block min-h-11 w-full rounded-xl border border-brk-outline bg-white px-3 text-sm"><option value="ALL">Tất cả</option><option value="COURSE">Khóa học</option><option value="DIGITAL">Sản phẩm số</option><option value="SERVICE">Dịch vụ</option></select></label>
+                <label className="space-y-1 text-xs text-gray-600">Hiển thị<select aria-label="Lọc hiển thị" value={filterStatus} onChange={event => setFilterStatus(event.target.value)} className="block min-h-11 w-full rounded-xl border border-brk-outline bg-white px-3 text-sm"><option value="ALL">Tất cả</option><option value="ACTIVE">Đang hiển thị</option><option value="HIDDEN">Đang ẩn</option></select></label>
             </div>
             {(search || filterStatus !== 'ALL' || filterCategory !== 'ALL' || filterProject !== 'ALL' || (isAdmin && filterTeacher !== 'SELF')) && <button type="button" onClick={() => { setSearch(''); setFilterStatus('ALL'); setFilterCategory('ALL'); setFilterProject('ALL'); if (isAdmin) setFilterTeacher('SELF') }} className="min-h-10 text-sm text-brk-primary">Xóa bộ lọc</button>}
 

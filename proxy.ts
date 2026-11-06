@@ -29,7 +29,7 @@ const RESERVED_PATHS = new Set([
     'tca', 'ktc', 'khoa-hoc', 'land', 'page', 'du-an', 'ho-so-hoc-tap'
 ])
 
-const RESOURCE_PREFIXES = new Set(['khoa-hoc', 'land', 'page', 'du-an'])
+const RESOURCE_PREFIXES = new Set(['khoa-hoc', 'san-pham', 'dich-vu', 'land', 'page', 'du-an'])
 
 // Lớp bảo vệ mặc định (defense-in-depth) cho các nhóm route quản trị/nhạy cảm.
 // Đây là lớp chặn thứ 2 — mỗi route/action bên trong vẫn PHẢI tự kiểm tra quyền
@@ -181,7 +181,9 @@ export default async function proxy(request: NextRequest, event: NextFetchEvent)
         if(platformSlugCandidate(path) && shouldBlockUnknownSlug(path, await publishedCustomPageSlugs())) return new NextResponse('Not found',{status:404,headers:{'Cache-Control':'no-store','Content-Type':'text/plain; charset=utf-8'}})
         if(path.startsWith('/api/') && !ADMIN_ONLY_PREFIXES.some(p=>path.startsWith(p))) return NextResponse.next()
         if(needsAuthLayer(path)) return (proxyHandler as unknown as NextMiddleware)(request,event)
-        return handlePlatformRequest(request, null)
+        const response = handlePlatformRequest(request, null)
+        if(process.env.SITE_VARIANT?.trim().toLowerCase()==='wi300') return (await import('@/lib/wi300/app-frame-response')).appFrameResponse(response,path)
+        return response
     }
     if(path.startsWith('/.well-known/giautoandien-domain/')) return NextResponse.next()
     const domainStarted=performance.now()

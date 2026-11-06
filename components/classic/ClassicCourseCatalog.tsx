@@ -54,7 +54,7 @@ export default async function ClassicCourseCatalog() {
     }
   }
 
-  const safeCourses = Array.isArray(courses) ? courses : []
+  const safeCourses = Array.isArray(courses) ? courses.filter(course => !course.productGroup || course.productGroup === 'COURSE') : []
   // Nhóm theo danh mục giống hệt cách trang chủ classic gom khóa học.
   const groupedOtherCourses = safeCourses.reduce((acc: any[], course: any) => {
     const category = course.courseCategory?.name || course.category || 'Khác'

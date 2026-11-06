@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma"
 import { logActivity } from "@/lib/activity-logger"
+import { orderGratitude } from '@/lib/offerings/purchase-snapshot'
 
 /**
  * CHẠY LẠI hoa hồng cho một khóa học (recalculate) — theo yêu cầu vận hành
@@ -141,7 +142,7 @@ export async function recalculateCourseCommissions(opts: {
     if (report.changes.length < CHANGE_CAP) report.changes.push(ch)
   }
 
-  function expectedLines(o: (typeof orders)[number]): ExpectedLine[] {
+  function expectedLines(o: (typeof orders)[number], ref: number | null): ExpectedLine[] {
     const lines: ExpectedLine[] = []
     // TRỰC TIẾP — chỉ các item thuộc khóa đang chạy lại
     if (o.affiliateId) {
@@ -159,7 +160,6 @@ export async function recalculateCourseCommissions(opts: {
     }
     // TRI ÂN — trên toàn bộ đơn (khớp engine), loại trừ item mà người được
     // tri ân là giảng viên
-    const ref = o.buyer?.referrerId
     if (ref) {
       let base = 0
       for (const it of o.items) {
@@ -216,7 +216,7 @@ export async function recalculateCourseCommissions(opts: {
     }
     report.ordersScanned += 1
 
-    const expected = expectedLines(o)
+    const expected = expectedLines(o, await orderGratitude(prisma, o))
 
     // Các dòng hoa hồng hiện có của đơn (mọi đường liên kết)
     const enrollmentIds = o.items.map(i => i.enrollmentId).filter((x): x is number => x != null)
