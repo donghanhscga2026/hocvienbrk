@@ -421,7 +421,7 @@ export default function PaymentsPage() {
               )
             })}
             {selectedCount > 0 && (
-              <span className="flex items-center text-[10px] text-indigo-600 font-bold shrink-0 ml-auto">
+              <span className="flex items-center text-[11px] text-indigo-600 font-bold shrink-0 ml-auto">
                 Đã chọn {selectedCount}
               </span>
             )}
@@ -429,12 +429,12 @@ export default function PaymentsPage() {
 
           {/* ROW 2: Date Range Filter */}
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] text-gray-500 font-bold shrink-0">📅 Khoảng thời gian:</span>
+            <span className="text-[11px] text-gray-500 font-bold shrink-0">📅 Khoảng thời gian:</span>
             {quickRanges.map(q => (
               <button
                 key={q.value}
                 onClick={() => { setDateMode('quick'); setQuickRange(q.value); loadPayments() }}
-                className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all shrink-0 ${
+                className={`px-2 py-2 rounded-lg text-xs font-bold transition-all shrink-0 ${
                   dateMode === 'quick' && quickRange === q.value
                     ? 'bg-gray-900 text-white'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -445,7 +445,7 @@ export default function PaymentsPage() {
             ))}
             <button
               onClick={() => setDateMode('custom')}
-              className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all shrink-0 ${
+              className={`px-2 py-2 rounded-lg text-xs font-bold transition-all shrink-0 ${
                 dateMode === 'custom' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -457,19 +457,19 @@ export default function PaymentsPage() {
                   type="date"
                   value={customFrom}
                   onChange={e => setCustomFrom(e.target.value)}
-                  className="px-2 py-1 rounded-lg text-[10px] font-semibold border border-gray-200 bg-white text-gray-700 outline-none focus:border-indigo-400"
+                  className="px-2 py-2 rounded-lg text-xs font-semibold border border-gray-200 bg-white text-gray-700 outline-none focus:border-indigo-400"
                 />
-                <span className="text-[10px] text-gray-400">→</span>
+                <span className="text-[11px] text-gray-400">→</span>
                 <input
                   type="date"
                   value={customTo}
                   onChange={e => setCustomTo(e.target.value)}
-                  className="px-2 py-1 rounded-lg text-[10px] font-semibold border border-gray-200 bg-white text-gray-700 outline-none focus:border-indigo-400"
+                  className="px-2 py-2 rounded-lg text-xs font-semibold border border-gray-200 bg-white text-gray-700 outline-none focus:border-indigo-400"
                 />
                 <button
                   onClick={loadPayments}
                   disabled={dateLoading || !customFrom || !customTo}
-                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-all shrink-0"
+                  className="px-2.5 py-2 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-all shrink-0"
                 >
                   {dateLoading ? '...' : 'Tải'}
                 </button>
@@ -479,7 +479,7 @@ export default function PaymentsPage() {
               <button
                 onClick={loadPayments}
                 disabled={dateLoading}
-                className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gray-800 text-white hover:bg-gray-900 disabled:opacity-50 transition-all shrink-0"
+                className="px-2.5 py-2 rounded-lg text-xs font-bold bg-gray-800 text-white hover:bg-gray-900 disabled:opacity-50 transition-all shrink-0"
               >
                 {dateLoading ? '...' : '🔄 Tải lại'}
               </button>
@@ -491,7 +491,7 @@ export default function PaymentsPage() {
             <button
               disabled={scanning || gmailStatus.penalized}
               onClick={handleManualScan}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all shrink-0 ${
+              className={`flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs font-bold transition-all shrink-0 ${
                 gmailStatus.penalized
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm'
@@ -509,7 +509,7 @@ export default function PaymentsPage() {
               <select
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value as SortField)}
-                className="text-[11px] font-semibold text-gray-700 bg-transparent border-none outline-none cursor-pointer pr-1 appearance-none"
+                className="text-xs font-semibold text-gray-700 bg-transparent border-none outline-none cursor-pointer pr-1 appearance-none"
               >
                 <option value="createdAt">📅 Đăng ký</option>
                 <option value="activatedAt">📅 Kích hoạt</option>
@@ -530,7 +530,7 @@ export default function PaymentsPage() {
               {payments.length > 0 && (
                 <button
                   onClick={selectedCount === payments.length ? clearSelection : selectAll}
-                  className="flex items-center gap-1 text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-md transition-colors shrink-0"
+                  className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-semibold bg-indigo-50 hover:bg-indigo-100 px-2 py-2 rounded-md transition-colors shrink-0"
                 >
                   {selectedCount === payments.length ? (
                     <CheckSquare className="w-3 h-3" />
@@ -547,7 +547,7 @@ export default function PaymentsPage() {
                   <button
                     onClick={() => handleRevertToPending(Array.from(selectedIds))}
                     disabled={bulkLoading}
-                    className="flex items-center gap-1 px-2.5 py-1 bg-yellow-50 border border-yellow-200 text-yellow-700 hover:bg-yellow-100 rounded-lg font-bold text-[10px] transition-colors disabled:opacity-50 shrink-0"
+                    className="flex items-center gap-1 px-2.5 py-2 bg-yellow-50 border border-yellow-200 text-yellow-700 hover:bg-yellow-100 rounded-lg font-bold text-xs transition-colors disabled:opacity-50 shrink-0"
                   >
                     {bulkLoading ? (
                       <div className="w-3 h-3 border-2 border-yellow-400/30 border-t-yellow-600 rounded-full animate-spin" />
@@ -559,7 +559,7 @@ export default function PaymentsPage() {
                   <button
                     onClick={() => handleCancel(Array.from(selectedIds))}
                     disabled={bulkLoading}
-                    className="flex items-center gap-1 px-2.5 py-1 bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 rounded-lg font-bold text-[10px] transition-colors disabled:opacity-50 shrink-0"
+                    className="flex items-center gap-1 px-2.5 py-2 bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 rounded-lg font-bold text-xs transition-colors disabled:opacity-50 shrink-0"
                   >
                     {bulkLoading ? (
                       <div className="w-3 h-3 border-2 border-red-400/30 border-t-red-600 rounded-full animate-spin" />
@@ -625,16 +625,16 @@ export default function PaymentsPage() {
                           )}
                         </button>
                       )}
-                      <span className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${statusColors[payment.status]}`}>
+                      <span className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-bold shrink-0 ${statusColors[payment.status]}`}>
                         <StatusIcon className="w-3 h-3" />
                         {statusLabels[payment.status]}
                       </span>
-                      <span className="text-[10px] text-gray-400 font-medium">#{payment.id}</span>
-                      <span className="text-[10px] text-gray-300 truncate">
+                      <span className="text-[11px] text-gray-400 font-medium">#{payment.id}</span>
+                      <span className="text-[11px] text-gray-300 truncate">
                         {payment.enrollment.course.id_khoa}
                       </span>
                     </div>
-                    <span className="text-[10px] text-gray-400 shrink-0 ml-1">
+                    <span className="text-[11px] text-gray-400 shrink-0 ml-1">
                       {new Date(payment.createdAt).toLocaleDateString('vi-VN')}
                     </span>
                   </div>
@@ -758,7 +758,7 @@ export default function PaymentsPage() {
                             </div>
                           </div>
                           {totalDeducted > 0 && (
-                            <div className="pt-1.5 border-t border-orange-100/50 text-[10px] text-green-700">
+                            <div className="pt-1.5 border-t border-orange-100/50 text-[11px] text-green-700">
                               💳 Đã trừ ví (MBV/VNĐ): <b>-{totalDeducted.toLocaleString()}đ</b>
                             </div>
                           )}
@@ -766,7 +766,7 @@ export default function PaymentsPage() {
                       )
                     })()}
                     {(payment.bankName || payment.accountNumber) && (
-                      <div className="pt-1.5 border-t border-orange-100/50 text-[10px] text-slate-600">
+                      <div className="pt-1.5 border-t border-orange-100/50 text-[11px] text-slate-600">
                         🏦 <span className="font-medium">{payment.bankName}</span>
                         {payment.accountNumber && ` - STK: ${payment.accountNumber}`}
                       </div>
@@ -793,7 +793,7 @@ export default function PaymentsPage() {
                         type="datetime-local"
                         value={enrollmentDates[enrollmentId] ?? ''}
                         onChange={e => setEnrollmentDates(prev => ({ ...prev, [enrollmentId]: e.target.value }))}
-                        className="w-full text-[11px] border border-blue-200 bg-white rounded-lg px-2 py-1.5 text-gray-800 font-medium focus:outline-none focus:ring-1.5 focus:ring-blue-400 focus:border-blue-400"
+                        className="w-full text-xs border border-blue-200 bg-white rounded-lg px-2 py-2 text-gray-800 font-medium focus:outline-none focus:ring-1.5 focus:ring-blue-400 focus:border-blue-400"
                         placeholder="Để trống = dùng thời điểm bấm Duyệt"
                       />
                       <p className="text-[8px] text-blue-500 mt-0.5 leading-tight">
@@ -845,7 +845,7 @@ export default function PaymentsPage() {
                     <div className="mb-2.5">
                       <button
                         onClick={() => setSelectedQR(payment.id)}
-                        className="flex items-center justify-center gap-1.5 w-full py-2 bg-indigo-50 border border-indigo-150 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-800 transition-colors rounded-lg text-[11px] font-bold"
+                        className="flex items-center justify-center gap-1.5 w-full py-2 bg-indigo-50 border border-indigo-150 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-800 transition-colors rounded-lg text-xs font-bold"
                       >
                         <QrCode className="w-3.5 h-3.5" />
                         QR Chuyển Khoản
@@ -903,7 +903,7 @@ export default function PaymentsPage() {
                             <button
                               onClick={() => handleRevertToPending([payment.enrollment.id])}
                               disabled={bulkLoading}
-                              className="flex items-center gap-1 px-2 py-1.5 bg-yellow-50 border border-yellow-200 text-yellow-700 hover:bg-yellow-100 rounded-lg font-bold text-[10px] transition-colors disabled:opacity-50"
+                              className="flex items-center gap-1 px-2 py-2 bg-yellow-50 border border-yellow-200 text-yellow-700 hover:bg-yellow-100 rounded-lg font-bold text-xs transition-colors disabled:opacity-50"
                               title="Xóa dữ liệu MFC thành viên, giữ nguyên hệ thống"
                             >
                               <RotateCcw className="w-3 h-3" />
@@ -913,7 +913,7 @@ export default function PaymentsPage() {
                               <button
                                 onClick={() => handleResetSystem(payment.enrollment.course.id)}
                                 disabled={bulkLoading}
-                                className="flex items-center gap-1 px-2 py-1.5 bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 rounded-lg font-bold text-[10px] transition-colors disabled:opacity-50"
+                                className="flex items-center gap-1 px-2 py-2 bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 rounded-lg font-bold text-xs transition-colors disabled:opacity-50"
                                 title="Xóa toàn bộ dữ liệu MFC hệ thống, rebuild thủ công"
                               >
                                 <Ban className="w-3 h-3" />
@@ -926,7 +926,7 @@ export default function PaymentsPage() {
                           <button
                             onClick={() => handleCancel([payment.enrollment.id])}
                             disabled={bulkLoading}
-                            className="flex items-center gap-1 px-2 py-1.5 bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 rounded-lg font-bold text-[10px] transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1 px-2 py-2 bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 rounded-lg font-bold text-xs transition-colors disabled:opacity-50"
                           >
                             <Ban className="w-3 h-3" />
                             Hủy
@@ -990,11 +990,11 @@ export default function PaymentsPage() {
                   </div>
                   <div>
                     <span className="text-gray-400 block text-[9px] font-bold uppercase">Nội dung CK</span>
-                    <span className="font-mono font-bold text-indigo-600 break-all text-[10px]">{standardContent}</span>
+                    <span className="font-mono font-bold text-indigo-600 break-all text-[11px]">{standardContent}</span>
                   </div>
                 </div>
                 {mbvDeducted > 0 && (
-                  <div className="mt-2 bg-green-50 border border-green-200 rounded-lg px-2.5 py-1.5 text-[10px] space-y-0.5">
+                  <div className="mt-2 bg-green-50 border border-green-200 rounded-lg px-2.5 py-1.5 text-[11px] space-y-0.5">
                     <div className="flex justify-between">
                       <span className="text-gray-400 font-bold uppercase">Giá gốc</span>
                       <span className="font-bold text-gray-800 line-through">{p.enrollment.course.phi_coc.toLocaleString()}đ</span>

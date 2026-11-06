@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
-import { BookOpen, BriefcaseBusiness, ChevronDown, GraduationCap, Home, LayoutGrid, LogOut, Package, Settings, Wallet, LifeBuoy, MessageCircle, Handshake, Users } from 'lucide-react'
+import { BookOpen, BriefcaseBusiness, ChevronDown, GraduationCap, Home, LayoutGrid, LogOut, Menu, Package, Settings, Wallet, LifeBuoy, MessageCircle, Handshake, Users, X } from 'lucide-react'
 import { useWi300Brand } from './Wi300BrandContext'
 import { signOutPushCleanup } from '@/lib/web-push-client'
 import { canTeach } from '@/lib/wi300/personal-space'
@@ -24,13 +24,14 @@ export default function Wi300Header() {
   const { data: session, status } = useSession()
   const path = usePathname()
   const [showShare, setShowShare] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const { open: openWallet, isOpen: walletOpen } = useMbwDashboard()
   const userId = session?.user?.id != null ? String(session.user.id) : null
   const accountRef = useRef<HTMLDetailsElement>(null)
   const closeAccount = () => { if (accountRef.current) accountRef.current.open = false }
 
   // Dropdown native hỗ trợ bàn phím; đóng khi chuyển trang hoặc bấm bên ngoài.
-  useEffect(() => { closeAccount() }, [path, session?.user?.id])
+  useEffect(() => { closeAccount(); setMenuOpen(false) }, [path, session?.user?.id])
   useEffect(() => {
     const closeOutside = (event: PointerEvent) => {
       if (event.target instanceof Node && !accountRef.current?.contains(event.target)) closeAccount()
@@ -55,13 +56,14 @@ export default function Wi300Header() {
           <Image src={brand.logoUrl} alt={`${brand.name} — Liên minh 300 doanh nghiệp số, WIPA cố vấn`} width={2089} height={753} loading="eager" fetchPriority="high" unoptimized className="h-auto w-24 object-contain min-[360px]:w-32 sm:w-40 xl:w-32 2xl:w-40" />
         </picture>
       </Link>
-      <nav aria-label="Điều hướng chính" className="col-span-2 row-start-2 flex w-full min-w-0 items-center gap-1 overflow-x-auto py-1 xl:w-auto xl:flex-wrap xl:justify-start xl:overflow-visible">
+      <nav aria-label="Điều hướng chính" className="col-span-2 row-start-2 hidden w-full min-w-0 items-center gap-1 overflow-x-auto py-1 lg:flex lg:w-auto lg:justify-start xl:flex-wrap xl:overflow-visible">
         {links.filter(item => websiteLinkVisible(item.href, brand.appearance)).map(({ href, label, icon: Icon }) => {
           const selected = path === href || (['/khoa-hoc', '/san-pham', '/dich-vu'].includes(href) && path.startsWith(href + '/'))
           return <Link key={href} href={href} target={href.startsWith('https://') ? '_blank' : undefined} rel={href.startsWith('https://') ? 'noopener noreferrer' : undefined} aria-current={selected ? 'page' : undefined} className={`inline-flex min-h-11 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-xl px-2.5 text-[11px] font-semibold sm:px-2.5 sm:text-sm lg:flex-none ${selected ? 'bg-brk-background text-brk-primary' : 'text-brk-muted hover:bg-brk-background hover:text-brk-primary'}`}><Icon className="h-4 w-4" aria-hidden="true" />{label}</Link>
         })}
       </nav>
       <div className="flex shrink-0 items-center justify-end gap-0.5 sm:gap-2">
+        <button type="button" aria-label="Menu điều hướng" aria-expanded={menuOpen} aria-controls="wi300-mobile-menu" onClick={() => setMenuOpen(value => !value)} className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl hover:bg-brk-background lg:hidden">{menuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}</button>
         {status !== 'loading' && <Wi300SpaceMenu role={session?.user?.role || 'guest'} actorKey={userId} route={path} onOpen={closeAccount} />}
         {/* Cụm hành động nhanh cạnh avatar; không gọi API chia sẻ cho tới khi mở. */}
         {userId != null && <><button type="button" aria-label="Chia sẻ link affiliate" title="Chia sẻ link affiliate" onClick={() => setShowShare(true)} className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl hover:bg-brk-background"><Image src="/Share_Link_3d.png" alt="" width={32} height={32} /></button><NotificationBell /></>}
@@ -83,6 +85,14 @@ export default function Wi300Header() {
         </details> : <Link href="/login" className="inline-flex min-h-11 items-center rounded-xl bg-brk-primary px-3 text-xs font-semibold text-white sm:text-sm">Tài khoản</Link>}
       </div>
     </div>
+    {menuOpen && <nav id="wi300-mobile-menu" aria-label="Điều hướng chính" className="border-t border-brk-outline px-3 py-2 lg:hidden">
+      <ul className="space-y-1">
+        {links.filter(item => websiteLinkVisible(item.href, brand.appearance)).map(({ href, label, icon: Icon }) => {
+          const selected = path === href || (['/khoa-hoc', '/san-pham', '/dich-vu'].includes(href) && path.startsWith(href + '/'))
+          return <li key={href}><Link href={href} target={href.startsWith('https://') ? '_blank' : undefined} rel={href.startsWith('https://') ? 'noopener noreferrer' : undefined} aria-current={selected ? 'page' : undefined} onClick={() => setMenuOpen(false)} className={`flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold ${selected ? 'bg-brk-background text-brk-primary' : 'text-brk-muted hover:bg-brk-background hover:text-brk-primary'}`}><Icon className="h-4 w-4" aria-hidden="true" />{label}</Link></li>
+        })}
+      </ul>
+    </nav>}
   </header>
     {showShare && <ShareModal isOpen onClose={() => setShowShare(false)} course={{ id_khoa: '', name_lop: brand.name }} affiliateCode={userId} shareType="header" siteName={brand.name} />}
     {walletOpen && <WalletPopup title="Ví Wi" />}

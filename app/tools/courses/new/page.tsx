@@ -916,9 +916,9 @@ function CreateCourseContent() {
                         </div>
                     </div>
                         <input aria-label="Tìm bài giảng" value={lessonSearch} onChange={event => setLessonSearch(event.target.value)} placeholder="Tìm theo tên hoặc thứ tự bài giảng…" className="min-h-11 w-full rounded-xl border border-brk-outline bg-white px-4 text-sm" />
-                        <div className="overflow-x-auto rounded-2xl border border-brk-outline bg-white"><div className="min-w-[700px]"><div className="grid grid-cols-[64px_minmax(0,1fr)_250px] gap-3 bg-gray-50 p-4 text-xs font-semibold text-gray-500"><span>Thứ tự</span><span>Bài giảng / Loại nội dung</span><span>Thao tác</span></div><div className="divide-y divide-brk-outline">
+                        <div className="rounded-2xl border border-brk-outline bg-white"><div><div className="hidden lg:grid grid-cols-[64px_minmax(0,1fr)_250px] gap-3 bg-gray-50 p-4 text-xs font-semibold text-gray-500"><span>Thứ tự</span><span>Bài giảng / Loại nội dung</span><span>Thao tác</span></div><div className="divide-y divide-brk-outline">
                             {sortedLessons.map((lesson: any) => (
-                                <div key={lesson.id} className="grid grid-cols-[64px_minmax(0,1fr)_250px] items-center gap-3 p-4">
+                                <div key={lesson.id} className="grid grid-cols-[40px_minmax(0,1fr)] items-start gap-3 p-4 lg:grid-cols-[64px_minmax(0,1fr)_250px] lg:items-center">
                                         <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-xs font-black font-mono">
                                             #{lesson.order}
                                         </div>
@@ -928,7 +928,7 @@ function CreateCourseContent() {
                                                 <Play className="w-3 h-3" /> {lesson.videoUrl ? 'Đã có Video' : 'Chưa có Video'}
                                             </div>
                                         </div>
-                                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                    <div className="col-span-2 flex flex-wrap items-center gap-2 shrink-0 lg:col-span-1">
                                         <button type="button" onClick={() => setAnnouncementLesson({ id: lesson.id, title: lesson.title })} className="min-h-11 px-3 rounded-xl bg-indigo-50 text-indigo-700 flex items-center gap-2 text-xs font-semibold">
                                             <Bell className="w-4 h-4" /> Thông báo học viên
                                         </button>

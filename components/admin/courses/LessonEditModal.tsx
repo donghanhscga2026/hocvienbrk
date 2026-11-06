@@ -92,12 +92,12 @@ export function LessonEditModal({ lesson, onClose, onSave, onDelete, presentatio
 
                     <div className="space-y-1.5">
                         <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Hình ảnh đính kèm</label>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                             <input
                                 type="text"
                                 value={imageUrl}
                                 onChange={(e) => setImageUrl(e.target.value)}
-                                className="flex-1 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
+                                className="min-w-0 flex-1 basis-48 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
                                 placeholder="https://... hoặc /uploads/lessons/..."
                             />
                             <label className="flex items-center gap-2 px-4 py-3 bg-blue-50 text-blue-600 rounded-2xl cursor-pointer hover:bg-blue-100 transition-all text-sm font-bold whitespace-nowrap">

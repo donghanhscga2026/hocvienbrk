@@ -55,7 +55,7 @@ export default async function AdminAffiliatePayoutsPage() {
                         Không có yêu cầu nào đang chờ
                     </div>
                 ) : (
-                    <div className="bg-white rounded-lg shadow overflow-hidden">
+                    <div className="bg-white rounded-lg shadow overflow-x-auto">
                         <table className="w-full">
                             <thead className="bg-gray-50">
                                 <tr>
@@ -141,7 +141,7 @@ export default async function AdminAffiliatePayoutsPage() {
                         Chưa có yêu cầu nào được xử lý
                     </div>
                 ) : (
-                    <div className="bg-white rounded-lg shadow overflow-hidden">
+                    <div className="bg-white rounded-lg shadow overflow-x-auto">
                         <table className="w-full">
                             <thead className="bg-gray-50">
                                 <tr>
