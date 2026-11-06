@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { isTeachingRole } from '@/lib/auth/roles'
 import { createCourseAction, getTeachersAction } from '@/app/actions/course-actions'
 import { updateCourseAction, updateLessonAction, deleteLessonAction } from '@/app/actions/admin-actions'
-import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle2, AlertCircle, List, Play, Edit2, X, FileSpreadsheet, Download, Save, Trash2, Plus, Mail, ArrowUp, ArrowDown, Bell } from 'lucide-react'
+import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle2, AlertCircle, List, ListVideo, Play, Edit2, X, FileSpreadsheet, Download, Save, Trash2, Plus, Mail, ArrowUp, ArrowDown, Bell } from 'lucide-react'
 import Link from 'next/link'
 import ManagementWorkspace from '@/components/layout/ManagementWorkspace'
 import MainHeader from '@/components/layout/MainHeader'
@@ -989,6 +989,9 @@ function CreateCourseContent() {
                                             </div>
                                         </div>
                                     <div className="col-span-2 flex flex-wrap items-center gap-2 shrink-0 lg:col-span-1">
+                                        <Link href={`/tools/courses/${courseId}/segments?lesson=${lesson.id}`} className="min-h-11 px-3 rounded-xl bg-teal-50 text-teal-700 flex items-center gap-2 text-xs font-semibold">
+                                            <ListVideo className="w-4 h-4" /> Đoạn bài giảng
+                                        </Link>
                                         <button type="button" onClick={() => setAnnouncementLesson({ id: lesson.id, title: lesson.title })} className="min-h-11 px-3 rounded-xl bg-indigo-50 text-indigo-700 flex items-center gap-2 text-xs font-semibold">
                                             <Bell className="w-4 h-4" /> Thông báo học viên
                                         </button>

@@ -466,6 +466,8 @@ model Lesson {
   course           Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
   comments         LessonComment[]
   progress         LessonProgress[]
+  segments         LessonSegment[]
+  transcriptCues   TranscriptCue[]
 
   @@unique([courseId, order])
 }
@@ -494,6 +496,7 @@ model Enrollment {
   referrer       User?            @relation("EnrollmentReferrer", fields: [referrerId], references: [id])
    user           User             @relation("StudentEnrollment", fields: [userId], references: [id], onDelete: Cascade)
    lessonProgress LessonProgress[]
+   segmentProgress SegmentProgress[]
    payment        Payment?
    gieoHatSettlements GieoHatSettlement[]
    hiddenFromGifts Boolean @default(false)
@@ -774,6 +777,67 @@ model LessonProgress {
   @@index([enrollmentId])
   @@index([lessonId])
   @@index([status])
+}
+
+/// Thư viện bài giảng thông minh (GĐ1) — đoạn nội dung trong 1 video của 1 bài
+/// học. Lớp dữ liệu phủ lên Lesson.videoUrl, không thay đổi định dạng cũ.
+/// status: DRAFT = AI/hệ thống đề xuất hoặc GV đang soạn, học viên chưa thấy;
+/// PUBLISHED = GV đã duyệt, học viên thấy và bấm để seek tới đoạn.
+model LessonSegment {
+  id         String   @id @default(cuid())
+  lessonId   String
+  videoIndex Int      @default(0)
+  startSec   Int
+  endSec     Int
+  title      String
+  summary    String?
+  keywords   String[] @default([])
+  order      Int
+  status     String   @default("DRAFT")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  lesson     Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  cues       TranscriptCue[]
+  progress   SegmentProgress[]
+
+  @@index([lessonId, order])
+  @@index([lessonId, videoIndex, status])
+}
+
+/// Từng câu/cụm lời nói trong video (transcript) — pipeline STT/AI ghi vào,
+/// tìm kiếm không dấu dùng cột textNorm đã bỏ dấu + hạ thường.
+model TranscriptCue {
+  id         BigInt         @id @default(autoincrement())
+  lessonId   String
+  videoIndex Int            @default(0)
+  startSec   Float
+  endSec     Float
+  text       String
+  textNorm   String
+  segmentId  String?
+  createdAt  DateTime       @default(now())
+  lesson     Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  segment    LessonSegment? @relation(fields: [segmentId], references: [id], onDelete: SetNull)
+
+  @@index([lessonId, videoIndex, startSec])
+  @@index([segmentId])
+}
+
+/// Tiến độ xem theo đoạn của 1 enrollment (song song LessonProgress theo bài).
+model SegmentProgress {
+  id           Int           @id @default(autoincrement())
+  enrollmentId Int
+  segmentId    String
+  watchedSec   Float         @default(0)
+  completed    Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  enrollment   Enrollment    @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  segment      LessonSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, segmentId])
+  @@index([enrollmentId])
+  @@index([segmentId])
 }
 
 model LessonComment {
