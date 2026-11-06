@@ -143,6 +143,7 @@ async function run() {
   process.env.SEPAY_WEBHOOK_API_KEY = 'fixture-key'
   let matched = 0, transactionStatus
   const hook = load('app/api/webhooks/sepay/route.ts', {
+    'server-only': {},
     '@/lib/prisma': { __esModule: true, default: { userBankAccount: { findFirst: async () => ({ id: 3, userId: 7, bankName: 'MB', webhookApiKeyHash: null }) }, processedTransaction: { findFirst: async () => null, create: async () => ({ id: 1 }), update: async ({ data }) => { transactionStatus = data.status } } } },
     '@/lib/test-account': {}, '@/lib/enrollment-activation': {},
     '@/lib/offerings/quotes': { matchQuoteTransfer: async (db, input) => { matched++; assert.equal(input.bankAccountId, 3); assert.equal(input.amount, 6000000); assert(input.receipt.startsWith('BANK:')); return { updated: true } } },

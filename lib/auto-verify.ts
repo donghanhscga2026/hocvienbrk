@@ -40,7 +40,7 @@ function parseSacombankEmail(htmlContent: string) {
   }
 
   let courseCode = null;
-  const courseCodeMatch = description.match(/COC[\s\._]*(\w+)/i);
+  const courseCodeMatch = description.match(/COC[\s\._]*([A-Z0-9_-]+)/i);
   if (courseCodeMatch) {
     courseCode = courseCodeMatch[1].toUpperCase();
   } else {
@@ -278,7 +278,7 @@ export async function processPaymentEmails() {
           }
 
           const parsed = parseBankEmail(body, fromAddress, subject);
-          if (!parsed || !parsed.amount || (!parsed.userId && !parsed.phone)) continue;
+          if (!parsed || !parsed.amount || (parsed.userId == null && !parsed.phone)) continue;
 
           // Xác định config khớp email này để lấy đúng tên ngân hàng (đa GV, đa ngân hàng)
           const fromLower = fromAddress.toLowerCase();
@@ -341,11 +341,11 @@ export async function processPaymentEmails() {
           try {
             const userPhone = enrollment.user.phone?.replace(/\D/g, '') || '';
             const emailPhone = parsed.phone || '';
-            const userIdMatch = parsed.userId && parsed.userId === enrollment.userId;
+            const userIdMatch = parsed.userId != null && parsed.userId === enrollment.userId;
             const phoneMatch = userPhone && emailPhone && userPhone.includes(emailPhone);
             const normalizeCode = (s: string) => s.replace(/[^A-Z0-9]/gi, '').toUpperCase();
             
-            let courseCodeMatch = parsed.courseCode && normalizeCode(enrollment.course.id_khoa).includes(normalizeCode(parsed.courseCode));
+            let courseCodeMatch = parsed.courseCode && normalizeCode(enrollment.course.id_khoa) === normalizeCode(parsed.courseCode);
             
             // Hỗ trợ mã khoa lịch sử (lấy từ alternativeCodes trong AutoVerifyConfig)
             if (!courseCodeMatch && parsed.courseCode) {
@@ -357,9 +357,9 @@ export async function processPaymentEmails() {
               }
             }
 
-            const amountMatch = parsed.amount >= (enrollment.phi_coc || enrollment.course.phi_coc || 0);
+            const amountMatch = parsed.amount >= (enrollment.phi_coc ?? enrollment.course.phi_coc ?? 0);
 
-            if (!((parsed.userId ? userIdMatch : phoneMatch) && courseCodeMatch && amountMatch)) continue;
+            if (!((parsed.userId != null ? userIdMatch : phoneMatch) && courseCodeMatch && amountMatch)) continue;
 
             // Use shared activation wrapper — handles Payment upsert, BRK activation, Enrollment → ACTIVE, commission, YTB sync
             const { processEnrollmentActivation } = await import("@/lib/enrollment-activation");

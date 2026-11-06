@@ -20,6 +20,7 @@ async function run() {
   let visible = true, userId = '0', writes = [], scopeCalls = 0
   const db = { course: { findFirst: async ({ where }) => { assert.deepEqual(where.AND[0], { status: true }); return visible ? { id: 7 } : null } } }
   const api = load('app/api/offerings/[slug]/consult/route.ts', {
+    'server-only': {},
     '@/lib/prisma': { __esModule: true, default: db }, '@/auth': { auth: async () => ({ user: { id: userId } }) },
     '@/lib/crm/service': { CrmError },
     '@/lib/crm/requests': { createRequest: async (database, input, actor) => { if (actor == null) throw new CrmError('Login', 401); writes.push({ input, actor }); return { success: true } } },

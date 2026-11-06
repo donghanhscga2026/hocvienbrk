@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
         requiresReferralActivation: true,
         referralActivationThreshold: true,
         feeType: true,
+        teacherBankAccount: { select: { id: true, accountNumber: true, accountHolder: true, bankName: true, qrCodeUrl: true } },
       }
     })
 
@@ -68,7 +69,9 @@ export async function POST(request: NextRequest) {
     // QUYẾT ĐỊNH NGHIỆP VỤ (2026-10-15): BỎ tự trừ MBV khi đăng ký.
     // MBV chỉ được trừ khi chính học viên tick "Dùng điểm MBV" ở bước thanh toán
     // (xem enrollInCourseAction trong app/actions/course-actions.ts).
-    let effectivePhiCoc = course.phi_coc
+    const { captureCheckout, capturePurchase } = await import('@/lib/offerings/purchase-snapshot')
+    const snapshot = await prisma.$transaction(tx => captureCheckout(tx, userIdNum, course.id, { price: course.phi_coc, bank: course.teacherBankAccount, gratitudeId: websiteDomain && !websiteDomain.affiliate ? null : user.referrerId }), { timeout: 20000 })
+    let effectivePhiCoc = snapshot.price
 
     const isAutoActive = effectivePhiCoc === 0
     let studyMode: EnrollmentMode = course.feeType === 'MIEN_PHI' ? EnrollmentMode.FREE : EnrollmentMode.COMPANION
@@ -83,7 +86,10 @@ export async function POST(request: NextRequest) {
       studyMode = referrerActiveCount >= course.referralActivationThreshold ? EnrollmentMode.COMPANION : EnrollmentMode.AUDITOR
     }
 
-    const newEnrollment = await prisma.enrollment.create({
+    const direct = await (await import('@/lib/affiliate/unified-commission')).resolveAffiliateIdFromCookie()
+    const affiliateId = websiteDomain && !websiteDomain.affiliate ? null : direct.affiliateId === userIdNum ? user.referrerId : direct.affiliateId ?? user.referrerId
+    const newEnrollment = await prisma.$transaction(async tx => {
+      const created = await tx.enrollment.create({
       data: {
         userId: userIdNum,
         courseId: course.id,
@@ -91,9 +97,12 @@ export async function POST(request: NextRequest) {
         ...(isAutoActive && course.productGroup === 'DIGITAL' ? { activatedAt: new Date() } : {}),
         studyMode,
         phi_coc: effectivePhiCoc,
-        referrerId: websiteDomain && !websiteDomain.affiliate ? null : user?.referrerId || null,
+        referrerId: affiliateId,
       }
-    })
+      })
+      await capturePurchase(tx, created.id, { ...snapshot, affiliateId, refCode: affiliateId === direct.affiliateId ? direct.refCode : null })
+      return created
+    }, { timeout: 20000 })
 
     // Award voucher từ course
     if (course.productGroup === 'DIGITAL') await (await import('@/lib/offerings/combo')).syncComboPurchase(newEnrollment.id)

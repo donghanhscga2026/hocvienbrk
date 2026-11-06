@@ -1,14 +1,14 @@
 const LS_KEY = 'affiliate_ref'
 const EXPIRY_MS = 30 * 24 * 60 * 60 * 1000
 
-function parseRefFromCookie(): number | null {
+function parseRefFromCookie(): string | number | null {
   try {
     const match = document.cookie.match(/(?:^|;\s*)aff_ref=([^;]*)/)
     if (!match) return null
     const data = JSON.parse(decodeURIComponent(match[1]))
     if (data?.r) {
-      const refId = parseInt(data.r)
-      if (!isNaN(refId) && refId > 0) return refId
+      const ref = String(data.r).trim()
+      if (ref) return /^\d+$/.test(ref) ? Number(ref) : ref
     }
     return null
   } catch {
@@ -16,7 +16,7 @@ function parseRefFromCookie(): number | null {
   }
 }
 
-function parseRefFromLocalStorage(): number | null {
+function parseRefFromLocalStorage(): string | number | null {
   try {
     const stored = localStorage.getItem(LS_KEY)
     if (!stored) return null
@@ -26,8 +26,8 @@ function parseRefFromLocalStorage(): number | null {
       return null
     }
     if (data?.ref) {
-      const refId = parseInt(data.ref)
-      if (!isNaN(refId) && refId > 0) return refId
+      const ref = String(data.ref).trim()
+      if (ref) return /^\d+$/.test(ref) ? Number(ref) : ref
     }
     return null
   } catch {
@@ -35,7 +35,7 @@ function parseRefFromLocalStorage(): number | null {
   }
 }
 
-export function getClientRef(): number | null {
+export function getClientRef(): string | number | null {
   if (typeof window === 'undefined') return null
   return parseRefFromCookie() || parseRefFromLocalStorage()
 }

@@ -23,6 +23,7 @@ import prisma from "@/lib/prisma"
 import { CommissionStatus, ConversionStatus, CommissionKind, type Prisma } from "@prisma/client"
 import { ensureWalletAndUpdate, createTransactionLog } from "./wallet-service"
 import { resolveRefToUserId } from "./resolve-ref-helper"
+import { orderGratitude, readPurchase } from '@/lib/offerings/purchase-snapshot'
 
 // Quyết định 2026-10-23: KHÔNG trừ bất kỳ khoản phí nào khi ghi nhận hoa hồng.
 // Mô hình vận hành: nền tảng KHÔNG giữ tiền — học phí vào thẳng tài khoản của
@@ -69,7 +70,7 @@ export async function createOrderForEnrollment(
 
   const enrollment = await db.enrollment.findUnique({
     where: { id: enrollmentId },
-    include: { course: { select: { id: true, phi_coc: true, name_lop: true, name_khoa: true } } }
+    include: { payment: true, course: { select: { id: true, phi_coc: true, name_lop: true, name_khoa: true } } }
   })
   if (!enrollment) {
     return { success: false, error: 'Enrollment not found' }
@@ -78,13 +79,14 @@ export async function createOrderForEnrollment(
     return { success: false, error: 'Đăng ký chưa có quyền sử dụng hợp lệ.' }
   }
 
-  const listedPrice = enrollment.course.phi_coc || 0
+  const snapshot = await readPurchase(db, enrollmentId)
+  const listedPrice = snapshot?.price ?? (enrollment.phi_coc + (enrollment.payment?.discountAmount || 0))
   const productName = enrollment.course.name_khoa || enrollment.course.name_lop || `Khóa học #${enrollment.course.id}`
 
   // Chỉ dùng thông tin đã lưu lúc khách mua, không đọc phiên người duyệt.
-  let affiliateId = enrollment.referrerId
-  let refCode: string | null = null
-  {
+  let affiliateId = snapshot ? snapshot.affiliateId ?? null : enrollment.referrerId
+  let refCode: string | null = snapshot?.refCode ?? null
+  if (!snapshot) {
     const conv = await db.affiliateConversion.findFirst({
       where: { enrollmentId },
       orderBy: { createdAt: 'desc' },
@@ -307,8 +309,7 @@ export async function processOrderCommission(orderId: number, db?: Prisma.Transa
     // Luôn trả cho người đầu tiên đưa khách vào hệ thống, bất kể đơn mua qua link ai.
     // LOẠI TRỪ (2026-10-20): không tính tri ân trên các khóa mà chính người được tri ân là giảng viên.
     // Custom service orders retain the relationship captured with the original request.
-    const quoteSource = await db.systemConfig.findUnique({ where: { key: 'catalog:quote-order:' + orderId } })
-    const referrerId = quoteSource ? (quoteSource.value as { gratitudeId?: number | null }).gratitudeId : order.buyer?.referrerId
+    const referrerId = await orderGratitude(db, order)
     if (referrerId && referrerId !== 0) {
       let gratitudeBase = 0 // GIÁ NIÊM YẾT của các item đủ điều kiện
       for (const item of order.items) {

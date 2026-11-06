@@ -7,7 +7,7 @@ const copy = value => value == null ? value : structuredClone(value)
 async function run() {
   let state, failOrder = false, failCommission = false, cookieReads = 0
   const course = { id: 9, id_khoa: 'APP', name_lop: 'App', phi_coc: 1000000, productGroup: 'DIGITAL', type: 'NORMAL', feeType: 'CO_PHI', teacherId: 7, allowMbvDeduction: true, voucherConfig: 'WALLET', teacherBankAccount: null }
-  const reset = () => { state = { enrollments: [], orders: [], conversions: [], commissions: [], wallets: new Map(), logs: [], balance: 2000000, mbv: 2000000, debits: [], gifts: 0 }; failOrder = false; failCommission = false }
+  const reset = () => { state = { configs: new Map(), enrollments: [], orders: [], conversions: [], commissions: [], wallets: new Map(), logs: [], balance: 2000000, mbv: 2000000, debits: [], gifts: 0 }; failOrder = false; failCommission = false }
   reset()
   const db = {
     $executeRaw: async () => {},
@@ -42,7 +42,10 @@ async function run() {
     affiliateCampaign: { findFirst: async () => ({ id: 1 }) },
     productAffiliateConfig: { findUnique: async () => ({ directRate: 10, isActive: true }) },
     affiliateLink: { findFirst: async () => ({ id: 1, code: 'REF8' }) },
-    systemConfig: { findUnique: async () => null },
+    systemConfig: {
+      findUnique: async ({ where }) => state.configs.has(where.key) ? { key: where.key, value: copy(state.configs.get(where.key)) } : null,
+      upsert: async ({ where, create, update }) => { if (!state.configs.has(where.key)) state.configs.set(where.key, copy(create.value)); else if (update.value) state.configs.set(where.key, copy(update.value)); return { key: where.key, value: copy(state.configs.get(where.key)) } },
+    },
     affiliateWallet: {
       findUnique: async ({ where }) => copy(state.wallets.get(where.userId)) || null,
       upsert: async ({ where, create, update }) => { let wallet = state.wallets.get(where.userId); if (wallet) wallet.pendingBalance += update.pendingBalance.increment; else wallet = { id: where.userId, balance: 0, pendingBalance: create.pendingBalance }; state.wallets.set(where.userId, wallet); return copy(wallet) },
@@ -59,8 +62,8 @@ async function run() {
     const result = queue.then(async () => { const before = copy(state); try { return await fn(db) } catch (error) { state = before; throw error } })
     queue = result.catch(() => {}); return result
   }
-  const engine = load('lib/affiliate/unified-commission.ts', { '@/lib/prisma': { __esModule: true, default: db } })
-  state.enrollments.push({ id: 50, userId: 0, courseId: 9, status: 'ACTIVE', referrerId: 8 })
+  const engine = load('lib/affiliate/unified-commission.ts', { 'server-only': {}, '@/lib/prisma': { __esModule: true, default: db } })
+  state.enrollments.push({ id: 50, userId: 0, courseId: 9, status: 'ACTIVE', referrerId: 8, phi_coc: 1000000 })
   state.conversions.push({ id: 1, enrollmentId: 50, link: { userId: 8, code: 'BUYER_REF' } })
   const orders = await Promise.all([engine.createOrderForEnrollment(50), engine.createOrderForEnrollment(50)])
   assert.equal(orders[0].orderId, orders[1].orderId); assert.equal(state.orders.length, 1)
@@ -94,6 +97,7 @@ async function run() {
     '@/lib/notifications': { sendTelegram: async () => {}, sendActivationEmail: async () => {} }, '@/lib/activity-logger': { logActivity: async () => {} },
     'next/cache': { revalidatePath: () => {} }, 'next/server': { after: () => {} },
     'next/headers': { cookies: async () => { cookieReads++; return { get: () => ({ value: '99' }) } }, headers: async () => new Headers() },
+    '@/lib/vietqr': { createPaymentQR: async () => ({ qrCodeUrl: 'https://test.invalid/qr', transferContent: 'HV 0 COC APP' }), generateTransferContent: () => 'HV 0 COC APP' },
   })
   const actions = load('app/actions/course-actions.ts', mocks)
   reset()
@@ -110,9 +114,57 @@ async function run() {
   reset()
   assert.equal((await actions.enrollInCourseAction(9, 8, true, 1000000, false, true, 1)).success, false)
   assert.equal(state.debits.length, 0, 'Invalid wallet and gift combination is rejected before any debit')
+  const qrPayments = []
+  db.payment.create = async ({ data }) => { qrPayments.push(copy(data)); return { id: qrPayments.length, ...data } }
+  for (const group of ['DIGITAL', 'SERVICE']) {
+    reset(); course.productGroup = group; course.phi_coc = 1000000
+    course.teacherBankAccount = { id: 1, accountNumber: '123456789', accountHolder: 'Owner', bankName: 'MB', qrCodeUrl: null }
+    state.balance = 300000
+    assert.equal((await actions.enrollInCourseAction(9, 8, false, 0, true)).success, true)
+    assert.equal(qrPayments.at(-1).amount, 700000)
+    assert.equal((await actions.enrollInCourseAction(9, 8)).success, true)
+    assert.equal(qrPayments.at(-1).amount, 700000, 'Reopening without a wallet checkbox retains the 300000 already paid')
+    assert.equal(state.balance, 0); assert.equal(state.debits.length, 1)
+    course.phi_coc = 2000000
+    course.teacherBankAccount = { ...course.teacherBankAccount, id: 2, accountNumber: '987654321' }
+    assert.equal((await actions.enrollInCourseAction(9, 8)).success, true)
+    assert.equal(qrPayments.at(-1).amount, 700000); assert.equal(qrPayments.at(-1).accountNumber, '123456789', 'Saved price and receiving account survive catalog edits')
+    const settle = load('lib/enrollment-activation.ts', { ...mocks, '@/lib/affiliate/commission-calculator': {} })
+    assert.equal((await settle.processEnrollmentActivation({ enrollmentId: 50, method: 'MANUAL_ADMIN', transferData: { amount: 700000, phone: null, courseCode: 'APP', bankName: 'MB', accountNumber: '123456789', transferTime: new Date(), content: 'Fixture' } })).success, true)
+    assert.equal(state.orders[0].totalAmount, 1000000); assert.equal(state.wallets.get(8).pendingBalance, 100000)
+  }
+  course.phi_coc = 1000000; course.teacherBankAccount = null
+  reset(); failCommission = true
+  const failedCommission = await actions.enrollInCourseAction(9, 8, false, 0, true)
+  assert.equal(failedCommission.success, true); assert.equal(failedCommission.commissionPending, true)
+  assert.equal(state.orders.length, 1); assert.equal(state.commissions.length, 0); assert.equal(state.orders[0].commissionProcessed, false)
+  failCommission = false
+  assert.equal((await actions.enrollInCourseAction(9, 8, false, 0, true)).commissionPending, false)
+  assert.equal(state.orders.length, 1); assert.equal(state.commissions.length, 2); assert.equal(state.debits.length, 1, 'Retry repairs commission without recharging the buyer')
+  reset()
+  const aliasMocks = { ...mocks, 'next/headers': { ...mocks['next/headers'], cookies: async () => ({ get: () => ({ value: JSON.stringify({ r: '12abc' }) }) }) } }
+  const aliasActions = load('app/actions/course-actions.ts', aliasMocks)
+  assert.equal((await aliasActions.enrollInCourseAction(9, null, false, 0, true)).success, true)
+  assert.equal(state.orders[0].affiliateId, 8); assert.equal(state.orders[0].refCode, '12abc')
+  const resolver = load('lib/affiliate/resolve-ref-helper.ts', { '@/lib/prisma': { __esModule: true, default: {
+    affiliateRef: { findUnique: async () => null },
+    user: { findUnique: async ({ where }) => where.affiliateCode === '12ABC' ? { id: 8 } : where.id === 12 ? { id: 12 } : null },
+  } } })
+  assert.equal(await resolver.resolveRefToUserId('12abc'), 8, 'Alphanumeric affiliate codes are never truncated to a member ID')
+  const globals = { window: global.window, document: global.document, localStorage: global.localStorage }
+  let affiliateCookie = 'aff_ref=' + encodeURIComponent(JSON.stringify({ r: '12abc' }))
+  global.window = {}; global.document = { get cookie() { return affiliateCookie } }
+  global.localStorage = { getItem: () => JSON.stringify({ ref: '12abc', timestamp: Date.now() }), removeItem: () => {} }
+  try {
+    const client = load('lib/affiliate/get-client-ref.ts')
+    assert.equal(client.getClientRef(), '12abc', 'Browser cookie retains the full affiliate code')
+    affiliateCookie = ''; assert.equal(client.getClientRef(), '12abc', 'Local storage fallback retains the full affiliate code')
+    reset(); assert.equal((await aliasActions.enrollInCourseAction(9, client.getClientRef(), false, 0, true)).success, true)
+    assert.equal(state.orders[0].affiliateId, 8); assert.equal(state.orders[0].refCode, '12abc')
+  } finally { for (const [key, value] of Object.entries(globals)) if (value === undefined) delete global[key]; else global[key] = value }
   for (const group of ['DIGITAL', 'SERVICE']) for (const kind of ['cash', 'mbv', 'gift', 'pending']) {
     reset(); course.productGroup = group
-    if (kind === 'pending') state.enrollments.push({ id: 50, userId: 0, courseId: 9, status: 'PENDING', referrerId: 8 })
+    if (kind === 'pending') state.enrollments.push({ id: 50, userId: 0, courseId: 9, status: 'PENDING', referrerId: 8, phi_coc: 1000000 })
     const purchase = () => actions.enrollInCourseAction(9, 8, kind === 'mbv', kind === 'mbv' ? 1000000 : 0, ['cash', 'pending'].includes(kind), kind === 'gift', 1)
     const result = await purchase()
     assert.equal(result.success, true, result.message); assert.equal(result.status, 'ACTIVE')
@@ -120,7 +172,7 @@ async function run() {
     assert.equal(state.commissions.length, 2); assert.equal(state.wallets.get(8).pendingBalance, 100000)
     const before = copy(state); await purchase(); assert.deepEqual(state, before, 'Retry never debits/uses gifts or earns twice')
   }
-  reset(); state.enrollments.push({ id: 50, userId: 0, courseId: 9, status: 'CANCELLED', referrerId: 8 })
+  reset(); state.enrollments.push({ id: 50, userId: 0, courseId: 9, status: 'CANCELLED', referrerId: 8, phi_coc: 1000000 })
   assert.equal((await actions.enrollInCourseAction(9, 8, false, 0, true)).success, false)
   assert.equal(state.balance, 2000000); assert.equal(state.orders.length, 0)
   const activation = load('lib/enrollment-activation.ts', { ...mocks, '@/lib/affiliate/commission-calculator': {} })

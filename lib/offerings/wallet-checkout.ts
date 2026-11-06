@@ -1,5 +1,6 @@
 import 'server-only'
 import prisma from '@/lib/prisma'
+import { checkoutKey, readPurchase } from './purchase-snapshot'
 
 // Khóa cả phép tính phần còn thiếu và ghi sổ ví để hai tab không trả trùng.
 export async function debitCheckoutWallets(userId: number, courseId: number, options: { useVoucher: boolean; voucherAmount: number; useCash: boolean }) {
@@ -13,19 +14,24 @@ export async function debitCheckoutWallets(userId: number, courseId: number, opt
       if (['ACTIVE', 'COMPLETED'].includes(current.status)) return { remaining: 0, voucherDeducted: 0, cashDeducted: 0 }
     }
     const course = await tx.course.findUnique({ where: { id: courseId }, select: { phi_coc: true, id_khoa: true, allowMbvDeduction: true, voucherConfig: true } })
-    if (!course || !course.allowMbvDeduction || course.voucherConfig !== 'WALLET') throw new Error('Sản phẩm chưa cho phép thanh toán bằng ví.')
+    if (!course) throw new Error('Không tìm thấy sản phẩm.')
+    const purchase = enrollment ? await readPurchase(tx, enrollment.id) : null
+    const intent = await tx.systemConfig.findUnique({ where: { key: checkoutKey(userId, courseId) } })
+    const price = purchase?.price ?? (intent?.value as { price?: number } | null)?.price ?? enrollment?.phi_coc ?? course.phi_coc
+    const allowed = course.allowMbvDeduction && course.voucherConfig === 'WALLET'
+    if ((options.useCash || options.useVoucher) && !allowed) throw new Error('Sản phẩm chưa cho phép thanh toán bằng ví.')
     await tx.$queryRaw`SELECT id FROM "brk_wallet" WHERE "userId" = ${userId} FOR UPDATE`
     const wallet = await tx.brkWallet.findUnique({ where: { userId } })
-    if (!wallet) return { remaining: course.phi_coc, voucherDeducted: 0, cashDeducted: 0 }
+    if (!wallet) return { remaining: price, voucherDeducted: 0, cashDeducted: 0 }
     const [mbv, cash] = await Promise.all([
       tx.brkTransaction.aggregate({ where: { walletId: wallet.id, refId: 'course_' + courseId }, _sum: { amount: true } }),
       tx.brkTransaction.aggregate({ where: { walletId: wallet.id, refId: 'course_cash_' + courseId }, _sum: { amount: true } }),
     ])
-    let remaining = Math.max(0, course.phi_coc - Math.abs(Number(mbv._sum.amount) || 0) - Math.abs(Number(cash._sum.amount) || 0))
+    let remaining = Math.max(0, price - Math.abs(Number(mbv._sum.amount) || 0) - Math.abs(Number(cash._sum.amount) || 0))
     const requested = Number.isFinite(options.voucherAmount) ? Math.max(0, Math.floor(options.voucherAmount)) : 0
-    const voucherDeducted = options.useVoucher ? Math.floor(Math.min(Number(wallet.mbvBalance), requested, remaining)) : 0
+    const voucherDeducted = options.useVoucher ? Math.floor(Math.min(Math.max(0, Number(wallet.mbvBalance)), requested, remaining)) : 0
     remaining -= voucherDeducted
-    const cashDeducted = options.useCash ? Math.floor(Math.min(Number(wallet.balance), remaining)) : 0
+    const cashDeducted = options.useCash ? Math.floor(Math.min(Math.max(0, Number(wallet.balance)), remaining)) : 0
     remaining -= cashDeducted
     for (const part of [
       { amount: voucherDeducted, balance: Number(wallet.mbvBalance), balanceType: 'MBV' as const, refId: 'course_' + courseId },

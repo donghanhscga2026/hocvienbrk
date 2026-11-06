@@ -24,7 +24,7 @@ async function run() {
     affiliateTransaction: { create: async ({ data }) => state.logs.push(data) },
   }
   db.$transaction = async fn => { const before = copy(state); try { return await fn(db) } catch (error) { state = before; throw error } }
-  const engine = load('lib/affiliate/unified-commission.ts', { '@/lib/prisma': { __esModule: true, default: db } })
+  const engine = load('lib/affiliate/unified-commission.ts', { 'server-only': {}, '@/lib/prisma': { __esModule: true, default: db } })
   const quotes = load('lib/offerings/quotes.ts', { 'server-only': {}, '@/lib/crm/requests': {}, '@/lib/crm/service': {}, '@/lib/affiliate/unified-commission': engine })
   assert.equal((await quotes.settleQuoteCommission(db, 1)).success, false)
   assert.equal(state.conversions.length, 0); assert.equal(state.commissions.length, 0); assert.equal(state.wallets.size, 0); assert.equal(state.logs.length, 0, 'No partial wallet or conversion survives a failure')
@@ -36,6 +36,16 @@ async function run() {
   assert.equal((await quotes.settleQuoteCommission(db, 2)).success, true)
   assert.equal(state.wallets.get(8).pendingBalance, 1200000, 'Two installments pay commission on 12m combined, not 24m')
   assert.equal(state.wallets.get(6).pendingBalance, 240000); assert.equal(state.commissions.length, 4)
+  db.course.findMany = async () => [{ id: 9, teacherId: 7 }]
+  db.enrollment.findMany = async () => [{ userId: 8 }]
+  db.order.findMany = async () => [...state.orders.values()]
+  db.affiliateConversion.findMany = async ({ where }) => state.conversions.filter(row => where.OR.some(condition => condition.orderRecordId === row.orderRecordId))
+  db.affiliateCommission.findMany = async ({ where }) => state.commissions.filter(row => where.conversionId.in.includes(row.conversionId))
+  const rerun = load('lib/affiliate/recalculate.ts', { 'server-only': {}, '@/lib/prisma': { __esModule: true, default: db }, '@/lib/activity-logger': { logActivity: async () => {} } })
+  const before = copy(state)
+  const report = await rerun.recalculateCourseCommissions({ courseId: 9, dryRun: true, actorId: 7 })
+  assert.deepEqual(report.changes, [], 'Rerun retains captured quote recipient 6, ignoring current buyer referrer 99')
+  assert.deepEqual(state, before, 'Rerun preview writes nothing')
   console.log('Quote commissions: real engine/wallet transaction rollback, successful retry, immutable attribution, account zero and per-installment/idempotent totals passed.')
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })
