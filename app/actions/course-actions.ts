@@ -113,10 +113,11 @@ export async function enrollInCourseAction(
         if (existing && course.productGroup === 'DIGITAL') await (await import('@/lib/offerings/combo')).syncComboPurchase(existing.id)
         const { captureCheckout, capturePurchase, readPurchase } = await import('@/lib/offerings/purchase-snapshot')
         const savedPurchase = existing ? await readPurchase(prisma, existing.id) : null
-        const checkout = savedPurchase || await prisma.$transaction(tx => captureCheckout(tx, userId, courseId, {
-            price: existing ? existing.phi_coc + (existing.payment?.discountAmount || 0) : course.phi_coc,
-            bank: course.teacherBankAccount, gratitudeId: websiteDomain && !websiteDomain.affiliate ? null : user?.referrerId ?? null,
+        const intent = savedPurchase?.bank ? savedPurchase : await prisma.$transaction(tx => captureCheckout(tx, userId, courseId, {
+            price: savedPurchase?.price ?? (existing ? existing.phi_coc + (existing.payment?.discountAmount || 0) : course.phi_coc),
+            bank: course.teacherBankAccount, gratitudeId: savedPurchase ? savedPurchase.gratitudeId : websiteDomain && !websiteDomain.affiliate ? null : user?.referrerId ?? null,
         }), { timeout: 20000 })
+        const checkout = savedPurchase ? { ...savedPurchase, bank: savedPurchase.bank ?? intent.bank } : intent
         course.phi_coc = checkout.price
         course.teacherBankAccount = checkout.bank
 
@@ -126,6 +127,10 @@ export async function enrollInCourseAction(
         let voucherDeducted = 0
         let cashDeducted = 0
         let voucherApplied = false
+        let walletPaid = 0
+        let benefitVoucherId: number | null = savedPurchase?.benefitVoucherId ?? existing?.payment?.voucherId ?? null
+        let appliedBenefitUserVoucherId: number | null = savedPurchase?.benefitUserVoucherId ?? null
+        let benefitAmountDue = savedPurchase?.benefitAmountDue ?? (benefitVoucherId != null ? existing?.phi_coc : undefined)
 
         if (course.type === 'LIB') {
             if (!user?.email) throw new Error("Chưa có email tài khoản. Vui lòng cập nhật email.")
@@ -144,11 +149,11 @@ export async function enrollInCourseAction(
             voucherDeducted = paid.voucherDeducted
             cashDeducted = paid.cashDeducted
             voucherApplied = voucherDeducted > 0
+            walletPaid = paid.walletPaid
         }
 
         // 3. Áp quyền lợi voucher (quà tặng khóa học) — LOẠI TRỪ với ví MBV/VNĐ
         // Chỉ validate ở đây; đánh dấu USED sau khi enrollment được tạo/cập nhật thành công.
-        let benefitVoucherId: number | null = null
         let chosenBenefit: { userVoucherId: number; voucherId: number; benefitType: string; extraAmount: number } | null = null
         const markBenefitUsed = async () => {
             if (chosenBenefit) {
@@ -160,6 +165,10 @@ export async function enrollInCourseAction(
             if (useVoucher || useVndWallet) {
                 throw new Error("Không thể dùng đồng thời quà tặng và ví MBV/VNĐ. Vui lòng chỉ chọn một.")
             }
+            if (walletPaid > 0) throw new Error('Lượt thanh toán đã dùng ví, không đổi sang quà tặng.')
+            if (benefitVoucherId != null && appliedBenefitUserVoucherId != null && appliedBenefitUserVoucherId !== benefitUserVoucherId) throw new Error('Lượt thanh toán đã áp dụng quà tặng khác.')
+        }
+        if (useVoucherBenefit && benefitVoucherId == null) {
             const { getApplicableVoucherBenefits } = await import('@/lib/voucher/voucher-service')
             const applicable = await getApplicableVoucherBenefits(userId, courseId)
             const chosen = applicable.find(a => a.userVoucherId === benefitUserVoucherId)
@@ -168,11 +177,13 @@ export async function enrollInCourseAction(
             }
             chosenBenefit = chosen
             benefitVoucherId = chosen.voucherId
+            appliedBenefitUserVoucherId = chosen.userVoucherId
             if (chosen.benefitType === 'FREE_100') {
                 effectivePhiCoc = 0
             } else {
                 effectivePhiCoc = Math.max(0, chosen.extraAmount)
             }
+            benefitAmountDue = effectivePhiCoc
         }
 
         if (existing && existing.status !== 'REJECTED') {
@@ -193,7 +204,7 @@ export async function enrollInCourseAction(
                             ...(isAutoActiveExisting && course.productGroup && course.productGroup !== 'COURSE' ? { activatedAt: existing.activatedAt || new Date() } : {}),
                         }
                     })
-                    await capturePurchase(tx, existing.id, { ...checkout, affiliateId: existing.referrerId, refCode: savedPurchase?.refCode ?? null })
+                    await capturePurchase(tx, existing.id, { ...checkout, affiliateId: existing.referrerId, refCode: savedPurchase?.refCode ?? null, benefitVoucherId, benefitUserVoucherId: appliedBenefitUserVoucherId, benefitAmountDue })
                     if (isAutoActiveExisting && course.type !== 'SYS' && course.type !== 'LIB') {
                         const order = await (await import('@/lib/affiliate/unified-commission')).createOrderForEnrollment(existing.id, tx)
                         if (!order.success) throw new Error(order.error)
@@ -419,7 +430,7 @@ export async function enrollInCourseAction(
                         referrerId: enrollmentReferrerId,
                     }
                 })
-                await capturePurchase(tx, created.id, { ...checkout, affiliateId: enrollmentReferrerId, refCode: enrollmentRawRefCode })
+                await capturePurchase(tx, created.id, { ...checkout, affiliateId: enrollmentReferrerId, refCode: enrollmentRawRefCode, benefitVoucherId, benefitUserVoucherId: appliedBenefitUserVoucherId, benefitAmountDue })
                 if (isAutoActive && course.type !== 'SYS' && course.type !== 'LIB') {
                     const order = await (await import('@/lib/affiliate/unified-commission')).createOrderForEnrollment(created.id, tx)
                     if (!order.success) throw new Error(order.error)

@@ -8,6 +8,9 @@ const snapshotSchema = z.object({
   price: z.number().finite().nonnegative(), bank: bankSchema.nullable(),
   gratitudeId: z.number().int().nonnegative().nullable(),
   affiliateId: z.number().int().nonnegative().nullable().optional(), refCode: z.string().nullable().optional(),
+  benefitVoucherId: z.number().int().nonnegative().nullable().optional(),
+  benefitUserVoucherId: z.number().int().nonnegative().nullable().optional(),
+  benefitAmountDue: z.number().finite().nonnegative().optional(),
 })
 export type PurchaseSnapshot = z.infer<typeof snapshotSchema>
 export const purchaseKey = (id: number) => 'catalog:purchase:' + id
@@ -20,11 +23,26 @@ export async function captureCheckout(tx: Prisma.TransactionClient, userId: numb
   const key = checkoutKey(userId, courseId)
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`
   const row = await tx.systemConfig.upsert({ where: { key }, create: { key, value: snapshotSchema.parse(candidate) }, update: {} })
-  return snapshotSchema.parse(row.value)
+  const saved = snapshotSchema.parse(row.value)
+  // Chỉ bổ sung lần đầu khi chưa từng có tài khoản nhận tiền được chọn.
+  if (!saved.bank && candidate.bank) {
+    const value = { ...saved, bank: candidate.bank }
+    await tx.systemConfig.upsert({ where: { key }, create: { key, value }, update: { value } })
+    return value
+  }
+  return saved
 }
 export async function capturePurchase(tx: DB, enrollmentId: number, snapshot: PurchaseSnapshot) {
   const key = purchaseKey(enrollmentId), value = snapshotSchema.parse(snapshot)
-  await tx.systemConfig.upsert({ where: { key }, create: { key, value }, update: {} })
+  const row = await tx.systemConfig.upsert({ where: { key }, create: { key, value }, update: {} })
+  const saved = snapshotSchema.parse(row.value)
+  let completed = saved
+  if (!saved.bank && value.bank) completed = { ...completed, bank: value.bank }
+  if (saved.benefitVoucherId == null && value.benefitVoucherId != null) completed = {
+    ...completed, benefitVoucherId: value.benefitVoucherId,
+    benefitUserVoucherId: value.benefitUserVoucherId, benefitAmountDue: value.benefitAmountDue,
+  }
+  if (completed !== saved) await tx.systemConfig.upsert({ where: { key }, create: { key, value: completed }, update: { value: completed } })
 }
 export async function orderGratitude(db: DB, order: { id: number; buyer?: { referrerId: number | null } | null; items: { enrollmentId?: number | null }[] }) {
   const quote = await db.systemConfig.findUnique({ where: { key: 'catalog:quote-order:' + order.id } })

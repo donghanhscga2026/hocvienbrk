@@ -7,7 +7,7 @@ const copy = value => value == null ? value : structuredClone(value)
 async function run() {
   let state, failOrder = false, failCommission = false, cookieReads = 0
   const course = { id: 9, id_khoa: 'APP', name_lop: 'App', phi_coc: 1000000, productGroup: 'DIGITAL', type: 'NORMAL', feeType: 'CO_PHI', teacherId: 7, allowMbvDeduction: true, voucherConfig: 'WALLET', teacherBankAccount: null }
-  const reset = () => { state = { configs: new Map(), enrollments: [], orders: [], conversions: [], commissions: [], wallets: new Map(), logs: [], balance: 2000000, mbv: 2000000, debits: [], gifts: 0 }; failOrder = false; failCommission = false }
+  const reset = () => { state = { configs: new Map(), payments: new Map(), enrollments: [], orders: [], conversions: [], commissions: [], wallets: new Map(), logs: [], balance: 2000000, mbv: 2000000, debits: [], gifts: 0 }; failOrder = false; failCommission = false }
   reset()
   const db = {
     $executeRaw: async () => {},
@@ -15,7 +15,7 @@ async function run() {
     course: { findUnique: async () => copy(course) },
     user: { findUnique: async () => ({ id: 0, name: 'Buyer', referrerId: 6 }) },
     enrollment: {
-      findUnique: async ({ where, include }) => { const row = state.enrollments.find(row => where.id != null ? row.id === where.id : row.userId === where.userId_courseId.userId && row.courseId === where.userId_courseId.courseId); return row ? copy({ ...row, ...(include?.course ? { course } : {}) }) : null },
+      findUnique: async ({ where, include }) => { const row = state.enrollments.find(row => where.id != null ? row.id === where.id : row.userId === where.userId_courseId.userId && row.courseId === where.userId_courseId.courseId); return row ? copy({ ...row, ...(include?.course ? { course } : {}), ...(include?.payment ? { payment: state.payments.get(row.id) || null } : {}) }) : null },
       findFirst: async () => ({ id: 90 }), count: async () => 0,
       create: async ({ data }) => { if (state.enrollments.length) throw Object.assign(Error('Duplicate'), { code: 'P2002' }); const row = { id: 50, ...copy(data) }; state.enrollments.push(row); return copy(row) },
       update: async ({ where, data }) => { const row = state.enrollments.find(row => row.id === where.id); Object.assign(row, data); return copy(row) },
@@ -55,7 +55,11 @@ async function run() {
     brkWallet: { findUnique: async () => ({ id: 1, balance: state.balance, mbvBalance: state.mbv }), update: async ({ data }) => { state.balance -= data.balance.decrement; state.mbv -= data.mbvBalance.decrement } },
     brkTransaction: { aggregate: async ({ where }) => ({ _sum: { amount: -state.debits.filter(row => row.ref === where.refId).reduce((sum, row) => sum + row.amount, 0) } }), create: async ({ data }) => state.debits.push({ amount: -data.amount, ref: data.refId }) },
     courseVoucherAward: { findMany: async () => [] },
-    payment: { deleteMany: async () => {}, updateMany: async () => {}, upsert: async ({ create }) => copy(create) },
+    payment: {
+      deleteMany: async ({ where }) => state.payments.delete(where.enrollmentId),
+      updateMany: async ({ where, data }) => { const payment = state.payments.get(where.enrollmentId); if (payment && (!where.status || where.status === payment.status)) Object.assign(payment, data) },
+      upsert: async ({ where, create, update }) => { const row = { ...(state.payments.get(where.enrollmentId) || create), ...update }; state.payments.set(where.enrollmentId, copy(row)); return copy(row) },
+    },
   }
   let queue = Promise.resolve()
   db.$transaction = fn => {
@@ -115,7 +119,44 @@ async function run() {
   assert.equal((await actions.enrollInCourseAction(9, 8, true, 1000000, false, true, 1)).success, false)
   assert.equal(state.debits.length, 0, 'Invalid wallet and gift combination is rejected before any debit')
   const qrPayments = []
-  db.payment.create = async ({ data }) => { qrPayments.push(copy(data)); return { id: qrPayments.length, ...data } }
+  db.payment.create = async ({ data }) => { const row = { id: qrPayments.length + 1, ...copy(data) }; qrPayments.push(row); state.payments.set(data.enrollmentId, copy(row)); return copy(row) }
+  const giftService = mocks['@/lib/voucher/voucher-service'], originalBenefits = giftService.getApplicableVoucherBenefits
+  for (const group of ['DIGITAL', 'SERVICE']) {
+    reset(); course.productGroup = group; course.phi_coc = 1000000
+    const bank = { id: 1, accountNumber: '123456789', accountHolder: 'Owner', bankName: 'MB', qrCodeUrl: null }
+    course.teacherBankAccount = bank
+    giftService.getApplicableVoucherBenefits = async () => state.gifts ? [] : [{ userVoucherId: 1, voucherId: 2, benefitType: 'EXTRA', extraAmount: 50000 }]
+    assert.equal((await actions.enrollInCourseAction(9, 8, false, 0, false, true, 1)).success, true)
+    assert.equal(qrPayments.at(-1).amount, 50000); assert.equal(state.gifts, 1)
+    assert.equal((await actions.enrollInCourseAction(9, 8)).success, true)
+    assert.equal(qrPayments.at(-1).amount, 50000, 'Reopening retains the gift discount after the voucher is used')
+    assert.equal(qrPayments.at(-1).voucherId, 2)
+    assert.equal((await actions.enrollInCourseAction(9, 8, false, 0, false, true, 1)).success, true)
+    assert.equal(state.gifts, 1, 'Retrying the same gift does not consume it again')
+    assert.equal((await actions.enrollInCourseAction(9, 8, false, 0, false, true, 99)).success, false, 'An applied gift cannot be replaced by another gift')
+    assert.equal((await actions.enrollInCourseAction(9, 8, false, 0, true)).success, false)
+    assert.equal(state.debits.length, 0, 'An already applied gift cannot be combined with a new wallet debit')
+    // Older pending purchases have a Payment discount but no gift snapshot yet.
+    const saved = state.configs.get('catalog:purchase:50')
+    delete saved.benefitAmountDue; delete saved.benefitVoucherId; delete saved.benefitUserVoucherId
+    assert.equal((await actions.enrollInCourseAction(9, 8)).success, true)
+    assert.equal(qrPayments.at(-1).amount, 50000, 'Legacy pending gift payments retain the recorded discount')
+    course.phi_coc = 2000000
+    assert.equal((await actions.enrollInCourseAction(9, 8)).success, true); assert.equal(qrPayments.at(-1).amount, 50000)
+    reset(); course.phi_coc = 1000000; course.teacherBankAccount = null
+    assert.equal((await actions.enrollInCourseAction(9, 8)).success, true)
+    assert.equal(state.configs.get('catalog:purchase:50').bank, null)
+    course.teacherBankAccount = bank; course.phi_coc = 2000000
+    assert.equal((await actions.enrollInCourseAction(9, 8)).success, true)
+    assert.equal(qrPayments.at(-1).amount, 1000000, 'Adding the first receiving account preserves the original price')
+    assert.equal(qrPayments.at(-1).accountNumber, bank.accountNumber)
+    assert.equal(state.configs.get('catalog:purchase:50').bank.id, 1)
+    course.teacherBankAccount = { ...bank, id: 2, accountNumber: '987654321' }
+    assert.equal((await actions.enrollInCourseAction(9, 8)).success, true)
+    assert.equal(qrPayments.at(-1).accountNumber, bank.accountNumber, 'A receiving account already selected is never silently replaced')
+    assert.equal(state.configs.get('catalog:purchase:50').affiliateId, 8)
+  }
+  giftService.getApplicableVoucherBenefits = originalBenefits
   for (const group of ['DIGITAL', 'SERVICE']) {
     reset(); course.productGroup = group; course.phi_coc = 1000000
     course.teacherBankAccount = { id: 1, accountNumber: '123456789', accountHolder: 'Owner', bankName: 'MB', qrCodeUrl: null }
@@ -125,6 +166,8 @@ async function run() {
     assert.equal((await actions.enrollInCourseAction(9, 8)).success, true)
     assert.equal(qrPayments.at(-1).amount, 700000, 'Reopening without a wallet checkbox retains the 300000 already paid')
     assert.equal(state.balance, 0); assert.equal(state.debits.length, 1)
+    assert.equal((await actions.enrollInCourseAction(9, 8, false, 0, false, true, 1)).success, false, 'A partial wallet payment cannot be combined with a later gift')
+    assert.equal(qrPayments.at(-1).amount, 700000); assert.equal(state.gifts, 0)
     course.phi_coc = 2000000
     course.teacherBankAccount = { ...course.teacherBankAccount, id: 2, accountNumber: '987654321' }
     assert.equal((await actions.enrollInCourseAction(9, 8)).success, true)
