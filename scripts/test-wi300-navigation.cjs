@@ -75,11 +75,12 @@ async function run() {
   user = { id: '42', name: 'Lucy', role: 'STUDENT' }
   await act(async () => renderShell())
   if (process.env.CRM_UI_SNAPSHOT_DIR) { const account = document.querySelector('header details'); account.open = true; fs.writeFileSync(path.join(process.env.CRM_UI_SNAPSHOT_DIR, 'header.html'), document.querySelector('header').outerHTML); account.open = false }
-  assert.ok(document.querySelector('header details a[href="/my-space?tab=learning"]'))
+  assert.equal(document.querySelector('header details a[href="/my-space?tab=learning"]'), null)
   assert.equal(document.querySelector('header details a[href="/my-space?tab=teaching"]'), null)
   assert.ok(document.querySelector('header details a[href="/my-requests"]'))
   assert.ok(document.querySelector('header details a[href="/support"]'))
-  assert.equal(document.querySelector('header details details').open, false, 'Secondary utilities collapse by default')
+  assert.equal(document.querySelector('header details details'), null, 'Account shortcuts are visible without a nested menu')
+  assert.deepEqual([...document.querySelectorAll('header details a, header details button')].map(item => item.textContent), ['Yêu cầu của tôi', 'Ví Wi', 'Hỗ trợ & phản hồi', 'Cài đặt tài khoản', 'Giới thiệu & hoa hồng', 'Đăng ký đối tác', 'Cài ứng dụng WI300', 'Đăng xuất'])
   const accountButtons = [...document.querySelectorAll('header details button')]
   assert.ok(accountButtons.some(button => button.textContent === 'Ví Wi'))
   const installButton = accountButtons.find(button => button.textContent === 'Cài ứng dụng WI300')
@@ -105,7 +106,7 @@ async function run() {
   assert.equal(document.querySelector('[data-wallet]').dataset.wallet, 'Ví Wi')
   user.role = 'TEACHER'
   await act(async () => renderShell())
-  assert.ok(document.querySelector('header details a[href="/my-space?tab=teaching"]'))
+  assert.equal(document.querySelector('header details a[href="/my-space?tab=teaching"]'), null)
   const details = document.querySelector('header details')
   details.open = true
   await act(async () => details.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))

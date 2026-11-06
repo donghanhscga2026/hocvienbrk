@@ -6,10 +6,9 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
-import { BookOpen, BriefcaseBusiness, ChevronDown, GraduationCap, Home, LayoutGrid, LogOut, Menu, Package, Settings, Wallet, LifeBuoy, MessageCircle, Handshake, Users, X } from 'lucide-react'
+import { BookOpen, BriefcaseBusiness, ChevronDown, Home, LayoutGrid, LogOut, Menu, Package, Settings, Wallet, LifeBuoy, MessageCircle, Handshake, Users, X } from 'lucide-react'
 import { useWi300Brand } from './Wi300BrandContext'
 import { signOutPushCleanup } from '@/lib/web-push-client'
-import { canTeach } from '@/lib/wi300/personal-space'
 import NotificationBell from '@/components/notifications/NotificationBell'
 import Wi300SpaceMenu from './Wi300SpaceMenu'
 import { InstallAppButton } from '@/components/pwa/PwaInstallProvider'
@@ -47,7 +46,7 @@ export default function Wi300Header() {
     { label: 'Sản phẩm số', url: '/san-pham', visible: true },
     { label: 'Dịch vụ', url: '/dich-vu', visible: true },
   ]).filter(item => item.visible).map(item => ({ href: item.url, label: item.url === '/san-pham' && item.label === 'Sản phẩm' ? 'Sản phẩm số' : item.label, icon: menuIcons[item.url.split('?')[0]] || LayoutGrid }))
-  const accountLink = 'flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-brk-background focus-visible:outline-brk-primary'
+  const accountLink = 'flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-base hover:bg-brk-background focus-visible:outline-brk-primary'
   return <><header className={`${brand.appearance?.common.stickyHeader !== false ? "sticky top-0" : "relative"} z-50 shrink-0 border-b border-brk-outline bg-white/95 backdrop-blur-xl`}>
     <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-2 sm:px-4 xl:flex xl:justify-between lg:px-6">
       <Link href="/" aria-label={`${brand.name} — Trang chủ`} className="flex shrink-0 items-center gap-2">
@@ -71,16 +70,25 @@ export default function Wi300Header() {
           if (event.key === 'Escape') { closeAccount(); accountRef.current?.querySelector('summary')?.focus() }
         }}>
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-xl px-1 text-xs font-semibold hover:bg-brk-background focus-visible:outline-brk-primary sm:px-2 sm:text-sm [&::-webkit-details-marker]:hidden" aria-label="Menu tài khoản">{session.user.image ? <Image src={session.user.image} alt="" width={36} height={36} unoptimized className="h-9 w-9 shrink-0 rounded-full border-2 border-brk-primary object-cover" /> : <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brk-primary text-white">{(session.user.name || 'Tài khoản').trim().split(/\s+/).map(word => word[0]).slice(-2).join('')}</span>}<span className="hidden max-w-24 truncate 2xl:block">{session.user.name || 'Tài khoản'}</span><ChevronDown className="hidden h-4 w-4 shrink-0 sm:block" aria-hidden="true" /></summary>
-          <div className="absolute right-0 top-full mt-2 max-h-[70dvh] w-60 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border border-brk-outline bg-white p-2 shadow-lg">
-            <p className="truncate border-b border-brk-outline px-3 py-2 text-sm font-semibold">{session.user.name || 'Tài khoản'}</p>
-            <Link href="/my-space?tab=learning" onClick={closeAccount} className={accountLink}><BookOpen className="h-4 w-4" aria-hidden="true" />Khóa học của tôi</Link>
-            <Link href="/my-requests" onClick={closeAccount} className={accountLink}><MessageCircle className="h-4 w-4" aria-hidden="true" />Yêu cầu của tôi</Link>
-            <button type="button" onClick={() => { closeAccount(); openWallet() }} className={`${accountLink} w-full text-left`}><Wallet className="h-4 w-4" aria-hidden="true" />Ví Wi</button>
-            <Link href="/support" onClick={closeAccount} className={accountLink}><LifeBuoy className="h-4 w-4" aria-hidden="true" />Hỗ trợ & phản hồi</Link>
-            {canTeach(session.user.role) && <div className="mt-1 border-t border-brk-outline pt-1"><Link href="/my-space?tab=teaching" onClick={closeAccount} className={accountLink}><GraduationCap className="h-4 w-4" aria-hidden="true" />Đào tạo & Giải pháp</Link><Link href="/tools/crm" onClick={closeAccount} className={accountLink}><Users className="h-4 w-4" aria-hidden="true" />CRM · Chăm sóc</Link></div>}
-            <details className="mt-1 border-t border-brk-outline pt-1"><summary className={`${accountLink} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}><LayoutGrid className="h-4 w-4" aria-hidden="true" />Tiện ích<ChevronDown className="ml-auto h-4 w-4" /></summary><div className="pl-2"><Link href="/my-space?tab=affiliate" onClick={closeAccount} className={accountLink}><Users className="h-4 w-4" aria-hidden="true" />Giới thiệu & hoa hồng</Link><Link href="/doi-tac" onClick={closeAccount} className={accountLink}><Handshake className="h-4 w-4" aria-hidden="true" />Đăng ký đối tác</Link>{session.user.role === 'ADMIN' && <Link href="/my-space?tab=admin" onClick={closeAccount} className={accountLink}><Settings className="h-4 w-4" aria-hidden="true" />Quản trị hệ thống</Link>}<InstallAppButton appName={brand.name} className="w-full hover:bg-brk-background" onBeforeOpen={closeAccount} /></div></details>
-            <Link href="/account-settings" onClick={closeAccount} className={accountLink}><Settings className="h-4 w-4" aria-hidden="true" />Cài đặt tài khoản</Link>
-            <button type="button" className={`${accountLink} w-full border-t border-brk-outline text-left`} onClick={async () => { closeAccount(); await signOutPushCleanup(); await signOut({ callbackUrl: '/' }) }}><LogOut className="h-4 w-4" aria-hidden="true" />Đăng xuất</button>
+          <div className="absolute right-0 top-full mt-2 max-h-[70dvh] w-[280px] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border border-brk-outline bg-white p-2 shadow-lg [&_button]:text-base">
+            <div className="mb-1 flex items-center gap-3 border-b border-brk-outline px-3 py-3">
+              {session.user.image ? <Image src={session.user.image} alt="" width={40} height={40} unoptimized className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brk-primary text-white">{(session.user.name || 'Tài khoản').trim().split(/\s+/).map(word => word[0]).slice(-2).join('')}</span>}
+              <p className="min-w-0 truncate text-base font-semibold">{session.user.name || 'Tài khoản'}</p>
+            </div>
+            <div role="group" aria-label="Yêu cầu và hỗ trợ">
+              <Link href="/my-requests" onClick={closeAccount} className={accountLink}><MessageCircle className="h-5 w-5 shrink-0" aria-hidden="true" />Yêu cầu của tôi</Link>
+              <button type="button" onClick={() => { closeAccount(); openWallet() }} className={`${accountLink} w-full text-left`}><Wallet className="h-5 w-5 shrink-0" aria-hidden="true" />Ví Wi</button>
+              <Link href="/support" onClick={closeAccount} className={accountLink}><LifeBuoy className="h-5 w-5 shrink-0" aria-hidden="true" />Hỗ trợ & phản hồi</Link>
+              <Link href="/account-settings" onClick={closeAccount} className={accountLink}><Settings className="h-5 w-5 shrink-0" aria-hidden="true" />Cài đặt tài khoản</Link>
+            </div>
+            <div role="group" aria-label="Giới thiệu và đối tác" className="mt-1 border-t border-brk-outline pt-1">
+              <Link href="/my-space?tab=affiliate" onClick={closeAccount} className={accountLink}><Users className="h-5 w-5 shrink-0" aria-hidden="true" />Giới thiệu & hoa hồng</Link>
+              <Link href="/doi-tac" onClick={closeAccount} className={accountLink}><Handshake className="h-5 w-5 shrink-0" aria-hidden="true" />Đăng ký đối tác</Link>
+            </div>
+            <div className="mt-1 border-t border-brk-outline pt-1">
+              <InstallAppButton appName={brand.name} className="w-full hover:bg-brk-background" onBeforeOpen={closeAccount} />
+              <button type="button" className={`${accountLink} w-full text-left`} onClick={async () => { closeAccount(); await signOutPushCleanup(); await signOut({ callbackUrl: '/' }) }}><LogOut className="h-5 w-5 shrink-0" aria-hidden="true" />Đăng xuất</button>
+            </div>
           </div>
         </details> : <Link href="/login" className="inline-flex min-h-11 items-center rounded-xl bg-brk-primary px-3 text-xs font-semibold text-white sm:text-sm">Tài khoản</Link>}
       </div>
