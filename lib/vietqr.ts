@@ -37,16 +37,20 @@ export function generateTransferContent(options: {
   userId: number | null | undefined
   courseCode: string
   bankName?: string | null // Ngân hàng của TK NHẬN tiền — VietinBank thì thêm tiền tố SEVQR
+  kind?: 'COC' | 'CC' // COC = cọc/học phí (mặc định); CC = gieo hạt cam kết
 }): string {
   // Format: SDT [phone_cuoi] HV [id] COC [code]
+  // Nội dung gieo hạt dùng mã CC thay COC để tách bạch với học phí và không
+  // khớp nhầm bộ đối soát kích hoạt khóa (vốn chỉ hiểu COC).
   // Các tham số nhận cả null/undefined và chuẩn hóa tại đây: nhiều điểm gọi
   // (popup thanh toán phía client) giữ phone/userId ở dạng nullable theo
   // trạng thái đăng nhập — gom nới kiểu về một chỗ này để mọi điểm gọi an
   // toàn type. userId null chỉ xảy ra ở nội dung hiển thị dự phòng khi chưa
   // có payment thật; nội dung chuẩn luôn do server sinh khi đã có user.
   const { phone, userId, courseCode, bankName } = options
+  const kind = options.kind === 'CC' ? 'CC' : 'COC'
   const cleanPhone = (phone || '').replace(/\D/g, '').slice(-6)
-  const base = `SDT ${cleanPhone} HV ${userId ?? 0} COC ${courseCode}`.toUpperCase()
+  const base = `SDT ${cleanPhone} HV ${userId ?? 0} ${kind} ${courseCode}`.toUpperCase()
   const content = isVietinBank(bankName) ? `SEVQR ${base}` : base
   return content.slice(0, 50) // Tăng giới hạn ký tự lên 50 vì có khoảng cách
 }

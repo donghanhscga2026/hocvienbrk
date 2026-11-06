@@ -18,6 +18,7 @@ export default function CourseActionsMenu({ id, slug, name, status, admin, busy,
     <Link href={`/khoa-hoc/${encodeURIComponent(slug || String(id))}`} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center rounded-lg px-3 text-sm hover:bg-brk-background">Xem công khai ↗</Link>
     <Link href={`/tools/courses/announce?courseId=${id}`} className="flex min-h-11 items-center rounded-lg px-3 text-sm hover:bg-brk-background">Gửi thông báo / email cho học viên</Link>
     <Link href={`/tools/courses/surveys?courseId=${id}`} className="flex min-h-11 items-center rounded-lg px-3 text-sm hover:bg-brk-background">Khảo sát trong khóa học</Link>
+    <Link href={`/tools/courses/gieo-hat?courseId=${id}`} className="flex min-h-11 items-center rounded-lg px-3 text-sm hover:bg-brk-background">Duyệt gieo hạt cam kết</Link>
     {admin && <button type="button" disabled={busy} onClick={() => { menu.current?.hidePopover?.(); onToggle() }} className="min-h-11 w-full rounded-lg px-3 text-left text-sm hover:bg-brk-background disabled:opacity-50">{status ? 'Ẩn khóa học' : 'Hiện khóa học'}</button>}
     {admin && onDelete && <button type="button" disabled={busy} onClick={() => { menu.current?.hidePopover?.(); onDelete() }} className="min-h-11 w-full rounded-lg px-3 text-left text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">Xóa khóa học</button>}
   </div></>

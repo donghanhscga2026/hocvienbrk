@@ -50,6 +50,11 @@ export interface GieoHatSettlementInput {
     computedAmount: number
     proposedAmount: number | null
     finalAmount: number | null
+    studentNote?: string | null
+    reviewNote?: string | null
+    reviewedAt?: Date | string | null
+    transferContent?: string | null
+    studentMarkedPaidAt?: Date | string | null
 }
 
 export type GieoHatItemStatus = "LATE" | "MISSING" | "SETTLED" | "PENDING_REVIEW"
@@ -75,6 +80,29 @@ export interface GieoHatPendingSettlement {
     lessonCount: number
 }
 
+/** Đợt chốt đang xử lý (PROPOSED chờ duyệt hoặc APPROVED chưa trả) — GĐ2. */
+export interface GieoHatActiveSettlement {
+    id: number
+    status: "PROPOSED" | "APPROVED"
+    createdAt: string
+    computedAmount: number
+    proposedAmount: number | null
+    finalAmount: number | null
+    studentNote: string | null
+    transferContent: string | null
+    studentMarkedPaidAt: string | null
+    lessonCount: number
+}
+
+/** Đợt chốt gần nhất bị giảng viên trả lại — GĐ2. */
+export interface GieoHatRejectedSettlement {
+    id: number
+    reviewedAt: string | null
+    reviewNote: string | null
+    computedAmount: number
+    proposedAmount: number | null
+}
+
 export interface GieoHatSummary {
     enabled: boolean
     /** Lý do không tính được (chưa bắt đầu học / enrollment không ACTIVE...) */
@@ -88,6 +116,10 @@ export interface GieoHatSummary {
     computedAmount: number
     settledItems: GieoHatItem[]
     pendingSettlement: GieoHatPendingSettlement | null
+    /** Đợt chốt đang xử lý (GĐ2) — null khi học viên được chốt đợt mới. */
+    activeSettlement: GieoHatActiveSettlement | null
+    /** Đợt chốt gần nhất bị trả lại (GĐ2) — để panel báo lý do cho học viên. */
+    lastRejected: GieoHatRejectedSettlement | null
 }
 
 /** Định dạng 1 thời điểm về ngày VN "YYYY-MM-DD" (Asia/Ho_Chi_Minh). */
@@ -143,6 +175,8 @@ export function computeGieoHatFromData(
         computedAmount: 0,
         settledItems: [],
         pendingSettlement: null,
+        activeSettlement: null,
+        lastRejected: null,
     }
     if (!settings.enabled) return { ...base, reason: "DISABLED" }
     if (!startedAt) return { ...base, reason: "NOT_STARTED" }
@@ -153,6 +187,11 @@ export function computeGieoHatFromData(
     const settledOrderToDate = new Map<number, string>()
     const pendingOrders = new Set<number>()
     let pendingSettlement: GieoHatPendingSettlement | null = null
+    // GĐ2: đợt đang xử lý (PROPOSED/APPROVED mới nhất) + đợt bị trả lại gần
+    // nhất. Đợt REJECTED không vào 2 map khóa bài ở trên nên các bài của nó
+    // được tính lại bình thường ở kỳ này — đúng ý nghĩa "trả lại, chốt lại".
+    let activeSettlement: GieoHatActiveSettlement | null = null
+    let lastRejected: GieoHatRejectedSettlement | null = null
     for (const s of settlements) {
         const orders = parseLessonOrders(s.lessonOrders)
         if (s.status === "APPROVED" || s.status === "PAID") {
@@ -166,6 +205,34 @@ export function computeGieoHatFromData(
                     computedAmount: s.computedAmount,
                     proposedAmount: s.proposedAmount,
                     lessonCount: orders.length,
+                }
+            }
+        }
+        if (s.status === "PROPOSED" || s.status === "APPROVED") {
+            if (!activeSettlement || s.id > activeSettlement.id) {
+                activeSettlement = {
+                    id: s.id,
+                    status: s.status,
+                    createdAt: new Date(s.createdAt).toISOString(),
+                    computedAmount: s.computedAmount,
+                    proposedAmount: s.proposedAmount,
+                    finalAmount: s.finalAmount,
+                    studentNote: s.studentNote ?? null,
+                    transferContent: s.transferContent ?? null,
+                    studentMarkedPaidAt: s.studentMarkedPaidAt
+                        ? new Date(s.studentMarkedPaidAt).toISOString()
+                        : null,
+                    lessonCount: orders.length,
+                }
+            }
+        } else if (s.status === "REJECTED") {
+            if (!lastRejected || s.id > lastRejected.id) {
+                lastRejected = {
+                    id: s.id,
+                    reviewedAt: s.reviewedAt ? new Date(s.reviewedAt).toISOString() : null,
+                    reviewNote: s.reviewNote ?? null,
+                    computedAmount: s.computedAmount,
+                    proposedAmount: s.proposedAmount,
                 }
             }
         }
@@ -245,6 +312,8 @@ export function computeGieoHatFromData(
     base.missingCount = missingCount
     base.computedAmount = (lateCount + missingCount) * rate
     base.pendingSettlement = pendingSettlement
+    base.activeSettlement = activeSettlement
+    base.lastRejected = lastRejected
     return base
 }
 
@@ -310,6 +379,11 @@ export async function getGieoHatSummary(enrollmentId: number): Promise<GieoHatSu
                 computedAmount: true,
                 proposedAmount: true,
                 finalAmount: true,
+                studentNote: true,
+                reviewNote: true,
+                reviewedAt: true,
+                transferContent: true,
+                studentMarkedPaidAt: true,
             },
             orderBy: { id: "asc" },
         }),
