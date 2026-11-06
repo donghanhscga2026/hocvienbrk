@@ -1,4 +1,5 @@
 import 'server-only'
+import { cache } from 'react'
 import type { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { getPublicProjects } from '@/lib/wi300/public-projects'
@@ -8,10 +9,26 @@ import { wi300CoursePreferences, wi300CourseWhere } from '@/lib/wi300/course-vis
 import { emptyOfferingDetails, offeringDetailsSchema, publicOfferingDetails, type ProductGroup } from './shared'
 
 export const offeringDetailsKey = (id: number) => 'catalog:offering:' + id
-export async function readOfferingDetails(id: number, db: Pick<Prisma.TransactionClient, 'systemConfig'> = prisma) {
+async function loadOfferingDetails(id: number, db: Pick<Prisma.TransactionClient, 'systemConfig'>) {
   const row = await db.systemConfig.findUnique({ where: { key: offeringDetailsKey(id) } })
   return offeringDetailsSchema.safeParse(row?.value || {}).data || { ...emptyOfferingDetails }
 }
+const requestOfferingDetails = cache((id: number) => loadOfferingDetails(id, prisma))
+export async function readOfferingDetails(id: number, db?: Pick<Prisma.TransactionClient, 'systemConfig'>) {
+  return db ? loadOfferingDetails(id, db) : requestOfferingDetails(id)
+}
+// Dùng cùng một bản ghi trong metadata, bộ chọn bố cục và trang chi tiết của request.
+// Không cache chéo người dùng; không đưa nguồn nội dung riêng tư vào dữ liệu này.
+export const getOfferingSalesCourse = cache((slug: string) => prisma.course.findUnique({
+  where: { id_khoa: slug },
+  select: {
+    id: true, id_khoa: true, name_lop: true, productGroup: true, phi_coc: true,
+    mo_ta_ngan: true, mo_ta_dai: true, link_anh_bia: true, type: true, feeType: true,
+    voucherConfig: true, allowMbvDeduction: true, requiresReferralActivation: true,
+    referralActivationThreshold: true, teacher: { select: { name: true } },
+    teacherBankAccount: { select: { id: true, accountHolder: true, accountNumber: true, bankName: true, qrCodeUrl: true } },
+  },
+}))
 export async function saveOfferingDetails(db: Prisma.TransactionClient, id: number, group: string, value: unknown, teacherId: number | null) {
   const details = offeringDetailsSchema.parse(value)
   if(group==='SERVICE' && details.service?.saleMode==='QUOTE') {
@@ -32,11 +49,11 @@ export async function saveOfferingDetails(db: Prisma.TransactionClient, id: numb
   }
   await db.systemConfig.upsert({ where: { key: offeringDetailsKey(id) }, create: { key: offeringDetailsKey(id), value: details }, update: { value: details } })
 }
-export async function publicCatalogWhere() {
+export const publicCatalogWhere = cache(async () => {
   const [profile, brand] = await Promise.all([getCurrentSiteProfile(), getCurrentDeploymentBrand()])
   const scope = getCourseWhereForProfile(profile || { userId: 0 })
   return brand ? wi300CourseWhere(scope, await wi300CoursePreferences(prisma), true, []) : scope
-}
+})
 export async function getOfferingCatalog(group: Exclude<ProductGroup, 'COURSE'>) {
   const items = await prisma.course.findMany({
     where: { AND: [await publicCatalogWhere(), { productGroup: group }] },

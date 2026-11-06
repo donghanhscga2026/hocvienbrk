@@ -32,6 +32,27 @@ async function capture(element, beforeRelease) {
 }
 
 async function run() {
+  for (const kind of ['PRODUCT', 'SERVICE']) {
+    let releaseCatalog, catalogReads = 0
+    const catalogWait = new Promise(resolve => { releaseCatalog = resolve })
+    const Catalog = load('components/wi300/WiOfferingCatalog.tsx', {
+      'next/link': link, 'next/image': image,
+      'next/navigation': { notFound: () => { throw Error('404') } },
+      '@/lib/wi300/public-projects': { getPublicProjects: async () => [] },
+      '@/lib/offerings/server': { getOfferingCatalog: () => { catalogReads++; return catalogWait } },
+      '@/components/offerings/OfferingCatalog': moduleOf(({ group }) => React.createElement('p', null, 'Loaded catalog ' + group)),
+      '@/lib/site-profile/presentation': { getPresentationBrand: async () => brand },
+    }).default
+    const tree = await Catalog({ kind })
+    const html = await capture(tree, shell => {
+      assert.equal(catalogReads, 1)
+      assert.ok(shell.includes(kind === 'PRODUCT' ? 'Công cụ &amp; tài nguyên số' : 'Đồng hành cùng chuyên gia'), 'Real introduction is delivered before slow catalog data')
+      assert.ok(shell.includes('Đang tải danh mục'))
+      assert.ok(!shell.includes('Loaded catalog'))
+      releaseCatalog([])
+    })
+    assert.ok(html.includes('Loaded catalog ' + (kind === 'PRODUCT' ? 'DIGITAL' : 'SERVICE')))
+  }
   let release, reads = 0
   const deferred = new Promise(resolve => { release = resolve })
   const PublicHome = load('components/wi300/Wi300PublicHome.tsx', {

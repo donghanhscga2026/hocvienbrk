@@ -17,7 +17,7 @@ import { getCoursePublicExtras } from '@/lib/course-page/public-extras'
 import { getPublicProjects } from '@/lib/wi300/public-projects'
 import CourseProjectBadges from '@/components/course/CourseProjectBadges'
 import OfferingDetail from '@/components/offerings/OfferingDetail'
-import { readOfferingDetails } from '@/lib/offerings/server'
+import { readOfferingDetails, getOfferingSalesCourse } from '@/lib/offerings/server'
 import { publicOfferingDetails, offeringHref, type ProductGroup } from '@/lib/offerings/shared'
 
 // Dùng chung kiểm tra phạm vi trong metadata và nội dung của cùng request.
@@ -45,7 +45,7 @@ export async function generateSalesMetadata({ params, expectedGroup }: SalesPage
     id = id.replace(/\$+$/, '')
     await requireDomainCourse(id)
 
-    const course = await getCourseByIdKhoa(id)
+    const course = await (expectedGroup && expectedGroup !== 'COURSE' ? getOfferingSalesCourse(id) : getCourseByIdKhoa(id))
 
     if (!course || (expectedGroup && course.productGroup !== expectedGroup)) return { title: 'Không tìm thấy nội dung' }
 
@@ -61,7 +61,7 @@ export async function generateSalesMetadata({ params, expectedGroup }: SalesPage
 
     // Check if dynamic course page exists
     const coursePage = await prisma.coursePage.findFirst({
-        where: { slug: id, status: 'published' }
+        where: { slug: id, status: 'published' }, select: { seo: true }
     })
 
     if (coursePage) {

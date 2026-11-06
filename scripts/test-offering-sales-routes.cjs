@@ -14,7 +14,7 @@ async function run() {
     '@/lib/website/domain-context': { requireDomainCourse: async () => {} },
     '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => ({ name: 'Wi300' }) },
     '@/app/actions/course-page-actions': { getPublishedCoursePageBySlug: async () => ({ useTemplate: true, theme: { importedLayout: true }, sections: [] }) },
-    '@/lib/offerings/server': { readOfferingDetails: async () => ({ salesLayout: layout, kind: 'OTHER', resources: [], modules: [] }) },
+    '@/lib/offerings/server': { getOfferingSalesCourse: async () => course(), readOfferingDetails: async () => ({ salesLayout: layout, kind: 'OTHER', resources: [], modules: [] }) },
     '@/lib/course-page/public-extras': { getCoursePublicExtras: async () => { extras++; return { lessons: [], testimonials: [], activeStudentCount: 0, totalHours: 0 } } },
     '@/lib/wi300/public-projects': { getPublicProjects: async () => [] },
     '@/components/landing/LandingPageClient': { CourseLandingClient: () => null },

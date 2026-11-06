@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import prisma from '@/lib/prisma'
 import { requireDomainCourse } from '@/lib/website/domain-context'
 import { getPublishedCoursePageBySlug } from '@/app/actions/course-page-actions'
-import { readOfferingDetails, publicCatalogWhere } from '@/lib/offerings/server'
+import { readOfferingDetails, publicCatalogWhere, getOfferingSalesCourse } from '@/lib/offerings/server'
 import type { ProductGroup } from '@/lib/offerings/shared'
 import OfferingDetail from './OfferingDetail'
 import CourseSalesPage from '@/components/course-page/CourseSalesPage'
@@ -17,7 +17,7 @@ export default async function OfferingSalesPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>
 }) {
   await requireDomainCourse(slug)
-  const course = await prisma.course.findUnique({ where: { id_khoa: slug }, select: { id: true, productGroup: true } })
+  const course = await getOfferingSalesCourse(slug)
   if (!course || course.productGroup !== group) notFound()
   const details = await readOfferingDetails(course.id)
   if (
