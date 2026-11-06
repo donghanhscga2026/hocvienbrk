@@ -989,6 +989,11 @@ export async function createCourseAction(formData: FormData) {
             feeType: (formData.get('feeType') as string) || 'MIEN_PHI',
             requiresReferralActivation: formData.get('requiresReferralActivation') === 'true',
             referralActivationThreshold: parseInt(formData.get('referralActivationThreshold') as string) || 0,
+            gieoHatEnabled: formData.get('gieoHatEnabled') === 'true',
+            gieoHatRate: (() => { const v = parseInt(formData.get('gieoHatRate') as string); return Number.isFinite(v) && v >= 0 ? v : 50000 })(),
+            gieoHatCountLate: formData.get('gieoHatCountLate') !== 'false',
+            gieoHatCountMissing: formData.get('gieoHatCountMissing') !== 'false',
+            gieoHatDailyOnly: formData.get('gieoHatDailyOnly') !== 'false',
             noidung_stk: formData.get('noidung_stk') as string || null,
             link_zalo: formData.get('link_zalo') as string || null,
             file_email: formData.get('file_email') as string || null,
@@ -1312,4 +1317,31 @@ export async function toggleHiddenFromGifts(enrollmentId: number) {
   } catch (error: any) {
     return { success: false, error: error.message }
   }
+}
+
+// ==========================================
+// GIEO HẠT CAM KẾT - Tóm tắt đối chiếu cho học viên (GĐ1: chỉ xem)
+// ==========================================
+export async function getGieoHatSummaryAction(enrollmentId: number) {
+    try {
+        const session = await auth()
+        if (!session?.user?.id) return { success: false as const, error: "Phiên đăng nhập hết hạn." }
+        const userId = Number(session.user.id)
+
+        // Enrollment phải thuộc về chính user đang đăng nhập + đúng domain.
+        await requireDomainEnrollment(enrollmentId, userId)
+        const enrollment = await prisma.enrollment.findUnique({
+            where: { id: enrollmentId, userId },
+            select: { id: true }
+        })
+        if (!enrollment) return { success: false as const, error: "Không tìm thấy ghi danh." }
+
+        const { getGieoHatSummary } = await import("@/lib/course/gieo-hat")
+        const summary = await getGieoHatSummary(enrollmentId)
+        if (!summary) return { success: false as const, error: "Không tìm thấy ghi danh." }
+        return { success: true as const, summary }
+    } catch (error: any) {
+        console.error("getGieoHatSummaryAction error:", error)
+        return { success: false as const, error: error?.message || "Không tải được thông tin gieo hạt." }
+    }
 }

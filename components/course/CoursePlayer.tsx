@@ -27,8 +27,11 @@ const StartDateModal = dynamic(() => import("./StartDateModal"), { ssr: false })
 import {
     confirmStartDateAction,
     submitAssignmentAction,
-    updateLastLessonAction
+    updateLastLessonAction,
+    getGieoHatSummaryAction
 } from "@/app/actions/course-actions"
+import GieoHatPanel from "./GieoHatPanel"
+import type { GieoHatSummary } from "@/lib/course/gieo-hat"
 import { hasUserCommentedOnLesson } from "@/app/actions/comment-actions"
 import { updateLessonAction } from "@/app/actions/admin-actions"
 
@@ -70,6 +73,25 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     const prevMobileTabRef = useRef(mobileTab)
     const [showCommentReminder, setShowCommentReminder] = useState(false)
     const [showDailyChallengeReminder, setShowDailyChallengeReminder] = useState(false)
+    // Gieo hạt cam kết (GĐ1): panel đối chiếu + huy hiệu số tiền trên header
+    const [showGieoHat, setShowGieoHat] = useState(false)
+    const [gieoHatSummary, setGieoHatSummary] = useState<GieoHatSummary | null>(null)
+    const [gieoHatLoading, setGieoHatLoading] = useState(false)
+    const gieoHatVisible = !!course.gieoHatEnabled && enrollment.status === 'ACTIVE'
+    const loadGieoHat = useCallback(async () => {
+        if (!course.gieoHatEnabled) return
+        setGieoHatLoading(true)
+        try {
+            const res = await getGieoHatSummaryAction(enrollment.id)
+            if (res.success) setGieoHatSummary(res.summary)
+        } catch { /* panel tự hiện trạng thái không tải được */ }
+        setGieoHatLoading(false)
+    }, [course.gieoHatEnabled, enrollment.id])
+    useEffect(() => {
+        if (gieoHatVisible) loadGieoHat()
+        // Chỉ nạp 1 lần lúc vào trang để hiện huy hiệu; mở panel sẽ nạp lại.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [gieoHatVisible])
     const [pendingLessonId, setPendingLessonId] = useState<string | null>(null)
     const [videoHidden, setVideoHidden] = useState(false)
     // [HOVER-HIDE] Desktop: hover vào khung bình luận sẽ tạm thu gọn video (không unmount)
@@ -338,6 +360,21 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 )}
 
                 <h1 className="min-w-0 flex-1 font-bold text-white website:text-brk-on-surface truncate text-sm sm:text-base text-right">{course.name_lop}</h1>
+                {gieoHatVisible && (
+                    <button
+                        onClick={() => { setShowGieoHat(true); loadGieoHat() }}
+                        title="Gieo hạt cam kết"
+                        aria-label="Gieo hạt cam kết"
+                        className="animate-gieo-hat-zoom relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-green-500 bg-green-900/70 text-lg"
+                    >
+                        🌱
+                        {gieoHatSummary && gieoHatSummary.computedAmount > 0 && (
+                            <span className="absolute -right-2.5 -top-2 whitespace-nowrap rounded-full border-2 border-zinc-900 bg-red-600 px-1.5 py-px text-[9.5px] font-bold leading-tight text-white">
+                                {gieoHatSummary.computedAmount.toLocaleString("vi-VN")}đ
+                            </span>
+                        )}
+                    </button>
+                )}
                 <NotificationBell />
                 <CrmRequestButton key={currentLessonId} courseId={course.id} courseTitle={course.name_lop} lessonId={currentLessonId} lessonTitle={currentLesson?.title} signedIn={!!session?.user} learning compact />
             </header>
@@ -630,6 +667,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
             )}
 
             <StartDateModal isOpen={!enrollment.startedAt} onConfirm={async (d) => { await confirmStartDateAction(course.id, d); window.location.reload(); }} />
+            <GieoHatPanel open={showGieoHat} onClose={() => setShowGieoHat(false)} summary={gieoHatSummary} loading={gieoHatLoading} />
         </div>
     )
 }

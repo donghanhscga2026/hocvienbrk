@@ -88,6 +88,7 @@ model User {
   metricEvents                 MetricEvent[]
   raceEnrollments              RaceEnrollment[]
   raceLeaves                   RaceLeave[]
+  gieoHatSettlements           GieoHatSettlement[]     @relation("GieoHatStudent")
 
   @@index([email])
   @@index([phone])
@@ -409,6 +410,11 @@ model Course {
   requiresReferralActivation  Boolean                 @default(false)
   referralActivationThreshold Int                     @default(0)
   memberLabels                Json                    @default("{}")
+  gieoHatEnabled              Boolean                 @default(false)
+  gieoHatRate                 Int                     @default(50000)
+  gieoHatCountLate            Boolean                 @default(true)
+  gieoHatCountMissing         Boolean                 @default(true)
+  gieoHatDailyOnly            Boolean                 @default(true)
   courseCategory              CourseCategory?         @relation(fields: [categoryId], references: [id])
   teacherBankAccount          UserBankAccount?        @relation("CourseTeacherBank", fields: [teacherBankAccountId], references: [id])
   teacher                     User?                   @relation(fields: [teacherId], references: [id])
@@ -426,6 +432,7 @@ model Course {
   systemTree                  SystemTree?
   learnerBaselines            LearnerBaseline[]
   attendanceSessions          AttendanceSession[]
+  gieoHatSettlements          GieoHatSettlement[]
 
   @@index([teacherId])
 }
@@ -488,12 +495,49 @@ model Enrollment {
    user           User             @relation("StudentEnrollment", fields: [userId], references: [id], onDelete: Cascade)
    lessonProgress LessonProgress[]
    payment        Payment?
+   gieoHatSettlements GieoHatSettlement[]
    hiddenFromGifts Boolean @default(false)
 
    @@unique([userId, courseId])
   @@index([userId])
   @@index([courseId])
   @@index([referrerId])
+}
+
+/// Gieo hạt cam kết — mỗi lần học viên chốt số gieo hạt của 1 enrollment là
+/// 1 bản ghi. lessonOrders lưu danh sách số thứ tự bài đã gộp trong lần chốt
+/// để lần tính sau không tính trùng bài đã chốt (xem lib/course/gieo-hat.ts).
+/// GĐ1 — kế hoạch tính năng Gieo hạt cam kết (05/11/2026).
+model GieoHatSettlement {
+  id                  Int                     @id @default(autoincrement())
+  enrollmentId        Int
+  courseId            Int
+  userId              Int
+  periodTo            DateTime
+  lessonOrders        Json
+  lateCount           Int                     @default(0)
+  missingCount        Int                     @default(0)
+  computedAmount      Int                     @default(0)
+  proposedAmount      Int?
+  studentNote         String?
+  finalAmount         Int?
+  status              GieoHatSettlementStatus @default(PROPOSED)
+  reviewedBy          Int?
+  reviewedAt          DateTime?
+  reviewNote          String?
+  transferContent     String?
+  studentMarkedPaidAt DateTime?
+  paidConfirmedBy     Int?
+  paidConfirmedAt     DateTime?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  enrollment          Enrollment              @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  course              Course                  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user                User                    @relation("GieoHatStudent", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([enrollmentId, status])
+  @@index([courseId, status])
+  @@index([userId])
 }
 
 /// Đo lường biến đổi của học viên theo từng khóa học: Điểm A (xuất phát điểm
@@ -2463,6 +2507,13 @@ enum EnrollmentMode {
 enum EnrollmentMemberRole {
   TV
   PS
+}
+
+enum GieoHatSettlementStatus {
+  PROPOSED
+  APPROVED
+  PAID
+  REJECTED
 }
 
 enum RaceStatus {

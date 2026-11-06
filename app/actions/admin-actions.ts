@@ -1885,7 +1885,12 @@ export async function updateCourseAction(courseId: number, data: {
     voucherConfig?: string,
     allowMbvDeduction?: boolean,
     requiresReferralActivation?: boolean,
-    referralActivationThreshold?: number
+    referralActivationThreshold?: number,
+    gieoHatEnabled?: boolean,
+    gieoHatRate?: number,
+    gieoHatCountLate?: boolean,
+    gieoHatCountMissing?: boolean,
+    gieoHatDailyOnly?: boolean
 }) {
     try {
         // ✅ Check course tồn tại + quyền sửa (TEACHER chỉ sửa course của mình)
@@ -1934,6 +1939,11 @@ export async function updateCourseAction(courseId: number, data: {
             allowMbvDeduction: data.allowMbvDeduction,
             requiresReferralActivation: data.requiresReferralActivation,
             referralActivationThreshold: data.referralActivationThreshold,
+            gieoHatEnabled: data.gieoHatEnabled,
+            gieoHatRate: data.gieoHatRate === undefined ? undefined : (Number.isFinite(data.gieoHatRate) && data.gieoHatRate >= 0 ? Math.floor(data.gieoHatRate) : 50000),
+            gieoHatCountLate: data.gieoHatCountLate,
+            gieoHatCountMissing: data.gieoHatCountMissing,
+            gieoHatDailyOnly: data.gieoHatDailyOnly,
             noidung_stk: data.noidung_stk ?? null,
             file_email: data.file_email ?? null,
             noidung_email: data.noidung_email ?? null,
