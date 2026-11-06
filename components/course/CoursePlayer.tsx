@@ -78,6 +78,12 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     const [gieoHatSummary, setGieoHatSummary] = useState<GieoHatSummary | null>(null)
     const [gieoHatLoading, setGieoHatLoading] = useState(false)
     const gieoHatVisible = !!course.gieoHatEnabled && enrollment.status === 'ACTIVE'
+    // GĐ2: đang có đợt đã duyệt chưa trả thì huy hiệu hiện số cuối của đợt
+    // đó (số tiền học viên thật sự phải chuyển), còn lại hiện số máy tính kỳ này.
+    const gieoHatBadgeAmount =
+        gieoHatSummary?.activeSettlement?.status === 'APPROVED'
+            ? (gieoHatSummary.activeSettlement.finalAmount ?? gieoHatSummary.computedAmount)
+            : (gieoHatSummary?.computedAmount ?? 0)
     const loadGieoHat = useCallback(async () => {
         if (!course.gieoHatEnabled) return
         setGieoHatLoading(true)
@@ -368,9 +374,9 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                         className="animate-gieo-hat-zoom relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-green-500 bg-green-900/70 text-lg"
                     >
                         🌱
-                        {gieoHatSummary && gieoHatSummary.computedAmount > 0 && (
+                        {gieoHatSummary && gieoHatBadgeAmount > 0 && (
                             <span className="absolute -right-2.5 -top-2 whitespace-nowrap rounded-full border-2 border-zinc-900 bg-red-600 px-1.5 py-px text-[9.5px] font-bold leading-tight text-white">
-                                {gieoHatSummary.computedAmount.toLocaleString("vi-VN")}đ
+                                {gieoHatBadgeAmount.toLocaleString("vi-VN")}đ
                             </span>
                         )}
                     </button>
@@ -667,7 +673,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
             )}
 
             <StartDateModal isOpen={!enrollment.startedAt} onConfirm={async (d) => { await confirmStartDateAction(course.id, d); window.location.reload(); }} />
-            <GieoHatPanel open={showGieoHat} onClose={() => setShowGieoHat(false)} summary={gieoHatSummary} loading={gieoHatLoading} />
+            <GieoHatPanel open={showGieoHat} onClose={() => setShowGieoHat(false)} summary={gieoHatSummary} loading={gieoHatLoading} enrollmentId={enrollment.id} onChanged={loadGieoHat} />
         </div>
     )
 }
