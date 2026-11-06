@@ -105,6 +105,12 @@ function CreateCourseContent() {
     const [allowMbvDeduction, setAllowMbvDeduction] = useState(true)
     const [requiresReferralActivation, setRequiresReferralActivation] = useState(false)
     const [referralActivationThreshold, setReferralActivationThreshold] = useState(0)
+    // Gieo hạt cam kết (GĐ1)
+    const [gieoHatEnabled, setGieoHatEnabled] = useState(false)
+    const [gieoHatRate, setGieoHatRate] = useState(50000)
+    const [gieoHatCountLate, setGieoHatCountLate] = useState(true)
+    const [gieoHatCountMissing, setGieoHatCountMissing] = useState(true)
+    const [gieoHatDailyOnly, setGieoHatDailyOnly] = useState(true)
     const [acceptedVoucherIds, setAcceptedVoucherIds] = useState<number[]>([])
     const [awardVoucherIds, setAwardVoucherIds] = useState<number[]>([])
     const [allVouchers, setAllVouchers] = useState<any[]>([])
@@ -246,6 +252,11 @@ function CreateCourseContent() {
                         setAllowMbvDeduction(courseRes.allowMbvDeduction !== false)
                         setRequiresReferralActivation(courseRes.requiresReferralActivation || false)
                         setReferralActivationThreshold(courseRes.referralActivationThreshold || 0)
+                        setGieoHatEnabled(courseRes.gieoHatEnabled || false)
+                        setGieoHatRate(courseRes.gieoHatRate ?? 50000)
+                        setGieoHatCountLate(courseRes.gieoHatCountLate !== false)
+                        setGieoHatCountMissing(courseRes.gieoHatCountMissing !== false)
+                        setGieoHatDailyOnly(courseRes.gieoHatDailyOnly !== false)
                         setAcceptedVoucherIds(courseRes.acceptedVouchers?.map((v: any) => v.voucherId) || [])
                         setAwardVoucherIds(courseRes.voucherAwards?.map((v: any) => v.voucherId) || [])
                         setNoidungStk(courseRes.noidung_stk || '')
@@ -325,6 +336,11 @@ function CreateCourseContent() {
                 allowMbvDeduction,
                 requiresReferralActivation,
                 referralActivationThreshold,
+                gieoHatEnabled,
+                gieoHatRate,
+                gieoHatCountLate,
+                gieoHatCountMissing,
+                gieoHatDailyOnly,
                 acceptedVoucherIds,
                 awardVoucherIds,
                 noidung_stk: noidungStk || null,
@@ -369,6 +385,11 @@ function CreateCourseContent() {
              formData.append('allowMbvDeduction', allowMbvDeduction ? 'true' : 'false')
              formData.append('requiresReferralActivation', requiresReferralActivation ? 'true' : 'false')
             formData.append('referralActivationThreshold', referralActivationThreshold.toString())
+            formData.append('gieoHatEnabled', gieoHatEnabled ? 'true' : 'false')
+            formData.append('gieoHatRate', gieoHatRate.toString())
+            formData.append('gieoHatCountLate', gieoHatCountLate ? 'true' : 'false')
+            formData.append('gieoHatCountMissing', gieoHatCountMissing ? 'true' : 'false')
+            formData.append('gieoHatDailyOnly', gieoHatDailyOnly ? 'true' : 'false')
             formData.append('acceptedVoucherIds', JSON.stringify(acceptedVoucherIds))
             formData.append('awardVoucherIds', JSON.stringify(awardVoucherIds))
             if (teacherBankAccountId) formData.append('teacherBankAccountId', teacherBankAccountId.toString())
@@ -820,6 +841,45 @@ function CreateCourseContent() {
                             className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
                             placeholder="Nội dung..." 
                         />
+                    </div>
+
+                    {/* GIEO HẠT CAM KẾT (GĐ1) — chỉ áp dụng cho khóa học */}
+                    <div hidden={productGroup !== 'COURSE'} className="mt-6 rounded-2xl border border-green-200 bg-green-50/60 p-4">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <label className="text-sm font-black text-gray-800 flex items-center gap-2">🌱 Gieo hạt cam kết</label>
+                            <label className="inline-flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" checked={gieoHatEnabled} onChange={(e) => setGieoHatEnabled(e.target.checked)} className="w-4 h-4 rounded" />
+                                <span className="text-sm font-bold text-gray-600">Bật gieo hạt cho khóa này</span>
+                            </label>
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-1.5">Khi bật, học viên thấy biểu tượng gieo hạt trong giao diện học: hệ thống tự tính số buổi nộp muộn / chưa nộp tính đến hết hôm qua và số tiền tương ứng để học viên đối chiếu.</p>
+                        {feeType === 'PHI_CAM_KET' && !gieoHatEnabled && (
+                            <p className="text-[11px] font-bold text-amber-600 mt-1.5">Khóa đang chọn dạng phí “Phí cam kết” — nên bật gieo hạt.</p>
+                        )}
+                        {gieoHatEnabled && (
+                            <div className="mt-4 space-y-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mức gieo hạt mỗi buổi phạm (VND)</label>
+                                        <input type="number" min={0} step={1000} value={gieoHatRate} onChange={(e) => setGieoHatRate(parseInt(e.target.value) || 0)} className="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap gap-x-6 gap-y-2">
+                                    <label className="inline-flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" checked={gieoHatCountLate} onChange={(e) => setGieoHatCountLate(e.target.checked)} className="w-4 h-4 rounded" />
+                                        <span className="text-sm font-bold text-gray-600">Tính buổi nộp muộn</span>
+                                    </label>
+                                    <label className="inline-flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" checked={gieoHatCountMissing} onChange={(e) => setGieoHatCountMissing(e.target.checked)} className="w-4 h-4 rounded" />
+                                        <span className="text-sm font-bold text-gray-600">Tính buổi chưa nộp</span>
+                                    </label>
+                                    <label className="inline-flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" checked={gieoHatDailyOnly} onChange={(e) => setGieoHatDailyOnly(e.target.checked)} className="w-4 h-4 rounded" />
+                                        <span className="text-sm font-bold text-gray-600">Chỉ tính bài thử thách hằng ngày</span>
+                                    </label>
+                                </div>
+                            </div>
+                        )}
                     </div>
                     </div>
                 </div>

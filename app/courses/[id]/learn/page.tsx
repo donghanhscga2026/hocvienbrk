@@ -52,7 +52,7 @@ export default async function CourseLearnPage({
   // enrollment bên dưới không phải fetch lại cùng 1 dòng course lần nữa.
   const course = await prisma.course.findUnique({
     where: { id_khoa: id },
-    select: { id: true, type: true, id_khoa: true, name_lop: true, teacherId: true, productGroup: true },
+    select: { id: true, type: true, id_khoa: true, name_lop: true, teacherId: true, productGroup: true, gieoHatEnabled: true },
   })
 
   if (!course) redirect(`/courses/${id}`)
@@ -134,7 +134,7 @@ export default async function CourseLearnPage({
       {brand && <Wi300Breadcrumb title={course.name_lop} courseSlug={course.id_khoa} learning />}
       <div className={brand ? 'min-h-0 flex-1' : 'contents'}>
       <CoursePlayer
-        course={{ id: course.id, id_khoa: course.id_khoa, name_lop: course.name_lop, type: course.type, teacherId: course.teacherId, lessons }}
+        course={{ id: course.id, id_khoa: course.id_khoa, name_lop: course.name_lop, type: course.type, teacherId: course.teacherId, gieoHatEnabled: course.gieoHatEnabled, lessons }}
         enrollment={enrollment}
         session={session}
       />

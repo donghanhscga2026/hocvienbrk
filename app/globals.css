@@ -167,6 +167,23 @@ body {
   animation-iteration-count: infinite;
   /* animation-duration: set inline per-instance (style.animationDuration) */
 }
+
+/* gieo-hat-zoom — nút Gieo hạt cam kết trên header CoursePlayer: nhấp nháy
+   kiểu zoom in–out (phóng to/thu nhỏ nhịp nhàng kèm quầng sáng xanh lá) để
+   học viên dễ thấy. Xem components/course/GieoHatPanel.tsx. */
+@keyframes gieo-hat-zoom {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+  }
+  50% {
+    transform: scale(1.18);
+    box-shadow: 0 0 0 7px rgba(74, 222, 128, 0.18);
+  }
+}
+.animate-gieo-hat-zoom {
+  animation: gieo-hat-zoom 1.15s ease-in-out infinite;
+}
 /* Ép màu chữ/icon bên trong đối tượng đang lóe sáng sang màu đã cấu hình —
    luôn tương phản rõ trên nền --attn-bg-color bất kể theme sáng/tối. */
 .attention-highlight-active * {
