@@ -25,7 +25,7 @@ export async function GET(request: Request) {
         { status: 403, headers: noStore },
       )
     const used = await prisma.enrollment.count({
-      where: { courseId, status: { in: ['ACTIVE', 'COMPLETED'] } },
+      where: { courseId, status: 'ACTIVE' },
     })
     return NextResponse.json({ used }, { headers: noStore })
   } catch (error) {

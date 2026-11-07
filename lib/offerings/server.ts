@@ -61,7 +61,7 @@ export async function getTrialRecord(courseId: number, userId: number): Promise<
 // Số suất ưu đãi đầu tiên đã dùng = số ghi danh đã kích hoạt thành công của món này.
 export async function getEarlyBirdUsed(courseId: number): Promise<number> {
   return prisma.enrollment.count({
-    where: { courseId, status: { in: ['ACTIVE', 'COMPLETED'] } },
+    where: { courseId, status: 'ACTIVE' },
   })
 }
 export const publicCatalogWhere = cache(async () => {
