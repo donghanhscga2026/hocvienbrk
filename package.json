@@ -14,6 +14,7 @@
     "lint": "eslint",
     "test:crm-notifications": "node scripts/test-crm-notifications.cjs",
     "test:care-rules": "node scripts/test-care-rules.cjs",
+    "test:care-followups": "node scripts/test-care-followups.cjs",
     "test:website-templates": "node scripts/test-free-design-disabled.cjs",
     "test:custom-domains": "node scripts/test-custom-domains.cjs",
     "test:multisite-integration": "node scripts/test-multisite-integration.cjs",

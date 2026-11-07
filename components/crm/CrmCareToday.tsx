@@ -6,7 +6,21 @@ type CareRuleId = 'R1' | 'R2' | 'R3' | 'R4' | 'R5' | 'R6'
 type CareStatus = 'pending' | 'reminded' | 'capped' | 'skipped' | 'takeover'
 type CareRow = {
   userId: number; userName: string; courseId: number; courseName: string; enrollmentId: number | null
-  ruleId: CareRuleId; ruleName: string; score: number; signal: string; detail: string; message: string; status: CareStatus
+  ruleId: CareRuleId; ruleName: string; score: number; signal: string; detail: string; message: string
+  templateVars: Record<string, string | number>
+  status: CareStatus
+}
+type LibraryTemplate = {
+  id: number; shortcut: string; name: string; body: string; scope: 'SYSTEM' | 'COURSE' | 'PERSONAL'; courseId: number | null; isActive: boolean
+}
+
+/** Render xem trước phía client cho câu mẫu thư viện: điền biến của dòng + tung spintax. */
+function renderPreview(body: string, vars: Record<string, string | number>): string {
+  const filled = body.replace(/\{(name|course|lesson|streak|amount|days|hours)\}/g, (m, key: string) => vars[key] !== undefined ? String(vars[key]) : m)
+  return filled.replace(/\{([^{}]*\|[^{}]*)\}/g, (_m, group: string) => {
+    const options = group.split('|')
+    return options[Math.floor(Math.random() * options.length)]
+  })
 }
 type CareData = {
   date: string
@@ -58,6 +72,19 @@ export default function CrmCareToday({ revision }: { revision: number }) {
   const [busyKey, setBusyKey] = useState('')
   const [actionError, setActionError] = useState('')
   const [notice, setNotice] = useState('')
+  const [library, setLibrary] = useState<LibraryTemplate[]>([])
+  const [remindTarget, setRemindTarget] = useState<CareRow | null>(null)
+  const [remindTemplateId, setRemindTemplateId] = useState('')
+  const [followTarget, setFollowTarget] = useState<CareRow | null>(null)
+  const [followDays, setFollowDays] = useState(3)
+  const [followTemplateId, setFollowTemplateId] = useState('')
+
+  useEffect(() => {
+    fetch('/api/crm/care-templates', { cache: 'no-store' }).then(async response => {
+      const result = await response.json().catch(() => null)
+      if (response.ok && result?.templates) setLibrary(result.templates)
+    }).catch(() => undefined)
+  }, [revision])
 
   useEffect(() => {
     const abort = new AbortController()
@@ -82,11 +109,11 @@ export default function CrmCareToday({ revision }: { revision: number }) {
     { label: 'Tạm dừng / đạt trần', value: data.stats.takeover + data.stats.capped, icon: PauseCircle },
   ]
 
-  const act = async (row: CareRow, action: 'remind' | 'skip') => {
+  const act = async (row: CareRow, action: 'remind' | 'skip', templateId?: number) => {
     const key = row.userId + ':' + row.courseId + ':' + row.ruleId
     setBusyKey(key); setActionError(''); setNotice('')
     try {
-      const result = await postCare('/api/crm/care-today/' + action, { userId: row.userId, courseId: row.courseId, ruleId: row.ruleId })
+      const result = await postCare('/api/crm/care-today/' + action, { userId: row.userId, courseId: row.courseId, ruleId: row.ruleId, ...(templateId ? { templateId } : {}) })
       setData(current => current ? {
         ...current,
         stats: {
@@ -97,10 +124,30 @@ export default function CrmCareToday({ revision }: { revision: number }) {
           ? { ...item, status: result.status as CareStatus } : item),
       } : current)
       setNotice(action === 'remind' ? 'Đã gửi nhắc cho ' + row.userName + '.' : 'Đã bỏ qua dòng của ' + row.userName + ' trong hôm nay.')
+      if (action === 'remind') setRemindTarget(null)
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Không xử lý được yêu cầu.')
     } finally { setBusyKey('') }
   }
+
+  const createFollow = async () => {
+    if (!followTarget) return
+    const row = followTarget
+    setBusyKey('follow'); setActionError(''); setNotice('')
+    try {
+      await postCare('/api/crm/care-followups', {
+        studentId: row.userId, courseId: row.courseId, ruleId: row.ruleId,
+        templateId: followTemplateId ? Number(followTemplateId) : null,
+        note: row.message, days: followDays,
+      })
+      setNotice(`Đã đặt hẹn theo dõi ${row.userName} sau ${followDays} ngày — học viên phản hồi là hẹn tự hủy. Xem ở tab Câu mẫu & hẹn giờ.`)
+      setFollowTarget(null)
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Không đặt được hẹn theo dõi.')
+    } finally { setBusyKey('') }
+  }
+
+  const templatesFor = (row: CareRow) => library.filter(t => t.isActive && (t.scope !== 'COURSE' || t.courseId === row.courseId))
 
   return <div className="space-y-5">
     <div className="flex items-center justify-between gap-3">
@@ -140,11 +187,58 @@ export default function CrmCareToday({ revision }: { revision: number }) {
             <span className={'text-xs font-medium ' + STATUS_CLASS[row.status]}>{STATUS_LABEL[row.status]}</span>
             <span className="flex-1" />
             {canSkip && <button disabled={busy} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-100 disabled:opacity-50" onClick={() => void act(row, 'skip')}>Bỏ qua hôm nay</button>}
-            {canRemind && <button disabled={busy} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50" onClick={() => void act(row, 'remind')}><Bell size={16} />{busy ? 'Đang gửi…' : 'Gửi nhắc'}</button>}
+            {(row.status === 'pending' || row.status === 'takeover' || row.status === 'capped') && <button disabled={busy} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-100 disabled:opacity-50" onClick={() => { setFollowTarget(row); setFollowDays(3); setFollowTemplateId('') }}>Hẹn theo dõi</button>}
+            {canRemind && <button disabled={busy} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50" onClick={() => { setRemindTarget(row); setRemindTemplateId('') }}><Bell size={16} />Gửi nhắc</button>}
           </div>
         </article>
       })}{rows.length === 0 && <p className="p-8 text-center text-sm text-slate-500">Không có học viên nào khớp bộ lọc. Hàng đợi đang sạch — tốt lắm.</p>}</div>
     </section>
     <p className="text-xs text-slate-500">Đang hiện {rows.length} dòng theo bộ lọc, tối đa 300 dòng điểm cao nhất. Gửi nhắc sẽ tính lại tín hiệu từ dữ liệu thật trước khi gửi.</p>
+
+    {remindTarget && <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label="Gửi nhắc học viên">
+      <div className="w-full max-w-lg space-y-3 rounded-2xl bg-white p-5">
+        <div className="flex items-center justify-between gap-2">
+          <strong className="text-sm text-slate-900">Gửi nhắc {remindTarget.userName}</strong>
+          <span className={'rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ' + RULE_BADGE[remindTarget.ruleId]}>{remindTarget.ruleId} · {remindTarget.ruleName}</span>
+        </div>
+        <p className="text-xs text-slate-500">{remindTarget.courseName} · {remindTarget.signal}</p>
+        <label className="block space-y-1">
+          <span className="text-xs font-medium text-slate-500">Câu mẫu</span>
+          <select value={remindTemplateId} onChange={e => setRemindTemplateId(e.target.value)} className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            <option value="">Mẫu mặc định của luật {remindTarget.ruleId}</option>
+            {templatesFor(remindTarget).map(t => <option key={t.id} value={t.id}>{t.name} ({t.shortcut})</option>)}
+          </select>
+        </label>
+        <div className="rounded-xl bg-slate-50 p-3">
+          <p className="mb-1 text-xs font-medium text-slate-500">Nội dung sẽ gửi (render ở máy chủ khi bấm gửi)</p>
+          <p className="text-sm leading-6 text-slate-700">{remindTemplateId ? renderPreview(templatesFor(remindTarget).find(t => t.id === Number(remindTemplateId))?.body || '', remindTarget.templateVars) : remindTarget.message}</p>
+        </div>
+        <div className="flex gap-2">
+          <button disabled={busyKey !== ''} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50" onClick={() => void act(remindTarget, 'remind', remindTemplateId ? Number(remindTemplateId) : undefined)}><Bell size={16} />{busyKey ? 'Đang gửi…' : 'Gửi nhắc này'}</button>
+          <button className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm" onClick={() => setRemindTarget(null)}>Đóng</button>
+        </div>
+      </div>
+    </div>}
+
+    {followTarget && <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label="Hẹn theo dõi học viên">
+      <div className="w-full max-w-lg space-y-3 rounded-2xl bg-white p-5">
+        <strong className="block text-sm text-slate-900">Hẹn theo dõi {followTarget.userName}</strong>
+        <p className="text-xs text-slate-500">{followTarget.courseName} · Nếu học viên học/nộp bài, bình luận hoặc gửi yêu cầu mới trước hạn, hẹn sẽ tự hủy và không gửi gì thêm.</p>
+        <div className="flex gap-2">
+          {[1, 3, 7].map(days => <button key={days} type="button" aria-pressed={followDays === days} className={(followDays === days ? 'bg-emerald-700 text-white ' : 'bg-white text-slate-700 ring-1 ring-slate-300 ') + 'min-h-11 flex-1 rounded-xl px-3 py-2 text-sm font-medium'} onClick={() => setFollowDays(days)}>Sau {days} ngày</button>)}
+        </div>
+        <label className="block space-y-1">
+          <span className="text-xs font-medium text-slate-500">Câu mẫu khi tới hạn (tùy chọn)</span>
+          <select value={followTemplateId} onChange={e => setFollowTemplateId(e.target.value)} className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            <option value="">Dùng nội dung nhắc hiện tại của dòng này</option>
+            {templatesFor(followTarget).map(t => <option key={t.id} value={t.id}>{t.name} ({t.shortcut})</option>)}
+          </select>
+        </label>
+        <div className="flex gap-2">
+          <button disabled={busyKey !== ''} className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50" onClick={() => void createFollow()}>{busyKey ? 'Đang đặt…' : 'Đặt hẹn theo dõi'}</button>
+          <button className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm" onClick={() => setFollowTarget(null)}>Đóng</button>
+        </div>
+      </div>
+    </div>}
   </div>
 }
