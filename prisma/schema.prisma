@@ -89,6 +89,9 @@ model User {
   raceEnrollments              RaceEnrollment[]
   raceLeaves                   RaceLeave[]
   gieoHatSettlements           GieoHatSettlement[]     @relation("GieoHatStudent")
+  careTemplatesOwned           CareTemplate[]          @relation("CareTemplateOwner")
+  careFollowUpsAsStudent       CareFollowUp[]          @relation("CareFollowUpStudent")
+  careFollowUpsCreated         CareFollowUp[]          @relation("CareFollowUpCreator")
 
   @@index([email])
   @@index([phone])
@@ -433,6 +436,8 @@ model Course {
   learnerBaselines            LearnerBaseline[]
   attendanceSessions          AttendanceSession[]
   gieoHatSettlements          GieoHatSettlement[]
+  careTemplates               CareTemplate[]
+  careFollowUps               CareFollowUp[]
 
   @@index([teacherId])
 }
@@ -541,6 +546,61 @@ model GieoHatSettlement {
   @@index([enrollmentId, status])
   @@index([courseId, status])
   @@index([userId])
+}
+
+/// Care Engine GĐ2 — thư viện câu mẫu dùng chung cho mọi kênh chăm sóc
+/// (gửi nhắc GĐ1, hẹn giờ theo dõi, sau này CRM/Zalo). Nội dung hỗ trợ biến
+/// {name} {course} {lesson} {streak} {amount} {days} {hours} và spintax
+/// {a|b|c} (xem lib/care/templates-lib.ts). Phạm vi: SYSTEM = toàn hệ
+/// thống, COURSE = theo 1 khóa, PERSONAL = chỉ chủ sở hữu. Shortcut là
+/// duy nhất trong cùng phạm vi — kiểm ở tầng service khi tạo/sửa.
+model CareTemplate {
+  id        Int               @id @default(autoincrement())
+  shortcut  String
+  name      String
+  body      String
+  scope     CareTemplateScope @default(PERSONAL)
+  courseId  Int?
+  ownerId   Int
+  usedCount Int               @default(0)
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  course    Course?           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  owner     User              @relation("CareTemplateOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  followUps CareFollowUp[]
+
+  @@index([scope, courseId])
+  @@index([ownerId])
+  @@index([shortcut])
+}
+
+/// Care Engine GĐ2 — hẹn giờ theo dõi 1 học viên: tới hạn, nếu học viên
+/// đã hoạt động/phản hồi từ lúc đặt hẹn thì tự hủy (CANCELLED_AUTO),
+/// chưa thì gửi nhắc theo câu mẫu đã chọn (xem lib/care/followups.ts).
+model CareFollowUp {
+  id           Int              @id @default(autoincrement())
+  studentId    Int
+  courseId     Int?
+  ruleId       String?
+  templateId   Int?
+  note         String?
+  dueAt        DateTime
+  status       CareFollowUpStatus @default(PENDING)
+  createdById  Int
+  sentAt       DateTime?
+  cancelledAt  DateTime?
+  cancelReason String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  student      User             @relation("CareFollowUpStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  createdBy    User             @relation("CareFollowUpCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  course       Course?          @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  template     CareTemplate?    @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([status, dueAt])
+  @@index([studentId, status])
+  @@index([courseId])
 }
 
 /// Đo lường biến đổi của học viên theo từng khóa học: Điểm A (xuất phát điểm
@@ -2578,6 +2638,19 @@ enum GieoHatSettlementStatus {
   APPROVED
   PAID
   REJECTED
+}
+
+enum CareTemplateScope {
+  SYSTEM
+  COURSE
+  PERSONAL
+}
+
+enum CareFollowUpStatus {
+  PENDING
+  SENT
+  CANCELLED_AUTO
+  CANCELLED_MANUAL
 }
 
 enum RaceStatus {
