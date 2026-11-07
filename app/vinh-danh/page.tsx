@@ -13,6 +13,10 @@ export const metadata = {
  * nền xanh nửa đêm + vàng kim loại gradient, cúp/crown/icon SVG, bục vinh
  * quang có bệ bậc, dòng đua hạng kèm khoảng cách tới hạng trên.
  * Logic dữ liệu giữ nguyên như các bản trước.
+ * Kỳ tháng hiện tại là số liệu tạm tính (snapshot được cron tính lại mỗi
+ * sáng): trang gắn nhãn "đang diễn ra" + dải tạm tính, danh hiệu bục dùng
+ * cách gọi tạm thời; kỳ chỉ chốt chính thức (và trao huy hiệu) vào đầu
+ * tháng sau. Cách hiển thị này theo bản mẫu v3 ní Cương duyệt sáng 07/11/2026.
  */
 export default async function VinhDanhPage({
   searchParams
@@ -30,6 +34,12 @@ export default async function VinhDanhPage({
   }).then(rs => rs.map(r => r.period))
 
   const period = params.period || periods[0] || currentPrevMonth()
+
+  // Kỳ đang diễn ra = kỳ của tháng hiện tại — snapshot của kỳ này là tạm
+  // tính, được tính lại mỗi sáng; các kỳ trước đều đã chốt chính thức.
+  const nowDate = new Date()
+  const currentPeriod = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, '0')}`
+  const isLivePeriod = period === currentPeriod
 
   const snapshots = period
     ? await prisma.leaderboardSnapshot.findMany({
@@ -110,7 +120,9 @@ export default async function VinhDanhPage({
     )
   }
 
-  const podiumTitles = ['Quán quân', 'Á quân', 'Hạng ba']
+  const podiumTitles = isLivePeriod
+    ? ['Đang dẫn đầu', 'Hạng hai tạm tính', 'Hạng ba tạm tính']
+    : ['Quán quân', 'Á quân', 'Hạng ba']
 
   const podiumCard = (s: (typeof displaySnapshots)[number], rank: number) => {
     const badges = badgeMap.get(s.userId) || []
@@ -239,8 +251,10 @@ export default async function VinhDanhPage({
           </h1>
           <p className="text-sm md:text-base text-[#9aa3c7] mt-3.5">
             {mode === 'hoa-hong'
-              ? 'Xếp hạng theo hoa hồng được ghi nhận · Chu kỳ hàng tháng'
-              : 'Xếp hạng theo doanh số giới thiệu (GMV) · Chu kỳ hàng tháng'}
+              ? 'Xếp hạng theo hoa hồng được ghi nhận'
+              : 'Xếp hạng theo doanh số giới thiệu (GMV)'}
+            {' · '}
+            {isLivePeriod ? 'Số liệu tạm tính của tháng đang diễn ra' : 'Chu kỳ hàng tháng'}
           </p>
           <div className="flex items-center justify-center gap-3 max-w-md mx-auto mt-5">
             <div className="h-px flex-1 bg-gradient-to-r from-transparent to-[#d4af37]" />
@@ -248,8 +262,15 @@ export default async function VinhDanhPage({
             <div className="h-px flex-1 bg-gradient-to-l from-transparent to-[#d4af37]" />
           </div>
           <p className="inline-block mt-4 px-5 py-1.5 rounded-full border border-[#d4af37]/60 bg-[#d4af37]/10 text-sm font-semibold text-[#f5e7c1]">
-            Kỳ vinh danh: {formatPeriod(period)}
+            Kỳ vinh danh: {formatPeriod(period)}{isLivePeriod ? ' · đang diễn ra' : ''}
           </p>
+
+          {isLivePeriod && (
+            <div className="mx-auto mt-4 max-w-xl px-4 py-2.5 rounded-2xl border border-[#d4af37]/40 bg-[#d4af37]/10 text-[13px] leading-relaxed text-[#f3d67b]">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 mr-2 animate-pulse" />
+              Kỳ đang diễn ra — số liệu <b>tạm tính</b>, được cập nhật mỗi sáng lúc 08:20. Bảng sẽ chốt chính thức vào đầu tháng sau và trao huy hiệu khi chốt.
+            </div>
+          )}
 
           <div className="flex justify-center gap-2.5 mt-7">
             <a href={`/vinh-danh?period=${period}`}
@@ -279,7 +300,7 @@ export default async function VinhDanhPage({
                       ? 'bg-white/10 text-white border-white/40 font-semibold'
                       : 'bg-transparent text-[#9aa3c7] border-white/15 hover:bg-white/10'
                   }`}>
-                  {formatPeriod(p)}
+                  {formatPeriod(p)}{p === currentPeriod ? ' · đang diễn ra' : ''}
                 </a>
               ))}
             </div>
@@ -316,7 +337,9 @@ export default async function VinhDanhPage({
                   Bục <span className={goldText}>vinh quang</span>
                 </h2>
                 <p className="text-center text-sm text-[#9aa3c7] mt-2 mb-10">
-                  Ba gương mặt xuất sắc nhất kỳ — đứng trên bệ cao nhất của bảng vàng
+                  {isLivePeriod
+                    ? 'Ba gương mặt đang dẫn đầu kỳ — thứ hạng còn thay đổi tới cuối tháng'
+                    : 'Ba gương mặt xuất sắc nhất kỳ — đứng trên bệ cao nhất của bảng vàng'}
                 </p>
                 <div className="grid md:grid-cols-3 gap-6 md:gap-5 items-end max-w-3xl mx-auto">
                   {podium.map((s, idx) => podiumCard(s, idx + 1))}
@@ -370,8 +393,8 @@ export default async function VinhDanhPage({
                           </div>
                           <div className="text-[11px] text-[#c8b26a] mt-1.5">
                             {gap > 0
-                              ? <>Còn <b className="text-[#ffe98a]">{fmt(gap)}</b> nữa là vượt hạng {displayRank - 1} · đạt {pct}% so với quán quân</>
-                              : <>Đang ngang số liệu với hạng {displayRank - 1} · đạt {pct}% so với quán quân</>}
+                              ? <>Còn <b className="text-[#ffe98a]">{fmt(gap)}</b> nữa là vượt hạng {displayRank - 1} · đạt {pct}% so với {isLivePeriod ? 'người dẫn đầu' : 'quán quân'}</>
+                              : <>Đang ngang số liệu với hạng {displayRank - 1} · đạt {pct}% so với {isLivePeriod ? 'người dẫn đầu' : 'quán quân'}</>}
                           </div>
                         </div>
                         <div className="flex gap-1.5 shrink-0">
@@ -405,9 +428,13 @@ export default async function VinhDanhPage({
         )}
 
         <p className="text-center text-[11px] text-[#9aa3c7] mt-10">
-          {mode === 'hoa-hong'
-            ? 'Bảng vinh danh được cập nhật đầu mỗi tháng từ hoa hồng đã ghi nhận của các đơn đã thanh toán.'
-            : 'Bảng vinh danh được cập nhật đầu mỗi tháng từ doanh số giới thiệu đã ghi nhận.'}
+          {isLivePeriod
+            ? (mode === 'hoa-hong'
+              ? 'Số liệu tạm tính của tháng đang diễn ra — cập nhật mỗi sáng từ hoa hồng đã ghi nhận của các đơn đã thanh toán; kỳ sẽ chốt chính thức vào đầu tháng sau.'
+              : 'Số liệu tạm tính của tháng đang diễn ra — cập nhật mỗi sáng từ doanh số giới thiệu đã ghi nhận; kỳ sẽ chốt chính thức vào đầu tháng sau.')
+            : (mode === 'hoa-hong'
+              ? 'Bảng vinh danh được cập nhật đầu mỗi tháng từ hoa hồng đã ghi nhận của các đơn đã thanh toán.'
+              : 'Bảng vinh danh được cập nhật đầu mỗi tháng từ doanh số giới thiệu đã ghi nhận.')}
         </p>
       </div>
     </main>
