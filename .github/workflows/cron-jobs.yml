@@ -9,6 +9,7 @@ on:
     - cron: '*/15 * * * *'
     - cron: '20 1 * * *'
     - cron: '30 1 * * 1'
+    - cron: '15 0 * * *'
   workflow_dispatch:
 
 jobs:
@@ -142,6 +143,16 @@ jobs:
         if: always()
         run: |
           curl --fail --silent --show-error --max-time 120 -X POST "${{ vars.SITE_URL }}/api/cron/affiliate-leaderboard" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+
+  care-reminders:
+    if: github.event.schedule == '15 0 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Care Engine morning scan (07:15 Vietnam time)
+        run: |
+          curl --fail --silent --show-error --max-time 300 -X GET "${{ vars.SITE_URL }}/api/cron/care-reminders?execute=1" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
 
   affiliate-weekly-check:
