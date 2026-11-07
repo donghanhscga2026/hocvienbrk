@@ -2,6 +2,7 @@ import { getSession } from "@/lib/get-session"
 import prisma from "@/lib/prisma"
 import { redirect } from "next/navigation"
 import CoursePlayer from "@/components/course/CoursePlayer"
+import CareQaWidget from "@/components/course/CareQaWidget"
 import { requireDomainCourse } from '@/lib/website/domain-context'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import Wi300Breadcrumb from '@/components/wi300/Wi300Breadcrumb'
@@ -139,6 +140,7 @@ export default async function CourseLearnPage({
         session={session}
       />
       </div>
+      <CareQaWidget courseId={course.id} />
     </div>
   )
 }

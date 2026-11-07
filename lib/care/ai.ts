@@ -46,7 +46,7 @@ export async function monthlyCareAiSpendVnd(courseId: number): Promise<number> {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
   const logs = await prisma.activityLog.findMany({
     where: {
-      action: 'CARE_AI_DRAFT',
+      action: { in: ['CARE_AI_DRAFT', 'CARE_AI_QA'] },
       createdAt: { gte: monthStart },
       metadata: { path: ['courseId'], equals: courseId },
     },
