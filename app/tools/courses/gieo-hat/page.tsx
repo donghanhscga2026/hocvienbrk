@@ -10,7 +10,10 @@ import {
     getGieoHatSettlementDetailAction,
     reviewGieoHatAction,
     confirmGieoHatReceivedAction,
+    getGieoHatReportAction,
+    exportGieoHatReportCsvAction,
     type GieoHatReviewItem,
+    type GieoHatReportRow,
 } from '@/app/actions/gieo-hat-actions'
 
 /**
@@ -66,6 +69,13 @@ const LESSON_STATUS: Record<string, { text: string; className: string }> = {
     ON_TIME: { text: 'Đúng hạn', className: 'bg-green-100 text-green-800' },
 }
 
+const SETTLEMENT_STATUS: Record<string, { text: string; className: string }> = {
+    PROPOSED: { text: 'Chờ duyệt', className: 'bg-amber-100 text-amber-800' },
+    APPROVED: { text: 'Đã duyệt, chờ tiền về', className: 'bg-sky-100 text-sky-800' },
+    PAID: { text: 'Đã nhận tiền', className: 'bg-green-100 text-green-800' },
+    REJECTED: { text: 'Đã trả lại', className: 'bg-red-100 text-red-800' },
+}
+
 function GieoHatReviewContent() {
     const searchParams = useSearchParams()
     const initialCourseId = Number(searchParams.get('courseId')) || 0
@@ -81,12 +91,18 @@ function GieoHatReviewContent() {
     const [finalText, setFinalText] = useState<Record<number, string>>({})
     const [rejectNote, setRejectNote] = useState<Record<number, string>>({})
     const [details, setDetails] = useState<Record<number, DetailState>>({})
+    const [reportRows, setReportRows] = useState<GieoHatReportRow[]>([])
+    const [exporting, setExporting] = useState(false)
 
     const load = useCallback(async (cid: number) => {
         setLoading(true)
         setError('')
         try {
-            const res = await listGieoHatForReviewAction(cid || undefined)
+            const [res, report] = await Promise.all([
+                listGieoHatForReviewAction(cid || undefined),
+                getGieoHatReportAction(cid || undefined),
+            ])
+            if (report.success) setReportRows(report.rows)
             if (!res.success) {
                 setError(res.error)
                 setPendingReview([])
@@ -160,6 +176,47 @@ function GieoHatReviewContent() {
             setError('Không xử lý được đề nghị. Vui lòng thử lại.')
         }
         setBusyId(null)
+    }
+
+    async function handleExportCsv() {
+        setExporting(true)
+        setError('')
+        try {
+            const res = await exportGieoHatReportCsvAction(courseId || undefined)
+            if (!res.success) {
+                setError(res.error)
+            } else {
+                const blob = new Blob(['\ufeff' + res.csv], { type: 'text/csv;charset=utf-8' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = res.filename
+                document.body.appendChild(a)
+                a.click()
+                a.remove()
+                URL.revokeObjectURL(url)
+                setNotice(`Đã xuất file ${res.filename}.`)
+            }
+        } catch {
+            setError('Không xuất được file CSV. Vui lòng thử lại.')
+        }
+        setExporting(false)
+    }
+
+    const reportSummary = {
+        proposedCount: reportRows.filter(r => r.status === 'PROPOSED').length,
+        proposedTotal: reportRows
+            .filter(r => r.status === 'PROPOSED')
+            .reduce((sum, r) => sum + (r.proposedAmount ?? r.computedAmount), 0),
+        approvedCount: reportRows.filter(r => r.status === 'APPROVED').length,
+        approvedTotal: reportRows
+            .filter(r => r.status === 'APPROVED')
+            .reduce((sum, r) => sum + (r.finalAmount ?? 0), 0),
+        paidCount: reportRows.filter(r => r.status === 'PAID').length,
+        paidTotal: reportRows
+            .filter(r => r.status === 'PAID')
+            .reduce((sum, r) => sum + (r.finalAmount ?? 0), 0),
+        rejectedCount: reportRows.filter(r => r.status === 'REJECTED').length,
     }
 
     async function handleConfirm(item: GieoHatReviewItem) {
@@ -388,6 +445,104 @@ function GieoHatReviewContent() {
                                 </button>
                             </div>
                         ))}
+                    </div>
+                )}
+
+                {/* ===== Báo cáo tổng hợp (GĐ3) ===== */}
+                <div className="mt-10 flex flex-wrap items-center gap-3">
+                    <h2 className="text-lg font-bold text-brk-primary">
+                        Báo cáo tổng hợp ({reportRows.length} đợt)
+                    </h2>
+                    <button
+                        onClick={handleExportCsv}
+                        disabled={exporting || loading}
+                        className="ml-auto min-h-11 rounded-xl bg-white px-5 text-sm font-bold text-green-700 ring-1 ring-[#CFE2CB] transition hover:bg-green-50 disabled:opacity-50"
+                    >
+                        {exporting ? 'Đang xuất…' : 'Xuất CSV'}
+                    </button>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <div className="rounded-2xl border border-[#E2E8DC] bg-white p-4 shadow-sm">
+                        <p className="text-xs font-semibold text-[#617066]">Chờ duyệt</p>
+                        <p className="mt-1 text-xl font-bold">{reportSummary.proposedCount} đợt</p>
+                        <p className="text-sm text-[#617066]">Tổng đề nghị {formatVnd(reportSummary.proposedTotal)}</p>
+                    </div>
+                    <div className="rounded-2xl border border-[#E2E8DC] bg-white p-4 shadow-sm">
+                        <p className="text-xs font-semibold text-[#617066]">Đã duyệt, chưa thu</p>
+                        <p className="mt-1 text-xl font-bold">{reportSummary.approvedCount} đợt</p>
+                        <p className="text-sm text-[#617066]">Tổng số cuối {formatVnd(reportSummary.approvedTotal)}</p>
+                    </div>
+                    <div className="rounded-2xl border border-[#E2E8DC] bg-white p-4 shadow-sm">
+                        <p className="text-xs font-semibold text-[#617066]">Đã nhận tiền</p>
+                        <p className="mt-1 text-xl font-bold">{reportSummary.paidCount} đợt</p>
+                        <p className="text-sm text-[#617066]">Tổng đã thu {formatVnd(reportSummary.paidTotal)}</p>
+                    </div>
+                    <div className="rounded-2xl border border-[#E2E8DC] bg-white p-4 shadow-sm">
+                        <p className="text-xs font-semibold text-[#617066]">Đã trả lại</p>
+                        <p className="mt-1 text-xl font-bold">{reportSummary.rejectedCount} đợt</p>
+                        <p className="text-sm text-[#617066]">Học viên chốt lại từ đầu</p>
+                    </div>
+                </div>
+                {!loading && reportRows.length === 0 ? (
+                    <p className="mt-3 rounded-2xl border border-[#E2E8DC] bg-white px-4 py-5 text-sm text-[#617066] shadow-sm">
+                        Chưa có đợt chốt gieo hạt nào trong phạm vi này.
+                    </p>
+                ) : (
+                    <div className="mt-3 overflow-x-auto rounded-2xl border border-[#E2E8DC] bg-white shadow-sm">
+                        <table className="w-full min-w-[1100px] border-collapse text-[13px]">
+                            <thead>
+                                <tr className="border-b border-[#E2E8DC] bg-[#F7F9F5] text-left text-[#617066]">
+                                    <th className="px-3 py-2.5 font-semibold">Học viên</th>
+                                    <th className="px-3 py-2.5 font-semibold">Khóa</th>
+                                    <th className="px-3 py-2.5 font-semibold">Kỳ tính đến</th>
+                                    <th className="px-3 py-2.5 text-right font-semibold">Muộn / chưa nộp</th>
+                                    <th className="px-3 py-2.5 text-right font-semibold">Số máy tính</th>
+                                    <th className="px-3 py-2.5 text-right font-semibold">Số đề nghị</th>
+                                    <th className="px-3 py-2.5 text-right font-semibold">Số cuối</th>
+                                    <th className="px-3 py-2.5 font-semibold">Trạng thái</th>
+                                    <th className="px-3 py-2.5 font-semibold">Ngày chốt</th>
+                                    <th className="px-3 py-2.5 font-semibold">Ngày nhận tiền</th>
+                                    <th className="px-3 py-2.5 font-semibold">Người xác nhận</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {reportRows.map(r => {
+                                    const st = SETTLEMENT_STATUS[r.status]
+                                    return (
+                                        <tr key={r.id} className="border-b border-[#F0F3EC] align-top">
+                                            <td className="px-3 py-2.5">
+                                                <b>{r.studentName || 'Học viên'}</b>
+                                                <span className="block text-xs text-[#617066]">HV {r.studentId}</span>
+                                            </td>
+                                            <td className="px-3 py-2.5">{r.courseName}</td>
+                                            <td className="whitespace-nowrap px-3 py-2.5">{formatDate(r.periodTo)}</td>
+                                            <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                                                {r.lateCount} / {r.missingCount}
+                                            </td>
+                                            <td className="whitespace-nowrap px-3 py-2.5 text-right">{formatVnd(r.computedAmount)}</td>
+                                            <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                                                {r.proposedAmount != null ? formatVnd(r.proposedAmount) : '—'}
+                                            </td>
+                                            <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                                                {r.finalAmount != null ? formatVnd(r.finalAmount) : '—'}
+                                            </td>
+                                            <td className="whitespace-nowrap px-3 py-2.5">
+                                                <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${st?.className || ''}`}>
+                                                    {st?.text || r.status}
+                                                </span>
+                                            </td>
+                                            <td className="whitespace-nowrap px-3 py-2.5">{formatDateTimeVN(r.createdAt)}</td>
+                                            <td className="whitespace-nowrap px-3 py-2.5">{formatDateTimeVN(r.paidConfirmedAt)}</td>
+                                            <td className="px-3 py-2.5">
+                                                {r.status === 'PAID' && r.paidConfirmedBy == null
+                                                    ? 'Tự động đối soát'
+                                                    : r.confirmerName || ''}
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 )}
             </ManagementWorkspace>

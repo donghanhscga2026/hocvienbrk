@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import { isTestAccount } from '@/lib/test-account';
 import { processEnrollmentActivation } from '@/lib/enrollment-activation';
 import { readPurchase } from '@/lib/offerings/purchase-snapshot';
+import { parseGieoHatContent, tryAutoConfirmGieoHat } from '@/lib/course/gieo-hat-match';
 
 function extractInfoFromDescription(description: string) {
     let phone = null;
@@ -187,6 +188,32 @@ export async function POST(req: NextRequest) {
             const result = await matchQuoteTransfer(prisma, { content: String(content), amount: Number(transferAmount), receipt: 'BANK:' + fingerprint, bankAccountId: bankAccount.id });
             await prisma.processedTransaction.update({ where: { id: txRecord.id }, data: { status: 'PROCESSED', reason: result?.commissionPending ? 'Thanh toán đã xác nhận; cần thử lại tính hoa hồng trong báo giá.' : null } });
             return NextResponse.json({ success: true, matched: 1 });
+        }
+
+        // Gieo hạt cam kết (nội dung CC): đối soát riêng tại đây, SAU khi đã
+        // xác thực + ghi nhận dedup, và KHÔNG BAO GIỜ rơi xuống luồng kích
+        // hoạt học phí COC bên dưới — kể cả khi không khớp được đợt chốt
+        // nào (vẫn trả 200 để SePay không retry vô hạn; ProcessedTransaction
+        // ghi UNMATCHED để truy vết và kênh Gmail còn cơ hội xử lý lại).
+        const ghParsed = parseGieoHatContent(String(content));
+        if (ghParsed) {
+            const gh = await tryAutoConfirmGieoHat({
+                userId: ghParsed.userId,
+                courseCode: ghParsed.courseCode,
+                amount: Number(transferAmount),
+                transferTime,
+                source: 'SEPAY',
+                teacherId,
+            });
+            if (gh.outcome === 'MATCHED') {
+                await prisma.processedTransaction.update({
+                    where: { id: txRecord.id },
+                    data: { status: 'PROCESSED', reason: gh.message }
+                });
+                return NextResponse.json({ success: true, matched: 1, gieoHat: gh.outcome }, { status: 200 });
+            }
+            await markUnmatched(gh.message);
+            return NextResponse.json({ success: true, matched: 0, gieoHat: gh.outcome }, { status: 200 });
         }
 
         // 2. Trích xuất thông tin từ nội dung chuyển khoản
