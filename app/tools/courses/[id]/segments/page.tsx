@@ -1,11 +1,12 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useState, use } from 'react'
-import { ArrowLeft, ArrowDown, ArrowUp, Loader2, Plus, Save, Trash2 } from 'lucide-react'
+import { Suspense, useCallback, useEffect, useMemo, useState, use } from 'react'
+import { ArrowLeft, ArrowDown, ArrowUp, Loader2, Plus, Save, Sparkles, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import MainHeader from '@/components/layout/MainHeader'
 import { formatSegmentTime, parseTimeInput } from '@/lib/course/segments'
+import { listVideoParts } from '@/lib/course/video-parts'
 
 // Thư viện bài giảng thông minh (GĐ1) — trang GV sửa đoạn bằng tay.
 // Đây cũng là nơi GV DUYỆT các đoạn DRAFT do pipeline STT/AI đề xuất ở giai
@@ -42,6 +43,8 @@ function SegmentsEditor({ courseId }: { courseId: number }) {
     const [lessonId, setLessonId] = useState<string>(searchParams.get('lesson') || '')
     const [loadError, setLoadError] = useState<string | null>(null)
     const [reloadTick, setReloadTick] = useState(0)
+    const [autoPartIndex, setAutoPartIndex] = useState('')
+    const [autoRunning, setAutoRunning] = useState(false)
     const [segments, setSegments] = useState<SegmentRow[]>([])
     const [loading, setLoading] = useState(true)
     const [loadingSegments, setLoadingSegments] = useState(false)
@@ -86,6 +89,39 @@ function SegmentsEditor({ courseId }: { courseId: number }) {
     }, [courseId, lessonId])
 
     useEffect(() => { fetchSegments() }, [fetchSegments])
+
+    // ── Tự động chia đoạn bằng AI ──
+    const selectedLesson = lessons.find((l: any) => l.id === lessonId)
+    const youtubeParts = useMemo(
+        () => (selectedLesson ? listVideoParts(selectedLesson).filter(p => p.youtubeId) : []),
+        [selectedLesson]
+    )
+    const effectivePartIndex = autoPartIndex !== '' ? Number(autoPartIndex) : (youtubeParts[0]?.index ?? -1)
+
+    const runAutoSegment = async () => {
+        if (!lessonId || effectivePartIndex < 0 || autoRunning) return
+        if (!window.confirm('AI sẽ đọc lời giảng và thay thế toàn bộ đoạn NHÁP hiện tại của video này bằng bản đề xuất mới (đoạn đã xuất bản không bị ảnh hưởng). Tiếp tục?')) return
+        setAutoRunning(true)
+        try {
+            const res = await fetch(`/api/courses/${courseId}/lessons/${lessonId}/auto-segment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ videoIndex: effectivePartIndex }),
+            })
+            const data = await res.json().catch(() => null)
+            if (res.ok && data?.success) {
+                notify(`Đã tạo ${data.segmentCount} đoạn nháp từ ${data.cueCount} câu lời giảng — kiểm tra rồi xuất bản ở danh sách bên dưới.`, 'success')
+                fetchSegments()
+                setReloadTick(t => t + 1)
+            } else {
+                notify(data?.error || 'Tự động chia đoạn thất bại', 'error')
+            }
+        } catch {
+            notify('Lỗi kết nối khi tự động chia đoạn', 'error')
+        } finally {
+            setAutoRunning(false)
+        }
+    }
 
     const notify = (text: string, type: 'success' | 'error') => setMessage({ text, type })
 
@@ -208,11 +244,37 @@ function SegmentsEditor({ courseId }: { courseId: number }) {
             ) : lessons.length === 0 ? (
                 <p className="mt-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500">Khóa học này chưa có bài học nào.</p>
             ) : (
-                <select value={lessonId} onChange={e => { setLessonId(e.target.value); setEditingId(null); setForm(emptyForm) }} className={inputCls + ' mt-1'}>
+                <select value={lessonId} onChange={e => { setLessonId(e.target.value); setEditingId(null); setForm(emptyForm); setAutoPartIndex('') }} className={inputCls + ' mt-1'}>
                     {lessons.map((l: any) => (
                         <option key={l.id} value={l.id}>#{l.order} — {l.title}{(l._count?.segments ?? 0) > 0 ? ` (${l._count.segments} đoạn)` : ''}</option>
                     ))}
                 </select>
+            )}
+
+            {!loading && !loadError && lessonId && (
+                <div className="mt-3 rounded-2xl border border-orange-200 bg-orange-50 p-4">
+                    <h3 className="text-sm font-black text-gray-900 flex items-center gap-2"><Sparkles className="w-4 h-4 text-orange-500" /> Tự động chia đoạn bằng AI</h3>
+                    {youtubeParts.length === 0 ? (
+                        <p className="mt-1 text-sm text-gray-500">Bài này không có video YouTube nên chưa dùng được tự động chia đoạn (hiện chỉ hỗ trợ video YouTube có phụ đề).</p>
+                    ) : (
+                        <>
+                            <div className="mt-2 flex flex-wrap items-center gap-3">
+                                {youtubeParts.length > 1 && (
+                                    <select value={String(effectivePartIndex)} onChange={e => setAutoPartIndex(e.target.value)} className={inputCls + ' w-auto'}>
+                                        {youtubeParts.map(p => (
+                                            <option key={p.index} value={p.index}>Video số {p.index} — {p.title}</option>
+                                        ))}
+                                    </select>
+                                )}
+                                <button onClick={runAutoSegment} disabled={autoRunning} className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-bold text-white hover:bg-orange-600 disabled:opacity-60">
+                                    {autoRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                    {autoRunning ? 'Đang đọc lời giảng & chia đoạn…' : 'Tự động chia đoạn'}
+                                </button>
+                            </div>
+                            <p className="mt-2 text-xs text-gray-500">AI đọc lời giảng của video và đề xuất các đoạn ở dạng bản nháp để thầy/cô duyệt. Đoạn nháp cũ của video này sẽ bị thay thế; đoạn đã xuất bản không bị ảnh hưởng. Quá trình có thể mất 30–60 giây.</p>
+                        </>
+                    )}
+                </div>
             )}
 
             <form onSubmit={handleSubmit} className="mt-5 rounded-2xl border border-brk-outline bg-white p-4 space-y-3">

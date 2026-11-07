@@ -36,6 +36,10 @@ export async function loadLessonForSegments(courseId: number, lessonId: string) 
         select: {
             id: true,
             courseId: true,
+            title: true,
+            videoUrl: true,
+            type: true,
+            content: true,
             course: { select: { teacherId: true } },
         },
     })
