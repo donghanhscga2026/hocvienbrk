@@ -14,7 +14,7 @@ export const metadata = {
  * quang có bệ bậc, dòng đua hạng kèm khoảng cách tới hạng trên.
  * Logic dữ liệu giữ nguyên như các bản trước.
  * Kỳ tháng hiện tại là số liệu tạm tính (snapshot được cron tính lại mỗi
- * sáng): trang gắn nhãn "đang diễn ra" + dải tạm tính, danh hiệu bục dùng
+ * ngày): trang gắn nhãn "đang diễn ra" + dải tạm tính, danh hiệu bục dùng
  * cách gọi tạm thời; kỳ chỉ chốt chính thức (và trao huy hiệu) vào đầu
  * tháng sau. Cách hiển thị này theo bản mẫu v3 ní Cương duyệt sáng 07/11/2026.
  */
@@ -268,7 +268,7 @@ export default async function VinhDanhPage({
           {isLivePeriod && (
             <div className="mx-auto mt-4 max-w-xl px-4 py-2.5 rounded-2xl border border-[#d4af37]/40 bg-[#d4af37]/10 text-[13px] leading-relaxed text-[#f3d67b]">
               <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 mr-2 animate-pulse" />
-              Kỳ đang diễn ra — số liệu <b>tạm tính</b>, được cập nhật mỗi sáng lúc 08:20. Bảng sẽ chốt chính thức vào đầu tháng sau và trao huy hiệu khi chốt.
+              Kỳ đang diễn ra — số liệu <b>tạm tính</b>, được cập nhật tự động mỗi ngày. Bảng sẽ chốt chính thức vào đầu tháng sau và trao huy hiệu khi chốt.
             </div>
           )}
 
@@ -430,8 +430,8 @@ export default async function VinhDanhPage({
         <p className="text-center text-[11px] text-[#9aa3c7] mt-10">
           {isLivePeriod
             ? (mode === 'hoa-hong'
-              ? 'Số liệu tạm tính của tháng đang diễn ra — cập nhật mỗi sáng từ hoa hồng đã ghi nhận của các đơn đã thanh toán; kỳ sẽ chốt chính thức vào đầu tháng sau.'
-              : 'Số liệu tạm tính của tháng đang diễn ra — cập nhật mỗi sáng từ doanh số giới thiệu đã ghi nhận; kỳ sẽ chốt chính thức vào đầu tháng sau.')
+              ? 'Số liệu tạm tính của tháng đang diễn ra — cập nhật mỗi ngày từ hoa hồng đã ghi nhận của các đơn đã thanh toán; kỳ sẽ chốt chính thức vào đầu tháng sau.'
+              : 'Số liệu tạm tính của tháng đang diễn ra — cập nhật mỗi ngày từ doanh số giới thiệu đã ghi nhận; kỳ sẽ chốt chính thức vào đầu tháng sau.')
             : (mode === 'hoa-hong'
               ? 'Bảng vinh danh được cập nhật đầu mỗi tháng từ hoa hồng đã ghi nhận của các đơn đã thanh toán.'
               : 'Bảng vinh danh được cập nhật đầu mỗi tháng từ doanh số giới thiệu đã ghi nhận.')}
