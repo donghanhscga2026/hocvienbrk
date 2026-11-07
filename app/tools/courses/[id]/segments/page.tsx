@@ -54,7 +54,8 @@ function SegmentsEditor({ courseId }: { courseId: number }) {
             .then(data => {
                 const list = data?.lessons || []
                 setLessons(list)
-                setLessonId(prev => prev || (list[0]?.id ?? ''))
+                // Mặc định chọn bài đầu tiên CÓ đoạn (nơi GV cần duyệt) thay vì bài đầu tiên của khóa
+                setLessonId(prev => prev || (list.find((l: any) => (l._count?.segments ?? 0) > 0)?.id ?? list[0]?.id ?? ''))
             })
             .catch(() => setMessage({ text: 'Không tải được danh sách bài học', type: 'error' }))
             .finally(() => setLoading(false))
@@ -192,7 +193,7 @@ function SegmentsEditor({ courseId }: { courseId: number }) {
             ) : (
                 <select value={lessonId} onChange={e => { setLessonId(e.target.value); setEditingId(null); setForm(emptyForm) }} className={inputCls + ' mt-1'}>
                     {lessons.map((l: any) => (
-                        <option key={l.id} value={l.id}>#{l.order} — {l.title}</option>
+                        <option key={l.id} value={l.id}>#{l.order} — {l.title}{(l._count?.segments ?? 0) > 0 ? ` (${l._count.segments} đoạn)` : ''}</option>
                     ))}
                 </select>
             )}
