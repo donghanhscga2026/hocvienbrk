@@ -369,6 +369,48 @@ export function upgradeZipBridge(html: string): string {
   return html.replace(/<script\b[^>]*\bdata-mfc-zip-bridge(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?[^>]*>[\s\S]*?<\/script\s*>/i, () => BRIDGE.trim())
 }
 
+// Bản vá font tiếng Việt cho trang dán code (iframe): các trang tự khai
+// font hệ thống (Georgia, Segoe UI...) vốn thiếu hoặc hiển thị sai glyph
+// tiếng Việt có dấu hai tầng, làm dấu bị tách rời. Khai @font-face mượn
+// đúng tên các font đó nhưng giới hạn unicode-range ở ký tự tiếng Việt:
+// ký tự latin vẫn dùng font gốc của trang, riêng ký tự tiếng Việt được
+// lấy từ subset vietnamese tự host cùng họ (serif → Cormorant Garamond
+// VN, sans → Inter VN). Chèn lúc hiển thị như upgradeZipBridge nên trang
+// đã lưu cũng được vá mà không phải sửa nội dung gốc.
+const VIETNAMESE_FONT_RANGE = 'U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB'
+const SERIF_VN_NORMAL = '/fonts/cormorant-garamond-vietnamese-variable-normal.woff2'
+const SERIF_VN_ITALIC = '/fonts/cormorant-garamond-vietnamese-variable-italic.woff2'
+const SANS_VN = '/fonts/inter-vietnamese-variable-normal.woff2'
+function shadowFace(family: string, style: 'normal' | 'italic', weight: string, src: string) {
+  return `@font-face{font-family:'${family}';font-style:${style};font-weight:${weight};font-display:swap;src:url('${src}') format('woff2');unicode-range:${VIETNAMESE_FONT_RANGE};}`
+}
+export const VIETNAMESE_FONT_PATCH = `<style data-mfc-vn-font-patch>${[
+  shadowFace('Georgia', 'normal', '300 700', SERIF_VN_NORMAL),
+  shadowFace('Georgia', 'italic', '300 700', SERIF_VN_ITALIC),
+  shadowFace('Times New Roman', 'normal', '300 700', SERIF_VN_NORMAL),
+  shadowFace('Times New Roman', 'italic', '300 700', SERIF_VN_ITALIC),
+  shadowFace('Segoe UI', 'normal', '100 900', SANS_VN),
+  shadowFace('Segoe UI', 'italic', '100 900', SANS_VN),
+  shadowFace('Arial', 'normal', '100 900', SANS_VN),
+  shadowFace('Arial', 'italic', '100 900', SANS_VN),
+  shadowFace('Helvetica Neue', 'normal', '100 900', SANS_VN),
+  shadowFace('Helvetica Neue', 'italic', '100 900', SANS_VN),
+  shadowFace('Helvetica', 'normal', '100 900', SANS_VN),
+  shadowFace('Helvetica', 'italic', '100 900', SANS_VN),
+].join('')}</style>`
+
+export function injectVietnameseFontPatch(html: string): string {
+  if (!html || html.includes('data-mfc-vn-font-patch')) return html
+  const headOpen = html.match(/<head\b[^>]*>/i)
+  if (headOpen && headOpen.index !== undefined) {
+    const at = headOpen.index + headOpen[0].length
+    return html.slice(0, at) + VIETNAMESE_FONT_PATCH + html.slice(at)
+  }
+  const headClose = html.search(/<\/head\s*>/i)
+  if (headClose >= 0) return html.slice(0, headClose) + VIETNAMESE_FONT_PATCH + html.slice(headClose)
+  return VIETNAMESE_FONT_PATCH + html
+}
+
 export async function prepareWebsiteZip(file: File): Promise<PreparedZipWebsite> {
   if (!file.name.toLowerCase().endsWith('.zip')) throw new Error('Vui lòng chọn file .zip')
   const buffer = await file.arrayBuffer()
