@@ -17,7 +17,8 @@ export async function GET(
       where: { id: parseInt(id) },
       include: {
         lessons: {
-          orderBy: { order: 'asc' }
+          orderBy: { order: 'asc' },
+          include: { _count: { select: { segments: true } } }
         },
         teacher: true,
         acceptedVouchers: {
