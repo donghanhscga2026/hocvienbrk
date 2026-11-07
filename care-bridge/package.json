@@ -1,0 +1,1 @@
+{"dependencies":{"qrcode-terminal":"^0.12.0","zca-js":"^2.1.2"},"description":"Care Bridge — tiến trình phụ giữ phiên nick Zalo phụ, thực thi lệnh gửi của Care Engine (GĐ4) qua API ký HMAC. KHÔNG thuộc build Next/Vercel.","engines":{"node":">=18"},"name":"hocvienbrk-care-bridge","private":true,"scripts":{"start":"node src/index.js"},"type":"module","version":"1.0.0"}
