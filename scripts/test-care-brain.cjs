@@ -83,4 +83,12 @@ ok(ai.includes('CareAiNotConfiguredError') && ai.includes('GEMINI_API_KEY') && a
 ok(fs.existsSync(path.resolve(root, 'app/api/crm/care-brain/route.ts')), 'route compile/stats tồn tại')
 ok(fs.existsSync(path.resolve(root, 'components/crm/CrmCareBrainPanel.tsx')), 'panel AI gợi ý trong CRM tồn tại')
 
+// 6) Hỏi đáp phía học viên: bắt buộc enrollment ACTIVE + nhánh ngoài phạm vi
+const qaRoute = fs.readFileSync(path.resolve(root, 'app/api/learn/care-qa/route.ts'), 'utf8')
+ok(qaRoute.includes("enrollment.status !== 'ACTIVE'"), 'route hỏi đáp: chặn khi enrollment không ACTIVE')
+ok(qaRoute.includes('outOfScope: true') && qaRoute.includes('chưa có trong nội dung khóa'), 'route hỏi đáp: có nhánh từ chối ngoài phạm vi rõ ràng')
+ok(fs.existsSync(path.resolve(root, 'components/course/CareQaWidget.tsx')), 'widget hỏi đáp học viên tồn tại')
+const learnPage = fs.readFileSync(path.resolve(root, 'app/courses/[id]/learn/page.tsx'), 'utf8')
+ok(learnPage.includes('<CareQaWidget courseId={course.id} />'), 'trang học: đã gắn widget hỏi đáp')
+
 console.log(`test-care-brain: ${checks} kiểm chứng PASS`)
