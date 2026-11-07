@@ -4,7 +4,7 @@ import React from 'react'
 import TemplateVideoOverlays from '@/components/course/TemplateVideoOverlays'
 import { useWi300Brand } from '@/components/wi300/Wi300BrandContext'
 import { zipFrameSource, zipSelectedBlockKeys, zipCourseLinks } from '@/lib/course-page/importer/source-url'
-import { upgradeZipBridge } from '@/lib/course-page/importer/zip-browser'
+import { injectVietnameseFontPatch, upgradeZipBridge } from '@/lib/course-page/importer/zip-browser'
 import { templateViewportHtml } from '@/lib/course-page/template-viewport'
 
 type Props = {
@@ -30,7 +30,7 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
   const [height, setHeight] = React.useState(900)
   const sourceUrl = content?.exactSource?.url || content?.importedSource?.exactSource?.url || ''
   const rawHtml = typeof content?.exactSource?.html === 'string' ? content.exactSource.html : undefined
-  const sourceHtml = React.useMemo(() => rawHtml ? upgradeZipBridge(templateViewportHtml(rawHtml)) : undefined, [rawHtml])
+  const sourceHtml = React.useMemo(() => rawHtml ? injectVietnameseFontPatch(upgradeZipBridge(templateViewportHtml(rawHtml))) : undefined, [rawHtml])
   const selectedBlockKeys = zipSelectedBlockKeys(content?.selectedBlockKeys)
   const registrationBlockKeys: string[] = Array.isArray(content?.registrationBlockKeys)
     ? content.registrationBlockKeys.filter((value: unknown): value is string => typeof value === 'string')

@@ -32,4 +32,35 @@ for (const face of faces) {
 assert.match(provider, /--font-course-serif\), 'Cormorant Garamond VN', Georgia/, 'Ngăn xếp font tiêu đề phải có Cormorant Garamond VN trước Georgia')
 assert.match(provider, /--font-course-sans\), 'Inter VN', system-ui/, 'Ngăn xếp font thân bài phải có Inter VN trước system-ui')
 
-console.log('PASS course fonts: vietnamese subsets declared, stacked and present for Cormorant Garamond + Inter')
+// Trang dán code chạy trong iframe nên font trang cha không áp dụng được:
+// bản vá lúc hiển thị phải mượn tên font hệ thống (Georgia, Segoe UI...)
+// với unicode-range tiếng Việt, và ZipSourceSection phải chèn bản vá vào
+// mọi tài liệu iframe. Các kiểm này khóa cả hai phía của cơ chế vá.
+async function checkIframePatch() {
+  const load = require('./helpers/load-ts.cjs')
+  const zipBrowser = load('lib/course-page/importer/zip-browser.ts')
+  const { injectVietnameseFontPatch, VIETNAMESE_FONT_PATCH } = zipBrowser
+  assert.equal(typeof injectVietnameseFontPatch, 'function', 'Thiếu injectVietnameseFontPatch')
+  for (const family of ['Georgia', 'Times New Roman', 'Segoe UI', 'Arial', 'Helvetica Neue', 'Helvetica']) {
+    assert.ok(VIETNAMESE_FONT_PATCH.includes(`font-family:'${family}'`), `Bản vá thiếu họ ${family}`)
+  }
+  assert.ok(VIETNAMESE_FONT_PATCH.includes(`unicode-range:${VIETNAMESE_RANGE};`), 'Bản vá thiếu unicode-range tiếng Việt')
+  assert.ok(VIETNAMESE_FONT_PATCH.includes('/fonts/cormorant-garamond-vietnamese-variable-normal.woff2'), 'Bản vá serif phải trỏ file Cormorant VN')
+  assert.ok(VIETNAMESE_FONT_PATCH.includes('/fonts/inter-vietnamese-variable-normal.woff2'), 'Bản vá sans phải trỏ file Inter VN')
+
+  const sample = '<!doctype html><html><head><meta charset="utf-8"><style>h2{font-family:Georgia,serif}</style></head><body><h2>Đến</h2></body></html>'
+  const patched = injectVietnameseFontPatch(sample)
+  assert.ok(patched.includes('data-mfc-vn-font-patch'), 'Chưa chèn style bản vá')
+  assert.ok(patched.indexOf('data-mfc-vn-font-patch') < patched.indexOf('font-family:Georgia,serif'), 'Bản vá phải nằm trong head trước CSS của trang')
+  assert.equal(injectVietnameseFontPatch(patched), patched, 'Chèn bản vá phải idempotent')
+  assert.ok(injectVietnameseFontPatch('<p>không có head</p>').startsWith('<style data-mfc-vn-font-patch>'), 'Trang không có head vẫn phải được vá ở đầu tài liệu')
+  assert.equal(injectVietnameseFontPatch(''), '', 'HTML rỗng giữ nguyên')
+
+  const section = fs.readFileSync(path.join(root, 'components/course-page/sections/ZipSourceSection.tsx'), 'utf8')
+  assert.match(section, /injectVietnameseFontPatch\(upgradeZipBridge\(templateViewportHtml\(rawHtml\)\)\)/, 'ZipSourceSection phải áp bản vá cho mọi tài liệu iframe')
+}
+
+checkIframePatch().then(
+  () => console.log('PASS course fonts: vietnamese subsets declared, stacked and present for Cormorant Garamond + Inter; iframe patch injected for saved code pages'),
+  error => { console.error(error); process.exit(1) },
+)

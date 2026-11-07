@@ -639,3 +639,226 @@ export async function confirmGieoHatReceivedAction(settlementId: number) {
         return { success: false as const, error: error?.message || "Không xác nhận được. Bạn thử lại sau nhé." }
     }
 }
+
+// ==========================================
+// GIẢNG VIÊN / ADMIN — Báo cáo tổng hợp + xuất CSV (GĐ3)
+// ==========================================
+export type GieoHatStatusKey = "PROPOSED" | "APPROVED" | "PAID" | "REJECTED"
+
+export interface GieoHatReportRow {
+    id: number
+    courseId: number
+    courseName: string
+    courseCode: string
+    studentId: number
+    studentName: string
+    studentPhone: string
+    /** Kỳ tính đến — nhãn ngày VN dạng yyyy-mm-dd. */
+    periodTo: string
+    lateCount: number
+    missingCount: number
+    computedAmount: number
+    proposedAmount: number | null
+    finalAmount: number | null
+    status: GieoHatStatusKey
+    createdAt: string
+    paidConfirmedAt: string | null
+    paidConfirmedBy: number | null
+    /** Tên người xác nhận tiền về; null + PAID nghĩa là tự động đối soát. */
+    confirmerName: string | null
+}
+
+const GIEO_HAT_STATUS_LABEL: Record<GieoHatStatusKey, string> = {
+    PROPOSED: "Chờ duyệt",
+    APPROVED: "Đã duyệt, chờ tiền về",
+    PAID: "Đã nhận tiền",
+    REJECTED: "Đã trả lại",
+}
+
+/** Lấy toàn bộ đợt chốt trong phạm vi quyền (dùng chung cho báo cáo + CSV). */
+async function fetchGieoHatReport(courseId?: number) {
+    const ctx = await getReviewScope()
+    if (!ctx) return { error: "Bạn không có quyền xem báo cáo gieo hạt." as const }
+
+    const courses = await prisma.course.findMany({
+        where: {
+            gieoHatEnabled: true,
+            ...(ctx.isAdmin ? {} : { teacherId: ctx.userId }),
+        },
+        select: { id: true, name_lop: true, id_khoa: true },
+        orderBy: { id: "asc" },
+    })
+
+    if (courseId) {
+        const target = await prisma.course.findUnique({
+            where: { id: courseId },
+            select: { teacherId: true },
+        })
+        if (!target || !canManageCourse(ctx, target.teacherId)) {
+            return { error: "Bạn không có quyền xem báo cáo gieo hạt của khóa này." as const }
+        }
+    }
+
+    const courseScope = courseId
+        ? { courseId }
+        : { courseId: { in: courses.map(c => c.id) } }
+
+    const settlements = await prisma.gieoHatSettlement.findMany({
+        where: courseScope,
+        select: {
+            id: true,
+            courseId: true,
+            userId: true,
+            periodTo: true,
+            lateCount: true,
+            missingCount: true,
+            computedAmount: true,
+            proposedAmount: true,
+            finalAmount: true,
+            status: true,
+            createdAt: true,
+            paidConfirmedAt: true,
+            paidConfirmedBy: true,
+            user: { select: { name: true, phone: true } },
+            course: { select: { name_lop: true, id_khoa: true } },
+        },
+        orderBy: { createdAt: "desc" },
+    })
+
+    // Tên người xác nhận tiền về (đợt tự động đối soát có paidConfirmedBy
+    // trống nên không có tên — giao diện hiển thị "Tự động đối soát").
+    const confirmerIds = Array.from(
+        new Set(settlements.map(s => s.paidConfirmedBy).filter((v): v is number => v != null))
+    )
+    const confirmers = confirmerIds.length
+        ? await prisma.user.findMany({
+              where: { id: { in: confirmerIds } },
+              select: { id: true, name: true },
+          })
+        : []
+    const confirmerNameById = new Map(confirmers.map(u => [u.id, u.name || ""]))
+
+    const rows: GieoHatReportRow[] = settlements.map(s => ({
+        id: s.id,
+        courseId: s.courseId,
+        courseName: s.course?.name_lop || s.course?.id_khoa || "",
+        courseCode: s.course?.id_khoa || "",
+        studentId: s.userId,
+        studentName: s.user?.name || "",
+        studentPhone: s.user?.phone || "",
+        periodTo: toVnDateString(s.periodTo),
+        lateCount: s.lateCount,
+        missingCount: s.missingCount,
+        computedAmount: s.computedAmount,
+        proposedAmount: s.proposedAmount,
+        finalAmount: s.finalAmount,
+        status: s.status as GieoHatStatusKey,
+        createdAt: new Date(s.createdAt).toISOString(),
+        paidConfirmedAt: s.paidConfirmedAt ? new Date(s.paidConfirmedAt).toISOString() : null,
+        paidConfirmedBy: s.paidConfirmedBy,
+        confirmerName: s.paidConfirmedBy != null ? confirmerNameById.get(s.paidConfirmedBy) ?? "" : null,
+    }))
+
+    return {
+        error: null,
+        courses: courses.map(c => ({ id: c.id, name: c.name_lop || c.id_khoa, code: c.id_khoa })),
+        rows,
+    }
+}
+
+export async function getGieoHatReportAction(courseId?: number) {
+    try {
+        const report = await fetchGieoHatReport(courseId)
+        if (report.error) return { success: false as const, error: report.error }
+        return { success: true as const, courses: report.courses, rows: report.rows }
+    } catch (error: any) {
+        console.error("getGieoHatReportAction error:", error)
+        return { success: false as const, error: error?.message || "Không tải được báo cáo gieo hạt." }
+    }
+}
+
+function csvCell(value: string | number | null | undefined): string {
+    const s = value == null ? "" : String(value)
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+function formatCsvDate(ymd: string): string {
+    const [y, m, d] = (ymd || "").split("-")
+    return d && m && y ? `${d}/${m}/${y}` : ymd
+}
+
+function formatCsvDateTime(iso: string | null): string {
+    if (!iso) return ""
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return ""
+    return d.toLocaleString("vi-VN", {
+        timeZone: "Asia/Ho_Chi_Minh",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    })
+}
+
+/**
+ * Xuất CSV toàn bộ đợt chốt trong phạm vi quyền + bộ lọc khóa hiện tại.
+ * Client tự thêm BOM UTF-8 khi tải xuống (đúng mẫu các trang xuất CSV
+ * hiện có) để Excel đọc đúng tiếng Việt.
+ */
+export async function exportGieoHatReportCsvAction(courseId?: number) {
+    try {
+        const report = await fetchGieoHatReport(courseId)
+        if (report.error) return { success: false as const, error: report.error }
+
+        const header = [
+            "Mã HV",
+            "Học viên",
+            "Số điện thoại",
+            "Khóa học",
+            "Mã khóa",
+            "Kỳ tính đến",
+            "Buổi nộp muộn",
+            "Buổi chưa nộp",
+            "Số máy tính (đ)",
+            "Số đề nghị (đ)",
+            "Số cuối (đ)",
+            "Trạng thái",
+            "Ngày chốt",
+            "Ngày xác nhận tiền về",
+            "Người xác nhận",
+        ]
+        const lines = report.rows.map(r =>
+            [
+                r.studentId,
+                r.studentName,
+                r.studentPhone,
+                r.courseName,
+                r.courseCode,
+                formatCsvDate(r.periodTo),
+                r.lateCount,
+                r.missingCount,
+                r.computedAmount,
+                r.proposedAmount ?? "",
+                r.finalAmount ?? "",
+                GIEO_HAT_STATUS_LABEL[r.status],
+                formatCsvDateTime(r.createdAt),
+                formatCsvDateTime(r.paidConfirmedAt),
+                r.status === "PAID" && r.paidConfirmedBy == null
+                    ? "Tự động đối soát"
+                    : r.confirmerName || "",
+            ]
+                .map(csvCell)
+                .join(",")
+        )
+
+        const coursePart = courseId
+            ? report.courses.find(c => c.id === courseId)?.code || String(courseId)
+            : "tat-ca-khoa"
+        const filename = `gieo-hat-${coursePart}-${toVnDateString(new Date())}.csv`
+        return { success: true as const, csv: [header.map(csvCell).join(","), ...lines].join("\n"), filename }
+    } catch (error: any) {
+        console.error("exportGieoHatReportCsvAction error:", error)
+        return { success: false as const, error: error?.message || "Không xuất được file CSV." }
+    }
+}
