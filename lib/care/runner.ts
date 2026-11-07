@@ -10,7 +10,7 @@ import { CARE_AUTO_RULES, careEventKey, vnDateString } from './rules'
  * đang xử lý) đã giải ở tầng hàng đợi.
  */
 
-export async function sendCareReminder(row: CareRow, now = new Date()): Promise<{ sent: boolean; reason: string }> {
+export async function sendCareReminder(row: CareRow, now = new Date(), messageOverride?: string): Promise<{ sent: boolean; reason: string }> {
   const eventKey = careEventKey(row.ruleId, row.userId, row.courseId, vnDateString(now))
   // R5 là nhiệm vụ phía giảng viên: thông báo đi cho giảng viên phụ trách khóa.
   const recipientId = row.ruleId === 'R5' ? row.teacherId : row.userId
@@ -19,7 +19,7 @@ export async function sendCareReminder(row: CareRow, now = new Date()): Promise<
     userId: recipientId,
     eventKey,
     kind: 'TASK_DUE',
-    title: row.message,
+    title: messageOverride && messageOverride.trim() ? messageOverride : row.message,
     courseId: row.courseId,
     enrollmentId: row.enrollmentId,
   })

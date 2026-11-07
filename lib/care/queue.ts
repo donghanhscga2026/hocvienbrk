@@ -29,6 +29,8 @@ export interface CareRow {
   signal: string
   detail: string
   message: string
+  /** Biến đã tính sẵn cho dòng này — GĐ2 dùng để render câu mẫu thư viện khi gửi nhắc. */
+  templateVars: Record<string, string | number>
   status: CareRowStatus
 }
 
@@ -314,6 +316,7 @@ export async function buildCareQueue(courseIds: number[] | null, now = new Date(
         signal: signalText,
         detail,
         message: careReminderText(signal.ruleId, vars),
+        templateVars: vars,
         status: 'pending',
       })
     }
