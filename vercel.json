@@ -38,10 +38,6 @@
     {
       "path": "/api/cron/baseline-reminders",
       "schedule": "15 2 * * *"
-    },
-    {
-      "path": "/api/cron/affiliate-leaderboard",
-      "schedule": "20 1 * * *"
     }
   ]
 }
