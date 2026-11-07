@@ -24,6 +24,21 @@ export default function OfferingSalesFields({
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [retry, setRetry] = useState(0)
+  const [earlyBirdUsed, setEarlyBirdUsed] = useState<number | null>(null)
+  useEffect(() => {
+    if (!courseId || !value.earlyBirdEnabled) return
+    const controller = new AbortController()
+    fetch(`/api/offerings/early-bird-usage?courseId=${encodeURIComponent(courseId)}`, {
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+      .then(async (response) => {
+        const data = await response.json()
+        if (response.ok && typeof data?.used === 'number') setEarlyBirdUsed(data.used)
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [courseId, value.earlyBirdEnabled])
   useEffect(() => {
     const controller = new AbortController()
     const timer = setTimeout(() => {
@@ -168,6 +183,81 @@ export default function OfferingSalesFields({
               </button>
             ))}
         </div>
+      </div>
+      <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <label className="flex min-h-11 items-center justify-between gap-3 font-semibold">
+          Ưu đãi cho những người đầu tiên
+          <input
+            type="checkbox"
+            checked={value.earlyBirdEnabled}
+            onChange={(event) => onChange({ ...value, earlyBirdEnabled: event.target.checked })}
+            className="h-5 w-5 shrink-0"
+          />
+        </label>
+        <label className="block font-semibold">
+          Số suất ưu đãi
+          <input
+            type="number"
+            min={1}
+            max={1000}
+            disabled={!value.earlyBirdEnabled}
+            value={value.earlyBirdSlots}
+            onChange={(event) => onChange({ ...value, earlyBirdSlots: Number(event.target.value) })}
+            className={field + ' disabled:opacity-50'}
+          />
+        </label>
+        <div className="space-y-2">
+          <label className="flex min-h-11 items-center gap-3 font-semibold">
+            <input
+              type="radio"
+              name="early-bird-mode"
+              checked={value.earlyBirdMode === 'FREE'}
+              disabled={!value.earlyBirdEnabled}
+              onChange={() => onChange({ ...value, earlyBirdMode: 'FREE' })}
+              className="h-5 w-5 shrink-0"
+            />
+            Miễn phí cho những người đầu tiên
+          </label>
+          <label className="flex min-h-11 items-center gap-3 font-semibold">
+            <input
+              type="radio"
+              name="early-bird-mode"
+              checked={value.earlyBirdMode === 'PRICE'}
+              disabled={!value.earlyBirdEnabled}
+              onChange={() => onChange({ ...value, earlyBirdMode: 'PRICE' })}
+              className="h-5 w-5 shrink-0"
+            />
+            Giá ưu đãi cho những người đầu tiên
+          </label>
+        </div>
+        {value.earlyBirdMode === 'PRICE' && (
+          <label className="block font-semibold">
+            Giá ưu đãi (đ)
+            <input
+              type="number"
+              min={0}
+              step={1000}
+              disabled={!value.earlyBirdEnabled}
+              value={value.earlyBirdPrice}
+              onChange={(event) => onChange({ ...value, earlyBirdPrice: Number(event.target.value) })}
+              className={field + ' disabled:opacity-50'}
+            />
+          </label>
+        )}
+        {value.earlyBirdEnabled && (
+          <p className="text-sm font-semibold text-green-950">
+            {courseId
+              ? earlyBirdUsed == null
+                ? 'Đang tải số suất đã dùng…'
+                : `Đã dùng ${earlyBirdUsed}/${value.earlyBirdSlots} suất · Còn ${Math.max(0, value.earlyBirdSlots - earlyBirdUsed)} suất`
+              : `Đã dùng 0/${value.earlyBirdSlots} suất (sản phẩm mới)`}
+          </p>
+        )}
+        <p className="text-sm leading-7 text-brk-muted">
+          Hệ thống tự đếm theo số người đã kích hoạt thành công, mỗi tài khoản tối đa 1 suất. Đủ suất là tự
+          về giá thường, không cần tắt tay. Chỉ áp dụng khi có giá cố định — dịch vụ báo giá riêng không áp
+          dụng ưu đãi này.
+        </p>
       </div>
     </div>
   )

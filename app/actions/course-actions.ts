@@ -21,8 +21,8 @@ import { resolveImageUrl } from "@/lib/image-utils"
 import { requireDomainCourse, requireDomainEnrollment, domainContext } from '@/lib/website/domain-context'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import { WI300_LEARNING_PREFIX, WI300_COURSE_PREFIX, ensureWi300CourseVisibility } from '@/lib/wi300/course-visibility'
-import { saveOfferingDetails } from '@/lib/offerings/server'
-import { parseOfferingDetails } from '@/lib/offerings/shared'
+import { saveOfferingDetails, readOfferingDetails, getEarlyBirdUsed } from '@/lib/offerings/server'
+import { parseOfferingDetails, earlyBirdState } from '@/lib/offerings/shared'
 
 /**
  * Đăng ký khóa học mới
@@ -113,8 +113,18 @@ export async function enrollInCourseAction(
         if (existing && course.productGroup === 'DIGITAL') await (await import('@/lib/offerings/combo')).syncComboPurchase(existing.id)
         const { captureCheckout, capturePurchase, readPurchase } = await import('@/lib/offerings/purchase-snapshot')
         const savedPurchase = existing ? await readPurchase(prisma, existing.id) : null
+        // Ưu đãi theo số suất đầu tiên chỉ áp cho người mua mới của sản phẩm/dịch vụ:
+        // giá được chốt tại thời điểm bắt đầu thanh toán rồi giữ nguyên trong ảnh chụp mua hàng.
+        let basePrice = course.phi_coc
+        if (!existing && ['DIGITAL', 'SERVICE'].includes(course.productGroup) && course.phi_coc > 0) {
+            const offerDetails = await readOfferingDetails(courseId)
+            if (offerDetails.earlyBirdEnabled) {
+                const usedSlots = await getEarlyBirdUsed(courseId)
+                basePrice = earlyBirdState(offerDetails, course.phi_coc, usedSlots).price
+            }
+        }
         const intent = savedPurchase?.bank ? savedPurchase : await prisma.$transaction(tx => captureCheckout(tx, userId, courseId, {
-            price: savedPurchase?.price ?? (existing ? existing.phi_coc + (existing.payment?.discountAmount || 0) : course.phi_coc),
+            price: savedPurchase?.price ?? (existing ? existing.phi_coc + (existing.payment?.discountAmount || 0) : basePrice),
             bank: course.teacherBankAccount, gratitudeId: savedPurchase ? savedPurchase.gratitudeId : websiteDomain && !websiteDomain.affiliate ? null : user?.referrerId ?? null,
         }), { timeout: 20000 })
         const checkout = savedPurchase ? { ...savedPurchase, bank: savedPurchase.bank ?? intent.bank } : intent
