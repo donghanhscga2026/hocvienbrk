@@ -43,6 +43,10 @@ export const offeringDetailsSchema = z.object({
   trialEnabled: z.boolean().default(false),
   trialDays: z.number().int().min(1).max(90).default(7),
   relatedItems: z.array(z.object({ courseId: z.number().int().positive() })).max(8).default([]).refine(items => new Set(items.map(item => item.courseId)).size === items.length, 'Mỗi món chỉ được chọn một lần.'),
+  earlyBirdEnabled: z.boolean().default(false),
+  earlyBirdSlots: z.number().int().min(1).max(1000).default(10),
+  earlyBirdMode: z.enum(['FREE', 'PRICE']).default('FREE'),
+  earlyBirdPrice: z.number().int().min(0).default(0),
 }).strict()
 export type OfferingDetails = z.infer<typeof offeringDetailsSchema>
 export const emptyOfferingDetails: OfferingDetails = offeringDetailsSchema.parse({})
@@ -91,4 +95,16 @@ export function trialIsActive(record: TrialRecord | null, now = Date.now()): boo
 }
 export function trialDaysLeft(record: TrialRecord, now = Date.now()): number {
   return Math.max(0, Math.ceil((new Date(record.endsAt).getTime() - now) / 86400000))
+}
+// Ưu đãi theo số suất đầu tiên: hệ thống đếm số người đã kích hoạt thành công;
+// còn suất và giá ưu đãi thấp hơn giá thường thì ưu đãi còn hiệu lực.
+export type EarlyBirdState = { enabled: boolean; active: boolean; price: number; left: number; used: number; slots: number }
+export function earlyBirdState(details: OfferingDetails, regularPrice: number, usedCount: number): EarlyBirdState {
+  const slots = details.earlyBirdSlots || 0
+  const used = Math.max(0, Math.floor(usedCount) || 0)
+  const left = Math.max(0, slots - used)
+  const enabled = !!details.earlyBirdEnabled && regularPrice > 0 && slots > 0
+  const offer = details.earlyBirdMode === 'FREE' ? 0 : Math.min(Math.max(0, details.earlyBirdPrice || 0), regularPrice)
+  const active = enabled && left > 0 && offer < regularPrice
+  return { enabled, active, price: active ? offer : regularPrice, left, used, slots }
 }

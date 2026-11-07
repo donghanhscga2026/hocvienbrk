@@ -22,7 +22,7 @@ import OfferingTrialStart from './OfferingTrialStart'
 import OfferingShare from './OfferingShare'
 import OfferingConsultation from './OfferingConsultation'
 import { isQuoteService } from '@/lib/offerings/service'
-import { publicCatalogWhere, readOfferingDetails, getOfferingSalesCourse, getTrialRecord, offeringDetailsKey } from '@/lib/offerings/server'
+import { publicCatalogWhere, readOfferingDetails, getOfferingSalesCourse, getTrialRecord, getEarlyBirdUsed, offeringDetailsKey } from '@/lib/offerings/server'
 import {
   groupInfo,
   offeringFacts,
@@ -33,6 +33,7 @@ import {
   offeringKinds,
   offeringDetailsSchema,
   emptyOfferingDetails,
+  earlyBirdState,
   productGroup,
   trialIsActive,
   trialDaysLeft,
@@ -114,6 +115,12 @@ export default async function OfferingDetail({
     course.phi_coc > 0 &&
     !trial &&
     (!enrollment || ['REJECTED', 'CANCELLED'].includes(enrollment.status))
+  const earlyBirdUsedCount =
+    details.earlyBirdEnabled && course.phi_coc > 0 && !quote
+      ? await getEarlyBirdUsed(course.id).catch(() => details.earlyBirdSlots)
+      : 0
+  const earlyBird = earlyBirdState(details, course.phi_coc, earlyBirdUsedCount)
+  const displayCourse = earlyBird.active ? { ...course, phi_coc: earlyBird.price } : course
   const relatedIds = (details.relatedItems || []).map((item) => item.courseId).filter((id) => id !== course.id)
   const relatedRows = relatedIds.length
     ? await prisma.course.findMany({
@@ -223,10 +230,27 @@ export default async function OfferingDetail({
                     <CheckCircle2 className="h-5 w-5" />
                     Đang dùng thử · Còn {trialDaysLeft(trial!)} ngày
                   </p>
+                ) : earlyBird.active ? (
+                  <div className="space-y-2">
+                    <p className="text-3xl font-bold text-red-700">
+                      {earlyBird.price > 0 ? earlyBird.price.toLocaleString('vi-VN') + 'đ' : 'Miễn phí'}
+                      <span className="ml-2 align-middle text-base font-medium text-brk-muted line-through">
+                        {course.phi_coc.toLocaleString('vi-VN')}đ
+                      </span>
+                    </p>
+                    <p className="rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+                      {details.earlyBirdMode === 'FREE'
+                        ? `Miễn phí cho ${earlyBird.slots} người đầu tiên · Còn ${earlyBird.left} suất`
+                        : `Ưu đãi cho ${earlyBird.slots} người đầu tiên · Còn ${earlyBird.left} suất`}
+                    </p>
+                  </div>
                 ) : (
-                  <p className="text-3xl font-bold text-red-700">
-                    {quote ? 'Liên hệ báo giá' : course.phi_coc > 0 ? course.phi_coc.toLocaleString('vi-VN') + 'đ' : 'Miễn phí'}
-                  </p>
+                  <div className="space-y-2">
+                    <p className="text-3xl font-bold text-red-700">
+                      {quote ? 'Liên hệ báo giá' : course.phi_coc > 0 ? course.phi_coc.toLocaleString('vi-VN') + 'đ' : 'Miễn phí'}
+                    </p>
+                    {earlyBird.enabled && <p className="text-sm text-brk-muted">Ưu đãi suất đầu tiên đã hết</p>}
+                  </div>
                 )}
               </div>
               <section>
@@ -261,7 +285,7 @@ export default async function OfferingDetail({
                         Nâng cấp để tiếp tục sử dụng sau khi hết dùng thử
                       </p>
                       <OfferingPurchase
-                        course={course}
+                        course={displayCourse}
                         enrollment={enrollment ? { status: enrollment.status } : null}
                         userId={userId}
                         userPhone={user?.phone || null}
@@ -279,7 +303,7 @@ export default async function OfferingDetail({
                     Bạn đã dùng thử và thời gian dùng thử đã hết. Mua để tiếp tục sử dụng.
                   </p>
                   <OfferingPurchase
-                    course={course}
+                    course={displayCourse}
                     enrollment={enrollment ? { status: enrollment.status } : null}
                     userId={userId}
                     userPhone={user?.phone || null}
@@ -299,7 +323,7 @@ export default async function OfferingDetail({
                       </Link>
                     ))}
                   <OfferingPurchase
-                    course={course}
+                    course={displayCourse}
                     enrollment={enrollment ? { status: enrollment.status } : null}
                     userId={userId}
                     userPhone={user?.phone || null}
