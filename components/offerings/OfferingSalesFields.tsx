@@ -36,6 +36,7 @@ export default function OfferingSalesFields({
         .then(async (response) => {
           const data = await response.json()
           if (!response.ok) throw new Error(data.error)
+          const list: Option[] = Array.isArray(data?.items) ? data.items : []
           if (!controller.signal.aborted)
             setItems((previous) => [
               ...new Map(
@@ -43,7 +44,7 @@ export default function OfferingSalesFields({
                   ...previous.filter((item) =>
                     (value.relatedItems || []).some((selected) => selected.courseId === item.id),
                   ),
-                  ...data.items,
+                  ...list,
                 ].map((item: Option) => [item.id, item]),
               ).values(),
             ])
