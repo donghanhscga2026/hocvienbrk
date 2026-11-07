@@ -12,6 +12,12 @@ import LessonContentBox from './LessonContentBox'
 export interface VideoPlayerHandle {
     /** Đọc vị trí phát video HIỆN TẠI (live), dùng để tính điểm ngay lúc bấm "Ghi nhận kết quả" */
     getLiveProgress: () => { maxTime: number; duration: number }
+    /** Nhảy tới giây `sec` trong video đang phát (Thư viện bài giảng thông minh).
+     * YouTube dùng seekTo của IFrame API, MP4 gán currentTime; nền tảng khác
+     * hoặc player chưa sẵn sàng thì trả false / chờ khởi tạo — không bao giờ ném lỗi. */
+    seekTo: (sec: number) => boolean
+    /** Như seekTo nhưng chọn trước video thứ `videoIndex` trong playlist của bài. */
+    seekToSegment: (videoIndex: number, sec: number) => boolean
 }
 
 interface VideoPlayerProps {
@@ -28,6 +34,10 @@ interface VideoPlayerProps {
     contentImageUrl?: string | null
     canEditContent?: boolean
     onSaveContent?: (content: string, imageUrl: string | null) => Promise<{ success: boolean; message?: string }>
+    /** Thư viện bài giảng thông minh: báo index video đang phát mỗi khi đổi học phần */
+    onVideoIndexChange?: (index: number) => void
+    /** Thư viện bài giảng thông minh: nhịp vị trí phát live (kèm cả khi tua lùi) để tô sáng đoạn đang phát */
+    onPlaybackTick?: (videoIndex: number, currentTime: number, duration: number) => void
 }
 
 type PlaylistItem = {
@@ -127,6 +137,8 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
     contentImageUrl,
     canEditContent,
     onSaveContent,
+    onVideoIndexChange,
+    onPlaybackTick,
 }, ref) {
     const playlist = useMemo(() => buildPlaylist(videoUrl, serverPlaylist, lessonType, lessonContent, canEditContent), [videoUrl, serverPlaylist, lessonType, lessonContent, canEditContent])
     const [currentIndex, setCurrentVideoIndex] = useState(lastVideoIndex < playlist.length ? lastVideoIndex : 0)
@@ -145,8 +157,11 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
     // phát tiếp bình thường (không hỏi lại) vì hasStarted không đổi theo index.
     const [hasStarted, setHasStarted] = useState(false)
     const handleStartPlayback = useCallback(() => setHasStarted(true), [])
-    type YTLikePlayer = { getCurrentTime?: () => number; getDuration?: () => number; destroy?: () => void }
+    type YTLikePlayer = { getCurrentTime?: () => number; getDuration?: () => number; destroy?: () => void; seekTo?: (seconds: number, allowSeekAhead: boolean) => void; playVideo?: () => void }
     const playerRef = useRef<YTLikePlayer | null>(null)
+    // Mốc seek đang chờ: khi player chưa khởi tạo (chưa bấm Play lần đầu hoặc
+    // vừa đổi học phần), seek được ghi lại ở đây và init dùng làm điểm bắt đầu.
+    const pendingSeekRef = useRef<number | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const saveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
     const docTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -240,14 +255,66 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
         return calculateAggregateProgress(merged)
     }, [currentIndex, currentItem, granularProgress, docTimer, calculateAggregateProgress])
 
-    useImperativeHandle(ref, () => ({ getLiveProgress }), [getLiveProgress])
+    const seekToSegment = useCallback((videoIndex: number, sec: number): boolean => {
+        const item = playlist[videoIndex]
+        if (!item || item.type !== 'video' || !Number.isFinite(sec)) return false
+        const source = item.source || detectVideoSource(item.url)
+        if (source.platform !== 'youtube' && source.platform !== 'mp4') return false
+
+        const target = Math.max(0, sec)
+        pendingSeekRef.current = target
+
+        if (videoIndex !== currentIndex) {
+            // Đổi học phần: effect khởi tạo player sẽ lấy pendingSeek làm điểm bắt đầu.
+            setCurrentVideoIndex(videoIndex)
+            setHasStarted(true)
+            return true
+        }
+        if (!hasStarted) {
+            // Chưa phát lần nào: ghi pending rồi bắt đầu phát, init sẽ nhảy đúng mốc.
+            setHasStarted(true)
+            return true
+        }
+        if (source.platform === 'youtube') {
+            if (playerRef.current?.seekTo) {
+                playerRef.current.seekTo(target, true)
+                playerRef.current.playVideo?.()
+                pendingSeekRef.current = null
+                onPlaybackTick?.(videoIndex, target, playerRef.current.getDuration?.() ?? 0)
+                return true
+            }
+            return true // player chưa ready — pendingSeek giữ lại cho init
+        }
+        const video = htmlVideoRef.current
+        if (video) {
+            const apply = () => { try { video.currentTime = target } catch { /* metadata chưa sẵn sàng */ } }
+            if (video.readyState >= 1) apply()
+            else video.addEventListener('loadedmetadata', apply, { once: true })
+            video.play().catch(() => { })
+            pendingSeekRef.current = null
+            onPlaybackTick?.(videoIndex, target, video.duration || 0)
+            return true
+        }
+        return true
+    }, [playlist, currentIndex, hasStarted, onPlaybackTick])
+
+    const seekTo = useCallback((sec: number): boolean => seekToSegment(currentIndex, sec), [seekToSegment, currentIndex])
+
+    useImperativeHandle(ref, () => ({ getLiveProgress, seekTo, seekToSegment }), [getLiveProgress, seekTo, seekToSegment])
+
+    useEffect(() => {
+        onVideoIndexChange?.(currentIndex)
+        // Chỉ báo khi index đổi, không phụ thuộc identity của callback
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentIndex])
 
     const trackYouTubeProgress = useCallback(() => {
         const currentTime = playerRef.current?.getCurrentTime?.() ?? 0
         const duration = playerRef.current?.getDuration?.() ?? 0
+        onPlaybackTick?.(currentIndex, currentTime, duration)
         const currentStored = granularProgress[currentIndex] || { maxTime: 0, duration: 0 }
         if (currentTime > currentStored.maxTime) saveProgress(currentIndex, currentTime, duration)
-    }, [currentIndex, granularProgress, saveProgress])
+    }, [currentIndex, granularProgress, saveProgress, onPlaybackTick])
 
     const trackMp4Progress = useCallback(() => {
         const video = htmlVideoRef.current
@@ -255,9 +322,10 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
         const currentTime = video.currentTime
         const duration = video.duration
         if (!duration || !isFinite(duration)) return
+        onPlaybackTick?.(currentIndex, currentTime, duration)
         const currentStored = granularProgress[currentIndex] || { maxTime: 0, duration: 0 }
         if (currentTime > currentStored.maxTime) saveProgress(currentIndex, currentTime, duration)
-    }, [currentIndex, granularProgress, saveProgress])
+    }, [currentIndex, granularProgress, saveProgress, onPlaybackTick])
 
     const onMp4Ended = useCallback(() => {
         const video = htmlVideoRef.current
@@ -271,7 +339,9 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
         if (!videoId || !videoContainerRef.current) return
 
         const stored = granularProgress[currentIndex] || { maxTime: 0, duration: 0 }
-        const startTime = Math.floor(stored.maxTime)
+        // Ưu tiên mốc seek đang chờ (bấm vào đoạn) hơn vị trí đã lưu trước đó.
+        const startTime = Math.floor(pendingSeekRef.current ?? stored.maxTime)
+        pendingSeekRef.current = null
 
         const player = new (window as any).YT.Player(videoContainerRef.current, {
             videoId,
@@ -308,8 +378,10 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
         if (!video) return
 
         const stored = granularProgress[currentIndex] || { maxTime: 0, duration: 0 }
-        if (stored.maxTime > 0) {
-            video.currentTime = stored.maxTime
+        const startAt = pendingSeekRef.current ?? stored.maxTime
+        pendingSeekRef.current = null
+        if (startAt > 0) {
+            video.currentTime = startAt
         }
 
         const onTimeupdate = () => {

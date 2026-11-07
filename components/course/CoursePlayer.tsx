@@ -16,6 +16,7 @@ import { useAttentionHighlightSettings } from "@/app/contexts/AttentionHighlight
 import { useDomainBrand } from '@/components/website/DomainShell'
 import LessonSidebar from "./LessonSidebar"
 import VideoPlayer, { VideoPlayerHandle } from "./VideoPlayer"
+import SegmentPanel, { SegmentPanelItem } from "./SegmentPanel"
 import AssignmentForm from "./AssignmentForm"
 import ChatSection from "./ChatSection"
 import CrmRequestButton from "@/components/crm/CrmRequestButton"
@@ -201,6 +202,92 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         const pct = Math.min(100, Math.round((maxTime / duration) * 100))
         setVideoPercent(pct)
     }, [currentLessonId])
+
+    // ── Thư viện bài giảng thông minh (GĐ1): đoạn trong video đang phát ──
+    // Bài không có đoạn PUBLISHED thì segments rỗng → panel không render,
+    // giao diện và hành vi giữ nguyên như trước.
+    const [lessonSegments, setLessonSegments] = useState<SegmentPanelItem[]>([])
+    const [segmentProgressMap, setSegmentProgressMap] = useState<Record<string, { watchedSec: number; completed: boolean }>>({})
+    const [currentVideoIndex, setCurrentVideoIndex] = useState(0)
+    const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null)
+    const segmentMaxRef = useRef<Record<string, number>>({})
+    const segmentLastSentRef = useRef<Record<string, number>>({})
+
+    useEffect(() => {
+        let cancelled = false
+        setLessonSegments([])
+        setSegmentProgressMap({})
+        setActiveSegmentId(null)
+        setCurrentVideoIndex(0)
+        segmentMaxRef.current = {}
+        segmentLastSentRef.current = {}
+        if (!currentLessonId) return
+        fetch(`/api/courses/${course.id}/lessons/${currentLessonId}/segments`)
+            .then(res => (res.ok ? res.json() : null))
+            .then(data => {
+                if (cancelled || !data?.success) return
+                setLessonSegments(data.segments || [])
+                const map: Record<string, { watchedSec: number; completed: boolean }> = {}
+                for (const p of data.segmentProgress || []) {
+                    map[p.segmentId] = { watchedSec: p.watchedSec, completed: p.completed }
+                }
+                setSegmentProgressMap(map)
+            })
+            .catch(() => { })
+        return () => { cancelled = true }
+    }, [course.id, currentLessonId])
+
+    const visibleSegments = useMemo(
+        () => lessonSegments.filter(s => s.videoIndex === currentVideoIndex && s.status === 'PUBLISHED'),
+        [lessonSegments, currentVideoIndex]
+    )
+    const visibleSegmentsRef = useRef<SegmentPanelItem[]>([])
+    visibleSegmentsRef.current = visibleSegments
+
+    const postSegmentProgress = useCallback((segmentId: string, watchedSec: number, completed: boolean) => {
+        if (!currentLessonId) return
+        fetch(`/api/courses/${course.id}/lessons/${currentLessonId}/segments/progress`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ segmentId, watchedSec, completed }),
+        }).catch(() => { })
+    }, [course.id, currentLessonId])
+
+    const handlePlaybackTick = useCallback((videoIndex: number, currentTime: number) => {
+        const segs = visibleSegmentsRef.current
+        if (segs.length === 0) return
+        // Đoạn đang phát = đoạn cuối cùng có startSec ≤ vị trí hiện tại của đúng video này
+        let active: SegmentPanelItem | null = null
+        for (const seg of segs) {
+            if (seg.videoIndex === videoIndex && currentTime >= seg.startSec) active = seg
+        }
+        if (!active) return
+        setActiveSegmentId(prev => (prev === active!.id ? prev : active!.id))
+
+        // Tiến độ trong đoạn: vị trí xa nhất đã chạm tới bên trong đoạn
+        const covered = Math.min(currentTime, active.endSec) - active.startSec
+        if (covered <= 0) return
+        const prevMax = segmentMaxRef.current[active.id] || 0
+        if (covered <= prevMax) return
+        segmentMaxRef.current[active.id] = covered
+
+        const length = Math.max(1, active.endSec - active.startSec)
+        const alreadyCompleted = segmentProgressMap[active.id]?.completed
+        if (!alreadyCompleted && covered >= length * 0.8) {
+            setSegmentProgressMap(prev => ({ ...prev, [active!.id]: { watchedSec: covered, completed: true } }))
+            segmentLastSentRef.current[active.id] = Date.now()
+            postSegmentProgress(active.id, covered, true)
+        } else if (Date.now() - (segmentLastSentRef.current[active.id] || 0) > 15000) {
+            // Gửi thưa (tối đa 15s/lần/đoạn) để tải lại trang vẫn thấy tiến độ dở dang
+            segmentLastSentRef.current[active.id] = Date.now()
+            postSegmentProgress(active.id, covered, false)
+        }
+    }, [postSegmentProgress, segmentProgressMap])
+
+    const handleSeekSegment = useCallback((segment: SegmentPanelItem) => {
+        setActiveSegmentId(segment.id)
+        videoPlayerRef.current?.seekToSegment(segment.videoIndex, segment.startSec)
+    }, [])
 
     const handleSubmitAssignment = useCallback(async (data: any, isUpdate: boolean = false) => {
         if (isSubmittingRef.current) return
@@ -437,6 +524,8 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                             playlistData={currentProgress?.scores?.playlist}
                                             lastVideoIndex={currentProgress?.scores?.lastVideoIndex}
                                             onProgress={handleVideoProgress}
+                                            onPlaybackTick={handlePlaybackTick}
+                                            onVideoIndexChange={setCurrentVideoIndex}
                                             onPercentChange={setVideoPercent}
                                             courseType={course.type}
                                             lessonType={currentLesson?.type}
@@ -452,6 +541,16 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                     )}
                                 </div>
                             </div>
+                            {visibleSegments.length > 0 && (
+                                <div className={isMobile ? 'mt-0' : 'mt-4 border-2 border-white shadow-2xl'}>
+                                    <SegmentPanel
+                                        segments={visibleSegments}
+                                        activeSegmentId={activeSegmentId}
+                                        progressMap={segmentProgressMap}
+                                        onSeekSegment={handleSeekSegment}
+                                    />
+                                </div>
+                            )}
                         </div>
                     )}
 
