@@ -3,8 +3,8 @@ import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/get-session'
 import { requireDomainCourse } from '@/lib/website/domain-context'
 import { getCurrentSiteProfile, getCourseWhereForProfile } from '@/lib/site-profile/runtime'
-import { readOfferingDetails } from './server'
-import { offeringAccess, deliveryStateSchema, type ProductGroup } from './shared'
+import { getTrialRecord, readOfferingDetails } from './server'
+import { offeringAccess, deliveryStateSchema, trialIsActive, type ProductGroup } from './shared'
 
 export class WorkspaceError extends Error {
   constructor(
@@ -38,8 +38,16 @@ export async function requireOfferingWorkspace(slug: string, group?: Exclude<Pro
     include: { payment: { select: { verifiedAt: true } } },
   })
   const details = await readOfferingDetails(course.id)
-  if (!offeringAccess(enrollment, course.productGroup === 'DIGITAL' ? details.accessDays : 0))
-    throw new WorkspaceError('Tài khoản chưa có quyền sử dụng hoặc đã hết hạn.', 403)
+  if (!offeringAccess(enrollment, course.productGroup === 'DIGITAL' ? details.accessDays : 0)) {
+    // Dùng thử còn hạn vẫn vào được không gian sử dụng. Bản ghi dùng thử tách hẳn
+    // với Enrollment nên không đổi quyền của khách đã mua hoặc được tặng.
+    const trial =
+      course.productGroup === 'DIGITAL' && details.kind !== 'COMBO'
+        ? await getTrialRecord(course.id, userId)
+        : null
+    if (!trialIsActive(trial))
+      throw new WorkspaceError('Tài khoản chưa có quyền sử dụng hoặc đã hết hạn.', 403)
+  }
   if (details.kind === 'COMBO') await (await import('./combo')).syncComboPurchase(enrollment!.id)
   return { course, userId, details, session, profile }
 }

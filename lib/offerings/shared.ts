@@ -40,6 +40,9 @@ export const offeringDetailsSchema = z.object({
   benefits: z.array(z.string().trim().max(240)).max(6).default([]).transform(items => items.filter(Boolean)),
   agenda: z.array(z.object({ title: z.string().trim().min(1).max(160), description: z.string().trim().max(2000) })).max(30).default([]),
   resources: z.array(z.object({ title: z.string().trim().min(1).max(200), kind: z.enum(['EBOOK', 'APP', 'TEMPLATE', 'GUIDE', 'RESOURCE', 'PROMPT', 'VIDEO']), viewer: z.enum(['LINK', 'PDF']).default('LINK'), url: safeUrl.refine(value => !!value, 'Nhập đường dẫn tài nguyên.'), instructions: z.string().trim().max(5000).default(''), guideUrl: safeUrl.default(''), description: z.string().trim().max(1000).optional(), iconUrl: safeUrl.optional(), openMode: z.enum(['EMBED', 'NEW_TAB']).optional(), guides: z.array(z.object({ title: z.string().trim().min(1).max(200), kind: z.enum(['TEXT', 'VIDEO', 'DOCS', 'PDF']), content: z.string().trim().max(5000).default(''), url: safeUrl.default('') }).refine(item => item.kind === 'TEXT' ? !!item.content : !!item.url, 'Nhập nội dung hoặc liên kết hướng dẫn.')).max(30).optional() })).max(100).default([]),
+  trialEnabled: z.boolean().default(false),
+  trialDays: z.number().int().min(1).max(90).default(7),
+  relatedItems: z.array(z.object({ courseId: z.number().int().positive() })).max(8).default([]).refine(items => new Set(items.map(item => item.courseId)).size === items.length, 'Mỗi món chỉ được chọn một lần.'),
 }).strict()
 export type OfferingDetails = z.infer<typeof offeringDetailsSchema>
 export const emptyOfferingDetails: OfferingDetails = offeringDetailsSchema.parse({})
@@ -48,9 +51,9 @@ export function parseOfferingDetails(value: unknown): OfferingDetails {
 }
 // Không đưa đường dẫn tài nguyên hoặc hướng dẫn sau mua vào danh mục công khai.
 export function publicOfferingDetails(details: OfferingDetails) {
-  const { kind, accessDays, sessions, durationMin, mode, format, platform, language, delivery, audience } = details
+  const { kind, accessDays, sessions, durationMin, mode, format, platform, language, delivery, audience, trialEnabled, trialDays } = details
   const service = details.service ? { ...details.service, fields: details.service.fields.filter(field => field.public), questions: isQuoteService(details) ? details.service.questions : [], inputs: '', startCondition: '' } : undefined
-  return { kind, accessDays, sessions, durationMin, mode, format, platform, language, delivery, audience, service }
+  return { kind, accessDays, sessions, durationMin, mode, format, platform, language, delivery, audience, trialEnabled, trialDays, service }
 }
 export const modeLabels = { ONLINE: 'Online', OFFLINE: 'Trực tiếp', HYBRID: 'Online & trực tiếp' }
 export const resourceLabels = { EBOOK: 'Ebook', APP: 'Công cụ / App', TEMPLATE: 'Template', GUIDE: 'Hướng dẫn', RESOURCE: 'Tài nguyên', PROMPT: 'Prompt', VIDEO: 'Video' }
@@ -70,4 +73,22 @@ export function offeringAccess(enrollment: { status: string; activatedAt?: Date 
   const activated = enrollment.activatedAt || enrollment.payment?.verifiedAt
   // Giữ quyền cũ nếu bản ghi lịch sử chưa có thời điểm kích hoạt đáng tin cậy.
   return !accessDays || !activated || now < new Date(activated).getTime() + accessDays * 86400000
+}
+// Bản ghi dùng thử nằm tách hẳn với Enrollment: dùng thử không tạo quyền mua/tặng
+// và không bao giờ đổi quyền của khách đã có quyền thật.
+export type TrialRecord = { startedAt: string; endsAt: string }
+export function parseTrialRecord(value: unknown): TrialRecord | null {
+  if (!value || typeof value !== 'object') return null
+  const { startedAt, endsAt } = value as { startedAt?: unknown; endsAt?: unknown }
+  if (typeof startedAt !== 'string' || typeof endsAt !== 'string') return null
+  const start = new Date(startedAt).getTime()
+  const end = new Date(endsAt).getTime()
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null
+  return { startedAt, endsAt }
+}
+export function trialIsActive(record: TrialRecord | null, now = Date.now()): boolean {
+  return !!record && now < new Date(record.endsAt).getTime()
+}
+export function trialDaysLeft(record: TrialRecord, now = Date.now()): number {
+  return Math.max(0, Math.ceil((new Date(record.endsAt).getTime() - now) / 86400000))
 }

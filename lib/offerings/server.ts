@@ -6,7 +6,7 @@ import { getPublicProjects } from '@/lib/wi300/public-projects'
 import { getCurrentSiteProfile, getCourseWhereForProfile } from '@/lib/site-profile/runtime'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import { wi300CoursePreferences, wi300CourseWhere } from '@/lib/wi300/course-visibility'
-import { emptyOfferingDetails, offeringDetailsSchema, publicOfferingDetails, type ProductGroup } from './shared'
+import { emptyOfferingDetails, offeringDetailsSchema, parseTrialRecord, publicOfferingDetails, type ProductGroup, type TrialRecord } from './shared'
 
 export const offeringDetailsKey = (id: number) => 'catalog:offering:' + id
 async function loadOfferingDetails(id: number, db: Pick<Prisma.TransactionClient, 'systemConfig'>) {
@@ -48,6 +48,15 @@ export async function saveOfferingDetails(db: Prisma.TransactionClient, id: numb
     await db.bookingSession.update({ where: { id: session.id }, data: { courseId: id, durationMin: details.durationMin } })
   }
   await db.systemConfig.upsert({ where: { key: offeringDetailsKey(id) }, create: { key: offeringDetailsKey(id), value: details }, update: { value: details } })
+}
+export const offeringTrialKey = (courseId: number, userId: number) => 'trial:offering:' + courseId + ':' + userId
+export async function getTrialRecord(courseId: number, userId: number): Promise<TrialRecord | null> {
+  try {
+    const row = await prisma.systemConfig.findUnique({ where: { key: offeringTrialKey(courseId, userId) } })
+    return parseTrialRecord(row?.value)
+  } catch {
+    return null
+  }
 }
 export const publicCatalogWhere = cache(async () => {
   const [profile, brand] = await Promise.all([getCurrentSiteProfile(), getCurrentDeploymentBrand()])

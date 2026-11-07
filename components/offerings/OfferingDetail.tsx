@@ -18,18 +18,24 @@ import { CheckCircle2, LifeBuoy, ArrowRight, Layers } from 'lucide-react'
 import OfferingRichText from './OfferingRichText'
 import MainHeader from '@/components/layout/MainHeader'
 import OfferingPurchase from './OfferingPurchase'
+import OfferingTrialStart from './OfferingTrialStart'
 import OfferingShare from './OfferingShare'
 import OfferingConsultation from './OfferingConsultation'
 import { isQuoteService } from '@/lib/offerings/service'
-import { publicCatalogWhere, readOfferingDetails, getOfferingSalesCourse } from '@/lib/offerings/server'
+import { publicCatalogWhere, readOfferingDetails, getOfferingSalesCourse, getTrialRecord, offeringDetailsKey } from '@/lib/offerings/server'
 import {
   groupInfo,
   offeringFacts,
+  offeringHref,
   offeringWorkspaceHref,
   publicOfferingDetails,
   offeringAccess,
   offeringKinds,
+  offeringDetailsSchema,
+  emptyOfferingDetails,
   productGroup,
+  trialIsActive,
+  trialDaysLeft,
   type ProductGroup,
   type OfferingDetails,
 } from '@/lib/offerings/shared'
@@ -97,6 +103,47 @@ export default async function OfferingDetail({
   const info = groupInfo[group]
   const active = offeringAccess(enrollment, group === 'DIGITAL' ? details.accessDays : 0)
   const previouslyActive = enrollment && ['ACTIVE', 'COMPLETED'].includes(enrollment.status)
+  const trial = userId != null && group === 'DIGITAL' ? await getTrialRecord(course.id, userId) : null
+  const trialActive = trialIsActive(trial)
+  const trialExpired = !!trial && !trialActive
+  const hasAccess = active || trialActive
+  const canStartTrial =
+    group === 'DIGITAL' &&
+    details.trialEnabled &&
+    details.kind !== 'COMBO' &&
+    course.phi_coc > 0 &&
+    !trial &&
+    (!enrollment || ['REJECTED', 'CANCELLED'].includes(enrollment.status))
+  const relatedIds = (details.relatedItems || []).map((item) => item.courseId).filter((id) => id !== course.id)
+  const relatedRows = relatedIds.length
+    ? await prisma.course.findMany({
+        where: { AND: [await publicCatalogWhere(), { id: { in: relatedIds } }] },
+        select: {
+          id: true,
+          id_khoa: true,
+          name_lop: true,
+          link_anh_bia: true,
+          phi_coc: true,
+          productGroup: true,
+          teacher: { select: { name: true } },
+        },
+      })
+    : []
+  const relatedMeta = relatedRows.length
+    ? await prisma.systemConfig.findMany({
+        where: { key: { in: relatedRows.map((row) => offeringDetailsKey(row.id)) } },
+      })
+    : []
+  const relatedByKey = new Map(relatedMeta.map((row) => [row.key, row.value]))
+  const related = relatedIds
+    .map((id) => relatedRows.find((row) => row.id === id))
+    .filter((row): row is NonNullable<typeof row> => !!row)
+    .map((row) => ({
+      ...row,
+      details:
+        offeringDetailsSchema.safeParse(relatedByKey.get(offeringDetailsKey(row.id)) || {}).data ||
+        emptyOfferingDetails,
+    }))
   const projects = (await getPublicProjects())
     .filter((project) => project.courseIds.includes(course.id))
     .map(({ slug, name, logo }) => ({ slug, name, logo }))
@@ -164,12 +211,17 @@ export default async function OfferingDetail({
             <aside className="space-y-5 rounded-2xl border border-brk-outline bg-white p-5 shadow-sm sm:p-6 lg:sticky lg:top-28">
               <div className="border-b border-brk-outline pb-5">
                 <h2 className="mb-3 text-2xl font-bold text-green-950">
-                  {active ? (group === 'DIGITAL' ? 'Sản phẩm của bạn' : 'Dịch vụ của bạn') : info.label}
+                  {hasAccess ? (group === 'DIGITAL' ? 'Sản phẩm của bạn' : 'Dịch vụ của bạn') : info.label}
                 </h2>
                 {active ? (
                   <p className="flex items-center gap-2 rounded-xl bg-green-50 p-3 font-semibold text-green-800">
                     <CheckCircle2 className="h-5 w-5" />
                     Đã kích hoạt
+                  </p>
+                ) : trialActive ? (
+                  <p className="flex items-center gap-2 rounded-xl bg-green-50 p-3 font-semibold text-green-800">
+                    <CheckCircle2 className="h-5 w-5" />
+                    Đang dùng thử · Còn {trialDaysLeft(trial!)} ngày
                   </p>
                 ) : (
                   <p className="text-3xl font-bold text-red-700">
@@ -196,21 +248,63 @@ export default async function OfferingDetail({
                   ))}
                 </dl>
               </section>
-              {quote ? <OfferingConsultation slug={slug} questions={details.service!.questions} signedIn={userId!=null} /> : active ? (
-                <Link href={offeringWorkspaceHref(group, slug)} className={button}>
-                  Mở nội dung <ArrowRight className="h-4 w-4" />
-                </Link>
+              {quote ? (
+                <OfferingConsultation slug={slug} questions={details.service!.questions} signedIn={userId != null} />
+              ) : hasAccess ? (
+                <div className="space-y-3">
+                  <Link href={offeringWorkspaceHref(group, slug)} className={button}>
+                    Mở nội dung <ArrowRight className="h-4 w-4" />
+                  </Link>
+                  {trialActive && !active && (
+                    <>
+                      <p className="text-sm font-semibold text-green-950">
+                        Nâng cấp để tiếp tục sử dụng sau khi hết dùng thử
+                      </p>
+                      <OfferingPurchase
+                        course={course}
+                        enrollment={enrollment ? { status: enrollment.status } : null}
+                        userId={userId}
+                        userPhone={user?.phone || null}
+                      />
+                    </>
+                  )}
+                </div>
               ) : previouslyActive ? (
                 <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
                   Quyền sử dụng đã hết hạn. Vui lòng gửi yêu cầu hỗ trợ để gia hạn.
                 </p>
+              ) : trialExpired ? (
+                <div className="space-y-3">
+                  <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
+                    Bạn đã dùng thử và thời gian dùng thử đã hết. Mua để tiếp tục sử dụng.
+                  </p>
+                  <OfferingPurchase
+                    course={course}
+                    enrollment={enrollment ? { status: enrollment.status } : null}
+                    userId={userId}
+                    userPhone={user?.phone || null}
+                  />
+                </div>
               ) : (
-                <OfferingPurchase
-                  course={course}
-                  enrollment={enrollment ? { status: enrollment.status } : null}
-                  userId={userId}
-                  userPhone={user?.phone || null}
-                />
+                <div className="space-y-3">
+                  {canStartTrial &&
+                    (userId != null ? (
+                      <OfferingTrialStart slug={slug} days={details.trialDays} />
+                    ) : (
+                      <Link
+                        href={'/login?callbackUrl=' + encodeURIComponent(offeringHref(group, slug))}
+                        className={button}
+                      >
+                        Dùng thử miễn phí {details.trialDays} ngày
+                      </Link>
+                    ))}
+                  <OfferingPurchase
+                    course={course}
+                    enrollment={enrollment ? { status: enrollment.status } : null}
+                    userId={userId}
+                    userPhone={user?.phone || null}
+                  />
+                </div>
               )}
               <div className="grid grid-cols-2 gap-3 border-t border-brk-outline pt-4">
                 <OfferingShare
@@ -300,7 +394,7 @@ export default async function OfferingDetail({
               <p className="my-3 text-brk-muted">
                 Tài nguyên và hướng dẫn được mở tại khu vực riêng sau khi kích hoạt sản phẩm.
               </p>
-              {active && (
+              {hasAccess && (
                 <Link
                   href={offeringWorkspaceHref(group, slug)}
                   className="inline-flex min-h-12 items-center rounded-xl bg-brk-primary px-5 font-semibold text-white"
@@ -329,6 +423,48 @@ export default async function OfferingDetail({
                   trao đổi trước khi đăng ký.
                 </p>
               )}
+            </section>
+          )}
+          {related.length > 0 && (
+            <section id="goi-y" className="scroll-mt-36 space-y-4">
+              <h2 className="text-2xl font-bold text-green-950">Gợi ý dùng cùng</h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {related.map((item) => {
+                  const itemQuote = item.productGroup === 'SERVICE' && isQuoteService(item.details)
+                  return (
+                    <Link
+                      key={item.id}
+                      href={offeringHref(item.productGroup, item.id_khoa)}
+                      className="flex gap-4 rounded-2xl border bg-white p-4"
+                    >
+                      {item.link_anh_bia && (
+                        <img
+                          src={item.link_anh_bia}
+                          alt={item.name_lop}
+                          className="h-20 w-28 shrink-0 rounded-xl object-cover"
+                        />
+                      )}
+                      <span className="min-w-0">
+                        <span className="block font-bold text-green-950">{item.name_lop}</span>
+                        <span className="mt-1 block text-sm text-brk-muted">
+                          {groupInfo[productGroup(item.productGroup)].label}
+                          {item.teacher?.name ? ' · ' + item.teacher.name : ''}
+                        </span>
+                        <span className="mt-1 block text-sm font-semibold text-red-700">
+                          {itemQuote
+                            ? 'Liên hệ báo giá'
+                            : item.phi_coc > 0
+                              ? item.phi_coc.toLocaleString('vi-VN') + 'đ'
+                              : 'Miễn phí'}
+                        </span>
+                        <span className="mt-1 block text-sm font-semibold text-brk-primary">
+                          {itemQuote ? 'Liên hệ báo giá →' : 'Xem chi tiết →'}
+                        </span>
+                      </span>
+                    </Link>
+                  )
+                })}
+              </div>
             </section>
           )}
           <section id="huong-dan" className="scroll-mt-36 space-y-5">
