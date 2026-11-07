@@ -90,8 +90,9 @@ async function run() {
     './OfferingRichText': { __esModule: true, default: ({ text }) => React.createElement('p', null, text) },
     './OfferingResources': { __esModule: true, default: ({ resources }) => React.createElement('div', null, resources.map((r, index) => React.createElement('div', { key: index }, r.title, r.url, r.body))) },
     './OfferingPurchase': { __esModule: true, default: props => React.createElement('div', { 'data-purchase': JSON.stringify(props) }) },
+    './OfferingTrialStart': { __esModule: true, default: () => null },
     './OfferingShare': { __esModule: true, default: () => null },
-    '@/lib/offerings/server': { getOfferingSalesCourse: async () => db.course.findUnique({}), readOfferingDetails: async () => { detailReads++; return details }, publicCatalogWhere: async () => ({ status: true }) },
+    '@/lib/offerings/server': { getOfferingSalesCourse: async () => db.course.findUnique({}), readOfferingDetails: async () => { detailReads++; return details }, publicCatalogWhere: async () => ({ status: true }), getTrialRecord: async () => null, offeringDetailsKey: (id) => 'catalog:offering:' + id },
     '@/lib/offerings/shared': shared,
   }).default
   group = 'DIGITAL'; enrollment = null

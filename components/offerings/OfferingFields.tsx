@@ -1,6 +1,7 @@
 'use client'
 import OfferingWorkspaceFields from './OfferingWorkspaceFields'
 import OfferingComboFields from './OfferingComboFields'
+import OfferingSalesFields from './OfferingSalesFields'
 import OfferingServiceFields from './OfferingServiceFields'
 import OfferingResourceEditor, { type ExistingOfferingContent } from './OfferingResourceEditor'
 import { offeringKinds, type OfferingDetails, type ProductGroup } from '@/lib/offerings/shared'
@@ -363,6 +364,23 @@ export default function OfferingFields({
             </p>
           </OfferingServiceFields>
         )}
+      </section>
+      <section
+        hidden={!show('pricing')}
+        data-offering-section="sales-methods"
+        className="space-y-4 rounded-2xl border bg-white p-5"
+      >
+        <h3 className="text-xl font-bold text-green-950">Cách bán & ưu đãi</h3>
+        <p className="text-sm leading-7 text-brk-muted">
+          Chỉ bật những cách bán bạn muốn áp dụng. Phần này không thay đổi giá và quyền lợi đã đặt ở trên.
+        </p>
+        <OfferingSalesFields
+          group={group}
+          value={value}
+          onChange={onChange}
+          courseId={courseId}
+          teacherId={teacherId}
+        />
       </section>
     </div>
   )

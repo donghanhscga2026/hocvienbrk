@@ -15,7 +15,7 @@ async function run() {
     '@/lib/get-session': { getSession: async () => userId == null ? null : ({ user: { id: userId } }) },
     '@/lib/website/domain-context': { requireDomainCourse: async () => {} },
     '@/lib/site-profile/runtime': { getCurrentSiteProfile: async () => ({}), getCourseWhereForProfile: () => ({ status: true, teacherId: 2 }) },
-    './server': { readOfferingDetails: async () => details },
+    './server': { readOfferingDetails: async () => details, getTrialRecord: async () => null },
   })
   userId = null
   await assert.rejects(() => workspace.readWorkspaceResource('PRODUCT', 'resource:0'), error => error.status === 401)
