@@ -3,6 +3,7 @@ import { buildTxFingerprint, TX_FINAL_STATES } from '@/lib/payment-dedup';
 import prisma from '@/lib/prisma';
 import { sendTelegramAdmin, sendSuccessEmail, sendTelegram } from './notifications';
 import { isTestAccount } from '@/lib/test-account';
+import { parseGieoHatContent, tryAutoConfirmGieoHat } from '@/lib/course/gieo-hat-match';
 
 function extractTextFromHtml(html: string): string {
   return html
@@ -246,7 +247,10 @@ export async function processPaymentEmails() {
       }
     });
 
-    if (pendingEnrollments.length === 0) return { processed: messages.length, matched: 0 };
+    // Không return sớm khi không có enrollment PENDING: email gieo hạt
+    // (nội dung CC) vẫn cần được đối soát trong vòng lặp dưới. Email học
+    // phí không khớp sẽ được ghi UNMATCHED (trạng thái xử lý lại được ở
+    // lần quét sau) như trước.
 
     for (const msg of messages) {
       // Nghỉ 200ms giữa các email để giảm tải dồn dập cho API
@@ -332,6 +336,41 @@ export async function processPaymentEmails() {
             if (dupErr?.code === 'P2002') continue; // Race: tiến trình/kênh khác vừa ghi nhận
             console.error(`  ⚠️ Lỗi ghi nhận dedup cho message ${msg.id}:`, dupErr);
           }
+
+        // Gieo hạt cam kết (nội dung CC): đối soát độc lập bằng hàm dùng
+        // chung với webhook SePay, KHÔNG rơi vào luồng kích hoạt học phí
+        // COC bên dưới. Không khớp được thì ghi UNMATCHED (xử lý lại được)
+        // và bỏ qua an toàn, không phá luồng quét hiện tại.
+        const ghParsed = parseGieoHatContent(parsed.content);
+        if (ghParsed) {
+          const gh = await tryAutoConfirmGieoHat({
+            userId: ghParsed.userId,
+            courseCode: ghParsed.courseCode,
+            amount: parsed.amount,
+            transferTime: emailTime,
+            source: 'EMAIL',
+          });
+          if (txRecord) {
+            await prisma.processedTransaction.update({
+              where: { id: txRecord.id },
+              data: gh.outcome === 'MATCHED'
+                ? { status: 'PROCESSED', reason: gh.message }
+                : { status: 'UNMATCHED', reason: gh.message },
+            });
+          }
+          if (gh.outcome === 'MATCHED') {
+            matchedCount++;
+            try {
+              await callGmailWithRetry(() => gmail.users.messages.modify({
+                userId: 'me', id: msg.id || '',
+                requestBody: { removeLabelIds: ['UNREAD'] }
+              }));
+            } catch (readErr) {
+              console.error(`  ⚠️ Không đánh dấu đã đọc được email gieo hạt ${msg.id}:`, readErr);
+            }
+          }
+          continue;
+        }
 
         let emailMatchedEnrollmentId: number | null = null;
         let emailError: string | null = null;
