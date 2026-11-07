@@ -4,12 +4,17 @@ import { crmBody, crmFailure, crmResponse } from '@/lib/crm/http'
 import { CrmError } from '@/lib/crm/service'
 import { buildCareQueue, careScopeCourseIds, countCareToday } from '@/lib/care/queue'
 import { sendCareReminder } from '@/lib/care/runner'
+import { bumpTemplateUsedCount, getTemplateForSend } from '@/lib/care/templates-store'
+import { renderCareLibraryTemplate } from '@/lib/care/templates-lib'
 export const dynamic = 'force-dynamic'
 
 const bodySchema = z.object({
   userId: z.number().int().positive(),
   courseId: z.number().int().positive(),
   ruleId: z.enum(['R1', 'R2', 'R3', 'R4', 'R5', 'R6']),
+  // GĐ2: chọn câu mẫu từ thư viện dùng chung — nội dung được render ở
+  // server từ mẫu + biến thật của học viên, không tin nội dung client.
+  templateId: z.number().int().positive().optional(),
 }).strict()
 
 /**
@@ -36,8 +41,17 @@ export async function POST(request: Request) {
       const alreadyToday = await countCareToday(row.userId, now)
       if (alreadyToday > 0) throw new CrmError('Học viên đã nhận 1 nhắc chăm sóc hôm nay (trần 1 nhắc/ngày).', 409)
     }
-    const result = await sendCareReminder(row, now)
+    let messageOverride: string | undefined
+    if (input.templateId) {
+      const template = await getTemplateForSend(actor, input.templateId)
+      if (template.scope === 'COURSE' && template.courseId !== input.courseId) {
+        throw new CrmError('Câu mẫu theo khóa chỉ dùng được cho đúng khóa của mẫu.', 400)
+      }
+      messageOverride = renderCareLibraryTemplate(template.body, row.templateVars)
+    }
+    const result = await sendCareReminder(row, now, messageOverride)
     if (!result.sent) throw new CrmError('Chưa gửi được nhắc. Có thể nhắc này vừa được gửi ở lượt khác.', 409)
+    if (input.templateId) await bumpTemplateUsedCount(input.templateId)
     return crmResponse({ sent: true, status: 'reminded' })
   } catch (e) { return crmFailure(e) }
 }
