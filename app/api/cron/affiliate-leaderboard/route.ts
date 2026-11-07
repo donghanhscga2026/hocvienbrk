@@ -4,8 +4,9 @@ import prisma from "@/lib/prisma"
 /**
  * Cron vinh danh Affiliate (Affiliate v2 — GĐ4 + cập nhật hằng ngày).
  *
- * Mỗi lần chạy (lịch chính: Vercel Cron 08:20 mỗi sáng trong vercel.json;
- * bộ lập lịch GitHub cũng gọi cùng endpoint này):
+ * Mỗi lần chạy (bộ lập lịch chuẩn của dự án: GitHub Actions — job
+ * academy-daily-sync trong .github/workflows/cron-jobs.yml, gọi POST
+ * mỗi ngày; bước này có if: always() để không bị chặn bởi bước khác lỗi):
  *  1. Chốt kỳ tháng trước nếu chưa có snapshot: tổng hợp GMV + hoa hồng
  *     theo CTV → ghi LeaderboardSnapshot, đồng thời trao huy hiệu.
  *     Idempotent — kỳ đã chốt không bao giờ bị ghi lại.
