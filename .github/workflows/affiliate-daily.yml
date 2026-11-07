@@ -1,0 +1,31 @@
+name: Affiliate daily (hoa hồng + vinh danh)
+
+# File lịch riêng cho 2 việc affiliate hằng ngày, tách khỏi cron-jobs.yml
+# (file đó mang 7 lịch gồm lịch mỗi 15 phút nên các lượt hẹn của nó hay bị
+# GitHub bỏ/trễ nhiều giờ — lượt 08:20 đo thực tế chạy lúc ~14:40).
+# Hai khung giờ mỗi ngày: lượt nào tới trước thì làm việc; cả hai endpoint
+# đều chạy lại an toàn nên lượt sau chạy trùng cũng vô hại:
+#   - process-commissions: chỉ nhả các khoản đã tới hạn (idempotent).
+#   - affiliate-leaderboard: chốt kỳ trước nếu chưa chốt (idempotent) và
+#     tính lại kỳ hiện tại dạng tạm tính (ghi đè có kiểm soát).
+# Hai bước tương ứng trong job academy-daily-sync của cron-jobs.yml vẫn
+# giữ nguyên làm lưới dự phòng (đã có if: always()).
+on:
+  schedule:
+    - cron: '20 1 * * *'
+    - cron: '35 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  affiliate-daily:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Affiliate commissions release (PENDING -> AVAILABLE)
+        run: |
+          curl --fail --silent --show-error --max-time 300 -X POST "${{ vars.SITE_URL }}/api/cron/process-commissions" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+      - name: Affiliate leaderboard (chốt kỳ trước + tạm tính kỳ hiện tại)
+        if: always()
+        run: |
+          curl --fail --silent --show-error --max-time 120 -X POST "${{ vars.SITE_URL }}/api/cron/affiliate-leaderboard" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
