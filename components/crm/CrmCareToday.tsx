@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Bell, Flame, Inbox, PauseCircle, RefreshCw, Search } from 'lucide-react'
+import { Bell, Flame, Inbox, MessageCircle, PauseCircle, RefreshCw, Search } from 'lucide-react'
 
 type CareRuleId = 'R1' | 'R2' | 'R3' | 'R4' | 'R5' | 'R6'
 type CareStatus = 'pending' | 'reminded' | 'capped' | 'skipped' | 'takeover'
@@ -130,6 +130,17 @@ export default function CrmCareToday({ revision }: { revision: number }) {
     } finally { setBusyKey('') }
   }
 
+  const enqueueZalo = async (row: CareRow) => {
+    const key = 'zalo:' + row.userId + ':' + row.courseId + ':' + row.ruleId
+    setBusyKey(key); setActionError(''); setNotice('')
+    try {
+      await postCare('/api/crm/care-zalo/enqueue', { userId: row.userId, courseId: row.courseId, ruleId: row.ruleId })
+      setNotice('Đã xếp lệnh gửi Zalo cho ' + row.userName + ' — Care Bridge sẽ gửi khi tiến trình phụ đang chạy. Theo dõi ở tab Kênh Zalo.')
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Không xếp được lệnh gửi Zalo.')
+    } finally { setBusyKey('') }
+  }
+
   const createFollow = async () => {
     if (!followTarget) return
     const row = followTarget
@@ -188,6 +199,7 @@ export default function CrmCareToday({ revision }: { revision: number }) {
             <span className="flex-1" />
             {canSkip && <button disabled={busy} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-100 disabled:opacity-50" onClick={() => void act(row, 'skip')}>Bỏ qua hôm nay</button>}
             {(row.status === 'pending' || row.status === 'takeover' || row.status === 'capped') && <button disabled={busy} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-100 disabled:opacity-50" onClick={() => { setFollowTarget(row); setFollowDays(3); setFollowTemplateId('') }}>Hẹn theo dõi</button>}
+            {row.status === 'pending' && row.ruleId !== 'R5' && <button disabled={busyKey !== ''} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-900 hover:bg-sky-100 disabled:opacity-50" onClick={() => void enqueueZalo(row)}><MessageCircle size={16} />{busyKey === 'zalo:' + key ? 'Đang xếp…' : 'Gửi qua Zalo'}</button>}
             {canRemind && <button disabled={busy} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50" onClick={() => { setRemindTarget(row); setRemindTemplateId('') }}><Bell size={16} />Gửi nhắc</button>}
           </div>
         </article>
