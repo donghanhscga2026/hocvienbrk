@@ -26,7 +26,8 @@
     "code-history": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/generate-code-history.ts",
     "create-brk-profile": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/create-brk-profile.ts",
     "add-site-profiles-tool": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/add-site-profiles-tool.ts",
-    "migrate-external-images": "ts-node -P tsconfig.seed.json scripts/migrate-external-images-to-supabase.ts"
+    "migrate-external-images": "ts-node -P tsconfig.seed.json scripts/migrate-external-images-to-supabase.ts",
+    "test:care-brain": "node scripts/test-care-brain.cjs"
   },
   "dependencies": {
     "@auth/core": "0.41.3",
