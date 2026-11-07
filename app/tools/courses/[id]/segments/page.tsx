@@ -40,6 +40,8 @@ function SegmentsEditor({ courseId }: { courseId: number }) {
     const searchParams = useSearchParams()
     const [lessons, setLessons] = useState<any[]>([])
     const [lessonId, setLessonId] = useState<string>(searchParams.get('lesson') || '')
+    const [loadError, setLoadError] = useState<string | null>(null)
+    const [reloadTick, setReloadTick] = useState(0)
     const [segments, setSegments] = useState<SegmentRow[]>([])
     const [loading, setLoading] = useState(true)
     const [loadingSegments, setLoadingSegments] = useState(false)
@@ -49,17 +51,25 @@ function SegmentsEditor({ courseId }: { courseId: number }) {
     const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
     useEffect(() => {
+        let cancelled = false
+        setLoading(true)
+        setLoadError(null)
         fetch(`/api/courses/${courseId}`)
-            .then(res => (res.ok ? res.json() : null))
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`)
+                return res.json()
+            })
             .then(data => {
+                if (cancelled) return
                 const list = data?.lessons || []
                 setLessons(list)
                 // Mặc định chọn bài đầu tiên CÓ đoạn (nơi GV cần duyệt) thay vì bài đầu tiên của khóa
                 setLessonId(prev => prev || (list.find((l: any) => (l._count?.segments ?? 0) > 0)?.id ?? list[0]?.id ?? ''))
             })
-            .catch(() => setMessage({ text: 'Không tải được danh sách bài học', type: 'error' }))
-            .finally(() => setLoading(false))
-    }, [courseId])
+            .catch(() => { if (!cancelled) setLoadError('Không tải được danh sách bài học. Có thể do kết nối tới máy chủ bị gián đoạn — bấm Thử lại, nếu vẫn lỗi hãy báo quản trị viên.') })
+            .finally(() => { if (!cancelled) setLoading(false) })
+        return () => { cancelled = true }
+    }, [courseId, reloadTick])
 
     const fetchSegments = useCallback(async () => {
         if (!lessonId) { setSegments([]); return }
@@ -188,8 +198,15 @@ function SegmentsEditor({ courseId }: { courseId: number }) {
             )}
 
             <label className="mt-4 block text-xs font-bold text-gray-500">Chọn bài học</label>
-            {loading ? (
+            {loadError ? (
+                <div className="mt-2 flex flex-wrap items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <span className="flex-1 min-w-[200px]">{loadError}</span>
+                    <button onClick={() => setReloadTick(t => t + 1)} className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700">Thử lại</button>
+                </div>
+            ) : loading ? (
                 <div className="mt-2 flex items-center gap-2 text-sm text-gray-500"><Loader2 className="w-4 h-4 animate-spin" /> Đang tải…</div>
+            ) : lessons.length === 0 ? (
+                <p className="mt-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500">Khóa học này chưa có bài học nào.</p>
             ) : (
                 <select value={lessonId} onChange={e => { setLessonId(e.target.value); setEditingId(null); setForm(emptyForm) }} className={inputCls + ' mt-1'}>
                     {lessons.map((l: any) => (
