@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, Fragment } from 'react'
 import { getAdminCoursesAction, bulkToggleCourseStatusAction, bulkUpdateCoursesOptionsAction } from '@/app/actions/admin-actions'
 import { getTeachersAction, deleteCourseAction, cloneCourseNextCohortAction, getCourseDeleteImpactAction } from '@/app/actions/course-actions'
-import { BookOpen, Users, Loader2, Plus, Eye, X, Search, Tag, Trash2, Save, Edit2 } from 'lucide-react'
+import { BookOpen, Users, Loader2, Plus, Eye, X, Search, Tag, Trash2, Save, Edit2, ChevronDown, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import CourseActionsMenu from '@/components/course/CourseActionsMenu'
@@ -67,6 +67,8 @@ function CoursesTab() {
     const [visibilityScope, setVisibilityScope] = useState("shared")
     const [currentUserId, setCurrentUserId] = useState<number | null>(null)
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+    const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+    const toggleCohortGroup = (key: string) => setCollapsedGroups(prev => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next })
     const [batchLoading, setBatchLoading] = useState(false)
 
     const [viewStudents, setViewStudents] = useState<{ courseId: number; courseName: string } | null>(null)
@@ -228,9 +230,41 @@ function CoursesTab() {
         })
     }, [courses, search, filterStatus, filterCategory, filterProject, projects])
 
-    const totalPages = Math.max(1, Math.ceil(filteredCourses.length / 10))
+    // Gom các kỳ của cùng một khóa học (cùng giảng viên + cùng tên khóa học chung)
+    // thành một nhóm để danh sách quản trị gọn; sản phẩm số và dịch vụ giữ nguyên từng dòng.
+    type CourseListEntry = { type: 'single'; course: any } | { type: 'group'; key: string; name: string; courses: any[] }
+    const groupedEntries = useMemo<CourseListEntry[]>(() => {
+        const cohortNo = (course: any) => {
+            const fromName = String(course.name_khoa || '').match(/K(\d+)\s*$/i)
+            if (fromName) return parseInt(fromName[1], 10)
+            const fromCode = String(course.id_khoa || '').match(/K(\d+)\s*$/i)
+            return fromCode ? parseInt(fromCode[1], 10) : Number.MAX_SAFE_INTEGER
+        }
+        const byKey = new Map<string, any[]>()
+        for (const course of filteredCourses) {
+            if (course.productGroup !== 'COURSE') continue
+            const key = `${course.teacherId}::${course.name_lop}`
+            const arr = byKey.get(key)
+            if (arr) arr.push(course); else byKey.set(key, [course])
+        }
+        const seen = new Set<string>()
+        const out: CourseListEntry[] = []
+        for (const course of filteredCourses) {
+            if (course.productGroup !== 'COURSE') { out.push({ type: 'single', course }); continue }
+            const key = `${course.teacherId}::${course.name_lop}`
+            if (seen.has(key)) continue
+            seen.add(key)
+            const members = byKey.get(key) || [course]
+            if (members.length >= 2) out.push({ type: 'group', key, name: course.name_lop, courses: [...members].sort((a, b) => cohortNo(a) - cohortNo(b)) })
+            else out.push({ type: 'single', course })
+        }
+        return out
+    }, [filteredCourses])
+
+    const totalPages = Math.max(1, Math.ceil(groupedEntries.length / 10))
     const currentPage = Math.min(page, totalPages)
-    const visibleCourses = filteredCourses.slice((currentPage - 1) * 10, currentPage * 10)
+    const visibleEntries = groupedEntries.slice((currentPage - 1) * 10, currentPage * 10)
+    const visibleCourses = visibleEntries.flatMap(entry => entry.type === 'group' ? entry.courses : [entry.course])
     const activityIds = visibleCourses.map(course => course.id).join(',')
     // Nhớ bộ lọc theo tài khoản trong phiên; không lưu dữ liệu hoặc danh sách học viên.
     useEffect(() => {
@@ -344,6 +378,44 @@ function CoursesTab() {
         }
     }
 
+    const renderCourseArticle = (course: any) => {
+                            const feeLabel = courseFeeLabels[course.feeType] || 'Học phí'
+                            const feeAmount = typeof course.phi_coc === 'number' && Number.isFinite(course.phi_coc) && course.phi_coc >= 0 ? course.phi_coc : null
+                            const feeText = feeAmount === null ? 'Chưa có học phí' : feeAmount === 0 && course.feeType === 'MIEN_PHI' ? 'Miễn phí' : feeAmount === 0 && course.feeType === 'PHI_TUY_TINH' ? 'Tùy tâm' : feeAmount.toLocaleString('vi-VN') + 'đ'
+                            const summary = activity.find(item => item.courseId === course.id)
+                            const names = projects.filter(project => project.courseIds.includes(course.id)).map(project => project.name)
+                            return <article key={course.id} className={`gap-3 p-4 [&>*]:min-w-0 [&>*]:[overflow-wrap:anywhere] ${display === 'list' ? 'grid grid-cols-[minmax(0,1fr)] rounded-2xl border border-brk-outline bg-white @[64rem]:grid-cols-[24px_minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_76px_56px_minmax(0,1.4fr)_112px] @[64rem]:items-center @[64rem]:rounded-none @[64rem]:border-x-0 @[64rem]:border-t-0 @[64rem]:last:border-b-0' : 'grid grid-cols-[minmax(0,1fr)] rounded-2xl border border-brk-outline bg-white'} ${selectedIds.has(course.id) ? 'bg-brk-background ring-2 ring-inset ring-brk-primary' : ''}`}>
+                                <input type="checkbox" aria-label={`Chọn ${course.name_lop}`} checked={selectedIds.has(course.id)} onChange={() => toggleSelect(course.id)} className="h-4 w-4 accent-green-700" />
+                                <div className="flex min-w-0 items-center gap-3">{course.link_anh_bia ? <img src={course.link_anh_bia} alt="" loading="lazy" decoding="async" width={80} height={64} className="h-16 w-20 shrink-0 rounded-lg object-cover" /> : <div className="flex h-16 w-20 shrink-0 items-center justify-center rounded-lg bg-brk-background text-brk-primary"><BookOpen size={24} /></div>}<div className="min-w-0 flex-1 [overflow-wrap:anywhere]"><Link href={`/tools/courses/new?id=${course.id}`} className="break-words text-sm font-bold text-brk-primary">{course.name_lop}</Link><p className="mt-1 whitespace-normal [overflow-wrap:anywhere] text-xs text-gray-500">{course.id_khoa}</p><span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${course.productGroup === 'DIGITAL' ? 'bg-purple-100 text-purple-700' : course.productGroup === 'SERVICE' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>{course.productGroup === 'DIGITAL' ? 'Sản phẩm số' : course.productGroup === 'SERVICE' ? 'Dịch vụ' : 'Khóa học'}</span><p className="mt-1 text-xs text-gray-500">{course.teacher?.name || course.teacher?.email || 'Chưa phân công'} · {course._count?.lessons || 0} bài</p></div></div>
+                                <div className="min-w-0"><p className="text-xs text-gray-500">{display === 'cards' ? 'Học phí · ' : ''}{feeLabel}</p><p className="mt-1 break-words text-sm font-semibold text-brk-primary">{feeText}</p></div>
+                                <p className="break-words text-xs font-medium text-brk-primary"><span className={display === 'list' ? 'text-gray-500 @[64rem]:hidden' : 'text-gray-500'}>Danh mục: </span>{course.courseCategory?.name || course.category || 'Khác'}</p>
+                                <p className="break-words text-xs text-gray-600"><span className={display === 'list' ? 'text-gray-500 @[64rem]:hidden' : 'text-gray-500'}>Dự án: </span>{names.join(', ') || 'Chưa liên kết'}</p>
+                                <span className={`w-fit rounded-full px-2 py-1 text-xs ${course.status ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{course.status ? 'Hiển thị' : 'Đang ẩn'}</span>
+                                <button type="button" onClick={() => handleViewStudents(course.id, course.name_lop)} className="min-h-11 text-left text-sm font-semibold text-brk-primary"><span className={display === 'list' ? '@[64rem]:hidden' : ''}>Học viên: </span>{course._count?.enrollments || 0} →</button>
+                                <div className="text-xs">{activityLoading ? <p role="status">Đang tải…</p> : summary ? <Link href={`/tools/courses/new?id=${course.id}&tab=activity`} className="block min-h-11 space-y-1 text-brk-primary"><p><strong>{summary.requests}</strong> yêu cầu cần trả lời</p><p><strong>{summary.submissions + summary.comments}</strong> hoạt động chưa xem</p></Link> : <p className="text-gray-500">Chưa tải được</p>}</div>
+                                <div className="flex min-w-0 flex-wrap items-center gap-2"><Link href={`/tools/courses/new?id=${course.id}`} className="inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-xl bg-brk-primary px-3 text-xs font-semibold text-white">Quản lý</Link><CourseActionsMenu id={course.id} slug={course.id_khoa} name={course.name_lop} status={course.status} admin={isAdmin} busy={batchLoading} onToggle={() => void handleToggleCourseStatus(course.id, course.status)} onDelete={() => void handleDeleteCourse(course.id, course.name_lop)} onNextCohort={course.productGroup === 'COURSE' ? () => void handleNextCohort(course.id, course.name_lop) : undefined} /></div>
+                            </article>
+    }
+
+    const renderCohortGroup = (entry: Extract<CourseListEntry, { type: 'group' }>) => {
+        const totalStudents = entry.courses.reduce((sum, c) => sum + (c._count?.enrollments || 0), 0)
+        const visibleCount = entry.courses.filter(c => c.status).length
+        const collapsed = collapsedGroups.has(entry.key)
+        return (
+            <Fragment key={entry.key}>
+                <div className="col-span-full flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-brk-primary/40 bg-brk-background px-4 py-2">
+                    <button type="button" onClick={() => toggleCohortGroup(entry.key)} aria-expanded={!collapsed} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-bold text-brk-primary">
+                        {collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}{entry.name}
+                    </button>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-brk-primary">{entry.courses.length} kỳ</span>
+                    <span className="text-xs text-gray-600">Tổng {totalStudents} lượt học viên</span>
+                    <span className="text-xs text-gray-500">{visibleCount}/{entry.courses.length} kỳ đang hiển thị</span>
+                </div>
+                {!collapsed && entry.courses.map(course => renderCourseArticle(course))}
+            </Fragment>
+        )
+    }
+
     return (
         <>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -411,24 +483,7 @@ function CoursesTab() {
                         <div className="min-w-0">
                         {display === 'list' && <div className="hidden @[64rem]:grid @[64rem]:grid-cols-[24px_minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_76px_56px_minmax(0,1.4fr)_112px] [&>*]:min-w-0 [&>*]:[overflow-wrap:anywhere] items-center gap-3 bg-brk-background px-4 py-3 text-xs font-semibold text-brk-on-surface"><span /><span>Khóa học / Giảng viên</span><span>Học phí</span><span>Danh mục</span><span>Dự án</span><span>Hiển thị</span><span>Học viên</span><span>Hoạt động</span><span>Thao tác</span></div>}
                         <div className={display === 'cards' ? 'grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 @[40rem]:grid-cols-2 @[72rem]:grid-cols-3' : 'grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 @[40rem]:grid-cols-2 @[64rem]:block'}>
-                        {visibleCourses.map(course => {
-                            const feeLabel = courseFeeLabels[course.feeType] || 'Học phí'
-                            const feeAmount = typeof course.phi_coc === 'number' && Number.isFinite(course.phi_coc) && course.phi_coc >= 0 ? course.phi_coc : null
-                            const feeText = feeAmount === null ? 'Chưa có học phí' : feeAmount === 0 && course.feeType === 'MIEN_PHI' ? 'Miễn phí' : feeAmount === 0 && course.feeType === 'PHI_TUY_TINH' ? 'Tùy tâm' : feeAmount.toLocaleString('vi-VN') + 'đ'
-                            const summary = activity.find(item => item.courseId === course.id)
-                            const names = projects.filter(project => project.courseIds.includes(course.id)).map(project => project.name)
-                            return <article key={course.id} className={`gap-3 p-4 [&>*]:min-w-0 [&>*]:[overflow-wrap:anywhere] ${display === 'list' ? 'grid grid-cols-[minmax(0,1fr)] rounded-2xl border border-brk-outline bg-white @[64rem]:grid-cols-[24px_minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_76px_56px_minmax(0,1.4fr)_112px] @[64rem]:items-center @[64rem]:rounded-none @[64rem]:border-x-0 @[64rem]:border-t-0 @[64rem]:last:border-b-0' : 'grid grid-cols-[minmax(0,1fr)] rounded-2xl border border-brk-outline bg-white'} ${selectedIds.has(course.id) ? 'bg-brk-background ring-2 ring-inset ring-brk-primary' : ''}`}>
-                                <input type="checkbox" aria-label={`Chọn ${course.name_lop}`} checked={selectedIds.has(course.id)} onChange={() => toggleSelect(course.id)} className="h-4 w-4 accent-green-700" />
-                                <div className="flex min-w-0 items-center gap-3">{course.link_anh_bia ? <img src={course.link_anh_bia} alt="" loading="lazy" decoding="async" width={80} height={64} className="h-16 w-20 shrink-0 rounded-lg object-cover" /> : <div className="flex h-16 w-20 shrink-0 items-center justify-center rounded-lg bg-brk-background text-brk-primary"><BookOpen size={24} /></div>}<div className="min-w-0 flex-1 [overflow-wrap:anywhere]"><Link href={`/tools/courses/new?id=${course.id}`} className="break-words text-sm font-bold text-brk-primary">{course.name_lop}</Link><p className="mt-1 whitespace-normal [overflow-wrap:anywhere] text-xs text-gray-500">{course.id_khoa}</p><span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${course.productGroup === 'DIGITAL' ? 'bg-purple-100 text-purple-700' : course.productGroup === 'SERVICE' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>{course.productGroup === 'DIGITAL' ? 'Sản phẩm số' : course.productGroup === 'SERVICE' ? 'Dịch vụ' : 'Khóa học'}</span><p className="mt-1 text-xs text-gray-500">{course.teacher?.name || course.teacher?.email || 'Chưa phân công'} · {course._count?.lessons || 0} bài</p></div></div>
-                                <div className="min-w-0"><p className="text-xs text-gray-500">{display === 'cards' ? 'Học phí · ' : ''}{feeLabel}</p><p className="mt-1 break-words text-sm font-semibold text-brk-primary">{feeText}</p></div>
-                                <p className="break-words text-xs font-medium text-brk-primary"><span className={display === 'list' ? 'text-gray-500 @[64rem]:hidden' : 'text-gray-500'}>Danh mục: </span>{course.courseCategory?.name || course.category || 'Khác'}</p>
-                                <p className="break-words text-xs text-gray-600"><span className={display === 'list' ? 'text-gray-500 @[64rem]:hidden' : 'text-gray-500'}>Dự án: </span>{names.join(', ') || 'Chưa liên kết'}</p>
-                                <span className={`w-fit rounded-full px-2 py-1 text-xs ${course.status ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{course.status ? 'Hiển thị' : 'Đang ẩn'}</span>
-                                <button type="button" onClick={() => handleViewStudents(course.id, course.name_lop)} className="min-h-11 text-left text-sm font-semibold text-brk-primary"><span className={display === 'list' ? '@[64rem]:hidden' : ''}>Học viên: </span>{course._count?.enrollments || 0} →</button>
-                                <div className="text-xs">{activityLoading ? <p role="status">Đang tải…</p> : summary ? <Link href={`/tools/courses/new?id=${course.id}&tab=activity`} className="block min-h-11 space-y-1 text-brk-primary"><p><strong>{summary.requests}</strong> yêu cầu cần trả lời</p><p><strong>{summary.submissions + summary.comments}</strong> hoạt động chưa xem</p></Link> : <p className="text-gray-500">Chưa tải được</p>}</div>
-                                <div className="flex min-w-0 flex-wrap items-center gap-2"><Link href={`/tools/courses/new?id=${course.id}`} className="inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-xl bg-brk-primary px-3 text-xs font-semibold text-white">Quản lý</Link><CourseActionsMenu id={course.id} slug={course.id_khoa} name={course.name_lop} status={course.status} admin={isAdmin} busy={batchLoading} onToggle={() => void handleToggleCourseStatus(course.id, course.status)} onDelete={() => void handleDeleteCourse(course.id, course.name_lop)} onNextCohort={course.productGroup === 'COURSE' ? () => void handleNextCohort(course.id, course.name_lop) : undefined} /></div>
-                            </article>
-                        })}
+                        {visibleEntries.map(entry => entry.type === 'group' ? renderCohortGroup(entry) : renderCourseArticle(entry.course))}
                         </div></div>
                     </div>
                     <div className="rounded-xl bg-brk-background p-4 text-sm text-gray-600">Trang bán khóa học có thư viện mẫu riêng. Mở <strong>Quản lý → Trang bán khóa học</strong> để chọn mẫu cho đúng khóa.</div>
