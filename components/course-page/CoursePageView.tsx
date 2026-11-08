@@ -32,6 +32,7 @@ interface CoursePageViewProps {
   totalHours?: number
   activeStudentCount?: number
   wi300Breadcrumb?: React.ReactNode
+  workspaceHref?: string
   projectLabels?: React.ReactNode
 }
 
@@ -47,6 +48,7 @@ export default function CoursePageView({
   totalHours = 0,
   activeStudentCount = 0,
   wi300Breadcrumb,
+  workspaceHref,
   projectLabels,
 }: CoursePageViewProps) {
   const router = useRouter()
@@ -102,7 +104,7 @@ export default function CoursePageView({
     if (actionType === 'open_registration') {
       if (quoteOffering) { document.getElementById('offering-sale-details')?.scrollIntoView({behavior:'smooth'}); return }
       if (isEnrolled) {
-        router.push(isOffering ? offeringWorkspaceHref(course.productGroup,course.id_khoa) : `/courses/${course.id_khoa}/learn`)
+        router.push(isOffering ? (workspaceHref ?? offeringWorkspaceHref(course.productGroup,course.id_khoa)) : `/courses/${course.id_khoa}/learn`)
         return
       }
       // Dữ liệu khách đã điền trên form của trang nhập: giữ để điền sẵn, không lưu DB.
@@ -244,6 +246,7 @@ export default function CoursePageView({
           userId={userId}
           initialEnrollment={effectiveEnrollment}
           initialContact={registrationPrefill || undefined}
+          workspaceHref={workspaceHref}
           onClose={() => { setShowRegistration(false); setRegistrationPrefill(null) }}
           onEnrolled={(enr) => {
             setLocalEnrollment(enr)

@@ -27,6 +27,9 @@ interface RegistrationFlowModalProps {
   // nhập. Vì vậy initialContact chỉ được hiển thị lại ở hộp thoại auth dự phòng
   // để khách đối chiếu, không ghi đè dữ liệu tài khoản.
   initialContact?: { fullName?: string; phone?: string; email?: string }
+  // Đường vào không gian sử dụng do trang bán chốt theo giao diện của site;
+  // không truyền thì dùng đường dẫn sản phẩm/dịch vụ như hiện tại.
+  workspaceHref?: string
   onClose: () => void
   onEnrolled?: (enrollment: any) => void
 }
@@ -38,6 +41,7 @@ export default function RegistrationFlowModal({
   userId,
   initialEnrollment,
   initialContact,
+  workspaceHref,
   onClose,
   onEnrolled,
 }: RegistrationFlowModalProps) {
@@ -950,7 +954,7 @@ export default function RegistrationFlowModal({
             {/* Learn CTA */}
             <div style={{ display: 'flex', gap: '12px' }}>
               <a
-                href={course.productGroup && course.productGroup !== 'COURSE' ? offeringWorkspaceHref(course.productGroup, course.id_khoa) : `/courses/${course.id_khoa}/learn`}
+                href={course.productGroup && course.productGroup !== 'COURSE' ? (workspaceHref ?? offeringWorkspaceHref(course.productGroup, course.id_khoa)) : `/courses/${course.id_khoa}/learn`}
                 style={{
                   flex: 1,
                   display: 'flex',

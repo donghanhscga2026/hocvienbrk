@@ -6,7 +6,8 @@ import CareQaWidget from "@/components/course/CareQaWidget"
 import { requireDomainCourse } from '@/lib/website/domain-context'
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import Wi300Breadcrumb from '@/components/wi300/Wi300Breadcrumb'
-import { offeringWorkspaceHref } from '@/lib/offerings/shared'
+import { classicWorkspaceHref, offeringWorkspaceHref } from '@/lib/offerings/shared'
+import { getPagePresentation } from '@/lib/site-profile/presentation'
 
 type PlaylistItem = {
   type: 'video' | 'doc'
@@ -58,7 +59,12 @@ export default async function CourseLearnPage({
 
   if (!course) redirect(`/courses/${id}`)
   // Sản phẩm/dịch vụ dùng trang nội dung riêng, kiểm tra quyền và hạn dùng ở server.
-  if (course.productGroup !== 'COURSE') redirect(offeringWorkspaceHref(course.productGroup, course.id_khoa))
+  if (course.productGroup !== 'COURSE') {
+    // Site classic không có mục Sản phẩm/Dịch vụ: vào không gian sử dụng theo
+    // dạng khóa học; site wi300 giữ đường dẫn sản phẩm/dịch vụ như hiện tại.
+    const presentation = await getPagePresentation(course.productGroup === 'DIGITAL' ? 'products' : 'services')
+    redirect(presentation === 'classic' ? classicWorkspaceHref(course.id_khoa) : offeringWorkspaceHref(course.productGroup, course.id_khoa))
+  }
 
   if (course.type === 'LIB') {
     if (!session?.user?.email) redirect(`/courses/${id}?error=lib_access_denied`)

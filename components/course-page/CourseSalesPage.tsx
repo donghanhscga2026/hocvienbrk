@@ -18,7 +18,8 @@ import { getPublicProjects } from '@/lib/wi300/public-projects'
 import CourseProjectBadges from '@/components/course/CourseProjectBadges'
 import OfferingDetail from '@/components/offerings/OfferingDetail'
 import { readOfferingDetails, getOfferingSalesCourse } from '@/lib/offerings/server'
-import { publicOfferingDetails, offeringHref, type ProductGroup } from '@/lib/offerings/shared'
+import { publicOfferingDetails, offeringHref, offeringWorkspaceHref, classicWorkspaceHref, type ProductGroup } from '@/lib/offerings/shared'
+import { getPagePresentation } from '@/lib/site-profile/presentation'
 
 // Dùng chung kiểm tra phạm vi trong metadata và nội dung của cùng request.
 const getPageProfile = cache(getCurrentSiteProfile)
@@ -123,6 +124,13 @@ export default async function CourseSalesPage({ params, searchParams, expectedGr
     }
     const offeringDetails = course.productGroup !== 'COURSE' ? await readOfferingDetails(course.id) : null
     if (offeringDetails && (!publishedPage || offeringDetails.salesLayout !== 'TEMPLATE')) return <OfferingDetail slug={course.id_khoa} />
+    // Đường vào không gian sử dụng: site classic đi theo dạng khóa học,
+    // site wi300 giữ đường dẫn sản phẩm/dịch vụ.
+    const workspaceHref = course.productGroup !== 'COURSE'
+        ? (await getPagePresentation(course.productGroup === 'DIGITAL' ? 'products' : 'services')) === 'classic'
+            ? classicWorkspaceHref(course.id_khoa)
+            : offeringWorkspaceHref(course.productGroup, course.id_khoa)
+        : undefined
     if (siteProfile && !(await canAccessPageCourse(siteProfile, course.id))) notFound()
     const courseId = course.id
     const userId = session?.user?.id != null ? parseInt(session.user.id) : null
@@ -195,6 +203,7 @@ export default async function CourseSalesPage({ params, searchParams, expectedGr
                     testimonials={testimonials}
                     totalHours={totalHours}
                     activeStudentCount={activeStudentCount}
+                    workspaceHref={workspaceHref}
                 />
             </>
         )
