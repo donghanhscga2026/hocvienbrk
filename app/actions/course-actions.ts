@@ -1377,3 +1377,111 @@ export async function getGieoHatSummaryAction(enrollmentId: number) {
         return { success: false as const, error: error?.message || "Không tải được thông tin gieo hạt." }
     }
 }
+
+/** Số kỳ rút từ tên kỳ ("... K02") hoặc cuối mã khóa ("..._K02"); null nếu không có. */
+function cohortNumberOf(nameKhoa: string | null, idKhoa: string): number | null {
+    const fromName = nameKhoa?.match(/K\s*(\d+)\s*$/i)
+    if (fromName) return parseInt(fromName[1], 10)
+    const fromCode = idKhoa.match(/K(\d+)$/i)
+    if (fromCode) return parseInt(fromCode[1], 10)
+    return null
+}
+
+/**
+ * Mở kỳ tiếp theo của một khóa học: sao chép toàn bộ thông tin và bài học
+ * của khóa nguồn sang một khóa mới có cùng tên khóa học chung (name_lop),
+ * tự sinh tên kỳ + mã kỳ tiếp theo. Kỳ mới ở trạng thái ẩn và chưa có ngày
+ * khai giảng — người tạo chọn ngày rồi bật Hiển thị khi sẵn sàng.
+ * Học viên, đơn hàng, thông báo, khảo sát của kỳ cũ KHÔNG được sao chép.
+ */
+export async function cloneCourseNextCohortAction(courseId: number) {
+    try {
+        const source = await prisma.course.findUnique({
+            where: { id: courseId },
+            include: {
+                lessons: {
+                    orderBy: { order: 'asc' },
+                    include: {
+                        segments: { orderBy: { order: 'asc' } },
+                        transcriptCues: { orderBy: { id: 'asc' } },
+                    },
+                },
+                acceptedVouchers: { select: { voucherId: true } },
+                autoVerifyConfig: true,
+            },
+        })
+        if (!source) return { success: false as const, error: 'Không tìm thấy khóa học nguồn' }
+        if (source.productGroup !== 'COURSE') return { success: false as const, error: 'Chức năng mở kỳ chỉ dùng cho khóa học' }
+        const { denied, ctx } = await requireCourseAccessAction(source.teacherId)
+        if (denied) return denied
+        if (!ctx) return { success: false as const, error: 'Unauthorized' }
+
+        // Số kỳ tiếp theo = số kỳ lớn nhất trong các kỳ cùng tên chung + cùng giảng viên, cộng 1.
+        const siblings = await prisma.course.findMany({
+            where: { name_lop: source.name_lop, teacherId: source.teacherId },
+            select: { name_khoa: true, id_khoa: true },
+        })
+        let next = Math.max(0, ...siblings.map(s => cohortNumberOf(s.name_khoa, s.id_khoa) ?? 0)) + 1
+        if (next < 2) next = 2
+
+        // Sinh mã kỳ mới, giữ nguyên độ dài phần số của mã nguồn (K02 -> K03).
+        const codeMatch = source.id_khoa.match(/^(.*?)(_?)K(\d+)$/i)
+        const buildCode = (n: number) => codeMatch
+            ? `${codeMatch[1]}${codeMatch[2]}K${String(n).padStart(codeMatch[3].length, '0')}`
+            : `${source.id_khoa}_K${String(n).padStart(2, '0')}`
+        let newCode = buildCode(next)
+        while (await prisma.course.findUnique({ where: { id_khoa: newCode }, select: { id: true } })) {
+            next += 1
+            newCode = buildCode(next)
+        }
+        const newNameKhoa = `${source.name_lop} K${String(next).padStart(2, '0')}`
+
+        const { lessons, acceptedVouchers, autoVerifyConfig, id: _sourceId, createdAt: _createdAt, updatedAt: _updatedAt, ...scalars } = source
+        const wi300 = !!await getCurrentDeploymentBrand()
+        if (wi300) await ensureWi300CourseVisibility(prisma)
+        const newCourse = await prisma.$transaction(async tx => {
+            const created = await tx.course.create({
+                data: {
+                    ...scalars,
+                    id_khoa: newCode,
+                    name_khoa: newNameKhoa,
+                    date_join: null,
+                    status: false,
+                } as Prisma.CourseCreateInput,
+            })
+            for (const lesson of lessons) {
+                const { segments, transcriptCues, id: _lessonId, courseId: _lessonCourseId, ...lessonScalars } = lesson
+                const newLesson = await tx.lesson.create({ data: { ...lessonScalars, courseId: created.id } })
+                const segmentIdMap = new Map<string, string>()
+                for (const seg of segments) {
+                    const { id: _segId, lessonId: _segLessonId, createdAt: _segCreatedAt, updatedAt: _segUpdatedAt, ...segScalars } = seg
+                    const newSeg = await tx.lessonSegment.create({ data: { ...segScalars, lessonId: newLesson.id } })
+                    segmentIdMap.set(seg.id, newSeg.id)
+                }
+                if (transcriptCues.length) {
+                    await tx.transcriptCue.createMany({
+                        data: transcriptCues.map(cue => {
+                            const { id: _cueId, lessonId: _cueLessonId, createdAt: _cueCreatedAt, segmentId, ...cueScalars } = cue
+                            return { ...cueScalars, lessonId: newLesson.id, segmentId: segmentId ? (segmentIdMap.get(segmentId) ?? null) : null }
+                        }),
+                    })
+                }
+            }
+            if (acceptedVouchers.length) {
+                await tx.courseAcceptedVoucher.createMany({ data: acceptedVouchers.map(v => ({ courseId: created.id, voucherId: v.voucherId })) })
+            }
+            if (autoVerifyConfig) {
+                const { id: _avId, courseId: _avCourseId, createdAt: _avCreatedAt, ...avScalars } = autoVerifyConfig
+                await tx.autoVerifyConfig.create({ data: { ...avScalars, courseId: created.id } })
+            }
+            if (wi300) await tx.systemConfig.upsert({ where: { key: WI300_COURSE_PREFIX + created.id }, create: { key: WI300_COURSE_PREFIX + created.id, value: created.status }, update: { value: created.status } })
+            return created
+        })
+        await ensureDefaultAffiliateConfig(newCourse.id, newCourse.phi_coc || 0, ctx.userId)
+        revalidatePath('/tools/courses')
+        return { success: true as const, course: newCourse, message: `Đã tạo kỳ mới ${newNameKhoa} (đang ẩn). Chọn ngày khai giảng rồi bật Hiển thị khi sẵn sàng.` }
+    } catch (error: any) {
+        console.error("cloneCourseNextCohortAction error:", error)
+        return { success: false as const, error: error?.message || 'Không tạo được kỳ mới' }
+    }
+}
