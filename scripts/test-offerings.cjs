@@ -29,7 +29,7 @@ async function run() {
   assert.equal(shared.offeringAccess({ status: 'ACTIVE' }, 30), true, 'Historic purchases without activation timestamps retain access')
 
   let visible = true, group = 'DIGITAL', enrollment = null, configWrites = 0, bookingOwner = 7, bookingCourse = null, used = 0
-  const item = { id: 5, id_khoa: 'EBOOK-5', name_lop: 'Ebook', productGroup: 'DIGITAL', phi_coc: 100000, teacherId: 7, teacher: { name: 'Expert' } }
+  const item = { id: 5, id_khoa: 'EBOOK-5', name_lop: 'Ebook', productGroup: 'DIGITAL', phi_coc: 100000, teacherId: 7, teacher: { name: 'Expert' }, _count: { enrollments: 3 } }
   const db = {
     course: { findMany: async args => { assert.equal(args.where.AND[1].productGroup, 'DIGITAL'); return [item] }, findUnique: async () => ({ ...item, productGroup: group }), findFirst: async () => visible ? { id: 5 } : null },
     enrollment: { findUnique: async () => enrollment },
