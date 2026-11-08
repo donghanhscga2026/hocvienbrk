@@ -9,7 +9,7 @@ import { ZaloConnection } from './zalo.js'
  * Nhiệm vụ: giữ phiên nick Zalo PHỤ, định kỳ hỏi website (API ký HMAC)
  * để lấy lệnh gửi nhắc của Care Engine rồi gửi qua Zalo với nhịp chống
  * khóa nick: giãn cách ngẫu nhiên 10–25 giây/tin (tối thiểu 3 giây,
- * tối đa 20 tin/phút), không gửi trong khung giờ yên lặng 21:30–07:00.
+ * tối đa 20 tin/phút), không gửi trong khung giờ yên lặng 22:00–06:00.
  * Tin học viên nhắn đến được đẩy ngược về website thành CrmRequest.
  *
  * Chống gửi trùng 2 lớp: website khóa idempotencyKey ở DB + bridge lưu
@@ -27,13 +27,13 @@ const RECONNECT_MAX_MS = 5 * 60_000
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const randomGapMs = () => 10_000 + Math.floor(Math.random() * 15_001) // 10–25 giây
 
-/** Khung giờ yên lặng theo giờ Việt Nam: 21:30 → 07:00 không gửi tin. */
+/** Khung giờ yên lặng theo giờ Việt Nam: 22:00 → 06:00 không gửi tin. */
 function isQuietHours(now = new Date()) {
   const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now)
   const hour = Number(parts.find((p) => p.type === 'hour')?.value || 0)
   const minute = Number(parts.find((p) => p.type === 'minute')?.value || 0)
   const total = hour * 60 + minute
-  return total >= 21 * 60 + 30 || total < 7 * 60
+  return total >= 22 * 60 || total < 6 * 60
 }
 
 /* ---------- Danh sách khóa đã gửi (chống trùng phía client) ---------- */
