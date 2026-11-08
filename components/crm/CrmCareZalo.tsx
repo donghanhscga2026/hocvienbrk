@@ -61,6 +61,15 @@ export default function CrmCareZalo({ revision }: { revision: number }) {
     return () => abort.abort()
   }, [revision, refresh])
 
+  // Tự làm mới mỗi 20 giây khi panel đang mở và tab trình duyệt đang hiển thị —
+  // trạng thái bridge, hàng đợi lệnh và tin Zalo đến luôn mới mà không cần bấm nút làm mới.
+  useEffect(() => {
+    const check = () => { if (!document.hidden) setRefresh(value => value + 1) }
+    const timer = window.setInterval(check, 20000)
+    window.addEventListener('focus', check); document.addEventListener('visibilitychange', check)
+    return () => { clearInterval(timer); window.removeEventListener('focus', check); document.removeEventListener('visibilitychange', check) }
+  }, [])
+
   if (error) return <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800">{error}<button className="ml-3 underline" onClick={() => setRefresh(value => value + 1)}>Thử lại</button></div>
   if (!data) return <p role="status" className="p-4 text-sm text-slate-500">Đang tải trạng thái kênh Zalo…</p>
 

@@ -1,16 +1,25 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import qrcodeTerminal from 'qrcode-terminal'
+import { exec } from 'node:child_process'
 import { LoginQRCallbackEventType, ThreadType, Zalo } from 'zca-js'
 import { config } from './config.js'
 
 /**
  * Lớp bọc quanh zca-js (thư viện Zalo không chính thức):
  * - Đăng nhập bằng phiên đã lưu trong data/session.json; chưa có phiên
- *   thì đăng nhập bằng mã QR in ra console (quét bằng nick Zalo PHỤ).
+ *   thì đăng nhập bằng mã QR (ảnh data/qr.png do máy chủ Zalo tạo).
  * - Nghe tin nhắn đến + sự kiện rớt kết nối để tiến trình chính xử lý.
  * - Gửi tin văn bản tới 1 học viên theo số điện thoại hoặc uid đã biết.
  * Tuyệt đối không dùng file này với nick Zalo chính của giảng viên.
+ *
+ * Bản sửa 08/11/2026 (từ bản vá pilot đã chạy thật):
+ * 1) zca-js 2.1.2 trả event.data.image là base64 THÔ (đã cắt tiền tố
+ *    "data:image/png;base64,") nên bản cũ không lưu được data/qr.png.
+ * 2) Mã QR vẽ từ event.data.code chỉ chứa chuỗi mã thô — Zalo quét vào
+ *    chỉ thấy văn bản, không mở được màn hình đăng nhập. Nội dung đăng nhập
+ *    đúng nằm trong ảnh máy chủ Zalo tạo (zaloapp.com/qr/...). Vì vậy
+ *    bỏ hẳn QR vẽ bằng ký tự trong console; chỉ dùng data/qr.png và
+ *    tự mở ảnh đó trên Windows mỗi khi có mã mới.
  */
 
 export function loadSession() {
@@ -29,12 +38,16 @@ function saveSession(credentials) {
   console.log('[care-bridge] Đã lưu phiên đăng nhập vào data/session.json — giữ file này bí mật như mật khẩu.')
 }
 
-function saveQrImage(dataUrl) {
-  const match = /^data:image\/png;base64,(.+)$/.exec(dataUrl || '')
-  if (!match) return
+function saveQrImage(image) {
+  const raw = String(image || '').replace(/^data:image\/png;base64,/, '')
+  if (!raw) return
   fs.mkdirSync(config.dataDir, { recursive: true })
-  fs.writeFileSync(path.join(config.dataDir, 'qr.png'), Buffer.from(match[1], 'base64'))
-  console.log('[care-bridge] Đã lưu ảnh mã QR vào data/qr.png (mở file này để quét nếu console khó nhìn).')
+  const qrPath = path.join(config.dataDir, 'qr.png')
+  fs.writeFileSync(qrPath, Buffer.from(raw, 'base64'))
+  console.log('[care-bridge] Đã lưu ảnh mã QR vào data/qr.png — mở file này và quét bằng ứng dụng Zalo của nick phụ.')
+  if (process.platform === 'win32') {
+    exec(`start "" "${qrPath}"`, () => {})
+  }
 }
 
 export class ZaloConnection {
@@ -63,9 +76,7 @@ export class ZaloConnection {
       this.api = await zalo.loginQR({}, async (event) => {
         switch (event.type) {
           case LoginQRCallbackEventType.QRCodeGenerated: {
-            if (event.data?.code) qrcodeTerminal.generate(event.data.code, { small: true })
             if (event.data?.image) saveQrImage(event.data.image)
-            console.log('[care-bridge] Quét mã QR ở trên (hoặc mở data/qr.png) bằng ứng dụng Zalo trên điện thoại của nick phụ.')
             break
           }
           case LoginQRCallbackEventType.QRCodeScanned:

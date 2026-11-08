@@ -39,7 +39,7 @@ Chạy thử:
 npm start
 ```
 
-Lần chạy đầu chưa có phiên lưu: chương trình in **mã QR ra console** (và lưu ảnh `data/qr.png`). Mở ứng dụng Zalo trên điện thoại của **nick phụ** → quét mã → xác nhận đăng nhập. Phiên được lưu vào `data/session.json`, các lần sau tự đăng nhập lại, không cần quét nữa (trừ khi Zalo thu hồi phiên).
+Lần chạy đầu chưa có phiên lưu: chương trình lưu **ảnh mã QR đăng nhập vào `data/qr.png`** và tự mở ảnh đó trên Windows. Mở ứng dụng Zalo trên điện thoại của **nick phụ** → quét mã trong ảnh `data/qr.png` → xác nhận đăng nhập. (Không quét mã QR vẽ bằng ký tự trong console: mã đó chỉ chứa chuỗi mã thô, Zalo quét vào chỉ hiện văn bản chứ không mở màn hình đăng nhập — nội dung đăng nhập đúng nằm trong ảnh do máy chủ Zalo tạo.) Phiên được lưu vào `data/session.json`, các lần sau tự đăng nhập lại, không cần quét nữa (trừ khi Zalo thu hồi phiên).
 
 ## Chạy nền lâu dài (chọn 1 cách)
 
