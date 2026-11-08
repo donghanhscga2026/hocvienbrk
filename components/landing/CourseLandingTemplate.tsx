@@ -16,6 +16,7 @@ import CrmRequestButton from '@/components/crm/CrmRequestButton'
 import RegistrationFlowModal from '@/components/course-page/RegistrationFlowModal'
 import CourseDashboardModal from '@/components/course/CourseDashboardModal'
 import { isValidImageUrl } from '@/lib/image-validation'
+import type { CohortLink } from '@/lib/cohort'
 
 interface CourseLesson {
     id: string
@@ -58,6 +59,7 @@ interface CourseLandingTemplateProps {
     totalHours: number
     activeStudentCount: number
     projectLabels?: ReactNode
+    cohorts?: CohortLink[]
 }
 
 
@@ -72,7 +74,8 @@ export default function CourseLandingTemplate({
     session,
     totalHours,
     activeStudentCount,
-    projectLabels
+    projectLabels,
+    cohorts
 }: CourseLandingTemplateProps) {
     const router = useRouter()
     const wi300 = useWi300Brand()
@@ -263,6 +266,18 @@ export default function CourseLandingTemplate({
                                     {course.name_lop}
                                 </h1>
                                 {projectLabels && <div className="my-4 rounded-xl bg-white p-3 text-slate-900">{projectLabels}</div>}
+                                {cohorts && cohorts.length >= 2 && (
+                                    <div className="my-4 rounded-xl border border-brk-outline bg-white p-3">
+                                        <p className="text-xs font-semibold text-gray-500">Khóa học này có {cohorts.length} kỳ:</p>
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                            {cohorts.map(item => item.current ? (
+                                                <span key={item.slug} className="rounded-full bg-brk-primary px-3 py-1.5 text-xs font-bold text-white">{item.label}{item.dateJoin ? ` · ${item.dateJoin}` : ''} · đang xem</span>
+                                            ) : (
+                                                <Link key={item.slug} href={`/khoa-hoc/${item.slug}`} className="rounded-full border border-brk-outline bg-white px-3 py-1.5 text-xs font-semibold text-brk-primary hover:bg-brk-background">{item.label}{item.dateJoin ? ` · ${item.dateJoin}` : ''}</Link>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                                 {/* Tên khóa học + Phí/Giá tiền chỉ hiện khi CHƯA kích hoạt - học viên đã kích hoạt không cần xem lại giá */}
                                 {!isEnrolled && course.name_khoa && (
                                     <p className="text-sm text-brk-muted">{course.name_khoa}</p>

@@ -55,8 +55,34 @@ export default async function ClassicCourseCatalog() {
   }
 
   const safeCourses = Array.isArray(courses) ? courses.filter(course => !course.productGroup || course.productGroup === 'COURSE') : []
+  // Gom các kỳ của cùng một khóa học thành một thẻ đại diện: kỳ mới nhất
+  // (số kỳ lớn nhất) đại diện cho cả nhóm, thẻ ghi thêm số kỳ để khách biết
+  // vào trang khóa học chọn kỳ. Chỉ áp dụng ở trang danh mục này; trang chủ
+  // classic dùng chung nguồn dữ liệu nhưng giữ nguyên cách hiển thị cũ.
+  const cohortNo = (c: any) => {
+    const fromName = String(c.name_khoa || '').match(/K(\d+)\s*$/i)
+    if (fromName) return parseInt(fromName[1], 10)
+    const fromCode = String(c.id_khoa || '').match(/K(\d+)\s*$/i)
+    return fromCode ? parseInt(fromCode[1], 10) : Number.MAX_SAFE_INTEGER
+  }
+  const cohortGroups = new Map<string, any[]>()
+  for (const c of safeCourses) {
+    const key = `${c.teacherId}::${c.name_lop}`
+    const arr = cohortGroups.get(key)
+    if (arr) arr.push(c); else cohortGroups.set(key, [c])
+  }
+  const seenCohort = new Set<string>()
+  const catalogCourses = safeCourses.flatMap((c: any) => {
+    const key = `${c.teacherId}::${c.name_lop}`
+    const members = cohortGroups.get(key) || [c]
+    if (members.length < 2) return [c]
+    if (seenCohort.has(key)) return []
+    seenCohort.add(key)
+    const representative = [...members].sort((a, b) => cohortNo(b) - cohortNo(a) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+    return [{ ...representative, cohortCount: members.length }]
+  })
   // Nhóm theo danh mục giống hệt cách trang chủ classic gom khóa học.
-  const groupedOtherCourses = safeCourses.reduce((acc: any[], course: any) => {
+  const groupedOtherCourses = catalogCourses.reduce((acc: any[], course: any) => {
     const category = course.courseCategory?.name || course.category || 'Khác'
     const existingGroup = acc.find(g => g.category === category)
     if (existingGroup) existingGroup.courses.push(course)

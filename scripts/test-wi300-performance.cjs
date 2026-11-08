@@ -75,7 +75,7 @@ async function run() {
     react: { ...React, cache: fn => fn },
     '@/lib/get-session': { getSession: async () => ({ user: { id: '31' } }) },
     '@/lib/prisma': { __esModule: true, default: {
-      course: { findUnique: count('course', course) }, user: { findUnique: count('user', { phone: 'test' }) },
+      course: { findUnique: count('course', course), findMany: async () => [] }, user: { findUnique: count('user', { phone: 'test' }) },
       enrollment: { findFirst: count('enrollment', enrollment), count: count('students', 4) },
       lesson: { findMany: count('lessons', [{ id: 'lesson-1', title: 'One', order: 1 }]) },
       lessonProgress: { groupBy: count('duration', [{ _max: { maxTime: 7200 } }]), findMany: count('reflections', []) },

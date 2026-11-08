@@ -19,6 +19,7 @@ import CourseProjectBadges from '@/components/course/CourseProjectBadges'
 import OfferingDetail from '@/components/offerings/OfferingDetail'
 import { readOfferingDetails, getOfferingSalesCourse } from '@/lib/offerings/server'
 import { publicOfferingDetails, offeringHref, type ProductGroup } from '@/lib/offerings/shared'
+import { cohortNumberOf, cohortShortLabel, type CohortLink } from '@/lib/cohort'
 
 // Dùng chung kiểm tra phạm vi trong metadata và nội dung của cùng request.
 const getPageProfile = cache(getCurrentSiteProfile)
@@ -200,12 +201,35 @@ export default async function CourseSalesPage({ params, searchParams, expectedGr
         )
     }
 
+    // Các kỳ khác của cùng khóa học (cùng giảng viên + cùng tên khóa học chung)
+    // để trang chi tiết hiện mục chọn kỳ. Chỉ liệt kê các kỳ đang hiển thị và
+    // thuộc phạm vi của site hiện tại; kỳ đang xem luôn có mặt trong danh sách.
+    let cohorts: CohortLink[] | undefined
+    if (course.productGroup === 'COURSE') {
+        const siblings = await prisma.course.findMany({
+            where: { teacherId: course.teacherId, name_lop: course.name_lop, productGroup: 'COURSE', status: true },
+            select: { id: true, id_khoa: true, name_khoa: true, name_lop: true, date_join: true },
+        })
+        const scoped = siteProfile
+            ? (await Promise.all(siblings.map(async s => (await canAccessPageCourse(siteProfile, s.id)) ? s : null))).filter((s): s is NonNullable<typeof s> => s != null)
+            : siblings
+        const withCurrent = scoped.some(s => s.id === course.id)
+            ? scoped
+            : [...scoped, { id: course.id, id_khoa: course.id_khoa, name_khoa: course.name_khoa, name_lop: course.name_lop, date_join: course.date_join }]
+        if (withCurrent.length >= 2) {
+            cohorts = [...withCurrent]
+                .sort((a, b) => cohortNumberOf(a) - cohortNumberOf(b))
+                .map(s => ({ slug: s.id_khoa, label: cohortShortLabel(s), dateJoin: s.date_join, current: s.id === course.id }))
+        }
+    }
+
     return (
         <>
             {notificationEntry}
             {deploymentBrand && <Wi300Header />}
             {breadcrumb}
             <CourseLandingClient
+                cohorts={cohorts}
                 projectLabels={projectLabels}
                 course={course}
                 lessons={lessons}
