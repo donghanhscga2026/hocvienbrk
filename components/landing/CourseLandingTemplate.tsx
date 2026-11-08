@@ -411,7 +411,7 @@ export default function CourseLandingTemplate({
             {/* Overview Section */}
             <section className="py-16">
                 <div className={wi300 ? "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8" : "container mx-auto px-4"}>
-                    <div className={wi300 ? "mx-auto max-w-5xl" : "max-w-4xl"}>
+                    <div className={wi300 ? "mx-auto max-w-5xl" : "mx-auto max-w-4xl"}>
                         <h2 className="text-2xl font-black text-brk-on-surface mb-6">
                             Giới thiệu khóa học
                         </h2>
@@ -427,7 +427,7 @@ export default function CourseLandingTemplate({
             {lessons.length > 0 && (
                 <section className="py-16 bg-brk-surface">
                     <div className={wi300 ? "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8" : "container mx-auto px-4"}>
-                        <div className={wi300 ? "mx-auto max-w-5xl" : "max-w-4xl"}>
+                        <div className={wi300 ? "mx-auto max-w-5xl" : "mx-auto max-w-4xl"}>
                             <h2 className="text-2xl font-black text-brk-on-surface mb-6">
                                 Nội dung khóa học
                             </h2>
@@ -479,7 +479,7 @@ export default function CourseLandingTemplate({
             {/* Testimonials Section */}
             <section className="py-16">
                 <div className={wi300 ? "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8" : "container mx-auto px-4"}>
-                    <div className={wi300 ? "mx-auto max-w-5xl" : "max-w-4xl"}>
+                    <div className={wi300 ? "mx-auto max-w-5xl" : "mx-auto max-w-4xl"}>
                         <h2 className="text-2xl font-black text-brk-on-surface mb-6">
                             Thành viên nói gì về khóa học
                         </h2>
