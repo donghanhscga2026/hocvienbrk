@@ -6,7 +6,7 @@ Luồng hoạt động:
 
 1. Mỗi 60 giây: gửi nhịp tim về website (panel “Kênh Zalo” trong CRM hiện trạng thái trực tuyến + phiên bản).
 2. Mỗi ~20 giây: xin website cấp lệnh gửi đang chờ (tôn trọng công tắc tắt khẩn cấp và trần 200 lệnh/ngày ở phía website).
-3. Gửi từng lệnh qua Zalo với **giãn cách ngẫu nhiên 10–25 giây/tin** (tối thiểu 3 giây, tối đa 20 tin/phút), **không gửi trong khung 21:30–07:00**. Gửi xong báo kết quả (thành công/thất bại) về website.
+3. Gửi từng lệnh qua Zalo với **giãn cách ngẫu nhiên 10–25 giây/tin** (tối thiểu 3 giây, tối đa 20 tin/phút), **không gửi trong khung 22:00–06:00**. Gửi xong báo kết quả (thành công/thất bại) về website.
 4. Tin học viên nhắn đến nick trợ lý được đẩy về website và tự thành **yêu cầu hỗ trợ trong CRM** để giảng viên trả lời như mọi kênh khác.
 5. Chống gửi trùng 2 lớp: website khóa `idempotencyKey` ở cơ sở dữ liệu; bridge lưu các khóa đã gửi thành công vào `data/sent-keys.json` — khởi động lại cũng không gửi trùng.
 

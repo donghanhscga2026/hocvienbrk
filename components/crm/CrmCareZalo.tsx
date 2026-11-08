@@ -205,7 +205,7 @@ export default function CrmCareZalo({ revision }: { revision: number }) {
           <h3 className="text-sm font-semibold text-slate-900">Rào chắn kênh Zalo</h3>
           <ul className="mt-2 list-disc space-y-1.5 pl-5 text-xs leading-5 text-slate-600">
             <li>Chỉ gửi cho học viên đã ghi danh hoặc đã có hội thoại — không gửi lạnh cho người lạ.</li>
-            <li>Giãn cách 10–25 giây/tin, tối đa 20 tin/phút, không gửi trong khung 21:30–07:00.</li>
+            <li>Giãn cách 10–25 giây/tin, tối đa 20 tin/phút, không gửi trong khung 22:00–06:00.</li>
             <li>Trần 1 nhắc chăm sóc/ngày/học viên tính liên kênh (app + Zalo), tôn trọng trạng thái đang có người thật xử lý.</li>
             <li>Bridge gặp sự cố → bật tắt khẩn cấp ở panel này, hàng đợi giữ nguyên chờ mở lại.</li>
           </ul>
