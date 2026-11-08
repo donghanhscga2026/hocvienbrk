@@ -104,6 +104,14 @@ export default async function OfferingDetail({
   const info = groupInfo[group]
   const active = offeringAccess(enrollment, group === 'DIGITAL' ? details.accessDays : 0)
   const previouslyActive = enrollment && ['ACTIVE', 'COMPLETED'].includes(enrollment.status)
+  // Bắt đầu sớm hai truy vấn độc lập để chúng chạy song song với các truy vấn
+  // còn lại thay vì nối tiếp nhau: số suất ưu đãi đã dùng và danh sách dự án
+  // công khai không phụ thuộc vào kết quả của nhau hay của việc dùng thử.
+  const earlyBirdUsedPromise =
+    details.earlyBirdEnabled && course.phi_coc > 0 && !quote
+      ? getEarlyBirdUsed(course.id).catch(() => details.earlyBirdSlots)
+      : Promise.resolve(0)
+  const projectsPromise = getPublicProjects()
   const trial = userId != null && group === 'DIGITAL' ? await getTrialRecord(course.id, userId) : null
   const trialActive = trialIsActive(trial)
   const trialExpired = !!trial && !trialActive
@@ -115,77 +123,81 @@ export default async function OfferingDetail({
     course.phi_coc > 0 &&
     !trial &&
     (!enrollment || ['REJECTED', 'CANCELLED'].includes(enrollment.status))
-  const earlyBirdUsedCount =
-    details.earlyBirdEnabled && course.phi_coc > 0 && !quote
-      ? await getEarlyBirdUsed(course.id).catch(() => details.earlyBirdSlots)
-      : 0
+  const earlyBirdUsedCount = await earlyBirdUsedPromise
   const earlyBird = earlyBirdState(details, course.phi_coc, earlyBirdUsedCount)
   const displayCourse = earlyBird.active ? { ...course, phi_coc: earlyBird.price } : course
   const relatedIds = (details.relatedItems || []).map((item) => item.courseId).filter((id) => id !== course.id)
-  const relatedRows = relatedIds.length
-    ? await prisma.course.findMany({
-        where: { AND: [await publicCatalogWhere(), { id: { in: relatedIds } }] },
-        select: {
-          id: true,
-          id_khoa: true,
-          name_lop: true,
-          link_anh_bia: true,
-          phi_coc: true,
-          productGroup: true,
-          teacher: { select: { name: true } },
-        },
-      })
-    : []
-  const relatedMeta = relatedRows.length
-    ? await prisma.systemConfig.findMany({
-        where: { key: { in: relatedRows.map((row) => offeringDetailsKey(row.id)) } },
-      })
-    : []
-  const relatedByKey = new Map(relatedMeta.map((row) => [row.key, row.value]))
-  const related = relatedIds
-    .map((id) => relatedRows.find((row) => row.id === id))
-    .filter((row): row is NonNullable<typeof row> => !!row)
-    .map((row) => ({
-      ...row,
-      details:
-        offeringDetailsSchema.safeParse(relatedByKey.get(offeringDetailsKey(row.id)) || {}).data ||
-        emptyOfferingDetails,
-    }))
   // Mua kèm ưu đãi (Đợt 2): chốt danh sách món kèm còn hợp lệ để đưa vào bước
   // thanh toán. Chỉ hiện cho khách chưa có quyền; giá kèm lấy từ cấu hình,
   // giá lẻ và điều kiện lấy từ dữ liệu thật của món kèm tại thời điểm xem trang.
   const attachConfig = details.attachEnabled && !quote && !hasAccess ? details.attachItems || [] : []
-  let attachOffers: { courseId: number; name: string; regularPrice: number; attachPrice: number }[] = []
-  if (attachConfig.length) {
-    const [mainTeacher, attachRows] = await Promise.all([
-      prisma.course.findUnique({ where: { id: course.id }, select: { teacherId: true } }),
-      prisma.course.findMany({
-        where: { AND: [await publicCatalogWhere(), { id: { in: attachConfig.map((item) => item.courseId) } }] },
-        select: { id: true, name_lop: true, phi_coc: true, productGroup: true, teacherId: true },
-      }),
-    ])
-    const attachMeta = attachRows.length
-      ? await prisma.systemConfig.findMany({
-          where: { key: { in: attachRows.map((row) => offeringDetailsKey(row.id)) } },
+  const relatedPromise = (async () => {
+    const relatedRows = relatedIds.length
+      ? await prisma.course.findMany({
+          where: { AND: [await publicCatalogWhere(), { id: { in: relatedIds } }] },
+          select: {
+            id: true,
+            id_khoa: true,
+            name_lop: true,
+            link_anh_bia: true,
+            phi_coc: true,
+            productGroup: true,
+            teacher: { select: { name: true } },
+          },
         })
       : []
-    const attachByKey = new Map(attachMeta.map((row) => [row.key, row.value]))
-    attachOffers = attachConfig
-      .map((entry) => {
-        const row = attachRows.find((candidate) => candidate.id === entry.courseId)
-        if (!row || row.id === course.id) return null
-        if (!['DIGITAL', 'SERVICE'].includes(row.productGroup) || row.teacherId !== mainTeacher?.teacherId) return null
-        if (row.phi_coc <= entry.price) return null
-        const targetDetails =
-          offeringDetailsSchema.safeParse(attachByKey.get(offeringDetailsKey(row.id)) || {}).data ||
-          emptyOfferingDetails
-        if (row.productGroup === 'SERVICE' && isQuoteService(targetDetails)) return null
-        return { courseId: row.id, name: row.name_lop || '', regularPrice: row.phi_coc, attachPrice: entry.price }
-      })
-      .filter((offer): offer is NonNullable<typeof offer> => !!offer)
-  }
+    const relatedMeta = relatedRows.length
+      ? await prisma.systemConfig.findMany({
+          where: { key: { in: relatedRows.map((row) => offeringDetailsKey(row.id)) } },
+        })
+      : []
+    const relatedByKey = new Map(relatedMeta.map((row) => [row.key, row.value]))
+    const related = relatedIds
+      .map((id) => relatedRows.find((row) => row.id === id))
+      .filter((row): row is NonNullable<typeof row> => !!row)
+      .map((row) => ({
+        ...row,
+        details:
+          offeringDetailsSchema.safeParse(relatedByKey.get(offeringDetailsKey(row.id)) || {}).data ||
+          emptyOfferingDetails,
+      }))
+    return related
+  })()
+  const attachPromise = (async () => {
+    let attachOffers: { courseId: number; name: string; regularPrice: number; attachPrice: number }[] = []
+    if (attachConfig.length) {
+      const [mainTeacher, attachRows] = await Promise.all([
+        prisma.course.findUnique({ where: { id: course.id }, select: { teacherId: true } }),
+        prisma.course.findMany({
+          where: { AND: [await publicCatalogWhere(), { id: { in: attachConfig.map((item) => item.courseId) } }] },
+          select: { id: true, name_lop: true, phi_coc: true, productGroup: true, teacherId: true },
+        }),
+      ])
+      const attachMeta = attachRows.length
+        ? await prisma.systemConfig.findMany({
+            where: { key: { in: attachRows.map((row) => offeringDetailsKey(row.id)) } },
+          })
+        : []
+      const attachByKey = new Map(attachMeta.map((row) => [row.key, row.value]))
+      attachOffers = attachConfig
+        .map((entry) => {
+          const row = attachRows.find((candidate) => candidate.id === entry.courseId)
+          if (!row || row.id === course.id) return null
+          if (!['DIGITAL', 'SERVICE'].includes(row.productGroup) || row.teacherId !== mainTeacher?.teacherId) return null
+          if (row.phi_coc <= entry.price) return null
+          const targetDetails =
+            offeringDetailsSchema.safeParse(attachByKey.get(offeringDetailsKey(row.id)) || {}).data ||
+            emptyOfferingDetails
+          if (row.productGroup === 'SERVICE' && isQuoteService(targetDetails)) return null
+          return { courseId: row.id, name: row.name_lop || '', regularPrice: row.phi_coc, attachPrice: entry.price }
+        })
+        .filter((offer): offer is NonNullable<typeof offer> => !!offer)
+    }
+    return attachOffers
+  })()
+  const [related, attachOffers] = await Promise.all([relatedPromise, attachPromise])
   const purchaseCourse = attachOffers.length ? { ...displayCourse, attachOffers } : displayCourse
-  const projects = (await getPublicProjects())
+  const projects = (await projectsPromise)
     .filter((project) => project.courseIds.includes(course.id))
     .map(({ slug, name, logo }) => ({ slug, name, logo }))
   const ownBrandShell = !!brand && !expectedGroup
