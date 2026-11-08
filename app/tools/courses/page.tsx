@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { getAdminCoursesAction, bulkToggleCourseStatusAction, bulkUpdateCoursesOptionsAction } from '@/app/actions/admin-actions'
-import { getTeachersAction, deleteCourseAction, cloneCourseNextCohortAction } from '@/app/actions/course-actions'
+import { getTeachersAction, deleteCourseAction, cloneCourseNextCohortAction, getCourseDeleteImpactAction } from '@/app/actions/course-actions'
 import { BookOpen, Users, Loader2, Plus, Eye, X, Search, Tag, Trash2, Save, Edit2 } from 'lucide-react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
@@ -170,7 +170,20 @@ function CoursesTab() {
     }
 
     const handleDeleteCourse = async (courseId: number, courseName: string) => {
-        if (!confirm(`Xóa hẳn khóa học "${courseName}"? Hành động này không thể hoàn tác. Chỉ xóa được khi khóa chưa có học viên ghi danh.`)) return
+        const pre = await getCourseDeleteImpactAction(courseId)
+        if (!pre.success) {
+            alert(pre.error || 'Không kiểm tra được thông tin khóa học')
+            return
+        }
+        const { activeStudents, pendingStudents, voucherLinks } = pre.impact
+        if (voucherLinks > 0) {
+            alert(`Khóa học "${courseName}" đang có ${voucherLinks} liên kết voucher. Hãy gỡ liên kết voucher trước khi xóa.`)
+            return
+        }
+        const studentNote = activeStudents + pendingStudents > 0
+            ? `\n\nKhóa đang có ${activeStudents} học viên đang học và ${pendingStudents} ghi danh chờ duyệt. Xóa khóa sẽ xóa luôn ghi danh, tiến độ học và bản ghi thanh toán của họ — không thể khôi phục.\nChỉ tiếp tục khi bạn đã xuất danh sách học viên hoặc đã chuyển học viên sang khóa khác.`
+            : ''
+        if (!confirm(`Xóa hẳn khóa học "${courseName}"? Hành động này không thể hoàn tác.${studentNote}\n\nBấm OK để xác nhận xóa vĩnh viễn.`)) return
         const res = await deleteCourseAction(courseId)
         if (res.success) {
             setCourses(prev => prev.filter(c => c.id !== courseId))

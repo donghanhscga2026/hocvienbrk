@@ -1160,6 +1160,22 @@ export async function createCourseAction(formData: FormData) {
 // ==========================================
 // DELETE COURSE - Xóa khóa học (Chỉ ADMIN, chặn khi đã có học viên)
 // ==========================================
+/**
+ * Số liệu tác động trước khi xóa khóa học, để hộp cảnh báo hiển thị đúng
+ * số học viên sẽ mất ghi danh, tiến độ và thanh toán. Chỉ ADMIN.
+ */
+export async function getCourseDeleteImpactAction(courseId: number) {
+    const { denied } = await requireAdminAction()
+    if (denied) return { success: false as const, error: denied.error }
+    const [activeStudents, pendingStudents, acceptedLinks, awardLinks] = await Promise.all([
+        prisma.enrollment.count({ where: { courseId, status: 'ACTIVE' } }),
+        prisma.enrollment.count({ where: { courseId, status: 'PENDING' } }),
+        prisma.courseAcceptedVoucher.count({ where: { courseId } }),
+        prisma.courseVoucherAward.count({ where: { courseId } }),
+    ])
+    return { success: true as const, impact: { activeStudents, pendingStudents, voucherLinks: acceptedLinks + awardLinks } }
+}
+
 export async function deleteCourseAction(courseId: number) {
     try {
         // 🔒 Chỉ ADMIN mới được xóa khóa học (giảng viên không được xóa, kể cả khóa của mình)
@@ -1174,15 +1190,16 @@ export async function deleteCourseAction(courseId: number) {
 
         if (!course) return { success: false, error: "Không tìm thấy khóa học" }
 
-        // 🚫 Chặn xóa khi khóa đã có học viên ghi danh (đang chờ duyệt hoặc đang học)
-        const studentCount = await prisma.enrollment.count({
-            where: { courseId, status: { in: ['PENDING', 'ACTIVE'] } }
-        })
-        if (studentCount > 0) {
-            return { success: false, error: `Khóa học đã có ${studentCount} học viên ghi danh nên không thể xóa. Hãy dùng chức năng Ẩn khóa học thay thế.` }
+        // 🚫 Chặn xóa khi khóa đang gắn liên kết voucher — phải gỡ liên kết trước
+        // (hai bảng liên kết voucher không cascade, xóa thẳng sẽ lỗi khóa ngoại)
+        const acceptedLinks = await prisma.courseAcceptedVoucher.count({ where: { courseId } })
+        const awardLinks = await prisma.courseVoucherAward.count({ where: { courseId } })
+        if (acceptedLinks + awardLinks > 0) {
+            return { success: false, error: `Khóa học đang có ${acceptedLinks + awardLinks} liên kết voucher. Hãy gỡ liên kết voucher trước khi xóa.` }
         }
 
-        // ✅ Xóa course (cascade xóa lessons...)
+        // ✅ Xóa course — cascade xóa luôn bài học, ghi danh, tiến độ và thanh toán.
+        // Admin đã được cảnh báo và xác nhận ở hộp thoại trước khi gọi tới đây.
         await prisma.course.delete({ where: { id: courseId } })
 
         revalidatePath('/tools/courses')
