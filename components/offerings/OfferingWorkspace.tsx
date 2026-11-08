@@ -13,8 +13,6 @@ import {
 import {
   offeringHref,
   offeringWorkspaceHref,
-  classicOfferingHref,
-  classicWorkspaceHref,
   groupInfo,
   resolvedWorkspace,
   workspaceLayouts,
@@ -39,23 +37,18 @@ const action =
 export default async function OfferingWorkspace({
   slug,
   group,
-  variant,
 }: {
   slug: string
   group: Exclude<ProductGroup, 'COURSE'>
-  variant?: 'classic'
 }) {
-  const classic = variant === 'classic'
-  const workspaceHref = classic ? classicWorkspaceHref(slug) : offeringWorkspaceHref(group, slug)
-  const detailHref = classic ? classicOfferingHref(slug) : offeringHref(group, slug)
   let context
   try {
     context = await requireOfferingWorkspace(slug, group)
   } catch (error) {
     if (!(error instanceof WorkspaceError)) throw error
     if (error.status === 401)
-      redirect('/login?callbackUrl=' + encodeURIComponent(workspaceHref))
-    if (error.status === 403) redirect(detailHref)
+      redirect('/login?callbackUrl=' + encodeURIComponent(offeringWorkspaceHref(group, slug)))
+    if (error.status === 403) redirect(offeringHref(group, slug))
     notFound()
   }
   const { course, details, userId, profile } = context
@@ -130,13 +123,9 @@ export default async function OfferingWorkspace({
       <div className="bg-stone-50 text-brk-on-surface">
         <main className="mx-auto max-w-[1440px] space-y-6 px-4 py-7 sm:px-6">
           <nav aria-label="Đường dẫn sử dụng" className="flex flex-wrap gap-2 text-sm text-brk-muted">
-            {classic ? (
-              <Link href="/khoa-hoc">Khóa học</Link>
-            ) : (
-              <Link href={'/my-space?tab=' + (group === 'DIGITAL' ? 'products' : 'services')}>
-                {group === 'DIGITAL' ? 'Sản phẩm đã mua' : 'Dịch vụ đã đặt'}
-              </Link>
-            )}
+            <Link href={'/my-space?tab=' + (group === 'DIGITAL' ? 'products' : 'services')}>
+              {group === 'DIGITAL' ? 'Sản phẩm đã mua' : 'Dịch vụ đã đặt'}
+            </Link>
             <span>/</span>
             <span aria-current="page">{course.name_lop}</span>
           </nav>
@@ -157,7 +146,7 @@ export default async function OfferingWorkspace({
                 Quyền truy cập đang hoạt động
               </p>
               <Link
-                href={detailHref}
+                href={offeringHref(group, slug)}
                 className="flex min-h-11 items-center justify-end gap-2 text-sm font-semibold text-brk-primary"
               >
                 Xem trang giới thiệu
@@ -211,7 +200,7 @@ export default async function OfferingWorkspace({
               </section>
             </div>
           )}
-          {ComboContents && <ComboContents details={details} active variant={variant} />}
+          {ComboContents && <ComboContents details={details} active />}
           {group === 'SERVICE' && details.service && <section className={panel + ' space-y-4'}><h2 className="text-2xl font-bold">Phạm vi dịch vụ của bạn</h2><dl className="grid gap-3 sm:grid-cols-2">{serviceFacts(effectiveService(details)).map(([label,text],index)=><div key={index}><dt className="text-sm text-brk-muted">{label}</dt><dd className="whitespace-pre-wrap">{text}</dd></div>)}</dl>{details.service.inputs && <p className="whitespace-pre-wrap">Khách cần cung cấp: {details.service.inputs}</p>}{details.service.startCondition && <p className="whitespace-pre-wrap">Điều kiện bắt đầu: {details.service.startCondition}</p>}</section>}
           {group === 'SERVICE' && !!details.service?.questions.length && <OfferingServiceIntake slug={slug} />}
           {showBookings && (
