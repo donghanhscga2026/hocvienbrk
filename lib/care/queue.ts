@@ -49,7 +49,10 @@ export interface CareQueueResult {
 
 const HOUR_MS = 60 * 60 * 1000
 const DAY_MS = 24 * HOUR_MS
-const MAX_ENROLLMENTS = 1500
+// Trần an toàn chống chạy quá tay khi nạp ghi danh, không phải giới hạn nghiệp vụ:
+// toàn bộ ghi danh trong phạm vi đều phải được quét chăm sóc. Trần cũ 1.500 khiến
+// 1.489 trong 2.989 ghi danh cũ nhất không bao giờ vào hàng đợi (kiểm chứng 08/11/2026).
+const MAX_ENROLLMENTS = 20000
 const MAX_ROWS = 300
 
 /** Phạm vi khóa của actor: admin = tất cả; giảng viên = khóa mình dạy. null = tất cả. */
