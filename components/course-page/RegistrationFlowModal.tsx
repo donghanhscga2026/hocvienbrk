@@ -53,6 +53,14 @@ export default function RegistrationFlowModal({
 
   const [step, setStep] = useState<FlowStep>(getInitialStep)
   const [enrollment, setEnrollment] = useState<any>(initialEnrollment || null)
+  // Mua kèm ưu đãi (Đợt 2): chỉ ở lượt mua mới; danh sách món kèm do trang chi
+  // tiết chốt sẵn trong course.attachOffers, giá không lấy từ phía khách.
+  const attachOffers: any[] = !initialEnrollment && Array.isArray(course.attachOffers) ? course.attachOffers : []
+  const [selectedAttach, setSelectedAttach] = useState<number[]>([])
+  const [attachedItems, setAttachedItems] = useState<any[]>([])
+  const attachTotal = attachOffers
+    .filter((offer: any) => selectedAttach.includes(offer.courseId))
+    .reduce((sum: number, offer: any) => sum + (offer.attachPrice || 0), 0)
   const [enrolling, setEnrolling] = useState(false)
   const [enrollError, setEnrollError] = useState<string | null>(null)
   const [showFullQR, setShowFullQR] = useState(false)
@@ -142,16 +150,18 @@ export default function RegistrationFlowModal({
         useVoucherBenefit ? 0 : voucherAmountToUse,
         useVoucherBenefit ? false : useVndWallet,
         useVoucherBenefit,
-        selectedVoucherId
+        selectedVoucherId,
+        selectedAttach
       )
       if (res.success) {
         setEnrollment(res.enrollment)
+        if (Array.isArray(res.attachItems)) setAttachedItems(res.attachItems)
         if (onEnrolled) onEnrolled(res.enrollment)
 
         // Calculate final effective amount that client expected
-        const finalDue = benefitDue !== null
+        const finalDue = (benefitDue !== null
           ? benefitDue
-          : Math.max(0, (course.phi_coc || 0) - (useVoucher ? voucherAmountToUse : 0) - (useVndWallet ? Math.min(vndBalance, Math.max(0, (course.phi_coc || 0) - (useVoucher ? voucherAmountToUse : 0))) : 0))
+          : Math.max(0, (course.phi_coc || 0) - (useVoucher ? voucherAmountToUse : 0) - (useVndWallet ? Math.min(vndBalance, Math.max(0, (course.phi_coc || 0) - (useVoucher ? voucherAmountToUse : 0))) : 0))) + attachTotal
 
         if (finalDue === 0) {
           setStep('thankyou')
@@ -167,7 +177,7 @@ export default function RegistrationFlowModal({
     } finally {
       setEnrolling(false)
     }
-  }, [enrollment, enrolling, course.id, course.phi_coc, useVoucher, voucherAmountToUse, useVndWallet, vndBalance, onEnrolled, useVoucherBenefit, selectedVoucherId, benefitDue])
+  }, [enrollment, enrolling, course.id, course.phi_coc, useVoucher, voucherAmountToUse, useVndWallet, vndBalance, onEnrolled, useVoucherBenefit, selectedVoucherId, benefitDue, selectedAttach, attachTotal])
 
   // Poll every 10s for payment verification (only when active)
   useEffect(() => {
@@ -513,6 +523,44 @@ export default function RegistrationFlowModal({
                   </div>
                 )}
 
+                {/* Mua kèm ưu đãi — giá riêng chỉ cho lần mua này, cộng vào cùng một lần chuyển khoản */}
+                {attachOffers.length > 0 && (
+                  <div style={{
+                    background: 'rgba(255, 193, 7, 0.05)',
+                    border: '1px solid rgba(255, 193, 7, 0.28)',
+                    borderRadius: '9px',
+                    padding: '9px 11px',
+                    marginBottom: '10px',
+                  }}>
+                    <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '12px', fontWeight: 700, color: '#F8F1E6', margin: '0 0 2px' }}>
+                      🛒 Mua kèm ưu đãi
+                    </p>
+                    <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '10px', color: '#A8A39C', margin: '0 0 6px' }}>
+                      Giá kèm chỉ áp dụng cho lần mua này. Tất cả thanh toán chung một lần chuyển khoản.
+                    </p>
+                    {attachOffers.map((offer: any) => {
+                      const checked = selectedAttach.includes(offer.courseId)
+                      return (
+                        <label key={offer.courseId} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '6px 0', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => setSelectedAttach(prev => checked ? prev.filter(id => id !== offer.courseId) : [...prev, offer.courseId])}
+                            style={{ width: '15px', height: '15px', flexShrink: 0, marginTop: '2px', cursor: 'pointer' }}
+                          />
+                          <span style={{ fontSize: '12px', color: '#F8F1E6', lineHeight: 1.5, flex: 1, minWidth: 0 }}>
+                            <strong>{offer.name}</strong>
+                          </span>
+                          <span style={{ fontSize: '12px', flexShrink: 0 }}>
+                            <span style={{ color: '#A8A39C', textDecoration: 'line-through', marginRight: '6px' }}>{(offer.regularPrice || 0).toLocaleString('vi-VN')}đ</span>
+                            <strong style={{ color: '#FFC94D' }}>{(offer.attachPrice || 0).toLocaleString('vi-VN')}đ</strong>
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
+
                 {/* Final calculation preview */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px', fontSize: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#A8A39C' }}>
@@ -537,11 +585,17 @@ export default function RegistrationFlowModal({
                       <span>-{finalPaidWithVnd.toLocaleString('vi-VN')} VND</span>
                     </div>
                   )}
+                  {attachOffers.filter((offer: any) => selectedAttach.includes(offer.courseId)).map((offer: any) => (
+                    <div key={offer.courseId} style={{ display: 'flex', justifyContent: 'space-between', color: '#FFC94D', fontWeight: 500 }}>
+                      <span>Mua kèm: {offer.name}</span>
+                      <span>+{(offer.attachPrice || 0).toLocaleString('vi-VN')} VND</span>
+                    </div>
+                  ))}
                   <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '1px 0' }} />
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700 }}>
                     <span style={{ color: '#F8F1E6' }}>Cần chuyển:</span>
                     <span style={{ color: '#C86B3D' }}>
-                      {(benefitDue !== null ? benefitDue : Math.max(0, (course.phi_coc || 0) - (useVoucher ? voucherAmountToUse : 0) - finalPaidWithVnd)).toLocaleString('vi-VN')} VND
+                      {((benefitDue !== null ? benefitDue : Math.max(0, (course.phi_coc || 0) - (useVoucher ? voucherAmountToUse : 0) - finalPaidWithVnd)) + attachTotal).toLocaleString('vi-VN')} VND
                     </span>
                   </div>
                 </div>
@@ -721,6 +775,25 @@ export default function RegistrationFlowModal({
                   </div>
                 )}
               </div>
+
+              {/* Đơn gồm món chính + các món mua kèm */}
+              {attachedItems.length > 0 && (
+                <div style={{
+                  marginBottom: '24px', padding: '14px 16px', borderRadius: '10px',
+                  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                }}>
+                  <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '12px', fontWeight: 700, color: '#F8F1E6', margin: '0 0 6px' }}>Đơn này gồm:</p>
+                  <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', color: '#C8C3BA', margin: '0 0 4px', lineHeight: 1.6 }}>• {course.name_lop || course.name_khoa}</p>
+                  {attachedItems.map((item: any) => (
+                    <p key={item.courseId} style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', color: '#C8C3BA', margin: '0 0 4px', lineHeight: 1.6 }}>
+                      • {item.name} <span style={{ color: '#FFC94D' }}>(mua kèm {(item.price || 0).toLocaleString('vi-VN')}đ)</span>
+                    </p>
+                  ))}
+                  <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '11px', color: '#A8A39C', margin: '6px 0 0' }}>
+                    Chuyển khoản một lần cho cả đơn — các món kèm được mở quyền cùng lúc với món chính.
+                  </p>
+                </div>
+              )}
 
               {/* Grid: QR + bank info */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>

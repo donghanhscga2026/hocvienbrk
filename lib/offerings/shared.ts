@@ -47,6 +47,8 @@ export const offeringDetailsSchema = z.object({
   earlyBirdSlots: z.number().int().min(1).max(1000).default(10),
   earlyBirdMode: z.enum(['FREE', 'PRICE']).default('FREE'),
   earlyBirdPrice: z.number().int().min(0).default(0),
+  attachEnabled: z.boolean().default(false),
+  attachItems: z.array(z.object({ courseId: z.number().int().positive(), price: z.number().int().positive() })).max(5).default([]).refine(items => new Set(items.map(item => item.courseId)).size === items.length, 'Mỗi món chỉ được chọn một lần.'),
 }).strict()
 export type OfferingDetails = z.infer<typeof offeringDetailsSchema>
 export const emptyOfferingDetails: OfferingDetails = offeringDetailsSchema.parse({})

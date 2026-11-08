@@ -91,6 +91,7 @@ async function run() {
     '@/lib/test-account': { isTestAccount: () => false }, '@/lib/affiliate/unified-commission': engine,
     '@/lib/website/domain-context': { requireDomainCourse: async () => {}, domainContext: async () => null },
     '@/lib/offerings/server': { readOfferingDetails: async () => ({ kind: 'APP' }) }, '@/lib/offerings/combo': { syncComboPurchase: async () => {}, syncComboInTransaction: async () => {} },
+    '@/lib/offerings/attach': { syncAttachInTransaction: async () => [], settleAttachOrders: async () => {}, settleAttachPurchases: async () => {}, getAttachPendingTotal: async () => 0, resolveAttachSelection: async () => [], createAttachEnrollments: async () => [] },
     '@/lib/affiliate/resolve-ref-helper': { resolveRefToUserId: async () => 8 },
     '@/lib/brk/wallet-service': {
       debitMbvWallet: async (id, amount, description, ref) => { state.mbv -= amount; state.debits.push({ amount, ref }) },
