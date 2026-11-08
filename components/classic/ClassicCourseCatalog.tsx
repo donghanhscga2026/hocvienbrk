@@ -7,6 +7,7 @@ import prisma from '@/lib/prisma'
 import { getCoursesForProfile } from '@/app/actions/site-profile-actions'
 import { getCurrentSiteProfile } from '@/lib/site-profile/runtime'
 import { FALLBACK_PROFILE } from '@/lib/db-fallback'
+import { ownedCohortOf } from '@/lib/cohort'
 
 /**
  * Bản classic (giautoandien) của trang danh mục khóa học /khoa-hoc.
@@ -79,7 +80,15 @@ export default async function ClassicCourseCatalog() {
     if (seenCohort.has(key)) return []
     seenCohort.add(key)
     const representative = [...members].sort((a, b) => cohortNo(b) - cohortNo(a) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
-    return [{ ...representative, cohortCount: members.length }]
+    // Nếu người xem đã có một kỳ khác của khóa này, ghi lên thẻ đại diện để
+    // thẻ dẫn họ vào đúng kỳ của mình thay vì hiện nút đăng ký như người mới.
+    const ownedStatus = new Map<number, string>()
+    for (const m of members) {
+      const e = enrollmentsMap[m.id]
+      if (e?.status) ownedStatus.set(m.id, e.status)
+    }
+    const owned = ownedCohortOf(members, representative.id, ownedStatus)
+    return [{ ...representative, cohortCount: members.length, ...(owned ? { ownedCohortSlug: owned.slug, ownedCohortLabel: owned.label, ownedCohortPending: owned.pending } : {}) }]
   })
   // Nhóm theo danh mục giống hệt cách trang chủ classic gom khóa học.
   const groupedOtherCourses = catalogCourses.reduce((acc: any[], course: any) => {

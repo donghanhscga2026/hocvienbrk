@@ -255,6 +255,12 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                     {typeof course.cohortCount === 'number' && course.cohortCount > 1 && (
                         <p className="mb-3 w-fit rounded-full bg-brk-background px-2.5 py-1 text-xs font-semibold text-brk-primary">Có {course.cohortCount} kỳ · Đang mở kỳ mới nhất</p>
                     )}
+                    {/* Đường vào kỳ của chính học viên khi họ đã có một kỳ khác của khóa này. */}
+                    {course.ownedCohortSlug && (
+                        <p className="mb-3 w-fit max-w-full rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                            <Link href={`/khoa-hoc/${course.ownedCohortSlug}`} className="hover:underline">{course.ownedCohortPending ? `Đã đăng ký kỳ ${course.ownedCohortLabel} · chờ kích hoạt` : `Bạn đang học kỳ ${course.ownedCohortLabel}`} · Vào kỳ của bạn</Link>
+                        </p>
+                    )}
 
                     {/* Tên công khai của giảng viên, lấy từ khóa học trên hệ thống. */}
                     {course.teacher?.name?.trim() && (

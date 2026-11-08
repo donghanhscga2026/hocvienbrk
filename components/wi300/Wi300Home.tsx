@@ -7,7 +7,7 @@ import type { DeploymentBrand } from '@/lib/site-profile/deployment-brand'
 import Wi300HomeClient from './Wi300HomeClient'
 import { canTeach } from '@/lib/wi300/personal-space'
 import { wi300CoursePreferences, wi300CourseWhere, wi300HiddenLearning } from '@/lib/wi300/course-visibility'
-import { cohortNumberOf } from '@/lib/cohort'
+import { cohortNumberOf, ownedCohortOf } from '@/lib/cohort'
 import { getPublicProjects } from '@/lib/wi300/public-projects'
 
 // Chỉ gửi dữ liệu dùng bởi card, bộ lọc và đăng ký; bỏ nội dung dài/email quản trị.
@@ -26,7 +26,7 @@ const courseSelect = {
   _count: { select: { enrollments: { where: { status: 'ACTIVE' as const } }, lessons: true } },
 } satisfies Prisma.CourseSelect
 
-export type Wi300Course = Prisma.CourseGetPayload<{ select: typeof courseSelect }> & { cohortCount?: number }
+export type Wi300Course = Prisma.CourseGetPayload<{ select: typeof courseSelect }> & { cohortCount?: number; ownedCohortSlug?: string | null; ownedCohortLabel?: string | null; ownedCohortPending?: boolean }
 const teachingSelect = {
   id: true, id_khoa: true, name_lop: true, status: true, link_anh_bia: true,
   _count: { select: { lessons: true, enrollments: { where: { status: 'ACTIVE' as const } } } },
@@ -54,6 +54,7 @@ export default async function Wi300Home({ brand, session, view = 'home', catalog
   let userPhone: string | null = null
   let catalogError = false
   let accountError = false
+  let cohortMembersByRep = new Map<number, Wi300Course[]>()
 
   // Dữ liệu giảng dạy không cache chung, không đưa khóa riêng vào danh mục công khai.
   // ADMIN cũng mặc định chỉ thấy khóa của mình, giống bộ lọc SELF hiện có.
@@ -106,6 +107,7 @@ export default async function Wi300Home({ brand, session, view = 'home', catalog
           if (seenCohort.has(key)) return []
           seenCohort.add(key)
           const representative = [...members].sort((a, b) => cohortNumberOf(b) - cohortNumberOf(a))[0]
+          cohortMembersByRep.set(representative.id, members)
           return [{ ...representative, cohortCount: members.length }]
         })
       }
@@ -117,9 +119,10 @@ export default async function Wi300Home({ brand, session, view = 'home', catalog
   }
   if (needsCourses && userId != null && Number.isInteger(userId)) {
     try {
+      const enrollmentCourseIds = Array.from(new Set([...courses.map(course => course.id), ...[...cohortMembersByRep.values()].flatMap(members => members.map(m => m.id))]))
       const [user, rows, hiddenLearning] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId }, select: { phone: true } }),
-        prisma.enrollment.findMany({ where: { userId, courseId: { in: courses.map(course => course.id) } }, select: {
+        prisma.enrollment.findMany({ where: { userId, courseId: { in: enrollmentCourseIds } }, select: {
           id: true, courseId: true, status: true, startedAt: true, hiddenFromGifts: true, updatedAt: true, lastLessonId: true,
           lessonProgress: { where: { status: { not: 'RESET' } }, orderBy: { updatedAt: 'desc' }, take: 1, select: { updatedAt: true } },
           payment: { select: { id: true, status: true, proofImage: true, qrCodeUrl: true, transferContent: true, amount: true, bankName: true, accountNumber: true } },
@@ -141,6 +144,17 @@ export default async function Wi300Home({ brand, session, view = 'home', catalog
       console.error('[WI300] Không tải được khóa học của tài khoản', error)
       accountError = true
     }
+  }
+  // Nếu người xem đã có một kỳ khác của khóa được gom, ghi lên thẻ đại diện
+  // để thẻ dẫn họ vào đúng kỳ của mình (giống danh mục classic).
+  if (cohortMembersByRep.size > 0 && enrollments.length > 0) {
+    const ownedStatus = new Map(enrollments.map(e => [e.courseId, e.status]))
+    courses = courses.map(course => {
+      const members = cohortMembersByRep.get(course.id)
+      if (!members) return course
+      const owned = ownedCohortOf(members, course.id, ownedStatus)
+      return owned ? { ...course, ownedCohortSlug: owned.slug, ownedCohortLabel: owned.label, ownedCohortPending: owned.pending } : course
+    })
   }
   const { teachingCourses, teachingError } = await teachingReady
   const { projects, projectsError } = await projectsReady
