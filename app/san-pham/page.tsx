@@ -9,5 +9,10 @@ export default async function Page() {
     const { default: ClassicOfferingCatalog } = await import('@/components/classic/ClassicOfferings')
     return <ClassicOfferingCatalog kind="PRODUCT" />
   }
+  if (!(await getCurrentDeploymentBrand())) {
+    // Site classic bật chọn-dùng bản wi300: bọc khung của chính site.
+    const { default: ClassicFrame } = await import('@/components/classic/ClassicFrame')
+    return <ClassicFrame title="Sản phẩm số"><WiOfferingCatalog kind="PRODUCT" /></ClassicFrame>
+  }
   return <WiOfferingCatalog kind="PRODUCT" />
 }
