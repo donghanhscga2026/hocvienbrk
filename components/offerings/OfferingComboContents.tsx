@@ -1,15 +1,17 @@
 import Link from 'next/link'
 import { comboItems } from '@/lib/offerings/combo'
-import { groupInfo, offeringWorkspaceHref, type OfferingDetails } from '@/lib/offerings/shared'
+import { groupInfo, offeringWorkspaceHref, classicWorkspaceHref, type OfferingDetails } from '@/lib/offerings/shared'
 import { getCurrentSiteProfile, getCourseWhereForProfile } from '@/lib/site-profile/runtime'
 import { serviceModels } from '@/lib/offerings/service'
 
 export default async function OfferingComboContents({
   details,
   active = false,
+  variant,
 }: {
   details: OfferingDetails
   active?: boolean
+  variant?: 'classic'
 }) {
   const profile = await getCurrentSiteProfile()
   const { status: _status, ...scope } = profile ? getCourseWhereForProfile(profile) : {}
@@ -59,7 +61,9 @@ export default async function OfferingComboContents({
                 href={
                   item.productGroup === 'COURSE'
                     ? `/courses/${encodeURIComponent(item.id_khoa)}/learn`
-                    : offeringWorkspaceHref(item.productGroup, item.id_khoa)
+                    : variant === 'classic'
+                      ? classicWorkspaceHref(item.id_khoa)
+                      : offeringWorkspaceHref(item.productGroup, item.id_khoa)
                 }
                 className="mt-auto inline-flex min-h-12 items-center justify-center rounded-xl bg-brk-primary px-4 font-semibold text-white"
               >
