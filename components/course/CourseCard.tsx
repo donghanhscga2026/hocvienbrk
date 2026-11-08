@@ -314,7 +314,10 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                                 </>
                             )
                         )}
-                        {/* Số bài học */}
+                        {/* Số bài học — chỉ khóa học mới có bài; sản phẩm số và dịch vụ
+                            không đếm theo bài nên ẩn hẳn, tránh hiện "0 bài" gây hiểu
+                            lầm là chưa có nội dung. */}
+                        {(!course.productGroup || course.productGroup === 'COURSE') && (
                         <button
                             onClick={(e) => {
                                 e.preventDefault()
@@ -325,6 +328,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                         >
                             {course._count?.lessons ?? 0} bài
                         </button>
+                        )}
 
                         {/* Số thành viên */}
                         <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-brk-background px-2.5 py-0.5 text-[10px] font-black tracking-wider text-brk-on-surface shadow-sm border border-brk-outline">
