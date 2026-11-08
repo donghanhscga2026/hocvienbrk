@@ -72,11 +72,11 @@ export const publicCatalogWhere = cache(async () => {
 export async function getOfferingCatalog(group: Exclude<ProductGroup, 'COURSE'>) {
   const items = await prisma.course.findMany({
     where: { AND: [await publicCatalogWhere(), { productGroup: group }] },
-    select: { id: true, id_khoa: true, name_lop: true, mo_ta_ngan: true, link_anh_bia: true, phi_coc: true, category: true, courseCategory: { select: { name: true } }, teacher: { select: { name: true } } },
+    select: { id: true, id_khoa: true, name_lop: true, mo_ta_ngan: true, link_anh_bia: true, phi_coc: true, category: true, courseCategory: { select: { name: true } }, teacher: { select: { name: true } }, _count: { select: { enrollments: { where: { status: 'ACTIVE' } } } } },
     orderBy: [{ pin: 'asc' }, { updatedAt: 'desc' }],
   })
   const metadata = items.length ? await prisma.systemConfig.findMany({ where: { key: { in: items.map(item => offeringDetailsKey(item.id)) } } }) : []
   const byKey = new Map(metadata.map(row => [row.key, row.value]))
   const projects = await getPublicProjects()
-  return items.map(item => ({ ...item, projects: projects.filter(project => project.courseIds.includes(item.id)).map(({ slug, name, logo }) => ({ slug, name, logo })), details: publicOfferingDetails(offeringDetailsSchema.safeParse(byKey.get(offeringDetailsKey(item.id)) || {}).data || emptyOfferingDetails) }))
+  return items.map(item => ({ ...item, memberCount: item._count.enrollments, projects: projects.filter(project => project.courseIds.includes(item.id)).map(({ slug, name, logo }) => ({ slug, name, logo })), details: publicOfferingDetails(offeringDetailsSchema.safeParse(byKey.get(offeringDetailsKey(item.id)) || {}).data || emptyOfferingDetails) }))
 }
