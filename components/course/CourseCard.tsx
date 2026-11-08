@@ -251,6 +251,11 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                         </h3>
                     </div>
 
+                    {/* Nhãn số kỳ: chỉ xuất hiện khi trang danh mục đã gom các kỳ thành một thẻ đại diện. */}
+                    {typeof course.cohortCount === 'number' && course.cohortCount > 1 && (
+                        <p className="mb-3 w-fit rounded-full bg-brk-background px-2.5 py-1 text-xs font-semibold text-brk-primary">Có {course.cohortCount} kỳ · Đang mở kỳ mới nhất</p>
+                    )}
+
                     {/* Tên công khai của giảng viên, lấy từ khóa học trên hệ thống. */}
                     {course.teacher?.name?.trim() && (
                         <p className="mb-3 flex w-fit max-w-full items-center gap-2 rounded-xl border border-brk-primary/20 bg-brk-primary/10 px-3 py-2 text-sm leading-relaxed" data-course-teacher>
