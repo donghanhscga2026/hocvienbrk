@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { getAdminCoursesAction, bulkToggleCourseStatusAction, bulkUpdateCoursesOptionsAction } from '@/app/actions/admin-actions'
-import { getTeachersAction, deleteCourseAction } from '@/app/actions/course-actions'
+import { getTeachersAction, deleteCourseAction, cloneCourseNextCohortAction } from '@/app/actions/course-actions'
 import { BookOpen, Users, Loader2, Plus, Eye, X, Search, Tag, Trash2, Save, Edit2 } from 'lucide-react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
@@ -176,6 +176,16 @@ function CoursesTab() {
             setCourses(prev => prev.filter(c => c.id !== courseId))
         } else {
             alert(res.error || 'Có lỗi xảy ra khi xóa khóa học')
+        }
+    }
+
+    const handleNextCohort = async (courseId: number, courseName: string) => {
+        if (!confirm(`Mở kỳ tiếp theo của "${courseName}"? Hệ thống sẽ sao chép toàn bộ thông tin và bài học sang kỳ mới (đang ẩn).`)) return
+        const res = await cloneCourseNextCohortAction(courseId)
+        if (res.success && res.course) {
+            window.location.href = `/tools/courses/new?id=${res.course.id}`
+        } else {
+            alert(res.error || 'Không tạo được kỳ mới')
         }
     }
 
@@ -403,7 +413,7 @@ function CoursesTab() {
                                 <span className={`w-fit rounded-full px-2 py-1 text-xs ${course.status ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{course.status ? 'Hiển thị' : 'Đang ẩn'}</span>
                                 <button type="button" onClick={() => handleViewStudents(course.id, course.name_lop)} className="min-h-11 text-left text-sm font-semibold text-brk-primary"><span className={display === 'list' ? '@[64rem]:hidden' : ''}>Học viên: </span>{course._count?.enrollments || 0} →</button>
                                 <div className="text-xs">{activityLoading ? <p role="status">Đang tải…</p> : summary ? <Link href={`/tools/courses/new?id=${course.id}&tab=activity`} className="block min-h-11 space-y-1 text-brk-primary"><p><strong>{summary.requests}</strong> yêu cầu cần trả lời</p><p><strong>{summary.submissions + summary.comments}</strong> hoạt động chưa xem</p></Link> : <p className="text-gray-500">Chưa tải được</p>}</div>
-                                <div className="flex min-w-0 flex-wrap items-center gap-2"><Link href={`/tools/courses/new?id=${course.id}`} className="inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-xl bg-brk-primary px-3 text-xs font-semibold text-white">Quản lý</Link><CourseActionsMenu id={course.id} slug={course.id_khoa} name={course.name_lop} status={course.status} admin={isAdmin} busy={batchLoading} onToggle={() => void handleToggleCourseStatus(course.id, course.status)} onDelete={() => void handleDeleteCourse(course.id, course.name_lop)} /></div>
+                                <div className="flex min-w-0 flex-wrap items-center gap-2"><Link href={`/tools/courses/new?id=${course.id}`} className="inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-xl bg-brk-primary px-3 text-xs font-semibold text-white">Quản lý</Link><CourseActionsMenu id={course.id} slug={course.id_khoa} name={course.name_lop} status={course.status} admin={isAdmin} busy={batchLoading} onToggle={() => void handleToggleCourseStatus(course.id, course.status)} onDelete={() => void handleDeleteCourse(course.id, course.name_lop)} onNextCohort={course.productGroup === 'COURSE' ? () => void handleNextCohort(course.id, course.name_lop) : undefined} /></div>
                             </article>
                         })}
                         </div></div>

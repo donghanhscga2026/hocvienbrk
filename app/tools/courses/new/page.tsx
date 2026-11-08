@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { isTeachingRole } from '@/lib/auth/roles'
-import { createCourseAction, getTeachersAction } from '@/app/actions/course-actions'
+import { createCourseAction, getTeachersAction, cloneCourseNextCohortAction } from '@/app/actions/course-actions'
 import { updateCourseAction, updateLessonAction, deleteLessonAction } from '@/app/actions/admin-actions'
 import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle2, AlertCircle, List, ListVideo, Play, Edit2, X, FileSpreadsheet, Download, Save, Trash2, Plus, Mail, ArrowUp, ArrowDown, Bell } from 'lucide-react'
 import Link from 'next/link'
@@ -427,7 +427,24 @@ function CreateCourseContent() {
             setMessage({ type: 'error', text: res.error || 'Lỗi khi xóa bài học' })
         }
     }
-    
+
+    const [cloning, setCloning] = useState(false)
+    const handleNextCohort = async () => {
+        if (!courseId || cloning) return
+        if (!window.confirm('Mở kỳ tiếp theo từ khóa này? Hệ thống sẽ sao chép toàn bộ thông tin và bài học sang kỳ mới (đang ẩn).')) return
+        setCloning(true)
+        try {
+            const res = await cloneCourseNextCohortAction(Number(courseId))
+            if (res.success && res.course) {
+                router.push(`/tools/courses/new?id=${res.course.id}`)
+            } else {
+                window.alert(res.error || 'Không tạo được kỳ mới')
+            }
+        } finally {
+            setCloning(false)
+        }
+    }
+
     return (
         <div className="min-h-screen bg-gray-50" onClickCapture={event => { if ((!dirty && !operationsDirty) || productGroup === 'COURSE') return; const anchor = (event.target as HTMLElement).closest('a'); if (anchor && anchor.target !== '_blank' && anchor.getAttribute('href')?.startsWith('/') && !window.confirm('Bạn có thay đổi chưa lưu. Rời trang này?')) { event.preventDefault(); event.stopPropagation() } }}>
             <MainHeader title={(isEditMode ? 'Quản lý ' : 'Tạo ') + group.singular} toolSlug="courses" />
@@ -435,7 +452,7 @@ function CreateCourseContent() {
             <nav aria-label="Nhóm nội dung" className="flex flex-wrap gap-2">{Object.entries(groupInfo).map(([key, item]) => <Link key={key} href={item.manager} className="inline-flex min-h-11 items-center rounded-xl border border-brk-outline bg-white px-4 text-base font-semibold text-brk-primary">{item.label}</Link>)}</nav>
             
             {(isEditMode || productGroup !== 'COURSE') && <div className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-4"><div className="flex min-w-0 items-center gap-4">{linkAnhBia && <img src={linkAnhBia} alt="" className="h-20 w-28 shrink-0 rounded-xl object-cover" />}<div><h1 className="text-2xl font-bold text-brk-primary">{nameLop || group.label}</h1><p className="mt-2 text-base text-gray-500">{idKhoa} · {group.label}{productGroup === 'COURSE' ? ` · ${lessons.length} bài giảng` : ''}</p></div></div><div className="flex flex-wrap gap-2">{isEditMode && <Link href={offeringHref(productGroup, idKhoa)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-xl border border-brk-outline bg-white px-4 text-base font-semibold text-brk-primary">{productGroup === 'COURSE' ? 'Xem khóa học' : 'Xem trang giới thiệu'} ↗</Link>}<button hidden={productGroup !== 'COURSE' || activeTab !== 'info'} type="submit" form="course-settings-form" disabled={loading || !idKhoa || !nameLop} className="min-h-11 rounded-xl bg-brk-primary px-4 text-base font-semibold text-white disabled:opacity-50">Lưu thay đổi</button></div></div>
+                <div className="flex flex-wrap items-center justify-between gap-4"><div className="flex min-w-0 items-center gap-4">{linkAnhBia && <img src={linkAnhBia} alt="" className="h-20 w-28 shrink-0 rounded-xl object-cover" />}<div><h1 className="text-2xl font-bold text-brk-primary">{nameLop || group.label}</h1><p className="mt-2 text-base text-gray-500">{idKhoa} · {group.label}{productGroup === 'COURSE' ? ` · ${lessons.length} bài giảng` : ''}</p></div></div><div className="flex flex-wrap gap-2">{isEditMode && <Link href={offeringHref(productGroup, idKhoa)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-xl border border-brk-outline bg-white px-4 text-base font-semibold text-brk-primary">{productGroup === 'COURSE' ? 'Xem khóa học' : 'Xem trang giới thiệu'} ↗</Link>}{isEditMode && productGroup === 'COURSE' && <button type="button" onClick={handleNextCohort} disabled={cloning} className="inline-flex min-h-11 items-center rounded-xl border border-brk-outline bg-white px-4 text-base font-semibold text-brk-primary disabled:opacity-50">{cloning ? 'Đang tạo kỳ…' : 'Mở kỳ tiếp theo'}</button>}<button hidden={productGroup !== 'COURSE' || activeTab !== 'info'} type="submit" form="course-settings-form" disabled={loading || !idKhoa || !nameLop} className="min-h-11 rounded-xl bg-brk-primary px-4 text-base font-semibold text-white disabled:opacity-50">Lưu thay đổi</button></div></div>
                 <nav aria-label={'Quản lý ' + group.singular} className="flex gap-2 overflow-x-auto pb-2">{(productGroup === 'COURSE' ? [{ id: 'info', label: 'Thông tin' }, { id: 'lessons', label: 'Bài giảng' }, { id: 'members', label: 'Học viên' }, { id: 'stats', label: 'Thống kê' }, { id: 'activity', label: 'Hoạt động học viên' }, { id: 'feed', label: 'Nhật ký' }, { id: 'sales', label: 'Trang bán khóa học' }] : [{ id: 'info', label: 'Thông tin' }, { id: 'sales', label: 'Trang giới thiệu' }, { id: 'resources', label: 'Nội dung sử dụng' }, { id: 'pricing', label: 'Giá & Quyền lợi' }, { id: 'members', label: 'Khách hàng' }, ...(productGroup === 'SERVICE' ? [{ id: 'operations', label: 'Vận hành' }] : []), { id: 'settings', label: 'Cài đặt thêm' }, { id: 'feed', label: 'Nhật ký' }]).map(tab => <button key={tab.id} type="button" disabled={!isEditMode && ['members', 'operations', 'feed'].includes(tab.id)} aria-current={activeTab === tab.id ? 'page' : undefined} onClick={() => selectTab(tab.id as ManagementTab)} className={`min-h-12 shrink-0 border-b-2 px-4 text-base font-semibold disabled:opacity-40 ${activeTab === tab.id ? 'border-brk-primary text-brk-primary' : 'border-transparent text-gray-500 hover:bg-white/60'}`}>{tab.label}</button>)}</nav>
                 {productGroup !== 'COURSE' && <div className="flex flex-wrap items-center gap-3">{dirty && <span className="text-sm font-semibold text-amber-800">Có thay đổi chưa lưu</span>}{isEditMode && <Link href={offeringWorkspaceHref(productGroup, idKhoa)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-xl border bg-white px-4 font-semibold text-brk-primary">Xem không gian sử dụng</Link>}{offeringForm && <button type="submit" form="course-settings-form" disabled={loading || !idKhoa || !nameLop} className="min-h-12 rounded-xl bg-brk-primary px-5 font-semibold text-white disabled:opacity-40">{loading ? 'Đang lưu…' : 'Lưu thay đổi'}</button>}</div>}
             </div>}
@@ -465,16 +482,17 @@ function CreateCourseContent() {
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                            <label className="text-sm font-semibold text-gray-600 ml-1">Tên {group.singular} *</label>
+                            <label className="text-sm font-semibold text-gray-600 ml-1">{productGroup === 'COURSE' ? 'Tên khóa học chung — các kỳ dùng chung' : `Tên ${group.singular}`} *</label>
                             <input
                                 data-help-id="input-class-name"
                                 type="text"
                                 value={nameLop}
                                 onChange={(e) => setNameLop(e.target.value)}
                                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
-                                placeholder="Tên lớp..."
+                                placeholder={productGroup === 'COURSE' ? 'Ví dụ: Kích Hoạt Dòng Tiền' : 'Tên lớp...'}
                                 required
                             />
+                            {productGroup === 'COURSE' && <p className="text-xs text-gray-500 ml-1">Các kỳ K01, K02, K03… của cùng một khóa học ghi giống hệt nhau ở ô này — hệ thống dựa vào ô này để gom các kỳ lại với nhau.</p>}
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-sm font-semibold text-gray-600 ml-1">Mã {group.singular} *</label>
@@ -490,14 +508,15 @@ function CreateCourseContent() {
                     </div>
                     
                     <div hidden={productGroup !== 'COURSE'} className="space-y-1.5 mt-4">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên khóa học (khác tên lớp)</label>
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên kỳ này</label>
                         <input 
                             type="text" 
                             value={nameKhoa} 
                             onChange={(e) => setNameKhoa(e.target.value)} 
                             className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                            placeholder="Tên khóa..." 
+                            placeholder="Ví dụ: Kích Hoạt Dòng Tiền K02" 
                         />
+                        <p className="text-xs text-gray-500 ml-1">Tên riêng của kỳ này, có số kỳ ở cuối. Mỗi kỳ một tên khác nhau.</p>
                     </div>
                     
                         <div className="space-y-1.5 mt-4">
