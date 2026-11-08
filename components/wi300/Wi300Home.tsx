@@ -7,6 +7,7 @@ import type { DeploymentBrand } from '@/lib/site-profile/deployment-brand'
 import Wi300HomeClient from './Wi300HomeClient'
 import { canTeach } from '@/lib/wi300/personal-space'
 import { wi300CoursePreferences, wi300CourseWhere, wi300HiddenLearning } from '@/lib/wi300/course-visibility'
+import { cohortNumberOf } from '@/lib/cohort'
 import { getPublicProjects } from '@/lib/wi300/public-projects'
 
 // Chỉ gửi dữ liệu dùng bởi card, bộ lọc và đăng ký; bỏ nội dung dài/email quản trị.
@@ -25,7 +26,7 @@ const courseSelect = {
   _count: { select: { enrollments: { where: { status: 'ACTIVE' as const } }, lessons: true } },
 } satisfies Prisma.CourseSelect
 
-export type Wi300Course = Prisma.CourseGetPayload<{ select: typeof courseSelect }>
+export type Wi300Course = Prisma.CourseGetPayload<{ select: typeof courseSelect }> & { cohortCount?: number }
 const teachingSelect = {
   id: true, id_khoa: true, name_lop: true, status: true, link_anh_bia: true,
   _count: { select: { lessons: true, enrollments: { where: { status: 'ACTIVE' as const } } } },
@@ -87,6 +88,27 @@ export default async function Wi300Home({ brand, session, view = 'home', catalog
       // hiện ở trang riêng của chúng; các view khác (trang chủ, không gian học viên) giữ nguyên.
       courses = await getCatalog(view === 'catalog' ? { ...catalogWhere, productGroup: 'COURSE' } : catalogWhere)
       courses = courses.map(course => ({ ...course, status: preferences.get(course.id) ?? false }))
+      if (view === 'catalog') {
+        // Gom các kỳ của cùng một khóa học thành một thẻ đại diện (kỳ mới nhất),
+        // giống danh mục classic; các view khác (không gian học viên, khám phá)
+        // giữ nguyên từng kỳ.
+        const cohortGroups = new Map<string, Wi300Course[]>()
+        for (const course of courses) {
+          const key = `${course.teacherId}::${course.name_lop}`
+          const arr = cohortGroups.get(key)
+          if (arr) arr.push(course); else cohortGroups.set(key, [course])
+        }
+        const seenCohort = new Set<string>()
+        courses = courses.flatMap(course => {
+          const key = `${course.teacherId}::${course.name_lop}`
+          const members = cohortGroups.get(key) || [course]
+          if (members.length < 2) return [course]
+          if (seenCohort.has(key)) return []
+          seenCohort.add(key)
+          const representative = [...members].sort((a, b) => cohortNumberOf(b) - cohortNumberOf(a))[0]
+          return [{ ...representative, cohortCount: members.length }]
+        })
+      }
     }
   } catch (error) {
     // Không hiển thị khóa học giả hoặc khóa ngoài phạm vi khi database lỗi.
