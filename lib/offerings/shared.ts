@@ -64,10 +64,6 @@ export function publicOfferingDetails(details: OfferingDetails) {
 export const modeLabels = { ONLINE: 'Online', OFFLINE: 'Trực tiếp', HYBRID: 'Online & trực tiếp' }
 export const resourceLabels = { EBOOK: 'Ebook', APP: 'Công cụ / App', TEMPLATE: 'Template', GUIDE: 'Hướng dẫn', RESOURCE: 'Tài nguyên', PROMPT: 'Prompt', VIDEO: 'Video' }
 export function offeringWorkspaceHref(group: unknown, slug: string) { return offeringHref(group, slug) + '/su-dung' }
-// Đường dẫn theo dạng khóa học cho các site classic (chỉ có mục Khóa học,
-// không có mục Sản phẩm/Dịch vụ riêng).
-export function classicOfferingHref(slug: string) { return '/khoa-hoc/' + encodeURIComponent(slug) }
-export function classicWorkspaceHref(slug: string) { return classicOfferingHref(slug) + '/su-dung' }
 export function resolvedWorkspace(group: string, details: OfferingDetails) { return details.workspaceLayout !== 'AUTO' ? details.workspaceLayout : group === 'SERVICE' ? effectiveService(details).model === 'SESSIONS' ? 'SESSIONS' : 'DELIVERY' : details.kind === 'APP' ? 'APP' : 'LIBRARY' }
 export function offeringFacts(group: string, details: ReturnType<typeof publicOfferingDetails>) {
   if (details.kind === 'COMBO') return [['Bao gồm', details.format || 'Các món trong gói'], ['Thời hạn', 'Theo từng món'], ['Kích hoạt', 'Sau khi combo được kích hoạt']]
