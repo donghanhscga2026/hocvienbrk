@@ -243,7 +243,8 @@ export async function processPaymentEmails() {
             autoVerifyConfig: { select: { alternativeCodes: true } }
           }
         },
-        user: { select: { id: true, name: true, phone: true, email: true, referrerId: true } }
+        user: { select: { id: true, name: true, phone: true, email: true, referrerId: true } },
+        payment: { select: { amount: true } }
       }
     });
 
@@ -396,7 +397,11 @@ export async function processPaymentEmails() {
               }
             }
 
-            const amountMatch = parsed.amount >= (enrollment.phi_coc ?? enrollment.course.phi_coc ?? 0);
+            // Số tiền phải đạt ít nhất số tiền trên bản ghi thanh toán của lượt mua
+            // (đơn mua kèm gồm cả món chính và món kèm); chưa có bản ghi thanh toán
+            // thì dùng phí cọc của ghi danh như trước.
+            const expectedAmount = enrollment.payment?.amount ?? enrollment.phi_coc ?? enrollment.course.phi_coc ?? 0;
+            const amountMatch = parsed.amount >= expectedAmount;
 
             if (!((parsed.userId != null ? userIdMatch : phoneMatch) && courseCodeMatch && amountMatch)) continue;
 
