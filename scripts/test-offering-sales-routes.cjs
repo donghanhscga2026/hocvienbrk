@@ -8,7 +8,7 @@ async function run() {
   const mocks = {
     react: { ...React, cache: fn => fn },
     'next/navigation': { notFound: () => { throw Error('NOT_FOUND') }, redirect: href => { throw Error('REDIRECT:' + href) } },
-    '@/lib/prisma': { __esModule: true, default: { course: { findUnique: async () => course(), findFirst: async () => null }, user: { findUnique: async () => null }, enrollment: { findFirst: async () => ({ status: 'ACTIVE' }) } } },
+    '@/lib/prisma': { __esModule: true, default: { course: { findUnique: async () => course(), findFirst: async () => null, findMany: async () => [] }, user: { findUnique: async () => null }, enrollment: { findFirst: async () => ({ status: 'ACTIVE' }) } } },
     '@/lib/get-session': { getSession: async () => ({ user: { id: '0' } }) },
     '@/lib/site-profile/runtime': { getCurrentSiteProfile: async () => ({}), canProfileAccessCourse: async () => allowed },
     '@/lib/website/domain-context': { requireDomainCourse: async () => {} },

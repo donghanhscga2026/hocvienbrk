@@ -20,6 +20,7 @@ import OfferingDetail from '@/components/offerings/OfferingDetail'
 import { readOfferingDetails, getOfferingSalesCourse } from '@/lib/offerings/server'
 import { publicOfferingDetails, offeringHref, type ProductGroup } from '@/lib/offerings/shared'
 import { cohortNumberOf, cohortShortLabel, type CohortLink } from '@/lib/cohort'
+import CohortPicker from '@/components/course/CohortPicker'
 
 // Dùng chung kiểm tra phạm vi trong metadata và nội dung của cùng request.
 const getPageProfile = cache(getCurrentSiteProfile)
@@ -168,42 +169,11 @@ export default async function CourseSalesPage({ params, searchParams, expectedGr
         ? <NotificationLessonEntry courseSlug={course.id_khoa} lessonId={requestedLesson} />
         : null
 
-    // Course page hiển thị hoàn toàn theo dữ liệu đã publish trong DB.
-    const effectiveCoursePage = coursePage
-    const projectLabels = projectBadges.length ? <CourseProjectBadges projects={projectBadges} showAll compact /> : undefined
-    const customWi300Page = !!deploymentBrand && effectiveCoursePage?.useTemplate !== false
-        && (effectiveCoursePage?.theme as { importedLayout?: boolean } | undefined)?.importedLayout === true
-    // Mẫu HTML sở hữu giao diện bên trong, nhưng trang hệ thống vẫn cần header.
-    // Gộp dự án vào breadcrumb để không chèn thêm một dải trước landing page.
-    const breadcrumb = deploymentBrand ? <Wi300Breadcrumb group={course.productGroup} title={course.name_lop} projectLabels={customWi300Page ? projectLabels : undefined} /> : undefined
-
-    // Giữ dữ liệu đã publish; chỉ bỏ phần thống kê mà mẫu ZIP không dùng.
-    if (effectiveCoursePage && (effectiveCoursePage as any).useTemplate !== false) {
-        return (
-            <>
-                {notificationEntry}
-                {customWi300Page && <Wi300Header />}
-                <CoursePageView
-                    wi300Breadcrumb={breadcrumb}
-                    projectLabels={customWi300Page ? undefined : projectLabels}
-                    coursePage={effectiveCoursePage as any}
-                    course={offeringDetails ? {...course, offeringDetails:publicOfferingDetails(offeringDetails)} : course}
-                    enrollment={enrollment}
-                    userPhone={userPhone}
-                    userId={userId}
-                    session={session}
-                    lessons={lessons}
-                    testimonials={testimonials}
-                    totalHours={totalHours}
-                    activeStudentCount={activeStudentCount}
-                />
-            </>
-        )
-    }
-
     // Các kỳ khác của cùng khóa học (cùng giảng viên + cùng tên khóa học chung)
     // để trang chi tiết hiện mục chọn kỳ. Chỉ liệt kê các kỳ đang hiển thị và
     // thuộc phạm vi của site hiện tại; kỳ đang xem luôn có mặt trong danh sách.
+    // Tính trước cả hai nhánh hiển thị: mẫu chuẩn hiện mục này trong trang,
+    // trang bán tự dựng (HTML riêng) hiện dạng dải hệ thống ở phía trên.
     let cohorts: CohortLink[] | undefined
     if (course.productGroup === 'COURSE') {
         const siblings = await prisma.course.findMany({
@@ -221,6 +191,44 @@ export default async function CourseSalesPage({ params, searchParams, expectedGr
                 .sort((a, b) => cohortNumberOf(a) - cohortNumberOf(b))
                 .map(s => ({ slug: s.id_khoa, label: cohortShortLabel(s), dateJoin: s.date_join, current: s.id === course.id }))
         }
+    }
+
+    // Course page hiển thị hoàn toàn theo dữ liệu đã publish trong DB.
+    const effectiveCoursePage = coursePage
+    const projectLabels = projectBadges.length ? <CourseProjectBadges projects={projectBadges} showAll compact /> : undefined
+    const customWi300Page = !!deploymentBrand && effectiveCoursePage?.useTemplate !== false
+        && (effectiveCoursePage?.theme as { importedLayout?: boolean } | undefined)?.importedLayout === true
+    // Mẫu HTML sở hữu giao diện bên trong, nhưng trang hệ thống vẫn cần header.
+    // Gộp dự án vào breadcrumb để không chèn thêm một dải trước landing page.
+    const breadcrumb = deploymentBrand ? <Wi300Breadcrumb group={course.productGroup} title={course.name_lop} projectLabels={customWi300Page ? projectLabels : undefined} /> : undefined
+
+    // Giữ dữ liệu đã publish; chỉ bỏ phần thống kê mà mẫu ZIP không dùng.
+    if (effectiveCoursePage && (effectiveCoursePage as any).useTemplate !== false) {
+        return (
+            <>
+                {notificationEntry}
+                {customWi300Page && <Wi300Header />}
+                {cohorts && (
+                    <div className="mx-auto w-full max-w-5xl px-4">
+                        <CohortPicker cohorts={cohorts} />
+                    </div>
+                )}
+                <CoursePageView
+                    wi300Breadcrumb={breadcrumb}
+                    projectLabels={customWi300Page ? undefined : projectLabels}
+                    coursePage={effectiveCoursePage as any}
+                    course={offeringDetails ? {...course, offeringDetails:publicOfferingDetails(offeringDetails)} : course}
+                    enrollment={enrollment}
+                    userPhone={userPhone}
+                    userId={userId}
+                    session={session}
+                    lessons={lessons}
+                    testimonials={testimonials}
+                    totalHours={totalHours}
+                    activeStudentCount={activeStudentCount}
+                />
+            </>
+        )
     }
 
     return (
