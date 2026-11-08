@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import { getPagePresentation, getPresentationBrand } from '@/lib/site-profile/presentation'
 import { getSession } from '@/lib/get-session'
 import Wi300Home from '@/components/wi300/Wi300Home'
@@ -16,5 +17,10 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   }
   const brand = await getPresentationBrand('my-space')
   if (!brand) redirect('/')
+  if (!(await getCurrentDeploymentBrand())) {
+    // Site classic bật chọn-dùng bản wi300: bọc khung của chính site.
+    const { default: ClassicFrame } = await import('@/components/classic/ClassicFrame')
+    return <ClassicFrame title="Không gian của tôi"><Wi300Home brand={brand} session={session} view="space" /></ClassicFrame>
+  }
   return <Wi300Home brand={brand} session={session} view="space" />
 }

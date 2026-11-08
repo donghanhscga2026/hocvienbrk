@@ -62,12 +62,14 @@ function PlatformMainHeader({ title, profile }: MainHeaderProps) {
         const paths = pathname.split('/').filter(Boolean)
         if (paths.length === 0 || (paths.length === 1 && paths[0] === 'tools')) {
             return '/'
-        } else if (paths.length === 1) {
+        } else if (paths.length <= 2) {
             return '/tools'
-        } else if (paths.length === 2) {
-            return '/tools'
-        } else {
+        } else if (paths[0] === 'tools') {
             return '/tools/' + paths[1]
+        } else {
+            // Ngoài khu công cụ (ví dụ trang sử dụng sản phẩm): về thẳng sảnh
+            // công cụ, tránh ghép '/tools/<đoạn>' không tồn tại gây lỗi 404.
+            return '/tools'
         }
     }
 
