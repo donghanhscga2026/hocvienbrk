@@ -34,7 +34,8 @@ export async function enrollInCourseAction(
     voucherAmountToUse: number = 0,
     useVndWallet: boolean = false,
     useVoucherBenefit: boolean = false,
-    benefitUserVoucherId: number = 0
+    benefitUserVoucherId: number = 0,
+    attachCourseIds: number[] = []
 ) {
     try {
         await requireDomainCourse(courseId)
@@ -103,6 +104,7 @@ export async function enrollInCourseAction(
                 }
             }
             if (course.productGroup === 'DIGITAL') await (await import('@/lib/offerings/combo')).syncComboPurchase(existing.id)
+            await (await import('@/lib/offerings/attach')).settleAttachPurchases(existing.id).catch(() => {})
             const enrollment = await prisma.enrollment.findUnique({ where: { id: existing.id }, include: { payment: true } })
             return { success: true, status: existing.status, enrollment, commissionPending }
         }
@@ -123,6 +125,15 @@ export async function enrollInCourseAction(
                 basePrice = earlyBirdState(offerDetails, course.phi_coc, usedSlots).price
             }
         }
+        // Mua kèm ưu đãi (Đợt 2): chỉ chốt ở lượt mua mới của sản phẩm/dịch vụ.
+        // Giá kèm lấy từ cấu hình của món chính, không lấy từ phía khách gửi lên.
+        let attachItems: { courseId: number; price: number; name: string }[] = []
+        if (!existing && attachCourseIds.length && ['DIGITAL', 'SERVICE'].includes(course.productGroup)) {
+            attachItems = await (await import('@/lib/offerings/attach')).resolveAttachSelection({
+                userId, mainCourseId: courseId, mainTeacherId: course.teacherId, selectedIds: attachCourseIds,
+            })
+        }
+        const attachTotal = attachItems.reduce((sum, item) => sum + item.price, 0)
         const intent = savedPurchase?.bank ? savedPurchase : await prisma.$transaction(tx => captureCheckout(tx, userId, courseId, {
             price: savedPurchase?.price ?? (existing ? existing.phi_coc + (existing.payment?.discountAmount || 0) : basePrice),
             bank: course.teacherBankAccount, gratitudeId: savedPurchase ? savedPurchase.gratitudeId : websiteDomain && !websiteDomain.affiliate ? null : user?.referrerId ?? null,
@@ -198,7 +209,10 @@ export async function enrollInCourseAction(
 
         if (existing && existing.status !== 'REJECTED') {
             if (existing.status === 'PENDING') {
-                const isAutoActiveExisting = effectivePhiCoc === 0
+                // Món kèm đã chốt ở lượt mua đầu vẫn chờ kích hoạt cùng món chính:
+                // số tiền còn phải chuyển gồm cả phần món kèm chưa thanh toán.
+                const attachDue = await (await import('@/lib/offerings/attach')).getAttachPendingTotal(existing.id)
+                const isAutoActiveExisting = effectivePhiCoc + attachDue === 0
 
                 // Cập nhật số tiền cọc (phi_coc) mới và tự động ACTIVE nếu số tiền sau giảm = 0đ
                 const updatedEnrollment = await prisma.$transaction(async tx => {
@@ -224,6 +238,7 @@ export async function enrollInCourseAction(
                 await markBenefitUsed()
 
                 if (course.productGroup === 'DIGITAL') await (await import('@/lib/offerings/combo')).syncComboPurchase(updatedEnrollment.id)
+                if (isAutoActiveExisting) await (await import('@/lib/offerings/attach')).settleAttachPurchases(existing.id)
 
                 if (isAutoActiveExisting) {
                     const settlement = await recordAutoPaidOrder(updatedEnrollment.id)
@@ -251,7 +266,7 @@ export async function enrollInCourseAction(
 
                 // Sinh bản ghi payment mới với QR mới theo cấu hình giáo viên hiện tại
                 const bankAcc = course.teacherBankAccount
-                if (effectivePhiCoc > 0 && bankAcc?.accountNumber && bankAcc?.accountHolder) {
+                if (effectivePhiCoc + attachDue > 0 && bankAcc?.accountNumber && bankAcc?.accountHolder) {
                     let qrCodeUrl = null
                     let transferContent = null
 
@@ -264,7 +279,7 @@ export async function enrollInCourseAction(
                             accountNo: bankAcc.accountNumber,
                             accountName: bankAcc.accountHolder,
                             acqId: bankAcc.bankName || 'SACOMBANK',
-                            amount: effectivePhiCoc
+                            amount: effectivePhiCoc + attachDue
                         })
                         qrCodeUrl = qrResult.qrCodeUrl
                         transferContent = qrResult.transferContent
@@ -278,13 +293,13 @@ export async function enrollInCourseAction(
 
                     if (!qrCodeUrl) {
                         const bankId = resolveBankBin(bankAcc.bankName)
-                        qrCodeUrl = `https://img.vietqr.io/image/${bankId}-${bankAcc.accountNumber}-qr_only.png?amount=${effectivePhiCoc}&addInfo=${encodeURIComponent(transferContent)}&accountName=${encodeURIComponent(bankAcc.accountHolder)}`
+                        qrCodeUrl = `https://img.vietqr.io/image/${bankId}-${bankAcc.accountNumber}-qr_only.png?amount=${effectivePhiCoc + attachDue}&addInfo=${encodeURIComponent(transferContent)}&accountName=${encodeURIComponent(bankAcc.accountHolder)}`
                     }
 
                     const newPayment = await prisma.payment.create({
                         data: {
                             enrollmentId: existing.id,
-                            amount: effectivePhiCoc,
+                            amount: effectivePhiCoc + attachDue,
                             status: 'PENDING',
                             transferContent: transferContent,
                             qrCodeUrl: qrCodeUrl,
@@ -412,7 +427,7 @@ export async function enrollInCourseAction(
             console.log('[ENROLL-DEBUG] Self-referral detected, fallback to user.referrerId =', enrollmentReferrerId)
         }
 
-        const isAutoActive = effectivePhiCoc === 0
+        const isAutoActive = effectivePhiCoc + attachTotal === 0
         let studyMode: EnrollmentMode = course.feeType === 'MIEN_PHI' ? EnrollmentMode.FREE : EnrollmentMode.COMPANION
 
         if (course.requiresReferralActivation && course.referralActivationThreshold > 0 && course.feeType !== 'MIEN_PHI') {
@@ -441,6 +456,11 @@ export async function enrollInCourseAction(
                     }
                 })
                 await capturePurchase(tx, created.id, { ...checkout, affiliateId: enrollmentReferrerId, refCode: enrollmentRawRefCode, benefitVoucherId, benefitUserVoucherId: appliedBenefitUserVoucherId, benefitAmountDue })
+                if (attachItems.length) await (await import('@/lib/offerings/attach')).createAttachEnrollments(tx, {
+                    userId, mainEnrollmentId: created.id, items: attachItems,
+                    bank: checkout.bank, gratitudeId: checkout.gratitudeId,
+                    referrerId: enrollmentReferrerId, refCode: enrollmentRawRefCode,
+                })
                 if (isAutoActive && course.type !== 'SYS' && course.type !== 'LIB') {
                     const order = await (await import('@/lib/affiliate/unified-commission')).createOrderForEnrollment(created.id, tx)
                     if (!order.success) throw new Error(order.error)
@@ -551,7 +571,8 @@ export async function enrollInCourseAction(
         }
 
         const bankAcc = course.teacherBankAccount
-        if (effectivePhiCoc > 0 && bankAcc?.accountNumber && bankAcc?.accountHolder) {
+        const combinedDue = effectivePhiCoc + attachTotal
+        if (combinedDue > 0 && bankAcc?.accountNumber && bankAcc?.accountHolder) {
             let qrCodeUrl = null
             let transferContent = null
 
@@ -565,7 +586,7 @@ export async function enrollInCourseAction(
                         accountNo: bankAcc.accountNumber,
                         accountName: bankAcc.accountHolder,
                         acqId: bankAcc.bankName || 'SACOMBANK',
-                        amount: effectivePhiCoc
+                        amount: combinedDue
                     })
                     qrCodeUrl = qrResult.qrCodeUrl
                     transferContent = qrResult.transferContent
@@ -580,13 +601,13 @@ export async function enrollInCourseAction(
 
             if (!qrCodeUrl) {
                 const bankId = resolveBankBin(bankAcc.bankName)
-                qrCodeUrl = `https://img.vietqr.io/image/${bankId}-${bankAcc.accountNumber}-qr_only.png?amount=${effectivePhiCoc}&addInfo=${encodeURIComponent(transferContent)}&accountName=${encodeURIComponent(bankAcc.accountHolder)}`
+                qrCodeUrl = `https://img.vietqr.io/image/${bankId}-${bankAcc.accountNumber}-qr_only.png?amount=${combinedDue}&addInfo=${encodeURIComponent(transferContent)}&accountName=${encodeURIComponent(bankAcc.accountHolder)}`
             }
 
             await prisma.payment.create({
                 data: {
                     enrollmentId: newEnrollment.id,
-                    amount: effectivePhiCoc,
+                    amount: combinedDue,
                     status: 'PENDING',
                     transferContent: transferContent,
                     qrCodeUrl: qrCodeUrl,
@@ -600,7 +621,7 @@ export async function enrollInCourseAction(
             })
         }
 
-        const missingBankAccount = effectivePhiCoc > 0 && !course.teacherBankAccount
+        const missingBankAccount = combinedDue > 0 && !course.teacherBankAccount
 
         // Lấy enrollment + payment đầy đủ để trả về cho client
         const enrolledData = await prisma.enrollment.findUnique({
@@ -634,6 +655,7 @@ export async function enrollInCourseAction(
             voucherApplied,
             voucherAmount: voucherDeducted,
             studyMode,
+            attachItems: attachItems.map(item => ({ courseId: item.courseId, name: item.name, price: item.price })),
             ...settlementResult
         }
     } catch (error: any) {

@@ -151,6 +151,40 @@ export default async function OfferingDetail({
         offeringDetailsSchema.safeParse(relatedByKey.get(offeringDetailsKey(row.id)) || {}).data ||
         emptyOfferingDetails,
     }))
+  // Mua kèm ưu đãi (Đợt 2): chốt danh sách món kèm còn hợp lệ để đưa vào bước
+  // thanh toán. Chỉ hiện cho khách chưa có quyền; giá kèm lấy từ cấu hình,
+  // giá lẻ và điều kiện lấy từ dữ liệu thật của món kèm tại thời điểm xem trang.
+  const attachConfig = details.attachEnabled && !quote && !hasAccess ? details.attachItems || [] : []
+  let attachOffers: { courseId: number; name: string; regularPrice: number; attachPrice: number }[] = []
+  if (attachConfig.length) {
+    const [mainTeacher, attachRows] = await Promise.all([
+      prisma.course.findUnique({ where: { id: course.id }, select: { teacherId: true } }),
+      prisma.course.findMany({
+        where: { AND: [await publicCatalogWhere(), { id: { in: attachConfig.map((item) => item.courseId) } }] },
+        select: { id: true, name_lop: true, phi_coc: true, productGroup: true, teacherId: true },
+      }),
+    ])
+    const attachMeta = attachRows.length
+      ? await prisma.systemConfig.findMany({
+          where: { key: { in: attachRows.map((row) => offeringDetailsKey(row.id)) } },
+        })
+      : []
+    const attachByKey = new Map(attachMeta.map((row) => [row.key, row.value]))
+    attachOffers = attachConfig
+      .map((entry) => {
+        const row = attachRows.find((candidate) => candidate.id === entry.courseId)
+        if (!row || row.id === course.id) return null
+        if (!['DIGITAL', 'SERVICE'].includes(row.productGroup) || row.teacherId !== mainTeacher?.teacherId) return null
+        if (row.phi_coc <= entry.price) return null
+        const targetDetails =
+          offeringDetailsSchema.safeParse(attachByKey.get(offeringDetailsKey(row.id)) || {}).data ||
+          emptyOfferingDetails
+        if (row.productGroup === 'SERVICE' && isQuoteService(targetDetails)) return null
+        return { courseId: row.id, name: row.name_lop || '', regularPrice: row.phi_coc, attachPrice: entry.price }
+      })
+      .filter((offer): offer is NonNullable<typeof offer> => !!offer)
+  }
+  const purchaseCourse = attachOffers.length ? { ...displayCourse, attachOffers } : displayCourse
   const projects = (await getPublicProjects())
     .filter((project) => project.courseIds.includes(course.id))
     .map(({ slug, name, logo }) => ({ slug, name, logo }))
@@ -285,7 +319,7 @@ export default async function OfferingDetail({
                         Nâng cấp để tiếp tục sử dụng sau khi hết dùng thử
                       </p>
                       <OfferingPurchase
-                        course={displayCourse}
+                        course={purchaseCourse}
                         enrollment={enrollment ? { status: enrollment.status } : null}
                         userId={userId}
                         userPhone={user?.phone || null}
@@ -303,7 +337,7 @@ export default async function OfferingDetail({
                     Bạn đã dùng thử và thời gian dùng thử đã hết. Mua để tiếp tục sử dụng.
                   </p>
                   <OfferingPurchase
-                    course={displayCourse}
+                    course={purchaseCourse}
                     enrollment={enrollment ? { status: enrollment.status } : null}
                     userId={userId}
                     userPhone={user?.phone || null}
@@ -323,7 +357,7 @@ export default async function OfferingDetail({
                       </Link>
                     ))}
                   <OfferingPurchase
-                    course={displayCourse}
+                    course={purchaseCourse}
                     enrollment={enrollment ? { status: enrollment.status } : null}
                     userId={userId}
                     userPhone={user?.phone || null}

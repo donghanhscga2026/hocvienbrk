@@ -134,17 +134,18 @@ export async function processEnrollmentActivation(options: ActivationOptions): P
   }
 
   const combo = enrollment.course.productGroup === 'DIGITAL' && (await (await import('@/lib/offerings/server')).readOfferingDetails(enrollment.courseId)).kind === 'COMBO'
-  const [payment, updatedEnrollment, activationOrder] = await prisma.$transaction(async tx => {
+  const [payment, updatedEnrollment, activationOrder, attachIds] = await prisma.$transaction(async tx => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'enrollment-order:' + enrollmentId}))`
     const current = await tx.enrollment.findUnique({ where: { id: enrollmentId } })
     if (!current || ['CANCELLED', 'REJECTED'].includes(current.status)) throw new Error('Đăng ký đã hủy hoặc bị từ chối.')
     const payment = await tx.payment.upsert({ where: { enrollmentId }, create: { enrollmentId, ...paymentData }, update: paymentData })
     const updatedEnrollment = await tx.enrollment.update({ where: { id: enrollmentId }, data: { status: 'ACTIVE', activatedAt: finalActivatedAt } })
     if (combo) await (await import('@/lib/offerings/combo')).syncComboInTransaction(tx, enrollmentId)
+    const attachIds = await (await import('@/lib/offerings/attach')).syncAttachInTransaction(tx, enrollmentId)
     const order = enrollment.course.type !== 'SYS'
       ? await (await import('@/lib/affiliate/unified-commission')).createOrderForEnrollment(enrollmentId, tx) : null
     if (order && !order.success) throw new Error(order.error || 'Không ghi nhận được đơn hàng.')
-    return [payment, updatedEnrollment, order] as const
+    return [payment, updatedEnrollment, order, attachIds] as const
   }, { timeout: 20000 })
 
   // ════════════════════════════════════════════════════════════
@@ -176,6 +177,16 @@ export async function processEnrollmentActivation(options: ActivationOptions): P
       }
     } catch (err) {
       console.error(`[Activation] Commission processing failed for enrollment#${enrollmentId}:`, err)
+    }
+  }
+
+  // Hoa hồng cho các món mua kèm đã mở quyền cùng lượt kích hoạt này.
+  if (attachIds.length) {
+    try {
+      const { settleAttachOrders } = await import('@/lib/offerings/attach')
+      await settleAttachOrders(attachIds)
+    } catch (err) {
+      console.error(`[Activation] Attach commission failed for enrollment#${enrollmentId}:`, err)
     }
   }
 

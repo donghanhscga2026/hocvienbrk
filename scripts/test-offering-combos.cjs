@@ -103,6 +103,7 @@ async function run() {
     '@/lib/affiliate/commission-calculator': {},
     '@/lib/offerings/server': { readOfferingDetails: async id => configs.get(`catalog:offering:${id}`) },
     '@/lib/offerings/combo': combo,
+    '@/lib/offerings/attach': { syncAttachInTransaction: async () => [], settleAttachOrders: async () => {} },
     '@/lib/affiliate/unified-commission': { resolveAffiliateIdFromCookie: async () => ({}), createOrderForEnrollment: async id => { orderCalls.push(id); return { success: true, orderId: id } }, processOrderCommission: async id => { commissionCalls.push(id); return { success: true } } },
     '@/lib/voucher/voucher-service': { grantVoucherBenefits: async () => {} },
   })
