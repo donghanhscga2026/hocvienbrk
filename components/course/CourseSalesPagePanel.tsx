@@ -110,7 +110,15 @@ export default function CourseSalesPagePanel({ slug, courseName, courseId, canEd
   async function goStep(next: Step) {
     if (locked || !canEdit || !ready) return
     setError(''); setNotice('')
-    if (next === 1 && dirty) { setError('Hãy lưu bản nháp trước khi đổi giao diện.'); return }
+    if (next === 1 && dirty) {
+      // Đừng chặn cứng: cho người dùng chọn bỏ phần chưa lưu để quay lại.
+      // Bản nháp đã lưu trước đó không bị đụng vào; bộ sửa được dựng lại từ
+      // bản đã lưu nên phần chưa lưu biến mất thật, đúng như đã hứa.
+      if (!window.confirm('Bạn có thay đổi chưa lưu ở phần chỉnh sửa. Quay lại bước chọn giao diện sẽ bỏ các thay đổi chưa lưu này — bản nháp đã lưu trước đó vẫn giữ nguyên. Vẫn quay lại?')) return
+      setContentDirty(false); setCodeDirty(false); setChecks({})
+      setFormRevision(value => value + 1)
+      if (codeOpened) setCodeSession(value => value + 1)
+    }
     if (next === 3) {
       if (!page && !codeOpened) { setError('Chọn giao diện và lưu bản nháp trước khi kiểm tra.'); return }
       if (!await saveCurrent()) return
