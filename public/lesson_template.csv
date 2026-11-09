@@ -1,0 +1,4 @@
+﻿order;title;videourl;content;isdailychallenge
+1;Bài 1: Giới thiệu khóa học;https://www.youtube.com/watch?v=VIDEO_ID;Chào mừng bạn đến với khóa học. Bài này giới thiệu tổng quan nội dung và cách học hiệu quả.;false
+2;Bài 2: Nội dung chính phần một;;Điền nội dung bài học tại đây. Có thể để trống link video nếu bài chỉ có nội dung chữ.;false
+3;Bài 3: Thử thách ngày;;Hoàn thành bài tập trong bài học rồi đánh dấu cột này là true nếu đây là bài thử thách ngày.;true

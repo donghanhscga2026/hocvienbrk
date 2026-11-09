@@ -216,16 +216,33 @@ export async function POST(
   }
 }
 
+// Excel tại Việt Nam ngăn cột bằng dấu chấm phẩy (file template mẫu dùng
+// kiểu này để mở ra là thấy cột); Google Sheets xuất ra lại ngăn bằng dấu
+// phẩy. Tự nhận kiểu ngăn cách theo dòng tiêu đề để cả hai đều import được.
+function detectDelimiter(text: string): string {
+  const firstLine = text.split('\n')[0] || '';
+  let semis = 0;
+  let commas = 0;
+  let quoted = false;
+  for (const char of firstLine) {
+    if (char === '"') quoted = !quoted;
+    else if (!quoted && char === ';') semis++;
+    else if (!quoted && char === ',') commas++;
+  }
+  return semis > commas ? ';' : ',';
+}
+
 function parseCSV(text: string): string[][] {
+  const delimiter = detectDelimiter(text);
   const rows: string[][] = [];
   let currentRow: string[] = [];
   let currentCell = '';
   let inQuotes = false;
-  
+
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
     const nextChar = text[i + 1];
-    
+
     if (char === '"') {
       if (inQuotes && nextChar === '"') {
         // Escaped quote
@@ -234,7 +251,7 @@ function parseCSV(text: string): string[][] {
       } else {
         inQuotes = !inQuotes;
       }
-    } else if (char === ',' && !inQuotes) {
+    } else if (char === delimiter && !inQuotes) {
       currentRow.push(currentCell);
       currentCell = '';
     } else if (char === '\n' && !inQuotes) {
