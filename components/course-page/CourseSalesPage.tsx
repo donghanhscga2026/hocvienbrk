@@ -22,6 +22,7 @@ import { publicOfferingDetails, offeringHref, type ProductGroup } from '@/lib/of
 import { cohortNumberOf, cohortShortLabel, type CohortLink } from '@/lib/cohort'
 import CohortPicker from '@/components/course/CohortPicker'
 import { courseSalesContentKey, parseCourseSalesContent, type CourseSalesContent } from '@/lib/course-sales-content'
+import { teacherProfileKey, teacherProfileSchema } from '@/lib/wi300/teacher-profile'
 
 // Dùng chung kiểm tra phạm vi trong metadata và nội dung của cùng request.
 const getPageProfile = cache(getCurrentSiteProfile)
@@ -232,19 +233,34 @@ export default async function CourseSalesPage({ params, searchParams, expectedGr
         )
     }
 
-    // Nội dung bán hàng bổ sung (3 ô chữ trong form sửa khóa học) + thông tin
-    // giảng viên cho trang mặc định. Chưa điền thì các mục tương ứng tự ẩn.
+    // Nội dung bán hàng bổ sung (3 ô chữ trong form sửa khóa học) + hồ sơ
+    // giảng viên sẵn có (trang Hồ sơ giảng viên) cho trang mặc định.
+    // Chưa điền thì các mục tương ứng tự ẩn.
     let salesContent: CourseSalesContent | undefined
-    let salesTeacher: { name: string; image: string | null } | null = null
+    let salesTeacher: { name: string; image: string | null; headline: string; introduction: string; fields: string[]; courseCount: number; studentCount: number } | null = null
     if (course.productGroup === 'COURSE') {
-        const [salesRow, teacherRow] = await Promise.all([
+        const teacherId = course.teacherId
+        const [salesRow, teacherRow, profileRow, courseCount, studentCount] = await Promise.all([
             prisma.systemConfig.findUnique({ where: { key: courseSalesContentKey(course.id) }, select: { value: true } }),
-            course.teacherId != null
-                ? prisma.user.findUnique({ where: { id: course.teacherId }, select: { name: true, image: true } })
+            teacherId != null
+                ? prisma.user.findUnique({ where: { id: teacherId }, select: { name: true, image: true } })
                 : Promise.resolve(null),
+            teacherId != null
+                ? prisma.systemConfig.findUnique({ where: { key: teacherProfileKey(teacherId) }, select: { value: true } })
+                : Promise.resolve(null),
+            teacherId != null
+                ? prisma.course.count({ where: { teacherId, productGroup: 'COURSE', status: true } })
+                : Promise.resolve(0),
+            teacherId != null
+                ? prisma.enrollment.count({ where: { status: 'ACTIVE', course: { teacherId } } })
+                : Promise.resolve(0),
         ])
         salesContent = parseCourseSalesContent(salesRow?.value)
-        salesTeacher = teacherRow ? { name: teacherRow.name || 'Giảng viên', image: teacherRow.image } : null
+        const parsedProfile = teacherProfileSchema.safeParse(profileRow?.value || {})
+        const profile = parsedProfile.success ? parsedProfile.data : teacherProfileSchema.parse({})
+        salesTeacher = teacherRow
+            ? { name: teacherRow.name || 'Giảng viên', image: teacherRow.image, headline: profile.headline, introduction: profile.introduction, fields: profile.fields, courseCount, studentCount }
+            : null
     }
 
     return (
