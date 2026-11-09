@@ -22,6 +22,7 @@ async function run() {
     '@/components/admin/courses/LessonEditModal': { LessonEditModal: ({ lesson }) => React.createElement('div', { 'data-edit-existing': lesson.id }, lesson.title) },
     '@/components/admin/courses/AddLessonModal': { AddLessonModal: () => null }, '@/components/admin/courses/LessonAnnouncementModal': { LessonAnnouncementModal: () => null },
     '@/app/actions/course-actions': { getTeachersAction: async () => ({ success: true, teachers: [{ id: 3, name: 'Owner' }] }) },
+    '@/app/actions/course-sales-actions': { getCourseSalesContentAction: async () => ({ success: true, content: { audience: '', outcomes: '', faq: '' } }), saveCourseSalesContentAction: async () => ({ success: true }) },
     '@/app/actions/admin-actions': { updateCourseAction: async (id, data) => { saved = { id, data }; return { success: !saveFails, error: 'Save failed fixture' } } },
   }
   global.fetch = async url => { requests.push(String(url)); return { ok: true, json: async () => url === '/api/auth/session' ? { user: { id: '3', role: 'TEACHER' } } : url === '/api/courses/42' ? course : url.includes('categories') ? { categories: [] } : url.includes('bank-accounts') ? { accounts: [] } : { vouchers: [] } } }
