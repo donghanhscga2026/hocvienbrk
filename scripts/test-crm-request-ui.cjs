@@ -100,7 +100,7 @@ async function run() {
   snapshot('sender-profile')
   await click(document.querySelector('button[aria-label="Đóng hồ sơ"]'))
   await click([...document.querySelectorAll('button')].find(node => node.textContent.includes(rows[3].name)))
-  ok(!button('Gửi phản hồi & thông báo') && document.body.textContent.includes('chưa tự gửi email'), 'Guest support does not claim undeliverable notification')
+  ok(button('Gửi phản hồi & thông báo') && document.body.textContent.includes('phản hồi sẽ được gửi qua email tới member@example.com'), 'Guest support with an email gets the reply form and an email notice')
   const Workspace = load('components/crm/CrmWorkspace.tsx').default
   await act(async () => root.render(React.createElement(Workspace)))
   ok(document.querySelector('a[href="/tools/crm?view=requests&status=NEW"]').textContent.includes('42'), 'Default overview uses whole-scope server count, not current contact page')

@@ -66,7 +66,7 @@ export default function OfferingServiceReply({
         {busy ? 'Đang gửi…' : 'Gửi phản hồi'}
       </button>
       <p className="text-xs text-brk-muted">
-        Phản hồi được gửi vào Yêu cầu của tôi và chuông thông báo của khách.
+        Phản hồi được gửi vào Yêu cầu của tôi, chuông thông báo và email của khách.
       </p>
     </form>
   )

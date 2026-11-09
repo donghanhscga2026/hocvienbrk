@@ -62,7 +62,9 @@ export async function updateRequest(db: PrismaClient, actor: CrmActor, raw: unkn
     const history = Array.isArray(previous.history) ? previous.history : []
     if (input.action === 'SEND_REPLY') {
       if (!input.publicReply?.trim()) throw new CrmError('Nhập phản hồi trước khi gửi.')
-      if (previous.userId == null) throw new CrmError('Khách chưa có tài khoản. Liên hệ qua email/điện thoại và lưu ghi chú nội bộ; hệ thống chưa tự gửi email.')
+      // Khách chưa có tài khoản vẫn nhận phản hồi qua email họ để lại (API gửi
+      // sau khi lưu). Chỉ chặn khi không có cả tài khoản lẫn email.
+      if (previous.userId == null && !previous.email?.trim()) throw new CrmError('Khách chưa có tài khoản và không để lại email. Liên hệ qua điện thoại và lưu ghi chú nội bộ.')
     }
     if (input.action === 'REMIND') {
       if (previous.ownerId == null) throw new CrmError('Phân công người phụ trách trước khi nhắc việc.')
@@ -74,8 +76,9 @@ export async function updateRequest(db: PrismaClient, actor: CrmActor, raw: unkn
     const event = { action: input.action, changedBy: actor.id, authorName: actor.name, changedAt: now, status, ownerId: input.ownerId === undefined ? previous.ownerId : input.ownerId, ...(input.outcome ? { outcome: input.outcome } : {}), content: input.action === 'SEND_REPLY' ? input.publicReply : input.resolution || '' }
     const result = await tx.crmRequest.updateMany({ where: { id: input.id, version: input.version, ...requestScope(actor) }, data: { ...(input.action === 'UPDATE' ? { ownerId: input.ownerId, status, resolution: input.resolution } : {}), ...(input.action === 'SEND_REPLY' ? { publicReply: input.publicReply, status } : {}), history: [...history, event], version: { increment: 1 } } })
     if (!result.count) throw new CrmError('Yêu cầu đã thay đổi. Hãy tải lại.', 409)
-    if (input.action === 'REMIND' || input.action === 'SEND_REPLY') {
+    if (input.action === 'REMIND' || (input.action === 'SEND_REPLY' && previous.userId != null)) {
       // Phản hồi cùng nội dung vẫn là lần gửi có chủ đích; dùng cùng key với trigger để không trùng.
+      // Khách chưa có tài khoản không có chuông — lớp API gửi email thay thế.
       await tx.appNotification.upsert({ where: { eventKey: (input.action === 'REMIND' ? 'request-reminder:' : 'request-updated:') + previous.id + ':' + (previous.version + 1) }, update: { title: input.action === 'REMIND' ? 'Có lời nhắc xử lý yêu cầu được giao' : 'Người phụ trách đã phản hồi yêu cầu của bạn' }, create: { eventKey: (input.action === 'REMIND' ? 'request-reminder:' : 'request-updated:') + previous.id + ':' + (previous.version + 1), recipientId: (input.action === 'REMIND' ? previous.ownerId : previous.userId)!, kind: input.action === 'REMIND' ? 'REQUEST_INCOMING' : 'REQUEST_UPDATED', title: input.action === 'REMIND' ? 'Có lời nhắc xử lý yêu cầu được giao' : 'Người phụ trách đã phản hồi yêu cầu của bạn', courseId: previous.courseId, requestId: previous.id } })
     }
     return { updated: true }

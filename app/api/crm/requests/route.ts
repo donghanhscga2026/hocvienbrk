@@ -5,6 +5,8 @@ import { auth } from '@/auth'
 import { getCrmActor } from '@/lib/crm/auth'
 import { crmBody, crmFailure, crmResponse } from '@/lib/crm/http'
 import { createRequest, readRequests, requestSource, requestProfile, updateRequest } from '@/lib/crm/requests'
+import { sendRequestReplyEmail } from '@/lib/crm/reply-email'
+import { getCurrentSiteProfile } from '@/lib/site-profile/runtime'
 import { requireDomainCourse, requireDomainModule } from '@/lib/website/domain-context'
 
 export const dynamic = 'force-dynamic'
@@ -30,6 +32,30 @@ export async function POST(request: Request) {
   } catch (e) { return crmFailure(e) }
 }
 export async function PATCH(request: Request) {
-  try { const raw = await crmBody(request, 20000); return crmResponse(await updateRequest(prisma, await getCrmActor(), raw)) }
+  try {
+    const raw = await crmBody(request, 20000)
+    const result = await updateRequest(prisma, await getCrmActor(), raw)
+    // Sau khi phản hồi đã lưu: gửi email cho khách (kể cả khách chưa có tài
+    // khoản, dùng email họ để lại). Lỗi gửi email không làm hỏng phản hồi.
+    if (raw?.action === 'SEND_REPLY' && typeof raw?.publicReply === 'string' && raw.publicReply.trim()) {
+      try {
+        const row = await prisma.crmRequest.findUnique({ where: { id: raw.id }, select: { email: true, name: true, content: true, userId: true } })
+        if (row?.email?.trim()) {
+          const brand = await getCurrentDeploymentBrand()
+          const profile = brand ? null : await getCurrentSiteProfile()
+          const host = request.headers.get('x-forwarded-host') || request.headers.get('host')
+          await sendRequestReplyEmail({
+            to: row.email.trim(),
+            name: row.name || '',
+            reply: raw.publicReply,
+            requestContent: row.content || '',
+            siteName: brand?.name || profile?.title || 'Wi300',
+            myRequestsUrl: row.userId != null && host ? 'https://' + host + '/my-requests?request=' + raw.id : '',
+          })
+        }
+      } catch (error) { console.error('Gửi email phản hồi hỗ trợ thất bại', error) }
+    }
+    return crmResponse(result)
+  }
   catch (e) { return crmFailure(e) }
 }
