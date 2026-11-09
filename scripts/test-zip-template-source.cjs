@@ -100,7 +100,7 @@ async function run() {
     })
     assert.ok(prepared.html.includes('Bản Đồ Tài Chính'))
     const page = new JSDOM(prepared.html).window.document
-    assert.ok([...page.querySelectorAll('img')].some(img => img.src.startsWith('data:')))
+    assert.ok([...page.querySelectorAll('img')].every(img => !img.src.startsWith('data:')), 'Ảnh trong ZIP không còn được nhúng base64 — phải thay bằng link ngoài')
     assert.ok(prepared.html.includes('mfc-zip-source'))
     const analysis = analyzeWebsiteHtml({ html: prepared.analysisHtml, sourceType: 'zip' })
     const actualKeys = [...page.querySelectorAll('[data-mfc-block]')].map(el => el.getAttribute('data-mfc-block'))

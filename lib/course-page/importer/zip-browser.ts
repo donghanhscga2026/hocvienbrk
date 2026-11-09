@@ -441,12 +441,22 @@ export async function prepareWebsiteZip(file: File): Promise<PreparedZipWebsite>
   })
   const analysisHtml = '<!doctype html>\n' + doc.documentElement.outerHTML
 
+  // Quy định dùng link ngoài cho ảnh/font/media (tiết kiệm dung lượng và
+  // băng thông): tài nguyên dạng này trong ZIP KHÔNG được nhúng base64 vào
+  // mã trang. Giữ nguyên đường dẫn để bước rà soát liệt kê từng mục, giảng
+  // viên thay bằng link ngoài trước khi lưu. Chỉ mã nguồn (CSS/JS và các
+  // file chữ khác) mới được nhúng.
+  const MEDIA_ASSET = /\.(?:png|jpe?g|webp|gif|avif|svg|ico|woff2?|ttf|otf|mp4|webm|mp3|wav)$/i
   const loadAsset = async (baseFile: string, ref: string) => {
     const resolved = resolveZipPath(baseFile, ref)
     if (!resolved) return null
     const entry = zip.entries.get(resolved)
     if (!entry) {
       warnings.push(`Không tìm thấy asset trong ZIP: ${resolved}`)
+      return null
+    }
+    if (MEDIA_ASSET.test(resolved)) {
+      warnings.push(`Không nhúng tài nguyên từ ZIP — hãy thay bằng link ngoài ở bước rà soát: ${resolved}`)
       return null
     }
     const bytes = await readEntry(zip, entry)
