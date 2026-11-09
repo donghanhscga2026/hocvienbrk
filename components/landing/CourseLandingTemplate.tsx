@@ -63,7 +63,7 @@ interface CourseLandingTemplateProps {
     projectLabels?: ReactNode
     cohorts?: CohortLink[]
     salesContent?: CourseSalesContent | null
-    teacher?: { name: string; image?: string | null; headline?: string; introduction?: string; fields?: string[]; courseCount?: number; studentCount?: number } | null
+    teacher?: { name: string; image?: string | null; headline?: string; introduction?: string } | null
 }
 
 
@@ -549,41 +549,23 @@ export default function CourseLandingTemplate({
                             <h2 className="text-2xl font-black text-brk-on-surface mb-6">
                                 Giảng viên
                             </h2>
-                            <div className="rounded-2xl border border-brk-outline bg-brk-surface p-6">
-                                <div className="flex items-center gap-4">
-                                    {teacher.image ? (
-                                        <Image src={teacher.image} alt={teacher.name} width={64} height={64} className="h-16 w-16 rounded-full object-cover" />
-                                    ) : (
-                                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-brk-primary/10 text-2xl font-black text-brk-primary">
-                                            {teacher.name.charAt(0)}
-                                        </div>
+                            <div className="flex flex-col items-center gap-[22px] rounded-2xl border border-brk-outline bg-brk-surface p-[22px] text-center sm:flex-row sm:text-left">
+                                {teacher.image ? (
+                                    <Image src={teacher.image} alt={teacher.name} width={108} height={108} className="h-[108px] w-[108px] shrink-0 rounded-full border-[3px] border-teal-100 object-cover" />
+                                ) : (
+                                    <div className="flex h-[108px] w-[108px] shrink-0 items-center justify-center rounded-full border-[3px] border-teal-100 bg-brk-primary/10 text-4xl font-black text-brk-primary">
+                                        {teacher.name.charAt(0)}
+                                    </div>
+                                )}
+                                <div>
+                                    <p className="text-xl font-extrabold text-brk-on-surface">{teacher.name}</p>
+                                    <p className="mt-0.5 text-sm font-semibold text-brk-primary">
+                                        {teacher.headline || 'Giảng viên của khóa học'}
+                                    </p>
+                                    {teacher.introduction && (
+                                        <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-brk-muted">{teacher.introduction}</p>
                                     )}
-                                    <div>
-                                        <p className="text-lg font-bold text-brk-on-surface">{teacher.name}</p>
-                                        <p className="mt-0.5 flex items-center gap-1.5 text-sm text-brk-muted">
-                                            <GraduationCap className="h-4 w-4" />
-                                            {teacher.headline || 'Giảng viên của khóa học'}
-                                        </p>
-                                        {((teacher.courseCount ?? 0) > 0 || (teacher.studentCount ?? 0) > 0) && (
-                                            <p className="mt-1 text-sm text-brk-muted">
-                                                {[
-                                                    (teacher.courseCount ?? 0) > 0 ? `${teacher.courseCount} khóa học` : null,
-                                                    (teacher.studentCount ?? 0) > 0 ? `${(teacher.studentCount ?? 0).toLocaleString('vi-VN')} học viên` : null,
-                                                ].filter(Boolean).join(' · ')}
-                                            </p>
-                                        )}
-                                    </div>
                                 </div>
-                                {teacher.fields && teacher.fields.length > 0 && (
-                                    <div className="mt-4 flex flex-wrap gap-2">
-                                        {teacher.fields.map(field => (
-                                            <span key={field} className="rounded-full border border-brk-outline bg-brk-background px-3 py-1 text-xs font-semibold text-brk-muted">{field}</span>
-                                        ))}
-                                    </div>
-                                )}
-                                {teacher.introduction && (
-                                    <p className="mt-4 whitespace-pre-line leading-7 text-brk-muted">{teacher.introduction}</p>
-                                )}
                             </div>
                         </div>
                     </div>
