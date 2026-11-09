@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { isTeachingRole } from '@/lib/auth/roles'
 import { createCourseAction, getTeachersAction, cloneCourseNextCohortAction } from '@/app/actions/course-actions'
+import { getCourseSalesContentAction, saveCourseSalesContentAction } from '@/app/actions/course-sales-actions'
 import { updateCourseAction, updateLessonAction, deleteLessonAction } from '@/app/actions/admin-actions'
 import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle2, AlertCircle, List, ListVideo, Play, Edit2, X, FileSpreadsheet, Download, Save, Trash2, Plus, Mail, ArrowUp, ArrowDown, Bell } from 'lucide-react'
 import Link from 'next/link'
@@ -96,6 +97,9 @@ function CreateCourseContent() {
     // Section2: Mô tả & Hình ảnh
     const [moTaNgan, setMoTaNgan] = useState('')
     const [moTaDai, setMoTaDai] = useState('')
+    const [salesAudience, setSalesAudience] = useState('')
+    const [salesOutcomes, setSalesOutcomes] = useState('')
+    const [salesFaq, setSalesFaq] = useState('')
     const [linkAnhBia, setLinkAnhBia] = useState('')
     
     // Section3: Học phí & Thanh toán
@@ -245,6 +249,15 @@ function CreateCourseContent() {
                         setMoTaNgan(courseRes.mo_ta_ngan || '')
                         setMoTaDai(courseRes.mo_ta_dai || '')
                         setLinkAnhBia(courseRes.link_anh_bia || '')
+                        if ((courseRes.productGroup || 'COURSE') === 'COURSE' && courseId) {
+                            getCourseSalesContentAction(parseInt(courseId)).then(saved => {
+                                if (saved.success) {
+                                    setSalesAudience(saved.content.audience)
+                                    setSalesOutcomes(saved.content.outcomes)
+                                    setSalesFaq(saved.content.faq)
+                                }
+                            }).catch(() => {})
+                        }
                         
                         setPhiCoc(courseRes.phi_coc || 0)
                         setFeeType(courseRes.feeType || 'MIEN_PHI')
@@ -355,8 +368,11 @@ function CreateCourseContent() {
             }
 
             const res = await updateCourseAction(parseInt(courseId), updateData)
-            
+
             if (res.success) {
+                if (productGroup === 'COURSE') {
+                    await saveCourseSalesContentAction(parseInt(courseId), { audience: salesAudience, outcomes: salesOutcomes, faq: salesFaq }).catch(() => null)
+                }
                 setMessage({ type: 'success', text: 'Đã cập nhật ' + group.singular + ' thành công!' })
                 setDirty(false)
                 if (productGroup === 'COURSE') setTimeout(() => router.push(group.manager), 1500)
@@ -400,8 +416,11 @@ function CreateCourseContent() {
             if ((isAdmin || isTeacher) && teacherId) formData.append('teacherId', teacherId)
             
             const res = await createCourseAction(formData)
-            
+
             if (res.success) {
+                if (productGroup === 'COURSE' && res.course?.id) {
+                    await saveCourseSalesContentAction(res.course.id, { audience: salesAudience, outcomes: salesOutcomes, faq: salesFaq }).catch(() => null)
+                }
                 setMessage({ type: 'success', text: 'Đã tạo ' + group.singular + ' thành công!' })
                 setDirty(false)
                 if (productGroup !== 'COURSE' && res.course) router.replace(`/tools/courses/new?id=${res.course.id}&group=${productGroup}`)
@@ -724,15 +743,54 @@ function CreateCourseContent() {
                     
                     <div className="space-y-1.5 mt-4">
                         <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả dài (Enter để xuống dòng)</label>
-                        <textarea 
-                            value={moTaDai} 
+                        <textarea
+                            value={moTaDai}
                             onChange={(e) => setMoTaDai(e.target.value)}
                             onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaDai)}
                             rows={5}
-                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" 
-                            placeholder="Mô tả chi tiết khóa học... (Enter để xuống dòng sẽ tự thêm <br>)" 
+                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y"
+                            placeholder="Mô tả chi tiết khóa học... (Enter để xuống dòng sẽ tự thêm <br>)"
                         />
                     </div>
+
+                    {productGroup === 'COURSE' && (
+                    <div className="mt-6 space-y-4 rounded-2xl border border-dashed border-gray-200 bg-gray-50/60 p-4">
+                        <div>
+                            <h3 className="text-sm font-black text-gray-900">Nội dung trang bán hàng (không bắt buộc)</h3>
+                            <p className="mt-1 text-xs leading-5 text-gray-500">Ba ô này giúp trang bán khóa học mặc định đầy đủ hơn mà không cần dựng trang riêng. Ô nào để trống thì mục đó không hiện trên trang.</p>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Khóa học dành cho ai (mỗi dòng một ý)</label>
+                            <textarea
+                                value={salesAudience}
+                                onChange={(e) => setSalesAudience(e.target.value)}
+                                rows={4}
+                                className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y"
+                                placeholder={'Người mới bắt đầu, chưa có nền tảng\nChủ shop muốn tự chạy quảng cáo\n…'}
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Học xong làm được gì (mỗi dòng một ý)</label>
+                            <textarea
+                                value={salesOutcomes}
+                                onChange={(e) => setSalesOutcomes(e.target.value)}
+                                rows={4}
+                                className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y"
+                                placeholder={'Tự dựng được trang bán hàng hoàn chỉnh\nBiết cách viết nội dung thu hút khách\n…'}
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Câu hỏi thường gặp (mỗi câu một đoạn: dòng đầu là câu hỏi, các dòng sau là câu trả lời, cách nhau một dòng trống)</label>
+                            <textarea
+                                value={salesFaq}
+                                onChange={(e) => setSalesFaq(e.target.value)}
+                                rows={5}
+                                className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y"
+                                placeholder={'Học trong bao lâu?\nBạn học online và xem lại bài không giới hạn thời gian.\n\nChưa có kinh nghiệm có học được không?\nĐược, khóa học đi từ cơ bản dành cho người mới.'}
+                            />
+                        </div>
+                    </div>
+                    )}
                     
                     <div className="space-y-1.5 mt-4">
                         <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link ảnh bìa</label>

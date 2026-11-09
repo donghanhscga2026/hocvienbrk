@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'r
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, Check, Code2, Eye, LayoutTemplate, Palette, Search, FileText } from 'lucide-react'
 import { getCoursePages, getCoursePage, updateCoursePage, publishCoursePage } from '@/app/actions/course-page-actions'
+import { COURSE_SALES_HTML_PROMPT } from '@/lib/course-sales-prompt'
 import { COURSE_TEMPLATE_LIBRARY } from '@/lib/course-page/templates'
 import { templateWorkspaceRequest } from '@/lib/course-page/template-workspace-client'
 import type { CourseEditorControls } from '@/lib/course-page/editor-controls'
@@ -31,6 +32,7 @@ export default function CourseSalesPagePanel({ slug, courseName, courseId, canEd
   const [contentDirty, setContentDirty] = useState(false), [codeDirty, setCodeDirty] = useState(false)
   const [device, setDevice] = useState(1280), [checks, setChecks] = useState<Record<string, boolean>>({})
   const [presetPreview, setPresetPreview] = useState(false)
+  const [promptCopied, setPromptCopied] = useState(false)
   const form = useRef<CourseEditorControls | null>(null), code = useRef<CourseEditorControls | null>(null)
   const stepHeading = useRef<HTMLHeadingElement>(null)
   const dialog = useRef<HTMLDialogElement>(null)
@@ -189,6 +191,12 @@ export default function CourseSalesPagePanel({ slug, courseName, courseId, canEd
           <span className="mt-3 block text-sm text-brk-muted">Dán HTML, CSS và JavaScript cho riêng khóa học này.</span>
         </label>
       </fieldset>
+      {source === 'code' && <div className="mt-5 rounded-xl border border-dashed border-brk-outline bg-brk-background p-4">
+        <p className="text-sm font-semibold">Đã có sẵn trang bán làm bên ngoài?</p>
+        <p className="mt-1 text-sm leading-6 text-brk-muted">Chép câu lệnh mẫu dưới đây, dán vào Gemini hoặc ChatGPT kèm mã HTML trang bán hiện tại của bạn. AI sẽ chuyển trang đó thành dạng tương thích để dán vào đây: nút đăng ký tự nối đúng chỗ, ảnh dùng link ngoài, bỏ phần đăng ký và thanh toán riêng của trang gốc.</p>
+        <textarea readOnly value={COURSE_SALES_HTML_PROMPT} rows={8} aria-label="Câu lệnh mẫu chuyển trang bán bên ngoài" className="mt-3 w-full rounded-xl border border-brk-outline bg-white p-3 text-xs leading-5" />
+        <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(COURSE_SALES_HTML_PROMPT); setPromptCopied(true); setTimeout(() => setPromptCopied(false), 2000) } catch { /* clipboard không khả dụng */ } }} className={button + ' mt-3'}>{promptCopied ? 'Đã chép câu lệnh' : 'Chép câu lệnh mẫu'}</button>
+      </div>}
       {source === 'preset' && <div className="mt-5 flex flex-wrap items-end gap-3"><label className="min-w-0 flex-1 space-y-2 text-sm font-semibold"><span>Chọn mẫu</span><select aria-label="Chọn mẫu giao diện" value={preset} disabled={locked} onChange={event => setPreset(event.target.value)} className="min-h-11 w-full rounded-xl border border-brk-outline bg-white px-3">{COURSE_TEMPLATE_LIBRARY.map(item => <option key={item.key} value={item.key}>{item.name}</option>)}</select></label><button type="button" disabled={locked} onClick={() => setPresetPreview(true)} className={button}><Eye size={16} />Xem trước mẫu</button></div>}
     </div>}
 
