@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, Check, Code2, Eye, LayoutTemplate, Palette, Search, FileText } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Code2, Eye, LayoutDashboard, LayoutTemplate, Palette, Search, FileText } from 'lucide-react'
 import { getCoursePages, getCoursePage, updateCoursePage, publishCoursePage } from '@/app/actions/course-page-actions'
 import { COURSE_SALES_HTML_PROMPT } from '@/lib/course-sales-prompt'
 import { COURSE_TEMPLATE_LIBRARY } from '@/lib/course-page/templates'
@@ -26,7 +26,7 @@ export default function CourseSalesPagePanel({ slug, courseName, courseId, canEd
   const [busy, setBusy] = useState(false), [editorBusy, setEditorBusy] = useState(false), [codeBusy, setCodeBusy] = useState(false)
   const [error, setError] = useState(''), [notice, setNotice] = useState('')
   const [step, setStep] = useState<Step | null>(null), [pane, setPane] = useState<Pane>('overview')
-  const [source, setSource] = useState<'preset' | 'code'>('preset'), [preset, setPreset] = useState<string>(COURSE_TEMPLATE_LIBRARY[0].key)
+  const [source, setSource] = useState<'preset' | 'code' | 'default'>('preset'), [preset, setPreset] = useState<string>(COURSE_TEMPLATE_LIBRARY[0].key)
   const [formRevision, setFormRevision] = useState(0), [codeSession, setCodeSession] = useState(0), [codeOpened, setCodeOpened] = useState(false)
   const [formOpened, setFormOpened] = useState(false)
   const [contentDirty, setContentDirty] = useState(false), [codeDirty, setCodeDirty] = useState(false)
@@ -122,6 +122,24 @@ export default function CourseSalesPagePanel({ slug, courseName, courseId, canEd
     if (locked || !canEdit || !ready) return
     if (dirty) { setError('Lưu bản nháp đang sửa trước khi thay giao diện.'); return }
     setError(''); setNotice('')
+    if (source === 'default') {
+      // Giao diện mặc định = trang bán tự sinh từ thông tin khóa học. Về mặt
+      // dữ liệu là tắt useTemplate của trang tùy chỉnh (trang nháp vẫn được
+      // giữ nguyên, không xóa); chưa có trang tùy chỉnh thì khóa học vốn đã
+      // đang dùng giao diện mặc định.
+      if (!page) { setNotice('Khóa học đang dùng giao diện mặc định của hệ thống rồi — trang bán tự sinh từ thông tin khóa học, không cần làm gì thêm.'); return }
+      if (!page.useTemplate) { setNotice('Khóa học đang dùng giao diện mặc định của hệ thống rồi. Trang tùy chỉnh vẫn được giữ làm bản nháp bên dưới.'); return }
+      if (!window.confirm('Chuyển trang bán sang giao diện mặc định của hệ thống? Trang tùy chỉnh vẫn được giữ nguyên làm bản nháp, không bị xóa — bạn quay lại được bất cứ lúc nào bằng cách chọn lại mẫu hoặc code riêng rồi xuất bản.')) return
+      setBusy(true)
+      try {
+        const result = await updateCoursePage(page.id, { useTemplate: false })
+        if (!result.success) throw new Error(result.error)
+        setPage({ ...page, useTemplate: false })
+        setNotice('Đã chuyển sang giao diện mặc định. Trang công khai giờ tự sinh từ thông tin khóa học; bản nháp trang tùy chỉnh vẫn được giữ nguyên.')
+      } catch (error) { setError(error instanceof Error ? error.message : 'Không chuyển được sang giao diện mặc định.') }
+      finally { setBusy(false) }
+      return
+    }
     if (source === 'code') {
       setCodeOpened(true); setCodeSession(value => value + 1); setPane('code'); setStep(2); return
     }
@@ -155,8 +173,8 @@ export default function CourseSalesPagePanel({ slug, courseName, courseId, canEd
   const preview = page && canEdit ? <TemplatePreviewFrame src={'/tools/courses/templates/preview?page=' + encodeURIComponent(page.id)} thumbnail title={'Giao diện đang lưu: ' + name} /> : <p className="rounded-xl bg-brk-background p-4 text-sm text-brk-muted">{ready ? 'Chưa có giao diện xem trước.' : 'Đang tải giao diện…'}</p>
   if (compact) return <section className="space-y-3 rounded-2xl border border-brk-outline bg-white p-4">
     <h2 className="font-bold">Trang bán khóa học</h2>{preview}<p className="text-sm font-semibold">{name}</p>
-    <p className="text-xs text-brk-muted">{page?.status === 'published' && page.useTemplate ? 'Trang đang công khai' : page ? 'Đang có bản nháp' : 'Chưa thiết lập trang bán'}</p>
-    {page && <label className="flex min-h-11 items-center gap-2 text-xs"><input type="checkbox" checked={page.useTemplate} disabled={!canEdit || locked || !ready} onChange={() => void toggle()} />Dùng mẫu khi đã xuất bản</label>}
+    <p className="text-xs text-brk-muted">{page?.status === 'published' && page.useTemplate ? 'Trang đang công khai' : page?.status === 'published' ? 'Đang dùng giao diện mặc định' : page ? 'Đang có bản nháp' : 'Chưa thiết lập trang bán'}</p>
+    {page && <label className="flex min-h-11 items-center gap-2 text-xs"><input type="checkbox" checked={page.useTemplate} disabled={!canEdit || locked || !ready} onChange={() => void toggle()} />Dùng trang tùy chỉnh khi xuất bản (bỏ chọn = giao diện mặc định)</label>}
     <button type="button" onClick={onOpen} className={button}>{page ? 'Chỉnh sửa trang bán' : 'Thiết lập trang bán'}</button>
     {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
   </section>
@@ -164,7 +182,7 @@ export default function CourseSalesPagePanel({ slug, courseName, courseId, canEd
   return <section aria-label="Thiết lập trang bán khóa học" className="min-w-0 space-y-4">
     <header className={card}>
       <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="mb-1 text-xs text-brk-muted">{courseName}</p><h2 className="text-xl font-bold text-brk-primary">Trang bán khóa học</h2></div>
-        <span className="rounded-full bg-brk-background px-3 py-1 text-xs">{page?.status === 'published' && page.useTemplate ? 'Trang đang công khai' : page ? 'Bản nháp' : ready ? 'Chưa thiết lập' : 'Đang tải…'}</span>
+        <span className="rounded-full bg-brk-background px-3 py-1 text-xs">{page?.status === 'published' && page.useTemplate ? 'Trang đang công khai' : page?.status === 'published' ? 'Đang dùng giao diện mặc định' : page ? 'Bản nháp' : ready ? 'Chưa thiết lập' : 'Đang tải…'}</span>
       </div>
       {canEdit && <nav aria-label="Các bước thiết lập trang bán" className="mt-5 grid grid-cols-3 gap-2 sm:gap-4">{steps.map((label, index) => {
         const value = index + 1 as Step
@@ -189,6 +207,10 @@ export default function CourseSalesPagePanel({ slug, courseName, courseId, canEd
         <label className={'cursor-pointer rounded-xl border p-5 ' + (source === 'code' ? 'border-brk-primary bg-brk-background' : 'border-brk-outline')}>
           <span className="flex items-center gap-3"><input type="radio" name={'sales-source-' + slug} value="code" checked={source === 'code'} onChange={() => setSource('code')} /><Code2 size={24} /><strong>Dùng code riêng</strong></span>
           <span className="mt-3 block text-sm text-brk-muted">Dán HTML, CSS và JavaScript cho riêng khóa học này.</span>
+        </label>
+        <label className={'cursor-pointer rounded-xl border p-5 md:col-span-2 ' + (source === 'default' ? 'border-brk-primary bg-brk-background' : 'border-brk-outline')}>
+          <span className="flex items-center gap-3"><input type="radio" name={'sales-source-' + slug} value="default" checked={source === 'default'} onChange={() => setSource('default')} /><LayoutDashboard size={24} /><strong>Giao diện mặc định của hệ thống</strong>{(!page || !page.useTemplate) && <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">Đang dùng</span>}</span>
+          <span className="mt-3 block text-sm text-brk-muted">Trang bán tự sinh từ thông tin khóa học: mô tả, danh sách bài học, giảng viên. Không cần thiết kế gì thêm; sửa thông tin khóa học là trang tự cập nhật. Trang tùy chỉnh (nếu có) vẫn được giữ làm bản nháp, không bị xóa.</span>
         </label>
       </fieldset>
       {source === 'code' && <div className="mt-5 rounded-xl border border-dashed border-brk-outline bg-brk-background p-4">
@@ -227,9 +249,9 @@ export default function CourseSalesPagePanel({ slug, courseName, courseId, canEd
 
     {ready && canEdit && <footer className="sticky bottom-0 z-40 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brk-outline bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-center gap-3">{step !== 1 ? <button type="button" disabled={locked} onClick={() => void goStep(step === 3 ? 2 : 1)} className={button}><ArrowLeft size={16} />{step === 3 ? 'Quay lại chỉnh sửa' : 'Quay lại'}</button> : page && <button type="button" disabled={locked} onClick={() => void goStep(2)} className={button}>Giữ giao diện hiện tại</button>}<span role="status" className="text-xs text-brk-muted">{locked ? 'Đang xử lý…' : dirty ? 'Có thay đổi chưa lưu' : 'Bước ' + step + ' / 3'}</span></div>
-      <div className="flex flex-wrap gap-2">{step === 2 && <><button type="button" disabled={locked || !dirty} onClick={() => void saveCurrent()} className={button}>Lưu nháp</button><button type="button" disabled={locked} onClick={() => void goStep(3)} className={primary}>{dirty ? 'Lưu & tiếp tục kiểm tra' : 'Tiếp tục kiểm tra'}<ArrowRight size={16} /></button></>}{step === 1 && <button type="button" disabled={locked} onClick={() => void startEditing()} className={primary}>{source === 'preset' ? 'Chọn mẫu & tiếp tục' : 'Tiếp tục dán code'}<ArrowRight size={16} /></button>}{step === 3 && <button type="button" disabled={locked || dirty || !page} onClick={() => void publish()} className={primary}>Xuất bản trang</button>}</div>
+      <div className="flex flex-wrap gap-2">{step === 2 && <><button type="button" disabled={locked || !dirty} onClick={() => void saveCurrent()} className={button}>Lưu nháp</button><button type="button" disabled={locked} onClick={() => void goStep(3)} className={primary}>{dirty ? 'Lưu & tiếp tục kiểm tra' : 'Tiếp tục kiểm tra'}<ArrowRight size={16} /></button></>}{step === 1 && <button type="button" disabled={locked} onClick={() => void startEditing()} className={primary}>{source === 'preset' ? 'Chọn mẫu & tiếp tục' : source === 'code' ? 'Tiếp tục dán code' : 'Dùng giao diện mặc định'}<ArrowRight size={16} /></button>}{step === 3 && <button type="button" disabled={locked || dirty || !page} onClick={() => void publish()} className={primary}>Xuất bản trang</button>}</div>
     </footer>}
-    {ready && page?.status === 'published' && page.useTemplate && <Link href={publicHref || '/khoa-hoc/' + encodeURIComponent(slug)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm text-brk-primary">Xem trang công khai ↗</Link>}
+    {ready && page?.status === 'published' && <Link href={publicHref || '/khoa-hoc/' + encodeURIComponent(slug)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm text-brk-primary">Xem trang công khai ↗</Link>}
     <dialog ref={dialog} aria-label="Xem trước mẫu có sẵn" onCancel={() => setPresetPreview(false)} className="m-auto max-h-[95dvh] w-[calc(100%_-_1rem)] max-w-6xl overflow-y-auto rounded-2xl bg-white p-4 backdrop:bg-black/50">{presetPreview && <><div className="mb-4 flex items-center justify-between gap-3"><h3 className="font-bold">Xem trước mẫu</h3><button type="button" onClick={() => setPresetPreview(false)} className={button}>Đóng</button></div><TemplatePreviewFrame src={'/tools/courses/templates/preview?system=' + encodeURIComponent(preset)} /></>}</dialog>
   </section>
 }
