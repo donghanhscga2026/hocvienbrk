@@ -237,10 +237,10 @@ export default async function CourseSalesPage({ params, searchParams, expectedGr
     // giảng viên sẵn có (trang Hồ sơ giảng viên) cho trang mặc định.
     // Chưa điền thì các mục tương ứng tự ẩn.
     let salesContent: CourseSalesContent | undefined
-    let salesTeacher: { name: string; image: string | null; headline: string; introduction: string; fields: string[]; courseCount: number; studentCount: number } | null = null
+    let salesTeacher: { name: string; image: string | null; headline: string; introduction: string } | null = null
     if (course.productGroup === 'COURSE') {
         const teacherId = course.teacherId
-        const [salesRow, teacherRow, profileRow, courseCount, studentCount] = await Promise.all([
+        const [salesRow, teacherRow, profileRow] = await Promise.all([
             prisma.systemConfig.findUnique({ where: { key: courseSalesContentKey(course.id) }, select: { value: true } }),
             teacherId != null
                 ? prisma.user.findUnique({ where: { id: teacherId }, select: { name: true, image: true } })
@@ -248,18 +248,12 @@ export default async function CourseSalesPage({ params, searchParams, expectedGr
             teacherId != null
                 ? prisma.systemConfig.findUnique({ where: { key: teacherProfileKey(teacherId) }, select: { value: true } })
                 : Promise.resolve(null),
-            teacherId != null
-                ? prisma.course.count({ where: { teacherId, productGroup: 'COURSE', status: true } })
-                : Promise.resolve(0),
-            teacherId != null
-                ? prisma.enrollment.count({ where: { status: 'ACTIVE', course: { teacherId } } })
-                : Promise.resolve(0),
         ])
         salesContent = parseCourseSalesContent(salesRow?.value)
         const parsedProfile = teacherProfileSchema.safeParse(profileRow?.value || {})
         const profile = parsedProfile.success ? parsedProfile.data : teacherProfileSchema.parse({})
         salesTeacher = teacherRow
-            ? { name: teacherRow.name || 'Giảng viên', image: teacherRow.image, headline: profile.headline, introduction: profile.introduction, fields: profile.fields, courseCount, studentCount }
+            ? { name: teacherRow.name || 'Giảng viên', image: teacherRow.image, headline: profile.headline, introduction: profile.introduction }
             : null
     }
 
