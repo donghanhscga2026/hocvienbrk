@@ -35,6 +35,7 @@ const mocks = {
   '@/components/admin/courses/AddLessonModal': { AddLessonModal: () => null },
   '@/components/admin/courses/LessonAnnouncementModal': { LessonAnnouncementModal: () => null },
   '@/app/actions/course-actions': { getTeachersAction: async () => ({ success: true, teachers: [{ id: 8, name: 'Hương Lucy' }] }) },
+  '@/app/actions/course-sales-actions': { getCourseSalesContentAction: async () => ({ success: true, content: { audience: '', outcomes: '', faq: '' } }), saveCourseSalesContentAction: async () => ({ success: true }) },
   '@/app/actions/admin-actions': { getAdminCoursesAction: (...args) => courseLoad(...args), bulkUpdateCoursesOptionsAction: async (ids, options) => { bulkUpdates.push({ ids, options }); return { success: !bulkFail, error: 'Fixture failure' } } },
   '@/app/actions/course-page-actions': { getCoursePages: async () => [{ id: 'page-1', slug: 'AI', useTemplate: true, status: 'draft' }], getCoursePage: async () => ({ id: 'page-1', slug: 'AI', useTemplate: true, status: 'draft', name: 'AI', sections: [] }), applyCoursePageTemplate: async (...args) => { applied.push(args); return { success: true } } },
   '@/app/actions/course-page-template-actions': { getStoredCoursePageTemplateOptions: async () => ({ success: true, templates }), applyStoredCoursePageTemplate: async (...args) => { applied.push(args); return { success: true } } },

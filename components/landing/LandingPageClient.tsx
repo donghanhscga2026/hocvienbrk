@@ -185,11 +185,15 @@ export function CourseLandingClient({
     totalHours,
     activeStudentCount,
     projectLabels,
-    cohorts
+    cohorts,
+    salesContent,
+    teacher
 }: CourseLandingClientProps) {
     return (
         <CourseLandingTemplate
             cohorts={cohorts}
+            salesContent={salesContent}
+            teacher={teacher}
             course={course}
             lessons={lessons}
             testimonials={testimonials}

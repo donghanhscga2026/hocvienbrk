@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import {
     ChevronDown, ChevronUp, Star, BookOpen, Users, Clock,
-    Check, Play, GraduationCap, MessageSquare, ArrowRight, Link2, ListChecks
+    Check, Play, GraduationCap, ArrowRight, Link2, ListChecks
 } from 'lucide-react'
 import { enrollInCourseAction, checkEnrollmentStatusAction, getBrkMbvBalanceAction } from '@/app/actions/course-actions'
 import { useRouter } from 'next/navigation'
@@ -18,6 +18,7 @@ import CourseDashboardModal from '@/components/course/CourseDashboardModal'
 import { isValidImageUrl } from '@/lib/image-validation'
 import type { CohortLink } from '@/lib/cohort'
 import CohortPicker from '@/components/course/CohortPicker'
+import type { CourseSalesContent } from '@/lib/course-sales-content'
 
 interface CourseLesson {
     id: string
@@ -61,6 +62,8 @@ interface CourseLandingTemplateProps {
     activeStudentCount: number
     projectLabels?: ReactNode
     cohorts?: CohortLink[]
+    salesContent?: CourseSalesContent | null
+    teacher?: { name: string; image?: string | null } | null
 }
 
 
@@ -76,7 +79,9 @@ export default function CourseLandingTemplate({
     totalHours,
     activeStudentCount,
     projectLabels,
-    cohorts
+    cohorts,
+    salesContent,
+    teacher
 }: CourseLandingTemplateProps) {
     const router = useRouter()
     const wi300 = useWi300Brand()
@@ -89,6 +94,7 @@ export default function CourseLandingTemplate({
     const [hasActivated, setHasActivated] = useState(false)
     const [showActivatedToast, setShowActivatedToast] = useState(false)
     const [showRoster, setShowRoster] = useState(false)
+    const [openFaq, setOpenFaq] = useState<number | null>(0)
     const [voucherBalance, setVoucherBalance] = useState<number>(0)
 
     useEffect(() => {
@@ -110,6 +116,10 @@ export default function CourseLandingTemplate({
         }
     })()
 
+    // Mô tả ngắn làm dòng giới thiệu nhanh ở đầu trang (bỏ thẻ HTML),
+    // mô tả dài làm phần giới thiệu chính — đúng vai của hai ô trong quản trị.
+    const promiseText = (course.mo_ta_ngan || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+    const introHtml = course.mo_ta_dai || course.mo_ta_ngan || 'Khóa học đang được cập nhật...'
     const effectiveEnrollment = localEnrollment || enrollment
     const isEnrolled = effectiveEnrollment?.status === 'ACTIVE'
     const isPending = effectiveEnrollment?.status === 'PENDING'
@@ -237,7 +247,7 @@ export default function CourseLandingTemplate({
     }
 
     return (
-        <div className="min-h-screen bg-brk-background">
+        <div className={`min-h-screen bg-brk-background ${!isEnrolled ? 'pb-24 lg:pb-0' : ''}`}>
             <MainHeader title="" />
 
             {/* CTA Section */}
@@ -318,6 +328,10 @@ export default function CourseLandingTemplate({
                                     </div>
                                 )}
                             </div>
+
+                            {!isEnrolled && promiseText && (
+                                <p className="mb-4 text-sm leading-6 text-brk-muted">{promiseText}</p>
+                            )}
 
                             {isEnrolled && (
                                 <div className="mb-4 p-3 bg-brk-primary/10 rounded-xl border border-brk-primary/30">
@@ -422,11 +436,57 @@ export default function CourseLandingTemplate({
                         </h2>
                         <div
                             className="text-brk-on-surface leading-relaxed whitespace-pre-line text-justify"
-                            dangerouslySetInnerHTML={{ __html: course.mo_ta_ngan || 'Khóa học đang được cập nhật...' }}
+                            dangerouslySetInnerHTML={{ __html: introHtml }}
                         />
                     </div>
                 </div>
             </section>
+
+            {/* Audience Section — từ ô "Khóa học dành cho ai" trong quản trị */}
+            {salesContent && salesContent.audience.length > 0 && (
+                <section className="py-16 bg-brk-surface">
+                    <div className={wi300 ? "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8" : "container mx-auto px-4"}>
+                        <div className={wi300 ? "mx-auto max-w-5xl" : "mx-auto max-w-4xl"}>
+                            <h2 className="text-2xl font-black text-brk-on-surface mb-6">
+                                Khóa học này dành cho bạn nếu…
+                            </h2>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                {salesContent.audience.map((item, index) => (
+                                    <div key={index} className="flex items-start gap-3 rounded-xl border border-brk-outline bg-brk-background p-4">
+                                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brk-primary/10 text-brk-primary">
+                                            <Check className="h-4 w-4" />
+                                        </span>
+                                        <p className="leading-relaxed text-brk-on-surface">{item}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            )}
+
+            {/* Outcomes Section — từ ô "Học xong làm được gì" trong quản trị */}
+            {salesContent && salesContent.outcomes.length > 0 && (
+                <section className="py-16">
+                    <div className={wi300 ? "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8" : "container mx-auto px-4"}>
+                        <div className={wi300 ? "mx-auto max-w-5xl" : "mx-auto max-w-4xl"}>
+                            <h2 className="text-2xl font-black text-brk-on-surface mb-6">
+                                Học xong bạn sẽ làm được
+                            </h2>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                {salesContent.outcomes.map((item, index) => (
+                                    <div key={index} className="flex items-start gap-3 rounded-xl border border-brk-outline bg-brk-surface p-4">
+                                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brk-accent/15 text-brk-accent">
+                                            <GraduationCap className="h-4 w-4" />
+                                        </span>
+                                        <p className="leading-relaxed text-brk-on-surface">{item}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            )}
 
             {/* Curriculum Section */}
             {lessons.length > 0 && (
@@ -481,7 +541,37 @@ export default function CourseLandingTemplate({
                 </section>
             )}
 
-            {/* Testimonials Section */}
+            {/* Instructor Section */}
+            {teacher?.name && (
+                <section className="py-16">
+                    <div className={wi300 ? "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8" : "container mx-auto px-4"}>
+                        <div className={wi300 ? "mx-auto max-w-5xl" : "mx-auto max-w-4xl"}>
+                            <h2 className="text-2xl font-black text-brk-on-surface mb-6">
+                                Giảng viên
+                            </h2>
+                            <div className="flex items-center gap-4 rounded-2xl border border-brk-outline bg-brk-surface p-6">
+                                {teacher.image ? (
+                                    <Image src={teacher.image} alt={teacher.name} width={64} height={64} className="h-16 w-16 rounded-full object-cover" />
+                                ) : (
+                                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-brk-primary/10 text-2xl font-black text-brk-primary">
+                                        {teacher.name.charAt(0)}
+                                    </div>
+                                )}
+                                <div>
+                                    <p className="text-lg font-bold text-brk-on-surface">{teacher.name}</p>
+                                    <p className="mt-0.5 flex items-center gap-1.5 text-sm text-brk-muted">
+                                        <GraduationCap className="h-4 w-4" />
+                                        Giảng viên của khóa học
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            )}
+
+            {/* Testimonials Section — ẩn hẳn khi chưa có chia sẻ nào */}
+            {testimonials.length > 0 && (
             <section className="py-16">
                 <div className={wi300 ? "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8" : "container mx-auto px-4"}>
                     <div className={wi300 ? "mx-auto max-w-5xl" : "mx-auto max-w-4xl"}>
@@ -489,7 +579,6 @@ export default function CourseLandingTemplate({
                             Thành viên nói gì về khóa học
                         </h2>
 
-                        {testimonials.length > 0 ? (
                             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {testimonials.slice(0, 3).map((testimonial) => (
                                     <div
@@ -532,21 +621,56 @@ export default function CourseLandingTemplate({
                                     </div>
                                 ))}
                             </div>
-                        ) : (
-                            <div className="text-center py-12 px-4 bg-brk-surface rounded-2xl border border-brk-outline">
-                                <MessageSquare className="w-12 h-12 mx-auto text-brk-muted mb-4" />
-                                <h3 className="text-lg font-bold text-brk-on-surface mb-2">
-                                    Chưa có chia sẻ nào
-                                </h3>
-                                <p className="text-brk-muted max-w-md mx-auto leading-relaxed">
-                                    Hãy tham gia khóa học và để lại cảm nhận của bạn để giúp cộng đồng thành viên có thêm động lực nhé!
-                                </p>
-                            </div>
-                        )}
                     </div>
                 </div>
             </section>
+            )}
 
+            {/* FAQ Section — từ ô "Câu hỏi thường gặp" trong quản trị */}
+            {salesContent && salesContent.faq.length > 0 && (
+                <section className="py-16 bg-brk-surface">
+                    <div className={wi300 ? "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8" : "container mx-auto px-4"}>
+                        <div className={wi300 ? "mx-auto max-w-5xl" : "mx-auto max-w-4xl"}>
+                            <h2 className="text-2xl font-black text-brk-on-surface mb-6">
+                                Câu hỏi thường gặp
+                            </h2>
+                            <div className="space-y-3">
+                                {salesContent.faq.map((item, index) => (
+                                    <div key={index} className="rounded-xl border border-brk-outline bg-brk-background">
+                                        <button
+                                            type="button"
+                                            onClick={() => setOpenFaq(openFaq === index ? null : index)}
+                                            className="flex w-full items-center justify-between gap-3 p-4 text-left font-semibold text-brk-on-surface"
+                                        >
+                                            {item.question}
+                                            <ChevronDown className={`h-5 w-5 shrink-0 transition-transform ${openFaq === index ? 'rotate-180' : ''}`} />
+                                        </button>
+                                        {openFaq === index && (
+                                            <p className="px-4 pb-4 leading-relaxed text-brk-muted">{item.answer}</p>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            )}
+
+            {/* Final CTA — thẻ giá lặp lại cuối trang */}
+            {!isEnrolled && (
+                <section className="py-16">
+                    <div className={wi300 ? "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8" : "container mx-auto px-4"}>
+                        <div className="mx-auto max-w-lg rounded-3xl border border-brk-outline bg-brk-surface p-6 text-center shadow-xl md:p-8">
+                            <h2 className="text-2xl font-black text-brk-on-surface">Sẵn sàng bắt đầu?</h2>
+                            <p className="mt-2 text-brk-muted">{course.name_lop}</p>
+                            <p className="mt-4 text-3xl font-black text-brk-on-surface">
+                                {effectivePhiCoc === 0 ? feeTypeDisplay.label : `${effectivePhiCoc.toLocaleString('vi-VN')}đ`}
+                            </p>
+                            <div className="mt-5">{getCTAButton()}</div>
+                        </div>
+                    </div>
+                </section>
+            )}
 
             {/* Footer */}
             <footer className="py-8 text-center text-brk-muted text-sm">
@@ -582,6 +706,26 @@ export default function CourseLandingTemplate({
                     courseName={course.name_lop}
                     onClose={() => setShowRoster(false)}
                 />
+            )}
+
+            {/* Thanh đăng ký dính đáy trên điện thoại */}
+            {!isEnrolled && (
+                <div className="fixed inset-x-0 bottom-0 z-40 border-t border-brk-outline bg-brk-surface/95 px-4 py-3 backdrop-blur lg:hidden">
+                    <div className="mx-auto flex max-w-lg items-center gap-3">
+                        <div className="min-w-0">
+                            <p className="truncate text-xs text-brk-muted">{course.name_lop}</p>
+                            <p className="font-black text-brk-on-surface">
+                                {effectivePhiCoc === 0 ? feeTypeDisplay.label : `${effectivePhiCoc.toLocaleString('vi-VN')}đ`}
+                            </p>
+                        </div>
+                        <button
+                            onClick={isPending ? () => setShowRegistration(true) : handleEnroll}
+                            className="flex-1 rounded-xl bg-brk-primary py-3 text-sm font-black uppercase tracking-wide text-brk-on-primary shadow-lg"
+                        >
+                            {isPending ? 'Chờ thanh toán' : effectivePhiCoc === 0 ? 'Kích hoạt miễn phí' : 'Đăng ký ngay'}
+                        </button>
+                    </div>
+                </div>
             )}
         </div>
     )
