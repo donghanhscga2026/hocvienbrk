@@ -28,6 +28,12 @@ export function compileTemplateSource(raw: TemplateSource) {
     const file = files.get(path)
     if (file) return { file }
     if (source.baseUrl) return { url: new URL(ref, source.baseUrl).href }
+    // Font thiếu file thì chữ vẫn đọc được bằng font mặc định — chỉ cảnh báo,
+    // không chặn cả bản xem trước như với ảnh hay mã nguồn.
+    if (/\.(?:woff2?|ttf|otf|eot)$/i.test(path)) {
+      warnings.add(`Thiếu file font ${path} — trang tạm dùng font mặc định. Muốn hiển thị đúng font, hãy thay bằng link font HTTPS (ví dụ Google Fonts).`)
+      return { url: '' }
+    }
     throw new Error(`Thiếu file ${path}. Hãy nhập ZIP kèm tài nguyên hoặc dùng URL ảnh/CSS HTTPS.`)
   }
   function css(text: string, base: string, chain: string[] = []): string {
