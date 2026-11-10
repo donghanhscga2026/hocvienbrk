@@ -228,6 +228,31 @@ export function applyEventMap(html: string, assignments: Record<string, ImportEv
   return { html: '<!doctype html>\n' + serialize(doc), warnings }
 }
 
+export type AutoEventStats = { total: number; register: number; kept: number }
+
+// Chuyển đổi TỰ ĐỘNG khi nhập trang — giảng viên không phải gán từng nút.
+// Quy ước Hương chốt: chỉ NÚT CTA (nút bấm, biểu mẫu, liên kết kêu gọi đăng
+// ký) mới chuyển về mở đăng ký (#dang-ky). Mọi liên kết còn lại — kể cả
+// liên kết neo #... cuộn trong trang và link ngoài — GIỮ NGUYÊN như trang
+// gốc, không cài gì thêm.
+export function autoEventAssignments(html: string): { assignments: Record<string, ImportEventAssignment>; stats: AutoEventStats } {
+  const doc = parse(html)
+  const assignments: Record<string, ImportEventAssignment> = {}
+  const stats: AutoEventStats = { total: 0, register: 0, kept: 0 }
+  interactiveNodes(doc).forEach((node, index) => {
+    stats.total += 1
+    const href = attr(node, 'href') || ''
+    const isCta = node.tagName === 'button' || node.tagName === 'form' || isRegistrationAnchor(href) || isRegistrationAnchor(textOf(node))
+    if (isCta) {
+      assignments[`el-${index + 1}`] = { action: 'register' }
+      stats.register += 1
+    } else {
+      stats.kept += 1
+    }
+  })
+  return { assignments, stats }
+}
+
 const STRUCTURAL = new Set(['header', 'nav', 'section', 'footer'])
 
 export function extractBlocks(html: string): ImportBlockItem[] {
