@@ -182,7 +182,12 @@ export default function OfferingLibrary({
                   </div>
                 </div>
                 {loaded.data.url && !openedLink ? (
-                  <OfferingResourceContent key={currentId} resource={loaded.data} />
+                  <OfferingResourceContent
+                    key={currentId}
+                    resource={loaded.data}
+                    slug={slug}
+                    resourceId={currentId}
+                  />
                 ) : (
                   (openedLink || loaded.data.links?.[0]) && (
                     <OfferingViewer

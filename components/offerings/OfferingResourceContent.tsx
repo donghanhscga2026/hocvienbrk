@@ -4,8 +4,18 @@ import { AppWindow, ExternalLink } from 'lucide-react'
 import type { WorkspaceResource } from '@/lib/offerings/workspace'
 import OfferingViewer, { embeddedSource } from './OfferingViewer'
 import OfferingInlineContent from './OfferingInlineContent'
+import OfferingDriveFolder from './OfferingDriveFolder'
+import { driveLinkInfo } from '@/lib/offerings/drive'
 
-export default function OfferingResourceContent({ resource }: { resource: WorkspaceResource }) {
+export default function OfferingResourceContent({
+  resource,
+  slug,
+  resourceId,
+}: {
+  resource: WorkspaceResource
+  slug?: string
+  resourceId?: string
+}) {
   const [opened, setOpened] = useState<Record<number, boolean>>({})
   const isApp = resource.kind === 'APP'
   const validLink = resource.url && embeddedSource(resource.url)
@@ -49,7 +59,17 @@ export default function OfferingResourceContent({ resource }: { resource: Worksp
         </section>
       )}
       {resource.url && (!isApp || resource.openMode !== 'NEW_TAB') && (
-        <OfferingViewer key={resource.url} url={resource.url} title={resource.title} kind={resource.kind} />
+        driveLinkInfo(resource.url)?.type === 'folder' && slug && resourceId ? (
+          <OfferingDriveFolder
+            key={resource.url}
+            slug={slug}
+            resourceId={resourceId}
+            url={resource.url}
+            title={resource.title}
+          />
+        ) : (
+          <OfferingViewer key={resource.url} url={resource.url} title={resource.title} kind={resource.kind} />
+        )
       )}
       {resource.instructions || resource.guideUrl || resource.guides?.length ? (
         <section className="space-y-4 border-t pt-5">
