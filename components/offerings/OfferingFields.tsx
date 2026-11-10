@@ -4,6 +4,7 @@ import OfferingComboFields from './OfferingComboFields'
 import OfferingSalesFields from './OfferingSalesFields'
 import OfferingServiceFields from './OfferingServiceFields'
 import OfferingResourceEditor, { type ExistingOfferingContent } from './OfferingResourceEditor'
+import { driveLinkHint } from './OfferingViewer'
 import { offeringKinds, type OfferingDetails, type ProductGroup } from '@/lib/offerings/shared'
 
 export type OfferingAdminSection = 'all' | 'info' | 'sales' | 'resources' | 'pricing'
@@ -210,6 +211,11 @@ export default function OfferingFields({
                 placeholder="Để trống nếu nhập nguồn theo từng tài nguyên"
                 className={field}
               />
+              {driveLinkHint(value.accessUrl) && (
+                <span className="mt-2 block text-sm font-normal leading-6 text-brk-muted">
+                  {driveLinkHint(value.accessUrl)}
+                </span>
+              )}
             </label>
           )}
           <label className="block font-semibold">

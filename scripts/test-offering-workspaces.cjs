@@ -101,6 +101,8 @@ async function run() {
   assert.equal(embeddedSource('//evil.example'), null)
   assert.equal(embeddedSource('https://youtu.be/dQw4w9WgXcQ', 'VIDEO').src, 'https://www.youtube.com/embed/dQw4w9WgXcQ')
   assert.equal(embeddedSource('https://drive.google.com/file/d/abc_123/view').src, 'https://drive.google.com/file/d/abc_123/preview')
+  assert.equal(embeddedSource('https://drive.google.com/drive/folders/abc_123?usp=sharing').src, 'https://drive.google.com/embeddedfolderview?id=abc_123#list')
+  assert.equal(embeddedSource('https://drive.google.com/drive/u/0/folders/abc_123').src, 'https://drive.google.com/embeddedfolderview?id=abc_123#list')
   assert.equal(embeddedSource('https://files.example/movie.mp4?token=123', 'VIDEO').video, true)
   const viewerHtml = renderToStaticMarkup(React.createElement(Viewer, { url: 'https://files.example/book.pdf', title: 'PDF' }))
   assert.ok(viewerHtml.includes('<iframe') && !viewerHtml.includes('target="_blank"') && !viewerHtml.includes('allow-popups') && !viewerHtml.includes('allow-top-navigation'))

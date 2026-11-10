@@ -3,6 +3,41 @@
 import { useState } from 'react'
 import { detectVideoSource } from '@/lib/video-sources'
 
+export function driveLinkInfo(raw: string) {
+  let url: URL
+  try {
+    url = new URL(raw.trim())
+  } catch {
+    return null
+  }
+  if (url.hostname === 'drive.google.com') {
+    const folder = url.pathname.match(/^\/drive\/(?:u\/\d+\/)?folders\/([\w-]+)/)?.[1]
+    if (folder)
+      return {
+        type: 'folder' as const,
+        embedUrl: `https://drive.google.com/embeddedfolderview?id=${folder}#list`,
+      }
+    const file = url.pathname.match(/^\/file\/d\/([\w-]+)/)?.[1] || url.searchParams.get('id')
+    if (file && /^[\w-]+$/.test(file))
+      return { type: 'file' as const, embedUrl: `https://drive.google.com/file/d/${file}/preview` }
+    return null
+  }
+  if (/^(docs|sheets|slides)\.google\.com$/.test(url.hostname)) {
+    const path = url.pathname.match(/^\/(document|spreadsheets|presentation)\/d\/([\w-]+)/)
+    if (path)
+      return { type: 'file' as const, embedUrl: `${url.origin}/${path[1]}/d/${path[2]}/preview` }
+  }
+  return null
+}
+
+export function driveLinkHint(raw: string) {
+  const info = driveLinkInfo(raw)
+  if (!info) return null
+  return info.type === 'folder'
+    ? 'Đã nhận diện: thư mục Google Drive. Khách sẽ thấy danh sách file ngay trong trang — nhớ để thư mục ở chế độ ai có liên kết đều xem được.'
+    : 'Đã nhận diện: tệp Google Drive. Khách sẽ xem trước ngay trong trang.'
+}
+
 export function embeddedSource(raw: string, kind?: string) {
   const value = raw.trim()
   if (
@@ -16,6 +51,8 @@ export function embeddedSource(raw: string, kind?: string) {
   } catch {
     return null
   }
+  const drive = driveLinkInfo(value)
+  if (drive) return { src: drive.embedUrl, video: false }
   if (url.hostname === 'drive.google.com') {
     const id = url.pathname.match(/^\/file\/d\/([\w-]+)/)?.[1] || url.searchParams.get('id')
     if (id && /^[\w-]+$/.test(id))
