@@ -77,12 +77,12 @@ async function run() {
 
   // ── Chuyển đổi sự kiện TỰ ĐỘNG (không gán tay từng nút) ─────────────────
   const auto = review.autoEventAssignments(fixture)
-  assert.deepEqual(auto.stats, { total: 7, register: 5, scroll: 1, external: 1 }, 'Tự động: 5 đăng ký, 1 cuộn tới khối, 1 link ngoài')
+  assert.deepEqual(auto.stats, { total: 7, register: 4, kept: 3 }, 'Tự động: chỉ 4 nút CTA về đăng ký, 3 liên kết giữ nguyên')
   const { html: autoHtml, warnings: autoWarnings } = review.applyEventMap(fixture, auto.assignments)
   assert.equal(autoWarnings.length, 0, 'Chuyển đổi tự động không sinh cảnh báo')
-  assert.ok(autoHtml.includes('data-mfc-action="scroll"') && autoHtml.includes('data-mfc-target="lo-trinh"'), 'Neo #lo-trinh tự cuộn tới khối lo-trinh')
-  assert.ok(autoHtml.includes('href="#dang-ky"'), 'Nút đăng ký về #dang-ky')
-  assert.ok(autoHtml.includes('https://zalo.me/123'), 'Link Zalo được giữ nguyên')
+  assert.ok(autoHtml.includes('data-mfc-action="register"') && autoHtml.includes('href="#dang-ky"'), 'Nút CTA về #dang-ky')
+  assert.ok(autoHtml.includes('href="#lo-trinh"') && !autoHtml.includes('data-mfc-action="scroll"'), 'Liên kết neo trong trang giữ nguyên, không cài cuộn')
+  assert.ok(autoHtml.includes('https://zalo.me/123') && !autoHtml.includes('data-mfc-action="external"'), 'Link Zalo giữ nguyên như trang gốc')
 
   // ── Khối ─────────────────────────────────────────────────────────────────
   const blocks = review.extractBlocks(fixture)

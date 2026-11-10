@@ -228,72 +228,32 @@ export function applyEventMap(html: string, assignments: Record<string, ImportEv
   return { html: '<!doctype html>\n' + serialize(doc), warnings }
 }
 
-export type AutoEventStats = { total: number; register: number; scroll: number; external: number }
+export type AutoEventStats = { total: number; register: number; kept: number }
 
-// Chuyển đổi sự kiện TỰ ĐỘNG khi nhập trang — giảng viên không phải gán
-// từng nút. Quy ước đã chốt với Hương: nút, biểu mẫu và liên kết không rõ
-// đích → mở đăng ký (#dang-ky); liên kết neo trỏ tới một khối có thật trong
-// trang → cuộn tới khối đó; link http(s)/tel/mailto → giữ link ngoài.
+// Chuyển đổi TỰ ĐỘNG khi nhập trang — giảng viên không phải gán từng nút.
+// Quy ước Hương chốt: chỉ NÚT CTA (nút bấm, biểu mẫu, liên kết kêu gọi đăng
+// ký) mới chuyển về mở đăng ký (#dang-ky). Mọi liên kết còn lại — kể cả
+// liên kết neo #... cuộn trong trang và link ngoài — GIỮ NGUYÊN như trang
+// gốc, không cài gì thêm.
 export function autoEventAssignments(html: string): { assignments: Record<string, ImportEventAssignment>; stats: AutoEventStats } {
   const doc = parse(html)
-  const blockKeys = new Set(extractBlocks(html).map(block => block.key))
-  // Map mỗi id trong trang về khóa của khối chứa nó, dùng đúng quy tắc khóa
-  // của extractBlocks để hai bên khớp nhau.
-  const idToBlock = new Map<string, string>()
-  {
-    const used = new Set<string>()
-    let count = 0
-    for (const node of elements(doc)) {
-      const explicit = attr(node, 'data-mfc-block')
-      let hasStructuralAncestor = false
-      let parent = node.parentNode as AnyNode | null
-      while (parent) {
-        if ('tagName' in parent && STRUCTURAL_TAGS.has(parent.tagName)) { hasStructuralAncestor = true; break }
-        parent = (parent as ElementNode).parentNode as AnyNode | null
-      }
-      if (!explicit && !(STRUCTURAL_TAGS.has(node.tagName) && !hasStructuralAncestor)) continue
-      count += 1
-      let key = explicit || attr(node, 'id') || `block-${count}`
-      let suffix = 2
-      const base = key
-      while (used.has(key)) key = `${base}-${suffix++}`
-      used.add(key)
-      walk(node, child => {
-        if (!('tagName' in child)) return
-        const childId = attr(child, 'id')
-        if (childId && !idToBlock.has(childId)) idToBlock.set(childId, key)
-      })
-    }
-  }
   const assignments: Record<string, ImportEventAssignment> = {}
-  const stats: AutoEventStats = { total: 0, register: 0, scroll: 0, external: 0 }
+  const stats: AutoEventStats = { total: 0, register: 0, kept: 0 }
   interactiveNodes(doc).forEach((node, index) => {
     stats.total += 1
-    const id = `el-${index + 1}`
     const href = attr(node, 'href') || ''
-    if (node.tagName !== 'form' && /^(?:https?:|tel:|mailto:)/i.test(href)) {
-      assignments[id] = { action: 'external', href }
-      stats.external += 1
-      return
+    const isCta = node.tagName === 'button' || node.tagName === 'form' || isRegistrationAnchor(href) || isRegistrationAnchor(textOf(node))
+    if (isCta) {
+      assignments[`el-${index + 1}`] = { action: 'register' }
+      stats.register += 1
+    } else {
+      stats.kept += 1
     }
-    if (node.tagName === 'a' && href.startsWith('#') && href.length > 1) {
-      let name = href.slice(1)
-      try { name = decodeURIComponent(name) } catch { /* giữ nguyên tên neo */ }
-      const target = blockKeys.has(name) ? name : idToBlock.get(name)
-      if (target) {
-        assignments[id] = { action: 'scroll', target }
-        stats.scroll += 1
-        return
-      }
-    }
-    assignments[id] = { action: 'register' }
-    stats.register += 1
   })
   return { assignments, stats }
 }
 
 const STRUCTURAL = new Set(['header', 'nav', 'section', 'footer'])
-const STRUCTURAL_TAGS = STRUCTURAL
 
 export function extractBlocks(html: string): ImportBlockItem[] {
   const doc = parse(html)

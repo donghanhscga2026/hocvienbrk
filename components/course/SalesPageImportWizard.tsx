@@ -67,7 +67,7 @@ export default function SalesPageImportWizard({ sourceHtml, sourceLabel, onCheck
   return (
     <section className="min-w-0 space-y-4 rounded-2xl border border-brk-outline bg-white p-4" aria-label="Rà soát trang nhập">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><h2 className="font-bold">Rà soát trang nhập</h2><p className="mt-1 text-sm text-brk-muted">Nguồn: {sourceLabel}. Ảnh phải dùng link HTTPS từ nền tảng bên ngoài — hệ thống không lưu ảnh. Nút và liên kết hệ thống tự chuyển đổi, bạn chỉ cần xử lý ảnh (nếu có) rồi đưa vào trình sửa code.</p>{auto.stats.total > 0 && <p className="mt-2 rounded-xl bg-brk-background p-3 text-sm">Tự động chuyển đổi {auto.stats.total} nút/liên kết: <strong>{auto.stats.register}</strong> mở đăng ký, <strong>{auto.stats.scroll}</strong> cuộn tới đúng khối trong trang, <strong>{auto.stats.external}</strong> giữ link ngoài (Zalo, gọi điện, email…). Bạn không cần chọn gì thêm cho phần này.</p>}</div>
+        <div><h2 className="font-bold">Rà soát trang nhập</h2><p className="mt-1 text-sm text-brk-muted">Nguồn: {sourceLabel}. Ảnh phải dùng link HTTPS từ nền tảng bên ngoài — hệ thống không lưu ảnh. Nút và liên kết hệ thống tự chuyển đổi, bạn chỉ cần xử lý ảnh (nếu có) rồi đưa vào trình sửa code.</p>{auto.stats.total > 0 && <p className="mt-2 rounded-xl bg-brk-background p-3 text-sm">Tự động chuyển đổi: <strong>{auto.stats.register}</strong> nút kêu gọi đăng ký → mở đăng ký của hệ thống. <strong>{auto.stats.kept}</strong> liên kết còn lại (cuộn trong trang, Zalo, gọi điện…) giữ nguyên như trang gốc — không cần cài gì thêm.</p>}</div>
         <button type="button" onClick={onClose} className={button}><X size={16} />Đóng</button>
       </div>
 
