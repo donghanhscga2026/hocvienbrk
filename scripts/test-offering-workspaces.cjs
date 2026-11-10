@@ -103,6 +103,15 @@ async function run() {
   assert.equal(embeddedSource('https://drive.google.com/file/d/abc_123/view').src, 'https://drive.google.com/file/d/abc_123/preview')
   assert.equal(embeddedSource('https://drive.google.com/drive/folders/abc_123?usp=sharing').src, 'https://drive.google.com/embeddedfolderview?id=abc_123#list')
   assert.equal(embeddedSource('https://drive.google.com/drive/u/0/folders/abc_123').src, 'https://drive.google.com/embeddedfolderview?id=abc_123#list')
+  const drive = load('lib/offerings/drive.ts')
+  assert.equal(drive.driveLinkInfo('https://drive.google.com/drive/folders/abc_123?usp=sharing').type, 'folder')
+  assert.equal(drive.driveLinkInfo('https://drive.google.com/file/d/abc_123/view').type, 'file')
+  assert.equal(drive.driveLinkInfo('https://example.com/file/d/abc_123/view'), null)
+  const listing = drive.parseDriveFolderListing('<div><a href="https://drive.google.com/drive/folders/F1"><span>Thư mục con</span></a><a href="https://drive.google.com/file/d/V1/view?usp=drive_web">Video 1.mp4</a><a href="https://drive.google.com/file/d/V1/view">Video trùng</a><a href="https://example.com/x">Ngoài Drive</a></div>')
+  assert.deepEqual(listing, [
+    { id: 'F1', name: 'Thư mục con', type: 'folder' },
+    { id: 'V1', name: 'Video 1.mp4', type: 'file' },
+  ])
   assert.equal(embeddedSource('https://files.example/movie.mp4?token=123', 'VIDEO').video, true)
   const viewerHtml = renderToStaticMarkup(React.createElement(Viewer, { url: 'https://files.example/book.pdf', title: 'PDF' }))
   assert.ok(viewerHtml.includes('<iframe') && !viewerHtml.includes('target="_blank"') && !viewerHtml.includes('allow-popups') && !viewerHtml.includes('allow-top-navigation'))
