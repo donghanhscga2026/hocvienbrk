@@ -75,6 +75,15 @@ async function run() {
   assert.equal(courseWarnings.length, 0)
   assert.ok(coursed.includes('data-mfc-action="course"') && coursed.includes('data-mfc-target="/khoa-hoc/KHOA_KHAC"'), 'course chuẩn hoá slug thành đường /khoa-hoc/')
 
+  // ── Chuyển đổi sự kiện TỰ ĐỘNG (không gán tay từng nút) ─────────────────
+  const auto = review.autoEventAssignments(fixture)
+  assert.deepEqual(auto.stats, { total: 7, register: 5, scroll: 1, external: 1 }, 'Tự động: 5 đăng ký, 1 cuộn tới khối, 1 link ngoài')
+  const { html: autoHtml, warnings: autoWarnings } = review.applyEventMap(fixture, auto.assignments)
+  assert.equal(autoWarnings.length, 0, 'Chuyển đổi tự động không sinh cảnh báo')
+  assert.ok(autoHtml.includes('data-mfc-action="scroll"') && autoHtml.includes('data-mfc-target="lo-trinh"'), 'Neo #lo-trinh tự cuộn tới khối lo-trinh')
+  assert.ok(autoHtml.includes('href="#dang-ky"'), 'Nút đăng ký về #dang-ky')
+  assert.ok(autoHtml.includes('https://zalo.me/123'), 'Link Zalo được giữ nguyên')
+
   // ── Khối ─────────────────────────────────────────────────────────────────
   const blocks = review.extractBlocks(fixture)
   assert.deepEqual(blocks.map(block => block.key), ['dau-trang', 'gioi-thieu', 'lo-trinh', 'chan-trang'])
