@@ -1,6 +1,6 @@
 'use client'
 import { useMemo, useState } from 'react'
-import { Check, Image as ImageIcon, Blocks, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, Image as ImageIcon, Blocks, X } from 'lucide-react'
 import { applyEventMap, applyImageMap, autoEventAssignments, extractBlocks, extractImageInventory } from '@/lib/course-page/import-review'
 
 export type ImageCheckResult = { url: string; ok: boolean; status: number; contentType: string | null; isImage: boolean }
@@ -23,6 +23,7 @@ export default function SalesPageImportWizard({ sourceHtml, sourceLabel, onCheck
   const blocks = useMemo(() => extractBlocks(sourceHtml), [sourceHtml])
   const [imageMap, setImageMap] = useState<Record<string, { url: string; alt: string }>>(() => Object.fromEntries(images.map(item => [item.id, { url: item.kind === 'url' ? item.currentUrl : '', alt: item.alt || '' }])))
   const [blockState, setBlockState] = useState<Record<string, { visible: boolean; registration: boolean }>>(() => Object.fromEntries(blocks.map(block => [block.key, { visible: true, registration: false }])))
+  const [blocksOpen, setBlocksOpen] = useState(false)
   const [checkResults, setCheckResults] = useState<Record<string, ImageCheckResult>>({})
   const [checking, setChecking] = useState(false)
   const [checkError, setCheckError] = useState('')
@@ -92,9 +93,14 @@ export default function SalesPageImportWizard({ sourceHtml, sourceLabel, onCheck
       </div>
 
       <div className="space-y-3">
-        <h3 className="flex items-center gap-2 font-semibold"><Blocks size={17} />Khối trên trang ({blocks.length})</h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="flex items-center gap-2 font-semibold"><Blocks size={17} />Khối trên trang ({blocks.length})</h3>
+          {blocks.length > 0 && <span className="text-sm text-brk-muted">— đang hiện {blocks.filter(block => blockState[block.key]?.visible !== false).length}/{blocks.length} khối</span>}
+          {blocks.length > 0 && <button type="button" onClick={() => setBlocksOpen(open => !open)} className={button + ' ml-auto'}>{blocksOpen ? <>Thu gọn<ChevronUp size={16} /></> : <>Mở ra<ChevronDown size={16} /></>}</button>}
+        </div>
+        <p className="text-sm text-brk-muted">Phần này chỉ để ẩn bớt một phần của trang gốc, hoặc đánh dấu phần nào là chỗ đăng ký. Trang gốc đã ổn thì cứ để nguyên, không cần chỉnh gì.</p>
         {blocks.length === 0 && <p className="text-sm text-brk-muted">Không tìm thấy khối cấu trúc cấp cao nhất.</p>}
-        {blocks.map(block => (
+        {blocksOpen && blocks.map(block => (
           <div key={block.key} className="flex flex-wrap items-center gap-4 rounded-xl border border-brk-outline p-3 text-sm">
             <span className="min-w-0 flex-1"><strong>{block.key}</strong> <span className="text-brk-muted">&lt;{block.tag}&gt;{block.heading ? ` — ${block.heading}` : ''}</span></span>
             <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={blockState[block.key]?.visible !== false} onChange={event => { const prev = blockState[block.key] || { visible: true, registration: false }; setBlockState(current => ({ ...current, [block.key]: { ...prev, visible: event.target.checked } })) }} />Hiển thị</label>
