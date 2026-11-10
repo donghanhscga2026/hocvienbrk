@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { resourceLabels, type OfferingDetails } from '@/lib/offerings/shared'
-import OfferingViewer from './OfferingViewer'
+import OfferingViewer, { driveLinkHint } from './OfferingViewer'
 import OfferingInlineContent from './OfferingInlineContent'
 import OfferingResourceContent from './OfferingResourceContent'
 
@@ -200,6 +200,11 @@ export default function OfferingResourceEditor({
                     placeholder="https://… hoặc đường dẫn nội bộ"
                     className={field}
                   />
+                  {driveLinkHint(resource.url) && (
+                    <span className="mt-2 block text-sm font-normal leading-6 text-brk-muted">
+                      {driveLinkHint(resource.url)}
+                    </span>
+                  )}
                 </label>
                 {resource.kind === 'APP' && (
                   <div className="space-y-4 rounded-xl bg-green-50 p-4">
