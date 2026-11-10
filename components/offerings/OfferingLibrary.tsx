@@ -93,7 +93,7 @@ export default function OfferingLibrary({
         className={
           compact
             ? 'space-y-4'
-            : `grid items-start gap-5 lg:grid-cols-[260px_minmax(0,1fr)] ${instructions ? 'xl:grid-cols-[250px_minmax(0,1fr)_280px]' : ''}`
+            : 'grid items-start gap-5 lg:grid-cols-[260px_minmax(0,1fr)]'
         }
       >
         <aside className={`min-w-0 rounded-2xl border bg-white p-4 ${compact ? '' : 'lg:sticky lg:top-28'}`}>
@@ -229,16 +229,16 @@ export default function OfferingLibrary({
             )
           )}
         </div>
-        {instructions && (
-          <aside
-            id="huong-dan"
-            className="min-w-0 scroll-mt-28 rounded-2xl border bg-white p-5 lg:col-span-2 xl:col-span-1 xl:sticky xl:top-28"
-          >
-            <h3 className="mb-3 text-lg font-bold">Hướng dẫn sử dụng</h3>
-            <OfferingInlineContent text={instructions} />
-          </aside>
-        )}
       </div>
+      {instructions && (
+        <section
+          id="huong-dan"
+          className="mt-5 min-w-0 scroll-mt-28 rounded-2xl border bg-white p-5 sm:p-6"
+        >
+          <h3 className="mb-3 text-xl font-bold">Hướng dẫn sử dụng</h3>
+          <OfferingInlineContent text={instructions} />
+        </section>
+      )}
     </section>
   )
 }
