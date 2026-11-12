@@ -149,6 +149,7 @@ jobs:
           node scripts/test-wi300-teacher-profile.cjs
           node scripts/test-wi300-course-hero.cjs
           node scripts/test-wi300-appearance.cjs
+          node scripts/test-secret-rotation.cjs
 
       - name: ZIP template source regression checks
         run: node scripts/test-zip-template-source.cjs
