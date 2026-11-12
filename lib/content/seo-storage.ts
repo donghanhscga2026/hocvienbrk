@@ -15,15 +15,36 @@ function secret() {
   if (!value || value.length < 16) throw new CrmError('Máy chủ chưa có khóa bảo vệ nội dung.', 503)
   return createHash('sha256').update('content-seo-v1:' + value).digest()
 }
+// Luân chuyển khóa: giải mã thử lần lượt mọi khóa đang cấu hình — khóa chuyên dụng
+// WI300_APPEARANCE_SECRET trước, rồi các khóa dự phòng cũ — như ở appearance-service.
+function decryptionSecrets() {
+  const keys: Buffer[] = []
+  for (const value of [process.env.WI300_APPEARANCE_SECRET, process.env.AUTH_SECRET, process.env.NEXTAUTH_SECRET]) {
+    if (!value || value.length < 16) continue
+    const key = createHash('sha256').update('content-seo-v1:' + value).digest()
+    if (!keys.some(item => item.equals(key))) keys.push(key)
+  }
+  if (!keys.length) throw new CrmError('Máy chủ chưa có khóa bảo vệ nội dung.', 503)
+  return keys
+}
 const envelope = z.object({ iv: z.string(), tag: z.string(), payload: z.string() }).strict()
 const privatePostSchema = z.object({ title: z.string().max(300), content: z.string().max(100000), image: z.string().max(1000).nullable() }).strict()
 export type PrivatePost = z.infer<typeof privatePostSchema>
 const contentRecordSchema = z.object({ seo: contentSeoSchema, draft: privatePostSchema.nullable().default(null) }).strict()
 type ContentRecord = z.infer<typeof contentRecordSchema>
 function decode(value: unknown, key: string): ContentRecord {
-  const record = envelope.parse(value), cipher = createDecipheriv('aes-256-gcm', secret(), Buffer.from(record.iv, 'base64'))
-  cipher.setAAD(Buffer.from(key)); cipher.setAuthTag(Buffer.from(record.tag, 'base64'))
-  const raw = JSON.parse(Buffer.concat([cipher.update(Buffer.from(record.payload, 'base64')), cipher.final()]).toString('utf8'))
+  const record = envelope.parse(value)
+  let text: string | undefined, lastError: unknown
+  for (const candidate of decryptionSecrets()) {
+    try {
+      const cipher = createDecipheriv('aes-256-gcm', candidate, Buffer.from(record.iv, 'base64'))
+      cipher.setAAD(Buffer.from(key)); cipher.setAuthTag(Buffer.from(record.tag, 'base64'))
+      text = Buffer.concat([cipher.update(Buffer.from(record.payload, 'base64')), cipher.final()]).toString('utf8')
+      break
+    } catch (error) { lastError = error }
+  }
+  if (text === undefined) throw lastError
+  const raw = JSON.parse(text)
   // Đọc được bản SEO cũ chỉ chứa các trường SEO, trước khi có nội dung nháp.
   return raw && 'seo' in raw ? contentRecordSchema.parse(raw) : { seo: contentSeoSchema.parse(raw), draft: null }
 }

@@ -17,13 +17,34 @@ function encryptionKey() {
   if (!secret || secret.length < 16) throw new CrmError('Máy chủ chưa có khóa bảo vệ cấu hình giao diện.', 503)
   return createHash('sha256').update(`wi300-appearance-v1:${secret}`).digest()
 }
+// Luân chuyển khóa: giải mã thử lần lượt mọi khóa đang cấu hình — khóa chuyên dụng
+// WI300_APPEARANCE_SECRET trước, rồi các khóa dự phòng cũ — để bản ghi đã mã hóa
+// bằng khóa cũ vẫn đọc được sau khi cài khóa mới. Ghi vẫn chỉ dùng encryptionKey()
+// (khóa ưu tiên cao nhất) nên dữ liệu tự chuyển sang khóa mới ở lần lưu tiếp theo.
+function decryptionKeys() {
+  const keys: Buffer[] = []
+  for (const secret of [process.env.WI300_APPEARANCE_SECRET, process.env.AUTH_SECRET, process.env.NEXTAUTH_SECRET]) {
+    if (!secret || secret.length < 16) continue
+    const key = createHash('sha256').update(`wi300-appearance-v1:${secret}`).digest()
+    if (!keys.some(item => item.equals(key))) keys.push(key)
+  }
+  if (!keys.length) throw new CrmError('Máy chủ chưa có khóa bảo vệ cấu hình giao diện.', 503)
+  return keys
+}
 function decode(value: unknown, key: string): AppearanceState {
   const record = encryptedSchema.parse(value)
-  const decipher = createDecipheriv('aes-256-gcm', encryptionKey(), Buffer.from(record.iv, 'base64'))
-  decipher.setAAD(Buffer.from(key))
-  decipher.setAuthTag(Buffer.from(record.tag, 'base64'))
-  const json = Buffer.concat([decipher.update(Buffer.from(record.payload, 'base64')), decipher.final()]).toString('utf8')
-  return stateSchema.parse(JSON.parse(json))
+  let lastError: unknown
+  for (const candidate of decryptionKeys()) {
+    let json: string
+    try {
+      const decipher = createDecipheriv('aes-256-gcm', candidate, Buffer.from(record.iv, 'base64'))
+      decipher.setAAD(Buffer.from(key))
+      decipher.setAuthTag(Buffer.from(record.tag, 'base64'))
+      json = Buffer.concat([decipher.update(Buffer.from(record.payload, 'base64')), decipher.final()]).toString('utf8')
+    } catch (error) { lastError = error; continue }
+    return stateSchema.parse(JSON.parse(json))
+  }
+  throw lastError
 }
 function encode(state: AppearanceState, key: string) {
   const iv = randomBytes(12)
