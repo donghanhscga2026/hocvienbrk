@@ -22,6 +22,18 @@ function secret() {
   if (!value || value.length < 16) throw new CrmError('Máy chủ chưa có khóa bảo vệ thư viện mẫu.', 503)
   return createHash('sha256').update('course-template-library-v1:' + value).digest()
 }
+// Luân chuyển khóa: giải mã thử lần lượt mọi khóa đang cấu hình — khóa chuyên dụng
+// WI300_APPEARANCE_SECRET trước, rồi các khóa dự phòng cũ — như ở appearance-service.
+function decryptionSecrets() {
+  const keys: Buffer[] = []
+  for (const value of [process.env.WI300_APPEARANCE_SECRET, process.env.AUTH_SECRET, process.env.NEXTAUTH_SECRET]) {
+    if (!value || value.length < 16) continue
+    const key = createHash('sha256').update('course-template-library-v1:' + value).digest()
+    if (!keys.some(item => item.equals(key))) keys.push(key)
+  }
+  if (!keys.length) throw new CrmError('Máy chủ chưa có khóa bảo vệ thư viện mẫu.', 503)
+  return keys
+}
 /** Cả tên và mã nguồn mẫu riêng đều mã hóa; không lưu file riêng ở bucket công khai. */
 export function sealLibrary(value: unknown, context: string) {
   const iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', secret(), iv)
@@ -31,9 +43,17 @@ export function sealLibrary(value: unknown, context: string) {
 }
 export function openLibrary(value: unknown, context: string): unknown {
   const record = z.object({ version: z.literal(1), iv: z.string(), tag: z.string(), payload: z.string() }).parse(value)
-  const decipher = createDecipheriv('aes-256-gcm', secret(), Buffer.from(record.iv, 'base64'))
-  decipher.setAAD(Buffer.from(context)); decipher.setAuthTag(Buffer.from(record.tag, 'base64'))
-  return JSON.parse(gunzipSync(Buffer.concat([decipher.update(Buffer.from(record.payload, 'base64')), decipher.final()]), { maxOutputLength: 10 * 1024 * 1024 }).toString('utf8'))
+  let plain: Buffer | undefined, lastError: unknown
+  for (const candidate of decryptionSecrets()) {
+    try {
+      const decipher = createDecipheriv('aes-256-gcm', candidate, Buffer.from(record.iv, 'base64'))
+      decipher.setAAD(Buffer.from(context)); decipher.setAuthTag(Buffer.from(record.tag, 'base64'))
+      plain = Buffer.concat([decipher.update(Buffer.from(record.payload, 'base64')), decipher.final()])
+      break
+    } catch (error) { lastError = error }
+  }
+  if (!plain) throw lastError
+  return JSON.parse(gunzipSync(plain, { maxOutputLength: 10 * 1024 * 1024 }).toString('utf8'))
 }
 export async function readLibraryPolicy(db: PrismaClient) {
   const row = await db.systemConfig.findUnique({ where: { key: POLICY } })
