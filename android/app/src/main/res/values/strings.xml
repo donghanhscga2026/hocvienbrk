@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MFC</string>
+    <string name="title_activity_main">MFC</string>
+    <string name="package_name">vn.giautoandien.app</string>
+    <string name="custom_url_scheme">vn.giautoandien.app</string>
+</resources>
