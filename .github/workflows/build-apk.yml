@@ -28,10 +28,13 @@ jobs:
           java-version: 21
 
       # Dung Android SDK preinstall cua runner (setup-android@v3 loi o goi legacy 'tools')
+      # sdkmanager khong nam trong PATH mac dinh nen phai do duong dan day du
       - name: Install Android platform 36 and build-tools
         run: |
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | sort -V | tail -1)"
+          echo "Using $SDKMANAGER (ANDROID_HOME=$ANDROID_HOME)"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Install dependencies
         run: npm ci
