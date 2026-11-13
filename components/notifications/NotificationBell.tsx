@@ -26,7 +26,7 @@ function PlatformNotificationBell() {
   const dataRef = useRef<AccountFeed | null>(null)
   const openRef = useRef(false)
   const [feed, setFeed] = useState<AccountFeed | null>(null)
-  const [position, setPosition] = useState({ left: 8, top: 64, width: 400, maxHeight: 560 })
+  const [position, setPosition] = useState<{ left: number; top: number; width: number; maxHeight: number; height?: number }>({ left: 8, top: 64, width: 400, maxHeight: 560 })
   const [open, setOpen] = useState(false)
   const [deviceOpen, setDeviceOpen] = useState(false)
   const [loading, setLoading] = useState<'initial' | 'more' | null>(null)
@@ -99,7 +99,9 @@ function PlatformNotificationBell() {
       if (!rect) return
       const width = Math.min(400, window.innerWidth - 16)
       const top = Math.min(rect.bottom + 8, Math.max(8, window.innerHeight - 160))
-      setPosition({ left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)), top, width, maxHeight: Math.max(120, Math.min(560, Math.floor(window.innerHeight * 0.7), window.innerHeight - top - 8)) })
+      const height = Math.max(120, Math.min(560, Math.floor(window.innerHeight * 0.7), window.innerHeight - top - 8))
+      const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+      setPosition({ left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)), top, width, maxHeight: height, ...(isIos ? { height } : {}) })
     }
     if (open) { place(); if (!node.matches(':popover-open')) node.showPopover() }
     else if (node.matches(':popover-open')) node.hidePopover()
