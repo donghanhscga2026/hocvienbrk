@@ -54,7 +54,7 @@
     "date-fns": "^4.4.0",
     "dompurify": "^3.3.1",
     "dotenv": "^18.0.10",
-    "googleapis": "^187.0.0",
+    "googleapis": "^190.0.0",
     "libphonenumber-js": "^1.13.17",
     "lightningcss": "^1.33.0",
     "lucide-react": "^1.76.0",
