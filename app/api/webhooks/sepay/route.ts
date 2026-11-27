@@ -77,17 +77,24 @@ export async function POST(req: NextRequest) {
 
         // 0. Xác thực — chặn request giả mạo kích hoạt miễn phí.
         // Cần accountNumber trước để biết dùng key riêng của TK nào.
+        // Một số tài khoản có thể có NHIỀU dòng UserBankAccount trùng số
+        // (đăng ký trùng) — tra TẤT CẢ các dòng của số tài khoản đó và
+        // chấp nhận key nếu khớp với bất kỳ dòng nào.
         const providedKey = extractApiKey(req);
-        const authAccount = body?.accountNumber
-            ? await prisma.userBankAccount.findFirst({
+        const bankAccounts = body?.accountNumber
+            ? await prisma.userBankAccount.findMany({
                 where: { accountNumber: String(body.accountNumber) },
                 select: { id: true, userId: true, bankName: true, webhookApiKeyHash: true }
             })
-            : null;
-        if (!isAuthorizedWebhook(providedKey, authAccount)) {
+            : [];
+        const authorizedAccount = bankAccounts.find((a) => isAuthorizedWebhook(providedKey, a));
+        const authorized = authorizedAccount !== undefined
+            || (bankAccounts.length === 0 && isAuthorizedWebhook(providedKey, null));
+        if (!authorized) {
             console.warn('⚠️ [SEPAY WEBHOOK] Unauthorized access attempt');
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
+        const authAccount = authorizedAccount ?? null;
 
         // SePay webhook format
         // https://docs.sepay.vn/tich-hop-he-thong/webhook
@@ -181,6 +188,12 @@ export async function POST(req: NextRequest) {
 
         const teacherId = bankAccount.userId;
 
+        // Mọi chủ sở hữu của các dòng trùng số tài khoản này: tập ứng viên
+        // khớp đơn phải xét enrollment của tất cả họ — chốt bankMatch ở
+        // bước 4 mới là điều kiện quyết định đúng dòng tài khoản của khóa.
+        const teacherIds = Array.from(new Set(bankAccounts.map((a) => a.userId)));
+        const bankAccountIds = bankAccounts.map((a) => a.id);
+
         // Quote references do not use the course COC/HV format. Match them first,
         // after webhook authentication and the existing cross-channel dedup claim.
         if (/SQ[A-F0-9]{20}/i.test(String(content))) {
@@ -229,7 +242,7 @@ export async function POST(req: NextRequest) {
         const pendingEnrollments = await prisma.enrollment.findMany({
             where: {
                 status: 'PENDING',
-                course: { teacherId: teacherId }
+                course: { teacherId: { in: teacherIds } }
             },
             include: {
                 course: {
@@ -247,7 +260,7 @@ export async function POST(req: NextRequest) {
         });
 
         if (pendingEnrollments.length === 0) {
-            const reason = `Không có enrollment PENDING nào của giảng viên #${teacherId} để khớp`;
+            const reason = `Không có enrollment PENDING nào của giảng viên #${teacherIds.join(', #')} để khớp`;
             console.log(`❌ [SEPAY] ${reason}`);
             await markUnmatched(reason);
             return NextResponse.json({ success: true, message: 'No pending enrollments for this teacher' }, { status: 200 });
@@ -283,7 +296,12 @@ export async function POST(req: NextRequest) {
             const expectedAmount = enrollment.payment?.amount ?? enrollment.phi_coc ?? enrollment.course.phi_coc ?? 0;
             const amountMatch = Number(transferAmount) >= expectedAmount;
             const snapshot = await readPurchase(prisma, enrollment.id);
-            const bankMatch = (snapshot ? snapshot.bank?.id : enrollment.course.teacherBankAccountId) === bankAccount.id
+            // Tài khoản kỳ vọng của enrollment chỉ cần là MỘT TRONG các
+            // dòng đăng ký của đúng số tài khoản nhận tiền này — không bắt
+            // buộc phải là dòng mà bước xác thực đã chọn, tránh lỗi khớp
+            // khi một số tài khoản có nhiều dòng đăng ký trùng.
+            const expectedBankId = snapshot ? snapshot.bank?.id : enrollment.course.teacherBankAccountId;
+            const bankMatch = expectedBankId != null && bankAccountIds.includes(expectedBankId)
                 && (!snapshot || snapshot.bank?.accountNumber === String(accountNumber));
 
             if (!((parsed.userId != null ? userIdMatch : phoneMatch) && courseCodeMatch && amountMatch && bankMatch)) continue;

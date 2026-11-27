@@ -3,8 +3,9 @@ const assert = require('node:assert/strict'), { createHash } = require('node:cry
 const load = require('./helpers/load-ts.cjs')
 async function run() {
   let pending = [], transactions = [], activated = [], snapshot = null
+  const bankRows = [{ accountNumber: '123', id: 1, userId: 7, bankName: 'MB', webhookApiKeyHash: createHash('sha256').update('fixture-key').digest('hex') }]
   const db = {
-    userBankAccount: { findFirst: async ({ where }) => ({ id: where.accountNumber === '123' ? 1 : 2, userId: 7, bankName: 'MB', webhookApiKeyHash: createHash('sha256').update('fixture-key').digest('hex') }) },
+    userBankAccount: { findMany: async ({ where }) => bankRows.filter(row => row.accountNumber === where.accountNumber) },
     processedTransaction: {
       findFirst: async ({ where }) => transactions.find(row => where.OR.some(condition => condition.externalId === row.externalId || condition.fingerprint === row.fingerprint)) || null,
       create: async ({ data }) => { const row = { id: transactions.length + 1, ...data }; transactions.push(row); return row },
@@ -31,6 +32,9 @@ async function run() {
   reset([row(91, 'APP', 2)])
   snapshot = { price: 100000, bank: { id: 1, accountNumber: '123', accountHolder: 'Owner', bankName: 'MB', qrCodeUrl: null }, gratitudeId: null }
   await call(); assert.deepEqual(activated, [91], 'A previously captured receiving account survives later catalog edits')
+  bankRows.push({ accountNumber: '123', id: 5, userId: 8, bankName: 'MB', webhookApiKeyHash: createHash('sha256').update('fixture-key').digest('hex') })
+  reset([row(91, 'APP', 5)]); await call(); assert.deepEqual(activated, [91], 'Duplicate rows for one account number: a course pointing at the second row still matches')
+  bankRows.pop()
   reset([row(91, 'APP')]); await call('HV 0 COC APP', 50000); assert.equal(activated.length, 0)
   reset([row(91, 'APP')]); assert.equal((await call('HV 0 COC APP', 100000, '123', 'invalid')).status, 401); assert.equal(transactions.length, 0)
   reset([row(90, 'APP'), row(91, 'APP')]); await call(); assert.equal(activated.length, 0); assert.equal(transactions[0].status, 'UNMATCHED', 'Ambiguous matches require manual reconciliation')
